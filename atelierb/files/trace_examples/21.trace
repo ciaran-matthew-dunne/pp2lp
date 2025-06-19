@@ -1,0 +1,25 @@
+﻿ [AXM7] &
+ [OR4] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: q and not(x$6,x$5,q(x$6,x$5): q)) => p or not(p))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: q => x$6,x$5,q(x$6,x$5): q))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [ALL9] &
+ [FIN(forall2(x,y).not(VRAI and not(q(x,y))) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: q) => x$6,x$5,q(x$6,x$5): q) => p or not(p)))] &
+ [STOP_NORM] &
+ [NRM15] &
+ [NRM] &
+ [FIN(q(x,y))] &
+ [STOP_1] &
+ [ALL7(1)] &
+ [ALL3] &
+ [AND3] &
+  (!x.!y.q(x,y) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: q) => x$6,x$5,q(x$6,x$5): q) => p or not(p))

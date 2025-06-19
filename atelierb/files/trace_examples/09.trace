@@ -1,0 +1,8 @@
+﻿ [AXM7] &
+ [OR4] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [IMP2] &
+  (not(p or not(p) => p and not(p)))

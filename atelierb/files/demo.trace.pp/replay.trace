@@ -1,0 +1,108 @@
+[ALL8(1)] <!(c,d,b).(not(c = d) => !(x$3,x$2).(x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) and not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))) and !(x$7,x$6).(x$7 = b and x$6 = c or (x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c))) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)))>
+[IMP4] <not(c = d) => !(x$3,x$2).(x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) and not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))) and !(x$7,x$6).(x$7 = b and x$6 = c or (x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c))) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[AND4] <!(x$3,x$2).(x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) and not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))) and !(x$7,x$6).(x$7 = b and x$6 = c or (x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c))) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[ALL8(3)] <!(x$7,x$6).(x$7 = b and x$6 = c or (x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c))) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[OR3] <x$7 = b and x$6 = c or (x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c))) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[AND3] <x$7,x$6: a and not(x$6 = d) and not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[AND3] <x$7,x$6: a and not(x$6 = d) => (not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[IMP4] <x$7,x$6: a => (not(x$6 = d) => (not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)))>
+[AR10(not(x$6 = d))] <not(x$6 = d) => (not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[IMP4] <not(x$6 = d) => (not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[XST5] <not(#(x$8).(x$7 = b and x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[STOP_1] <not(x$8 = c)>
+[IMP4_1] <x$7 = b => not(x$8 = c)>
+[AND2_1] <not(x$7 = b and x$8 = c)>
+[ALL7(3)] <!(x$8).not(x$7 = b and x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[FIN(x$7 = b => not(x$8 = c))] <FIN(x$7 = b => not(x$8 = c) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- !(x$8).not(x$7 = b and x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- forall(x$8).(x$7 = b => not(x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | 13)>
+[NRM2] <forall(x$8).(x$7 = b => not(x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[STOP_NORM] <x$7 = b => forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[NRM] <forall(x$8).(x$7 = b => not(x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[FIN(x$7 = b => forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))] <FIN(x$7 = b => forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- forall(x$8).(x$7 = b => not(x$8 = c)) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- x$7 = b => forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | 14)>
+[IMP3] <x$7 = b => forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[NRM14] <forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[NRM22(1)] <forall2(x$8).not(VRAI and x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[STOP_NORM] <not(VRAI) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[NRM] <forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[FIN(not(VRAI) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))] <FIN(not(VRAI) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- forall(x$8).not(x$8 = c) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | (Hyp,not(c = d),(x$7,x$6: a),not(x$6 = d) |- not(VRAI) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)) | 16)>
+[VR1] <not(VRAI) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[IMP4] <not(x$7 = b) => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[AND4] <x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[AXM3] <not(x$6 = d)>
+[OR4] <x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c)))>
+[AND1] <not(x$7 = b and x$6 = c) => x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))>
+[IMP4] <not(x$6 = c) => x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))>
+[AND4] <x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))>
+[XST6] <not(#(x$9).(x$7 = b and x$9 = c))>
+[ALL8(3)] <!(x$9).not(x$7 = b and x$9 = c)>
+[AND2] <not(x$7 = b and x$9 = c)>
+[AXM1] <x$7 = b => not(x$9 = c)>
+[AXM3] <x$7,x$6: a>
+[IMP5(1)] <not(x$7 = b) => x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))>
+[AND4] <x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))>
+[XST6] <not(#(x$9).(x$7 = b and x$9 = c))>
+[ALL8(3)] <!(x$9).not(x$7 = b and x$9 = c)>
+[AND2] <not(x$7 = b and x$9 = c)>
+[AXM1] <x$7 = b => not(x$9 = c)>
+[AXM3] <x$7,x$6: a>
+[AND3] <x$7 = b and x$6 = c => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d)>
+[OPR1(2)] <x$7 = b => (x$6 = c => x$7 = b and x$6 = c or (x$7,x$6: a and not(#(x$9).(x$7 = b and x$9 = c))) and not(x$6 = d))>
+[OPR1(2)] <x$6 = c => b = b and x$6 = c or (b,x$6: a and not(#(x$9).(b = b and x$9 = c))) and not(x$6 = d)>
+[AND4] <b = b and c = c or (b,c: a and not(#(x$9).(b = b and x$9 = c))) and not(c = d)>
+[AXM3] <not(c = d)>
+[OR4] <b = b and c = c or (b,c: a and not(#(x$9).(b = b and x$9 = c)))>
+[AND1] <not(b = b and c = c) => b,c: a and not(#(x$9).(b = b and x$9 = c))>
+[EVR1] <not(c = c) => b,c: a and not(#(x$9).(b = b and x$9 = c))>
+[EVR1] <not(b = b) => b,c: a and not(#(x$9).(b = b and x$9 = c))>
+[ALL8(3)] <!(x$3,x$2).(x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) and not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[AND3] <x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) and not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))>
+[OR3] <x$3 = b and x$2 = c or (x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c))) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[AND3] <x$3,x$2: a and not(#(x$4).(x$3 = b and x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[IMP4] <x$3,x$2: a => (not(#(x$4).(x$3 = b and x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))))>
+[XST5] <not(#(x$4).(x$3 = b and x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[STOP_1] <not(x$4 = c)>
+[IMP4_1] <x$3 = b => not(x$4 = c)>
+[AND2_1] <not(x$3 = b and x$4 = c)>
+[ALL7(3)] <!(x$4).not(x$3 = b and x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[FIN(x$3 = b => not(x$4 = c))] <FIN(x$3 = b => not(x$4 = c) | (Hyp,not(c = d),(x$3,x$2: a) |- !(x$4).not(x$3 = b and x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | (Hyp,not(c = d),(x$3,x$2: a) |- forall(x$4).(x$3 = b => not(x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | 12)>
+[NRM2] <forall(x$4).(x$3 = b => not(x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[STOP_NORM] <x$3 = b => forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[NRM] <forall(x$4).(x$3 = b => not(x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[FIN(x$3 = b => forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))))] <FIN(x$3 = b => forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))) | (Hyp,not(c = d),(x$3,x$2: a) |- forall(x$4).(x$3 = b => not(x$4 = c)) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | (Hyp,not(c = d),(x$3,x$2: a) |- x$3 = b => forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | 13)>
+[IMP3] <x$3 = b => forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[NRM14] <forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[NRM22(1)] <forall2(x$4).not(VRAI and x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[STOP_NORM] <not(VRAI) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[NRM] <forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[FIN(not(VRAI) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))))] <FIN(not(VRAI) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))) | (Hyp,not(c = d),(x$3,x$2: a) |- forall(x$4).not(x$4 = c) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | (Hyp,not(c = d),(x$3,x$2: a) |- not(VRAI) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))) | 15)>
+[VR1] <not(VRAI) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[IMP4] <not(x$3 = b) => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[AR10(not(x$2 = d))] <not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))>
+[IMP4] <not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))>
+[OR4] <x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))>
+[AND1] <not(x$3 = b and x$2 = c) => x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))>
+[IMP4] <not(x$2 = c) => x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))>
+[AND4] <x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))>
+[XST6] <not(#(x$5).(x$3 = b and x$5 = c))>
+[ALL8(3)] <!(x$5).not(x$3 = b and x$5 = c)>
+[AND2] <not(x$3 = b and x$5 = c)>
+[AXM1] <x$3 = b => not(x$5 = c)>
+[AND4] <x$3,x$2: a and not(x$2 = d)>
+[AXM3] <not(x$2 = d)>
+[AXM3] <x$3,x$2: a>
+[IMP5(1)] <not(x$3 = b) => x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))>
+[AND4] <x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))>
+[XST6] <not(#(x$5).(x$3 = b and x$5 = c))>
+[ALL8(3)] <!(x$5).not(x$3 = b and x$5 = c)>
+[AND2] <not(x$3 = b and x$5 = c)>
+[AXM1] <x$3 = b => not(x$5 = c)>
+[AND4] <x$3,x$2: a and not(x$2 = d)>
+[AXM3] <not(x$2 = d)>
+[AXM3] <x$3,x$2: a>
+[AND3] <x$3 = b and x$2 = c => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c))))>
+[OPR1(2)] <x$3 = b => (x$2 = c => (not(x$2 = d) => x$3 = b and x$2 = c or (x$3,x$2: a and not(x$2 = d) and not(#(x$5).(x$3 = b and x$5 = c)))))>
+[OPR1(2)] <x$2 = c => (not(x$2 = d) => b = b and x$2 = c or (b,x$2: a and not(x$2 = d) and not(#(x$5).(b = b and x$5 = c))))>
+[IMP5(1)] <not(c = d) => b = b and c = c or (b,c: a and not(c = d) and not(#(x$5).(b = b and x$5 = c)))>
+[OR4] <b = b and c = c or (b,c: a and not(c = d) and not(#(x$5).(b = b and x$5 = c)))>
+[AND1] <not(b = b and c = c) => b,c: a and not(c = d) and not(#(x$5).(b = b and x$5 = c))>
+[EVR1] <not(c = c) => b,c: a and not(c = d) and not(#(x$5).(b = b and x$5 = c))>
+[EVR1] <not(b = b) => b,c: a and not(c = d) and not(#(x$5).(b = b and x$5 = c))>
