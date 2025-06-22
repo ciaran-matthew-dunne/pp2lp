@@ -3,14 +3,21 @@ require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 symbol bool : Set;
 rule El bool ↪ Prop;
 
+symbol TOP : Prf (⊤) ≔
+  begin
+    simplify;
+    assume r h;
+    refine h;
+  end;
+
 injective symbol list : Set → Set;
 symbol nil [a : Set] : El (list a);
 symbol ∷ [a : Set] : El (a ⤳ list a ⤳ list a);
 notation ∷ infix right 5;
 
 sequential symbol elem [a : Set] : El (a ⤳ list a ⤳ bool);
-rule (elem $x nil)        ↪ ⊥
-with (elem $x ($x ∷ $xs)) ↪ ⊤
+rule (elem _   nil)       ↪ ⊥
+with (elem $x ($x ∷ _))   ↪ ⊤
 with (elem $x (_  ∷ $ys)) ↪ (elem $x $ys);
 
 symbol ≈ [a : Set] : El (a ⤳ a ⤳ bool);
@@ -69,15 +76,10 @@ symbol solveur [a : Set] : El (a ⤳ a);
 symbol ℕ : El exp;
 symbol ∈ : El (exp ⤳ exp ⤳ prd); notation ∈ infix 5;
 
-
-
-
 // ## sequents
 symbol sequent : Set;
 injective symbol ⟝ : El (list prd ⤳ prd ⤳ sequent);
 notation ⟝ infix 0;
-
-
 
 injective symbol ✓ : El sequent → TYPE;
 
@@ -108,15 +110,15 @@ symbol AND4 [H : El (list prd)] [P Q : El prd] :
   ✓ (H ⟝ P) → // H ⊢ P is the first antecedent
   ✓ (H ⟝ (P ∧ Q));
 
-// This rule seems to involve pattern matching within a conjunction,
-// and a substitution-like operation that is not directly captured by
-// the current primitives.
 symbol AND5 [H : El (list prd)] [P Q R A B : El prd] :
   // Antécédents: "P ∧ · · · Contient A", "H ⊢ P ∧ · · · ∧ (A ⇒ B) ∧ · · · ⇒ R"
   // Conséquent: "H ⊢ P ∧ · · · ∧ B ∧ · · · ⇒ R"
   // Requires a more sophisticated pattern matching and replacement mechanism.
   // Stub for now.
   TYPE;
+
+
+
 // #################
 // 5.2. Disjunction
 // #################
@@ -164,18 +166,11 @@ symbol IMP5 [H : El (list prd)] [P Q : El prd] :
   ✓ (H ⟝ Q) →
   ✓ (H ⟝ P ⇒ Q);
 
-// from (H,P ⟝ Q) ⇀ R and (H ⟝ P ⇒ Q)
-// infer (H ⟝ P ⇒ R)
-// This rule has a 'Résultat' (Result) column, which is not directly representable
-// in the current syntax. It implies a transformation or a return value from the proof rule.
-symbol IMP4' [H : El (list prd)] [P Q R S : El prd] :
-  // Antécédents: "(H,P ⊢ Q) ⇝ R"
-  // Conséquent: "H ⊢ P ⇒ Q"
-  // Résultat: "P ⇒ R"
-  // This rule requires understanding of the '⇝' operator and 'Résultat' column.
+symbol IMP4' [H : El (list prd)] [P Q R S : El prd] : //???
   TYPE;
 
-// #################
+
+  // #################
 // 5.4. Equivalence
 // #################
 symbol EQV1 [H : El (list prd)] [P Q R : El prd] :
@@ -259,9 +254,9 @@ symbol AXM9 [H : El (list prd)] [R Q : El prd] :
 // #############################
 sequential symbol distinct : El (idt ⤳ idt ⤳ bool);
 rule distinct $x $x ↪ ⊥
-with distinct $x _ ↪ ⊤ ;
+with distinct $x  _ ↪ ⊤;
 
-symbol ? (x : El idt) : El vrb ≔ x ∷ nil;
+symbol ? (x : El idt)  : El vrb ≔ x ∷ nil;
 symbol ⨾ (x y : El idt) : El vrb ≔ x ∷ y ∷ nil;
 notation ⨾ infix right 5;
 
