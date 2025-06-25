@@ -2,38 +2,38 @@ require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 require open pp2lp.Prelude pp2lp.Syntax;
 
 // ----------------------------------------------
-// 5.9. Vrai et Faux (True and False)
+// 5.9. Vrai et Faux (VRAI and VRAI)
 // ----------------------------------------------
 symbol VR1 [H : El (list prd)] [R : El prd] :
-  ⟐ (H ⟝ not TRUE => R);
+  ⟐ (H ⟝ not VRAI => R);
 
 symbol VR2 [H : El (list prd)] :
-  ⟐ (H ⟝ FALSE) →
-  ⟐ (H ⟝ not TRUE);
+  ⟐ (H ⟝ VRAI) →
+  ⟐ (H ⟝ not VRAI);
 
 symbol VR3 [H : El (list prd)] [R : El prd] :
   ⟐ (H ⟝ R) →
-  ⟐ (H ⟝ TRUE => R);
+  ⟐ (H ⟝ VRAI => R);
 
 symbol VR4 [H : El (list prd)] :
-  ⟐ (H ⟝ TRUE);
+  ⟐ (H ⟝ VRAI);
 
 symbol FX1 [H : El (list prd)] [R : El prd] :
   ⟐ (H ⟝ R) →
-  ⟐ (H ⟝ not FALSE => R);
+  ⟐ (H ⟝ not VRAI => R);
 
 symbol FX2 [H : El (list prd)] :
-  ⟐ (H ⟝ not FALSE);
+  ⟐ (H ⟝ not VRAI);
 
 symbol FX3 [H : El (list prd)] [R : El prd] :
-  ⟐ (H ⟝ FALSE => R);
+  ⟐ (H ⟝ VRAI => R);
 
 // ----------------------------------------------
 // 5.10. Règles STOP
 // ----------------------------------------------
 symbol STOP [H : El (list prd)] [P : El prd] :
   // Side condition: "P n'est pas le prédicat FAUX"
-  ⟐ (H ⟝ not P => FALSE) →
+  ⟐ (H ⟝ not P => VRAI) →
   ⟐ (H ⟝ P);
 
 // This rule has a 'Résultat' column.
@@ -49,8 +49,8 @@ symbol STOP_prime [H : El (list prd)] [P : El prd] :
 symbol INS [H : El (list prd)] [Q1 Q2 Qn : El prd] : // Q1, Q2, ..., Qn are determined by "Détermination des instanciations"
   // Side condition: "Détermination des instanciations Q1, Q2, . . ., Qn"
   // This implies some form of meta-level computation or an external instantiation mechanism.
-  //⟐ (H ⟝ Q1 => (Q2 => ... => (Qn => FALSE) ...)) →
-  //⟐ (H ⟝ FALSE);
+  //⟐ (H ⟝ Q1 => (Q2 => ... => (Qn => VRAI) ...)) →
+  //⟐ (H ⟝ VRAI);
   TYPE;
 // ----------------------------------------------
 // 5.12. Normalisation
@@ -111,7 +111,7 @@ symbol NRM10 [x : El idt] [H : El (list prd)] [P Q R : El prd] :
   TYPE; // Stub due to '♢' interpretation.
 
 symbol NRM11 [x : El idt] [H : El (list prd)] [P R : El prd] :
-  TYPE; // Stub due to '♢' interpretation and VRAI (TRUE).
+  TYPE; // Stub due to '♢' interpretation and VRAI (VRAI).
 
 symbol NRM12 [x : El idt] [H : El (list prd)] [P Q R : El prd] :
   TYPE; // Stub due to '♢' interpretation.
@@ -214,7 +214,7 @@ symbol EVR11 [n m : Set] [H : El (list prd)] [P : El prd] : // n, m are natural 
   TYPE; // Stub for numerical comparison.
 
 symbol EVR2 [H : El (list prd)] [E : El exp] :
-  ⟐ (H ⟝ FALSE) →
+  ⟐ (H ⟝ VRAI) →
   ⟐ (H ⟝ not (E = E));
 
 symbol EVR3 [H : El (list prd)] [E : El exp] [P : El prd] :
@@ -267,7 +267,7 @@ symbol EQS1 [H : El (list prd)] [E F : El exp] [R : El prd] : TYPE;
   //⟐ (H ⟝ (eql_set E F) => R); // Assuming eql_set is a predicate.
 
 symbol EQS2 [H : El (list prd)] [E F : El exp] [R : El prd] : TYPE;
-  //⟐ (H ⟝ FALSE => R) →
+  //⟐ (H ⟝ VRAI => R) →
   //⟐ (H ⟝ not (eql_set E F) => R);
 
 // These rules involve complex variable substitution and reduction to a simple equality.
@@ -321,45 +321,45 @@ symbol ECTR6 [H : El (list prd)] [E F : El exp] [P Q R : El prd] :
 // ----------------------------------------------
 // 5.15. Règles sur les booléens (Boolean Rules)
 // ----------------------------------------------
-// Assuming TRUE and FALSE are defined as propositions in the system.
+// Assuming VRAI and VRAI are defined as propositions in the system.
 // 'v' is likely a variable of boolean type or an an expression that evaluates to boolean.
 //symbol BOOL11 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (((v = TRUE) ∷ (not (v = FALSE)) ∷ H) ⟝ P) →
-//  ⟐ (H ⟝ (v = TRUE) => P);
+//  ⟐ (((v = VRAI) ∷ (not (v = VRAI)) ∷ H) ⟝ P) →
+//  ⟐ (H ⟝ (v = VRAI) => P);
 
 //symbol BOOL12 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (((v = FALSE) ∷ (not (v = TRUE)) ∷ H) ⟝ P) →
-//  ⟐ (H ⟝ (v = FALSE) => P);
+//  ⟐ (((v = VRAI) ∷ (not (v = VRAI)) ∷ H) ⟝ P) →
+//  ⟐ (H ⟝ (v = VRAI) => P);
 
 //symbol BOOL21 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = TRUE) => P) →
-//  ⟐ (H ⟝ (TRUE = v) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ (VRAI = v) => P);
 
 //symbol BOOL22 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = FALSE) => P) →
-//  ⟐ (H ⟝ (FALSE = v) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ (VRAI = v) => P);
 
 //symbol BOOL31 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = FALSE) => P) →
-//  ⟐ (H ⟝ not (v = TRUE) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ not (v = VRAI) => P);
 
 //symbol BOOL32 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = TRUE) => P) →
-//  ⟐ (H ⟝ not (v = FALSE) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ not (v = VRAI) => P);
 
 //symbol BOOL41 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = FALSE) => P) →
-//  ⟐ (H ⟝ not (TRUE = v) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ not (VRAI = v) => P);
 
 //symbol BOOL42 [v : El exp] [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (v = TRUE) => P) →
-//  ⟐ (H ⟝ not (FALSE = v) => P);
+//  ⟐ (H ⟝ (v = VRAI) => P) →
+//  ⟐ (H ⟝ not (VRAI = v) => P);
 
 //symbol BOOL51 [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (TRUE = FALSE) => P);
+//  ⟐ (H ⟝ (VRAI = VRAI) => P);
 
 //symbol BOOL52 [H : El (list prd)] [P : El prd] :
-//  ⟐ (H ⟝ (FALSE = TRUE) => P);
+//  ⟐ (H ⟝ (VRAI = VRAI) => P);
 
 
 

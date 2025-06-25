@@ -7,21 +7,29 @@ injective symbol or : El (prd ⤳ prd ⤳ prd);
 injective symbol => : El (prd ⤳ prd ⤳ prd);
 injective symbol <=> : El (prd ⤳ prd ⤳ prd);
 injective symbol not : El (prd ⤳ prd);
-injective symbol forall : El (vrb ⤳ prd ⤳ prd);
-injective symbol exists : El (vrb ⤳ prd ⤳ prd);
-injective symbol = : El (exp ⤳ exp ⤳ prd);
+injective symbol ! : El ((exp ⤳ prd) ⤳ prd);
+injective symbol # : El ((exp ⤳ prd) ⤳ prd);
+injective symbol =  : El (exp ⤳ exp ⤳ prd);
 injective symbol != : El (exp ⤳ exp ⤳ prd);
 injective symbol Ⅎ : El frm → El prd;
 
+notation = infix left 2;
 notation and infix left 2;
 notation or  infix left 2;
 notation =>  infix left 2;
 notation <=> infix left 1;
 notation not       prefix 3;
 
+notation ! quantifier;
+notation # quantifier;
+
 // weird quantifiers (?)
-symbol ♢ : El (vrb ⤳ prd ⤳ prd);
-symbol ♡ : El (vrb ⤳ prd ⤳ prd);
+symbol ♢ : El ((exp ⤳ prd) ⤳ prd);
+symbol ♡ : El ((exp ⤳ prd) ⤳ prd);
+
+notation ♢ quantifier;
+notation ♡ quantifier;
+
 
 // arithmetic
 symbol ≤ : El (exp ⤳ exp ⤳ prd);
@@ -44,5 +52,5 @@ notation - infix 5;
 notation ∈ infix 5;
 
 // booleans
-symbol TRUE  : El prd;
-symbol FALSE : El prd;
+symbol VRAI  : El prd;
+symbol FAUX : El prd;

@@ -46,3 +46,9 @@ notation ⟝ infix 0;
 injective symbol ⟐  : El seq → TYPE;
 injective symbol ✓ : El prd → TYPE;
 rule (✓ $P) ↪ ⟐ (nil ⟝ $P);
+
+// ???
+symbol ⟿ : El (seq ⤳ prd ⤳ bool);
+notation ⟿ infix 0;
+
+symbol 𝕁 : El seq → El prd → TYPE;

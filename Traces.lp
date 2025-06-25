@@ -6,7 +6,8 @@ require open
 
 require open
   pp2lp.rules.AXM pp2lp.rules.AND pp2lp.rules.OR
-  pp2lp.rules.IMP pp2lp.rules.EQV pp2lp.rules.NOT;
+  pp2lp.rules.IMP pp2lp.rules.EQV pp2lp.rules.NOT
+  pp2lp.rules.ALL;
 
 symbol {|05.trace|} [p q] :
   ✓ (not (p or q) => not p) ≔
@@ -109,4 +110,125 @@ begin
   }{
     apply AXM7;
   };
+end;
+
+symbol {|11.trace|} [p] :
+  ✓ (p => (p => p and p)) ≔
+begin
+  assume p;
+  simplify;
+  apply IMP4;
+
+  // apply IMP5 (1);
+  // apply AND4;
+  // apply AXM3;
+  // apply AXM3;
+abort;
+
+symbol {|12.trace|} [p q] :
+  ✓ (not (p <=> p) => q) ≔
+begin
+  assume p q;
+  simplify;
+  apply EQV1 {
+    apply IMP4;
+    apply AXM2;
+    simplify elem;
+    refine TOP;
+  }{
+    apply IMP4;
+    apply AXM1;
+    simplify elem;
+    refine TOP;
+  };
+end;
+
+symbol {|13.trace|} [p] :
+  ✓ (not (p <=> not p)) ≔
+begin
+  assume p;
+  simplify;
+  apply EQV2 {
+    apply IMP4;
+    apply NOT2;
+    apply AXM3;
+    simplify elem;
+    refine TOP;
+  } {
+    apply NOT1;
+    apply AXM7;
+  };
+end;
+
+symbol {|14.trace|} [p q] :
+  ✓ ((p <=> not(p)) => q) ≔
+begin
+  assume p q;
+  simplify;
+  apply EQV3 {
+    apply IMP4;
+    apply AXM2;
+    simplify elem;
+    refine TOP;
+  } {
+    apply IMP4;
+    apply NOT1;
+    apply AXM1;
+    simplify elem;
+    refine TOP;
+  };
+end;
+
+symbol {|15.trace|} [p] :
+  ✓ (p <=> p) ≔
+begin
+  assume p;
+  simplify;
+  apply EQV4
+    { apply AXM7 }
+    { apply AXM7 };
+end;
+
+symbol {|16.trace|} [p q r] :
+  ✓ (not q => (p => (q => r))) ≔
+begin
+  assume p q r;
+  simplify;
+  apply IMP4;
+  apply AXM5;
+  simplify elem;
+  refine TOP;
+end;
+
+symbol {|17.trace|} [p q r] :
+  ✓ (q => (p => (not q => r))) ≔
+begin
+  assume p q r;
+  simplify;
+  apply IMP4;
+  apply AXM6;
+  simplify elem;
+  refine TOP;
+end;
+
+symbol {|18.trace|} [p q r] :
+  ✓ (not q => (p => (q => r))) ≔
+begin
+  assume p q r;
+  simplify;
+  apply IMP4;
+  apply AXM5;
+  simplify elem;
+  refine TOP;
+end;
+
+symbol {|19.trace|} [p q r] :
+  ✓ (not q => (p => (q => r))) ≔
+begin
+  assume p q r;
+  simplify;
+  apply IMP4;
+  apply AXM5;
+  simplify elem;
+  refine TOP;
 end;
