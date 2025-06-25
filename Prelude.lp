@@ -22,8 +22,8 @@ rule (elem _   nil)       ↪ ⊥
 with (elem $x ($x ∷ _))   ↪ ⊤
 with (elem $x (_  ∷ $ys)) ↪ (elem $x $ys);
 
-symbol = [a : Set] : El (a ⤳ a ⤳ bool);
-notation = infix right 5;
+symbol ≈ [a : Set] : El (a ⤳ a ⤳ bool);
+notation ≈ infix right 5;
 
 // identifiers
 symbol String : TYPE;
