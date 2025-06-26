@@ -1,13 +1,6 @@
 require open
-  Logic.U.Set Logic.U.Prop Logic.U.Arrow;
-
-require open
-  pp2lp.Prelude pp2lp.Syntax;
-
-require open
-  pp2lp.rules.AXM pp2lp.rules.AND pp2lp.rules.OR
-  pp2lp.rules.IMP pp2lp.rules.EQV pp2lp.rules.NOT
-  pp2lp.rules.ALL;
+  Logic.U.Set Logic.U.Prop Logic.U.Arrow
+  pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
 
 symbol {|05.trace|} [p q] :
   ✓ (not (p or q) => not p) ≔

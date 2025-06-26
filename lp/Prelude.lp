@@ -50,5 +50,3 @@ rule (✓ $P) ↪ ⟐ (nil ⟝ $P);
 // ???
 symbol ⟿ : El (seq ⤳ prd ⤳ bool);
 notation ⟿ infix 0;
-
-symbol 𝕁 : El seq → El prd → TYPE;
