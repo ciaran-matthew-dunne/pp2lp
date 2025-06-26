@@ -70,3 +70,13 @@ notation < infix 5;
 notation + infix 5;
 notation - infix 5;
 notation ∈ infix 5;
+
+// ordered pairs, set equality ??
+symbol opair : El (exp ⤳ exp ⤳ exp);
+symbol eql_set : El (exp ⤳ exp ⤳ prd);
+
+symbol ⭆ : El (list prd ⤳ prd ⤳ prd);
+notation ⭆ infix 5;
+
+rule (nil ⭆ $p) ↪ $p
+with (($q ∷ $qs) ⭆ $p) ↪ $q => ($qs ⭆ $p);
