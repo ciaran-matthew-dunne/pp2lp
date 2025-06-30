@@ -1,5 +1,7 @@
 require open
-  Logic.U.Set Logic.U.Prop Logic.U.Arrow
+  Logic.U.Set Logic.U.Prop Logic.U.Arrow;
+
+require open
   pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
 
 symbol {|05.trace|} [p q] :

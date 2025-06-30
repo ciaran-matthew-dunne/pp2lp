@@ -22,6 +22,12 @@ rule (elem _   nil)       ↪ ⊥
 with (elem $x ($x ∷ _))   ↪ ⊤
 with (elem $x (_  ∷ $ys)) ↪ (elem $x $ys);
 
+// `replace x y zs` replaces the first instance of `x` in `xs` with `y`.
+sequential symbol replace [a : Set] : El (a ⤳ a ⤳ list a ⤳ list a);
+rule (replace  _ $y nil)          ↪ nil
+with (replace $x $y ($x ∷ $zs))   ↪ $y ∷ $zs
+with (replace $x $y ($z ∷ $zs))   ↪ $z ∷ (replace $x $y $zs);
+
 symbol ≈ [a : Set] : El (a ⤳ a ⤳ bool);
 notation ≈ infix right 5;
 

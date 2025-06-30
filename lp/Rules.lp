@@ -1,10 +1,18 @@
-require open
-  Logic.U.Set Logic.U.Prop Logic.U.Arrow
-  pp2lp.Prelude pp2lp.Syntax;
+require open Logic.U.Set Logic.U.Prop Logic.U.Arrow Logic.U.Inf;
+require open pp2lp.Prelude pp2lp.Syntax;
 
 // ----------------------------------------------
 // 5.1. Conjunction
 // ----------------------------------------------
+sequential symbol to_list : El (prd ⤳ list prd);
+rule to_list ($x and $xs) ↪ $x ∷ (to_list $xs)
+with to_list $p           ↪ nil;
+
+sequential symbol conj : El (list prd ⤳ prd);
+rule conj ($x ∷ nil) ↪ $x
+with conj ($x ∷ $xs) ↪ $x and (conj $xs)
+with conj nil        ↪ FAUX;
+
 symbol AND1 [H : El (list prd)] [P Q R : El prd] :
   ⟐ (H ⟝ not Q => R) →
   ⟐ (H ⟝ not P => R) →
@@ -23,8 +31,10 @@ symbol AND4 [H : El (list prd)] [P Q : El prd] :
   ⟐ (H ⟝ P) →
   ⟐ (H ⟝ (P and Q));
 
-symbol AND5 [H : El (list prd)] [P Q R A B : El prd] :
-  TYPE;
+symbol AND5 [H : El (list prd)] [P' R A B : El prd] :
+  Prf (elem A (to_list P')) →
+  ⟐ (H ⟝ conj (replace (A => B) B (to_list P')) => R) →
+  ⟐ (H ⟝ P' => R);
 
 
 // ----------------------------------------------
@@ -67,15 +77,18 @@ symbol IMP3 [H : El (list prd)] [P Q R : El prd] :
   ⟐ (H ⟝ (P => Q) => R);
 
 symbol IMP4 [H : El (list prd)] [P Q : El prd] :
-  ⟐ (P ∷ H ⟝ Q) → ⟐ (H ⟝ P => Q);
+  ⟐ (P ∷ H ⟝ Q) →
+  ⟐ (H ⟝ P => Q);
 
 symbol IMP5 [H : El (list prd)] [P Q : El prd] :
   Prf (elem P H) → // Side condition: "P est dans H"
   ⟐ (H ⟝ Q) →
   ⟐ (H ⟝ P => Q);
 
-symbol IMP4' [H : El (list prd)] [P Q R S : El prd] : //???
-  TYPE;
+symbol IMP4' [H : El (list prd)] [P Q R S : El prd] :
+  Prf ((P ∷ H ⟝ Q) ⟿ R) →
+  Prf ((H ⟝ P => Q) ⟿ (P => R));
+
 
 
 // ----------------------------------------------
@@ -113,6 +126,7 @@ symbol NOT2 [H : El (list prd)] [P : El prd] :
   ⟐ (H ⟝ P) →
   ⟐ (H ⟝ not not P);
 
+
 // ----------------------------------------------
 // 5.6. Axioms
 // ----------------------------------------------
@@ -143,11 +157,14 @@ symbol AXM6 [H : El (list prd)] [P Q R : El prd] :
 symbol AXM7 [H : El (list prd)] [P : El prd] :
   ⟐ (H ⟝ P => P);
 
-symbol AXM8 [H : El (list prd)] [P R : El prd] :
-  TYPE;
+symbol AXM8 [H : El (list prd)] [P' R : El prd] :
+  Prf (elem R (to_list P')) →
+  ⟐ (H ⟝ P' => R);
 
-symbol AXM9 [H : El (list prd)] [R Q : El prd] :
-  TYPE;
+symbol AXM9 [H : El (list prd)] [R Q : El prd] [P : El (exp ⤳ prd)] [x E : El exp] :
+  Prf (elem (`! x, not (VRAI and P x)) H) →
+  Prf (P E ≈ R) →
+  ⟐ (H ⟝ R => Q);
 
 
 // ----------------------------------------------
@@ -173,9 +190,6 @@ symbol ALL5 [H : El (list prd)] [P R : El prd] :
   ⟐ (H ⟝ `! x, (not P => R)) →
   ⟐ (H ⟝ not (`! x, P) => R);
 
-// redundant (??) same as ALL5, but also performs alpha-conversion.
-symbol ALL5_1 [H : El (list prd)] [P R : El prd] : TYPE;
-
 symbol ALL6 [H : El (list prd)] [P : El prd] :
   ⟐ (H ⟝ (`! x, P) => VRAI) →
   ⟐ (H ⟝ not (`! x, P));
@@ -185,28 +199,24 @@ symbol ALL7 [H : El (list prd)] [P Q R : El prd] :
   ⟐ (H ⟝ (`♢ x, R) => Q) →
   ⟐ (H ⟝ (`! x, P) => Q);
 
-// redundant (??) same as ALL7, but also performs alpha-conversion.
-symbol ALL7_1 [H : El (list prd)] [P Q R S A : El prd] : TYPE;
-
 symbol ALL7' [H : El (list prd)] [P Q R S : El prd] :
   Prf ((H ⟝ P) ⟿ R) →
   Prf ((H ⟝ (`♢ x, R) => Q) ⟿ S) →
   Prf ((H ⟝ (`! x, P) => Q) ⟿ S);
 
-// redundant (??) same as ALL8', but also performs alpha-conversion.
-symbol ALL7'_1 [H : El (list prd)] [P Q R S A : El prd] : TYPE;
-
 symbol ALL8' [H : El (list prd)] [P Q : El prd] :
   Prf ((H ⟝ P) ⟿ Q) →
   Prf ((H ⟝ (`! x, P)) ⟿ (`! x, Q));
-
-// redundant (??) same as ALL8', but also performs alpha-conversion.
-symbol ALL8'_1 [H : El (list prd)] [P Q : El prd] : TYPE;
 
 symbol ALL9' [H : El (list prd)] [P : El (exp ⤳ prd)] [Q R : El prd] :
   Prf (((! P) ∷ H ⟝ Q) ⟿ R) →
   Prf ((H ⟝ (♡ P) => Q) ⟿ (! P) => R);
 
+// (??) redunant rules due to HOAS
+symbol ALL5_1 [H : El (list prd)] [P R : El prd] : TYPE;
+symbol ALL7_1 [H : El (list prd)] [P Q R S A : El prd] : TYPE;
+symbol ALL7'_1 [H : El (list prd)] [P Q R S A : El prd] : TYPE;
+symbol ALL8'_1 [H : El (list prd)] [P Q : El prd] : TYPE;
 
 // ----------------------------------------------
 // 5.8. Existential quantification
@@ -248,14 +258,13 @@ symbol XST7 [x : El idt] [H : El (list prd)] [P R Q : El prd] :
   ⟐ (H ⟝ `! x, (P => R)) →
   ⟐ (H ⟝ (`# x, P) => R);
 
-// redunant rule.
-symbol XST7_1 [x : El idt] [H : El (list prd)] [P R Q : El prd] : TYPE;
-
 symbol XST8 [x y : El idt] [H : El (list prd)] [P R A : El prd] :
   Prf ((H ⟝ not P) ⟿ R) →
   ⟐ (H ⟝ (`! x, R) => VRAI) →
   ⟐ (H ⟝ (`# x, P));
 
+// redunant rules.
+symbol XST7_1 [x : El idt] [H : El (list prd)] [P R Q : El prd] : TYPE;
 symbol XST8_1 [x y : El idt] [H : El (list prd)] [P R A : El prd] : TYPE;
 
 // ----------------------------------------------
@@ -300,6 +309,12 @@ symbol STOP' [H : El (list prd)] [P : El prd] :
 // ----------------------------------------------
 // 5.11 INS rule
 // ----------------------------------------------
+symbol ⭆ : El (list prd ⤳ prd ⤳ prd);
+notation ⭆ infix 5;
+
+rule (nil ⭆ $p) ↪ $p
+with (($q ∷ $qs) ⭆ $p) ↪ $q => ($qs ⭆ $p);
+
 symbol INS [H Q : El (list prd)] :
   ⟐ (H ⟝ Q ⭆ FAUX) →
   ⟐ (H ⟝ FAUX);
@@ -340,13 +355,9 @@ symbol NRM8 [H : El (list prd)] [Q S : El prd] :
   ⟐ (H ⟝ (`♢ x, `♢ y, Q) => S) →
   ⟐ (H ⟝ (`♢ x, `! y, Q) => S);
 
-symbol NRM8_1 : TYPE;
-
 symbol NRM9 [H : El (list prd)] [P Q S : El prd] :
   ⟐ (H ⟝ `♢ x, `♢ y, (P => Q) => S) →
   ⟐ (H ⟝ `♢ x, (P => `! y, Q) => S);
-
-symbol NRM9_1 : TYPE;
 
 symbol NRM10 [H : El (list prd)] [P Q R : El prd] :
   ⟐ (H ⟝ `♡ x, not (P and Q) => R) →
@@ -409,6 +420,7 @@ symbol NRM23 [H : El (list prd)] [P : El (exp ⤳ prd)] [Q : El prd] [E : El exp
   ⟐ (H ⟝ `♡ x, not (P x and (E = x)) => Q);
 
 sequential symbol NRM24_aux : El (prd ⤳ bool);
+
 rule NRM24_aux ($A and $B) ↪ ⊥
 with NRM24_aux  _          ↪ ⊥ ;
 
@@ -425,29 +437,44 @@ symbol NRM26 [H : El (list prd)] [P : El (exp ⤳ prd)] :
   ⟐ (H ⟝ `♡ x, P x) →
   ⟐ (H ⟝ `♡ x, `♡ y, P x);
 
-// ---- stuff for arithmetic ??? -------
+// ---- not yet implemented, possibly requires manipulation of variables? ------
 symbol NRM27 [H : El (list prd)] [P Q : El prd] : TYPE;
 
 symbol NRM29 [H : El (list prd)] [P Q S R : El prd] [a b : El exp] : TYPE;
 
 symbol NRM29_1 [H : El (list prd)] [P Q S R : El prd] [a b : El exp] : TYPE;
+// -----------------------------------------------------------------------------
 
-symbol NRM30 [H : El (list prd)] [P Q S R : El prd] [a b : El exp] : TYPE;
+symbol NRM30 [H : El (list prd)] [P' : El (exp ⤳ prd)] [S R : El prd] [a b x : El exp] :
+  Prf (elem ((a + x) ≤ 𝟎) (to_list (P' x))) →
+  Prf (elem ((b - x) ≤ 𝟎) (to_list (P' x))) →
+  Prf (ev (a + b = 𝟎)) →
+  ⟐ (H ⟝ not (P' b) => R) →
+  ⟐ (H ⟝ `♡ x, not (P' x) => R);
 
-symbol NRM30_1 [H : El (list prd)] [P Q S R : El prd] [a b : El exp] : TYPE;
+symbol NRM30_1 [H : El (list prd)] [P' : El (exp ⤳ prd)] [S R : El prd] [a b x : El exp] :
+  Prf (elem ((x + a) ≤ 𝟎)   (to_list (P' x))) →
+  Prf (elem ((⨪ x + b) ≤ 𝟎) (to_list (P' x))) →
+  Prf (ev (a + b = 𝟎)) →
+  ⟐ (H ⟝ not (P' b) => R) →
+  ⟐ (H ⟝ `♡ x, not (P' x) => R);
+
+// redunant rules??
+symbol NRM8_1 : TYPE;
+symbol NRM9_1 : TYPE;
+
 
 // ----------------------------------------------
 // 5.13. Rules for equality
 // ----------------------------------------------
-
 symbol EVR1 [H : El (list prd)] [P : El prd] [E : El exp] :
   ⟐ (H ⟝ not (E = E) => P);
 
-// BROKEN. need 'builtin' integration
 symbol EVR11 [H : El (list prd)] [P : El prd] [n m : El exp] :
-  Prf (¬ (n ≈ m)) →
-  ⟐ (H ⟝ (n = m) => P) →
-  TYPE;
+  Prf (ev (n != m)) →
+  Prf (n ∈ ℕ) →
+  Prf (m ∈ ℕ) →
+  ⟐ (H ⟝ (n = m) => P);
 
 symbol EVR2 [H : El (list prd)] [E : El exp] :
   ⟐ (H ⟝ FAUX) →
@@ -548,53 +575,72 @@ symbol ECTR6 [H : El (list prd)] [Q : El prd] [P : El (exp ⤳ prd)] [E F : El e
   Prf (elem (not (P F)) H) →
   ⟐ (H ⟝ P E => Q);
 
-// ----------------------------------------------
-// 5.14. Règles sur l'arithmétique (Arithmetic Rules)
-// ----------------------------------------------
 
+// ----------------------------------------------
+// 5.14. Rules for arithmetic
+// ----------------------------------------------
 symbol AR1 [H : El (list prd)] [E : El exp] [R : El prd] :
   ⟐ (H ⟝ R) →
   ⟐ (H ⟝ (E ≤ E) => R);
 
 symbol AR2 [a b : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (ev (a > b)) →
+  ⟐ (H ⟝ a ≤ b => R);
 
 symbol AR3 [a : El exp] [H : El (list prd)] [R : El prd] :
   ⟐ (H ⟝ ((𝟏 - a) ≤ 𝟎) => R) →
   ⟐ (H ⟝ not (a ≤ 𝟎) => R);
 
 symbol AR4 [E F : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (elem (F ≤ 𝟎) H) →
+  Prf (ev ((E + F) > 𝟎)) →
+  ⟐ (H ⟝ E ≤ 𝟎 => R);
 
 symbol AR5 [a : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (elem (a ≪ 𝟎) H) →
+  ⟐ (H ⟝ (a = 𝟎 => (⨪ a ≤ 𝟎 => R))) →
+  ⟐ (H ⟝ ⨪ a ≤ 𝟎 => R);
 
 symbol AR6 [a : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (elem (⨪ a ≪ 𝟎) H) →
+  ⟐ (H ⟝ (a = 𝟎 => (a ≤ 𝟎 => R))) →
+  ⟐ (H ⟝ a ≤ 𝟎 => R);
 
 symbol AR7 [a b c : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (elem ((c + b) ≪ 𝟎) H) →
+  Prf (ev ((a + c) = 𝟎)) →
+  ⟐ (H ⟝ (a = b) => ((a - b) ≤ 𝟎) => R) →
+  ⟐ (H ⟝ ((a - b) ≤ 𝟎) => R);
 
 symbol AR8 [a b c : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (elem ((a - b) ≪ 𝟎) H) →
+  Prf (ev ((a + c) = 𝟎)) →
+  ⟐ (H ⟝ (a = b) => ((c + b) ≤ 𝟎) => R) →
+  ⟐ (H ⟝ ((c + b) ≤ 𝟎) => R);
 
 symbol AR9 [E F : El exp] [H : El (list prd)] [R : El prd] :
-  TYPE;
+  Prf (ev E ≈ F) →
+  ⟐ (H ⟝ (F ≤ 𝟎) => R) →
+  ⟐ (H ⟝ (E ≤ 𝟎) => R);
 
-symbol AR10 [H : El (list prd)] [P R : El prd] :
-  ⟐ (H ⟝ (solveur P) => R) →
+symbol AR10 [H : El (list prd)] [P Q R : El prd] :
+  Prf (ev P ≈ Q) →
+  ⟐ (H ⟝ Q => R) →
   ⟐ (H ⟝ P => R);
 
 symbol AR11 [x : El exp] [H : El (list prd)] [P : El prd] :
   ⟐ (H ⟝ not (x ≤ x) => P);
 
-symbol AR12 [a b : El exp] [H : El (list prd)] [P : El prd] : TYPE;
+symbol AR12 [a b : El exp] [H : El (list prd)] [P : El prd] :
+  ⟐ ((a ≤ b) ∷ H ⟝ (a ≤ b) => P);
+
 
 // ----------------------------------------------
 // 5.15 Booleans
 // ----------------------------------------------
 // in contrast to `VRAI` and `FAUX` in `VRFX` (both of type `prd`),
 // the rules in this file operate on boolean values of type `exp`.
+// ----------------------------------------------
 symbol FALSE : El exp;
 symbol TRUE : El exp;
 
