@@ -422,7 +422,7 @@ symbol NRM23 [H : El (list prd)] [P : El (exp ⤳ prd)] [Q : El prd] [E : El exp
 sequential symbol NRM24_aux : El (prd ⤳ bool);
 
 rule NRM24_aux ($A and $B) ↪ ⊥
-with NRM24_aux  _          ↪ ⊥ ;
+with NRM24_aux  _          ↪ ⊥;
 
 symbol NRM24 [H : El (list prd)] [P Q : El prd] :
   Prf (NRM24_aux P) →
