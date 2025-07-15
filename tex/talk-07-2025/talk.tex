@@ -1,22 +1,112 @@
-\documentclass{beamer}
+\documentclass[lualatex]{beamer}
 
-\usepackage{unicode-math}
+\usepackage{listings}
+\usepackage{unicode-math-input}
+\usepackage{stmaryrd}
+\usepackage{mathtools}
+\usepackage{amssymb}
 \usepackage{hyperref}
+\usepackage{tikz}
+\usepackage{array}
+\usepackage{xcolor}
+
+\input{lambdapi}
+\lstset{language=Lambdapi}
+\newcommand{\pplp}{\texttt{pp2lp}}
+\newcommand{\lp}{\textsc{LP}}
+\newcommand{\pp}{\textsc{PP}}
 
 \title{
-  \texttt{pp2lp}:
-    automating proof translation
-    from Atelier-B to $λΠ$}
-\author{Ciaran Dunne, Guillaume Burel}
+  \small{[\,translating proof traces from Atelier-B's\,]}
+\\[1mm]
+  \normalsize Predicate Prover ($\pp$) to LambdaPi ($\lp$)
+\\[5mm]
+  \href{https://github.com/ciaran-matthew-dunne/pp2lp}{
+    \texttt{github.com/ciaran-matthew-dunne/pp2lp}
+  }
+}
 
+\author{Ciarán Dunne, Guillaume Burel}
+\institute{Telecom SudParis}
+\date{\today}
+
+
+% TODO.
+% - atelier B, PP traces, REPLAY.KIN
+% - pdf of syntax, rules. encoding of rules in lambdapi.
+% - sketch of ocaml translation.
+% - future directions.
 \begin{document}
-
 \maketitle
 
-\begin{frame}{Introduction}
-
-	lorem ipsum ....
-
+\begin{frame}{}
+	Atelier-B can use automated prover $\pp$ for some goals.
+	\begin{itemize}
+		\item the \alert{predicate prover}: strictly FOL + arithmetic, no set theory.
+		\item inference rules documented in PDF. over 100.
+		\item internally certified by Clearsy. no external checker.
+		\item previous ICSPA work allows obtaining \alert{proof traces}.
+	\end{itemize}
+	% snippet of some rules from pdf.
 \end{frame}
 
+\begin{frame}{}
+	\textbf{goal}: verify proofs externally in \alert{lambdapi} ($\lp$).
+	\begin{enumerate}
+		\item faithfully represent inference rules of $\pp$ in $\lp$,
+		\item automatically translate proof traces into $\lp$ proof terms,
+		\item run \texttt{lambdapi check} on generated files,
+		\item ???
+		\item profit!
+
+	\end{enumerate}
+\end{frame}
+
+\begin{frame}$$
+		\begin{array}{l@{\quad}r@{\ }r@{\ }l}
+			\textit{(expressions)} & X,Y \in \alert{\texttt{exp}}
+			\\[2mm]
+			\textit{(formulas)}    & \Phi, \Psi \in \alert{\texttt{frm}}
+			\\[2mm]
+			\textit{(predicates)}  & P,Q \in \alert{\texttt{prd}}        & \Coloneq &
+			P \wedge Q
+			\mid P \vee Q
+			\mid \neg P
+			\\ && \mid &
+			P \Longrightarrow Q
+			\mid P \Longleftrightarrow Q
+			\\ && \mid &
+			\forall x, P
+			\mid \exists x, P
+			\\ && \mid &
+			X = Y
+			\mid \Phi
+			\\[2mm]
+			\textit{(sequents)}    & \Sigma \in \alert{\texttt{seq}}     &
+			\Coloneq               & P_1, \ldots, P_n \vdash Q
+		\end{array}
+	$$
+\end{frame}
+
+% \begin{frame}[fragile]{}
+% 	\begin{lstlisting}
+% 	symbol Set : TYPE;
+% 	symbol El  : Set → TYPE;
+% 	\end{lstlisting}
+% 	\begin{lstlisting}
+% 	symbol prd : Set;
+% 	injective symbol and : El (prd $\leadsto$ prd $\leadsto$ prd);
+% 	injective symbol or : El (prd $\leadsto$ prd $\leadsto$ prd);
+% 	injective symbol => : El (prd $\leadsto$ prd $\leadsto$ prd);
+% 	..
+% 	\end{lstlisting}
+% \end{frame}
+
+% \begin{frame}[fragile]{}
+% 	\begin{lstlisting}
+% 	symbol exp : Set;
+% 	symbol frm : Set;
+% 	symbol seq : Set;
+% 	\end{lstlisting}
+% \end{frame}
 \end{document}

@@ -1,13 +1,16 @@
-require open
-  Logic.U.Set Logic.U.Prop Logic.U.Arrow;
+require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
+require open pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
 
-require open
-  pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
+injective symbol ✓ : El prd → TYPE;
+// theorem, derivable sequent with no hypothesis.
+rule (✓ $P) ↪ ⟐ (nil ⟝ $P);
+
+
+
 
 symbol {|05.trace|} [p q] :
   ✓ (not (p or q) => not p) ≔
 begin
-  simplify;
   assume p q;
   simplify;
   apply OR1;
@@ -206,16 +209,45 @@ begin
   refine TOP;
 end;
 
-symbol {|18.trace|} [p q r] :
-  ✓ (not q => (p => (q => r))) ≔
+symbol {|18.trace|} [p] :
+  ✓ (
+    ! (one "a") (
+      ! (one "x") (not (VRAI and (var "x" = var "x")))
+    =>
+      (var "a" = var "a" => p)
+    )
+  ) ≔
 begin
-  assume p q r;
+  assume p;
   simplify;
-  apply IMP4;
-  apply AXM5;
-  simplify elem;
-  refine TOP;
-end;
+
+  apply ALL8;
+  //apply ALL7 VRAI;
+  apply ALL7 VRAI
+    { simplify;
+      admit
+    }
+    { apply NRM1;
+      apply FX3;
+    };
+
+  type STOP';
+  type STOP _ ;
+  type EVR2;
+  type VR3;
+  type AND2;
+abort;
+
+
+type VR3;
+type EVR2;
+
+type STOP';
+
+
+
+type FX3;
+
 
 symbol {|19.trace|} [p q r] :
   ✓ (not q => (p => (q => r))) ≔
@@ -227,3 +259,46 @@ begin
   simplify elem;
   refine TOP;
 end;
+
+symbol foo : El (exp ⤳ prd);
+
+
+symbol p1 : ✓ (FAUX => FAUX) ≔ AXM7;
+
+
+
+symbol {|22.trace|} :
+  ✓ (not (! (one "x") (! (one "y") (not (var "x" = var "x"))))) ≔
+begin
+abort;
+
+symbol {|26.trace|} :
+✓ (! (two "a" "b")
+    ((var "a" = var "b")
+  =>
+    (! (one "x") (
+      ! (one "y") (
+        (var "x" = var "y") => ((var "x" = var "a") => (var "y" = var "b"))
+      )
+    ))
+  )) ≔
+begin
+  simplify;
+  apply ALL8;
+  apply OPR1;
+  apply ALL4;
+abort;
+
+
+//symbol {|20.trace|} [p ] :
+//  ✓ (not (`! x,`! y, x = y) => (p or not p)) ≔
+//begin
+//  assume p;
+//  simplify;
+//  apply ALL1;
+//  apply ALL5;
+//  apply ALL8;
+//  //apply AXM5;
+//  //simplify elem;
+//  //refine TOP;
+//end;
