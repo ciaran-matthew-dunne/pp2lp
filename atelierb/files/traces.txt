@@ -1,0 +1,351 @@
+# atelierb/files/trace_examples/01.trace
+﻿ [AXM1] &
+ [NOT1] &
+ [OR4] &
+ [IMP4] &
+ [AXM4] &
+ [OR4] &
+ [IMP4] &
+ [AND1] &
+  (not(p and q) => not(p) or not(q))
+
+# atelierb/files/trace_examples/02.trace
+﻿ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+  (not(p and not(p)))
+
+# atelierb/files/trace_examples/03.trace
+﻿ [AXM3] &
+ [AXM3] &
+ [AND4] &
+ [IMP4] &
+ [AR10(q)] &
+ [IMP4] &
+ [AND3] &
+  (p and q => q and p)
+
+# atelierb/files/trace_examples/04.trace
+﻿ [AXM8] &
+ [AND5] &
+  (a and p and (p => q) and c => q)
+
+# atelierb/files/trace_examples/05.trace
+﻿ [AXM4] &
+ [IMP4] &
+ [OR1] &
+  (not(p or q) => not(p))
+
+# atelierb/files/trace_examples/06.trace
+﻿ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [OR2] &
+  (not(p and not(p) or (q and not(q))))
+
+# atelierb/files/trace_examples/07.trace
+﻿ [AXM4] &
+ [OR4] &
+ [IMP4] &
+ [AXM2] &
+ [OR4] &
+ [IMP4] &
+ [OR3] &
+  (p or q => q or p)
+
+# atelierb/files/trace_examples/08.trace
+﻿ [AXM7] &
+ [IMP4] &
+ [IMP1] &
+  (not(p => q) => not(q))
+
+# atelierb/files/trace_examples/09.trace
+﻿ [AXM7] &
+ [OR4] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [IMP2] &
+  (not(p or not(p) => p and not(p)))
+
+# atelierb/files/trace_examples/10.trace
+﻿ [AXM7] &
+ [AXM7] &
+ [IMP3] &
+  (p => not(p) => not(p))
+
+# atelierb/files/trace_examples/11.trace
+﻿ [AXM3] &
+ [AXM3] &
+ [AND4] &
+ [IMP5(1)] &
+ [IMP4] &
+  (p => (p => p and p))
+
+# atelierb/files/trace_examples/12.trace
+﻿ [AXM1] &
+ [IMP4] &
+ [AXM2] &
+ [IMP4] &
+ [EQV1] &
+  (not(p <=> p) => q)
+
+# atelierb/files/trace_examples/13.trace
+﻿ [AXM7] &
+ [NOT1] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [EQV2] &
+  (not(p <=> not(p)))
+
+# atelierb/files/trace_examples/14.trace
+﻿ [AXM1] &
+ [NOT1] &
+ [IMP4] &
+ [AXM2] &
+ [IMP4] &
+ [EQV3] &
+  (p <=> not(p) => q)
+
+# atelierb/files/trace_examples/15.trace
+﻿ [AXM7] &
+ [AXM7] &
+ [EQV4] &
+  (p <=> p)
+
+# atelierb/files/trace_examples/16.trace
+﻿ [AXM5] &
+ [IMP4] &
+  (not(q) => (p => (q => r)))
+
+# atelierb/files/trace_examples/17.trace
+﻿ [AXM6] &
+ [IMP4] &
+  (q => (p => (not(q) => r)))
+
+# atelierb/files/trace_examples/18.trace
+﻿ [FX3] &
+ [FIN(FAUX => (a = a => p))] &
+ [STOP_NORM] &
+ [NRM1] &
+ [NRM] &
+ [FIN(FAUX)] &
+ [STOP_1] &
+ [EVR2_1] &
+ [VR3_1] &
+ [AND2_1] &
+ [ALL7(1)] &
+ [ALL8(1)] &
+  (!a.(!x.not(VRAI and x = x) => (a = a => p)))
+
+# atelierb/files/trace_examples/19.trace
+﻿ [AXM9] &
+ [ALL9] &
+ [FIN(forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$5).(x$4,x$5: p => x$4,p(x$4): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [ALL9] &
+ [FIN(forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)))] &
+ [STOP_NORM] &
+ [NRM14] &
+ [NRM] &
+ [FIN(not(p(x)))] &
+ [STOP_1] &
+ [VR3_1] &
+ [AND2_1] &
+ [ALL7(1)] &
+ [AND3] &
+ [ALL8(1)] &
+  (!a.(!x.not(VRAI and p(x)) and !(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)))
+
+# atelierb/files/trace_examples/20.trace
+﻿ [AXM7] &
+ [OR4] &
+ [IMP4] &
+ [ALL8(1)] &
+ [ALL5(2)] &
+ [ALL1] &
+  (not(!x.!y.(x = y)) => p or not(p))
+
+# atelierb/files/trace_examples/21.trace
+﻿ [AXM7] &
+ [OR4] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: q and not(x$6,x$5,q(x$6,x$5): q)) => p or not(p))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: q => x$6,x$5,q(x$6,x$5): q))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [ALL9] &
+ [FIN(forall2(x,y).not(VRAI and not(q(x,y))) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: q) => x$6,x$5,q(x$6,x$5): q) => p or not(p)))] &
+ [STOP_NORM] &
+ [NRM15] &
+ [NRM] &
+ [FIN(q(x,y))] &
+ [STOP_1] &
+ [ALL7(1)] &
+ [ALL3] &
+ [AND3] &
+  (!x.!y.q(x,y) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: q) => x$6,x$5,q(x$6,x$5): q) => p or not(p))
+
+# atelierb/files/trace_examples/22.trace
+﻿ [AXM7] &
+ [FIN(FAUX => FAUX)] &
+ [STOP_NORM] &
+  [NRM1] &
+ [NRM] &
+ [FIN(FAUX)] &
+ [STOP_1] &
+ [EVR2_1] &
+ [ALL7(1)] &
+ [ALL6] &
+ [ALL2] &
+  (not(!x.!y.not(x = x)))
+
+# atelierb/files/trace_examples/23.trace
+﻿ [AXM9] &
+ [NOT1] &
+ [STOP] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b)))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [ALL9] &
+ [FIN(forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))] &
+ [STOP_NORM] &
+ [NRM14] &
+ [NRM] &
+ [FIN(not(p(x,y)))] &
+ [STOP_1] &
+ [ALL7(1)] &
+ [XST5] &
+ [XST1] &
+ [AND3] &
+ [ALL8(1)] &
+  (!(a,b).(not(#x.#y.p(x,y)) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))
+
+# atelierb/files/trace_examples/24.trace
+﻿ [AXM7] &
+ [OR4] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [IMP4] &
+ [ALL8(1)] &
+ [XST7(2)] &
+ [XST3] &
+ [AND3] &
+  (#x.#y.p(x,y) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q))
+
+# atelierb/files/trace_examples/25.trace
+﻿ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [ALL8(3)] &
+ [XST6] &
+ [XST2] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(#x.#y.(p(x,y) and not(p(x,y)))))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(1)] &
+ [XST7_1(2)] &
+ [ALL7(1)] &
+  (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(#x.#y.(p(x,y) and not(p(x,y)))))
+
+# atelierb/files/trace_examples/26.trace
+﻿ [AXM7] &
+ [OPR1(1)] &
+ [ALL8(1)] &
+ [ALL4] &
+ [OPR1(1)] &
+ [ALL8(1)] &
+  (!(a,b).(a = b => !x.!y.(x = y => (x = a => y = b))))
+
+# atelierb/files/trace_examples/27.trace
+﻿ [VR4] &
+ [FIN(VRAI)] &
+ [NRM19] &
+ [NRM14] &
+ [NRM] &
+ [FIN(not(p(x,y)))] &
+ [STOP_1] &
+ [ALL7(3)] &
+ [FIN(not(p(x,y)))] &
+ [STOP_1] &
+ [XST8(3)] &
+ [XST4] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => #x.#y.p(x,y))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [IMP4] &
+ [AND3] &
+ [ALL8(1)] &
+  (!(a,b).(p(a,b) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => #x.#y.p(x,y)))
+
+# atelierb/files/trace_examples/28.trace
+﻿ [VR1] &
+  (not(VRAI) => p)
+
+# atelierb/files/trace_examples/29.trace
+﻿ [VR4] &
+ [FX1] &
+  (not(FAUX) => VRAI)
+
+# atelierb/files/trace_examples/30.trace
+﻿ [FX2] &
+  (not(FAUX))

@@ -1,34 +1,41 @@
-require open Logic.U.Set Logic.U.Prop Logic.U.Arrow Logic.U.Quant;
+require open Logic.U.Set Logic.U.Prop;
+require open Logic.U.Arrow Logic.U.DepArrow Logic.U.Quant;
 require open pp2lp.Prelude;
 
-// ------ predicates, expressions, formulas ------
 
+
+// ------ predicates, expressions, formulas ------
 symbol idt ≔ string;
 symbol vrb ≔ list idt;
 
-symbol EXP : TYPE;
-symbol FRM : TYPE;
+symbol Frm : TYPE;
 
-inductive PRD : TYPE ≔
-  | AND : PRD → PRD → PRD
-  | OR  : PRD → PRD → PRD
-  | IMPL : PRD → PRD → PRD
-  | IFF  : PRD → PRD → PRD
-  | NOT : PRD → PRD
-  | ALL : El vrb → PRD → PRD
-  | EXI : El vrb → PRD → PRD
-  | EQ  : EXP → EXP → PRD
-  | ATOM : FRM → PRD;
+inductive Exp : TYPE ≔
+  | VAR : El idt → Exp
+  | ZERO : Exp
+  | ONE : Exp
+  | MINUS : Exp → Exp → Exp
+  | ADD : Exp → Exp → Exp
+  | SUB : Exp → Exp → Exp
+with Prd : TYPE ≔
+  | AND : Prd → Prd → Prd
+  | OR  : Prd → Prd → Prd
+  | IMPL : Prd → Prd → Prd
+  | IFF  : Prd → Prd → Prd
+  | NOT : Prd → Prd
+  | ALL : El vrb → Prd → Prd
+  | EXI : El vrb → Prd → Prd
+  | EQ  : Exp → Exp → Prd
+  | ATOM : Frm → Prd;
 
 symbol prd : Set;
 symbol exp : Set;
 symbol frm : Set;
 
-rule El prd ↪ PRD;
-rule El exp ↪ EXP;
+rule El prd ↪ Prd;
+rule El exp ↪ Exp;
+rule El frm ↪ Frm;
 
-// inject identifiers into expressions.
-injective symbol var : El (idt ⤳ exp);
 
 
 // ------ primitive logical symbols --------------
@@ -49,72 +56,21 @@ notation =>  infix left 2;
 notation <=> infix left 1;
 notation not prefix 3;
 
+// mystery quantifiers
+injective symbol ♢ : El (vrb ⤳ prd ⤳ prd);  // aka. forall
+injective symbol ♡ : El (vrb ⤳ prd ⤳ prd); // aka. forall2
 
-
-
-// ------ Sequents ---------------------------
-
-// sequents
-symbol seq : Set;
-injective symbol ⟝ : El ((list prd) ⤳ prd ⤳ seq);
-notation ⟝ infix 0;
-
-// sequents-as-types
-symbol ▷ : El seq → Set;
-
-// results
-symbol ⟿ : El seq → El prd → Set;
-notation ⟿ infix 0;
-
-// exceptions
-symbol ∅ : Set;
-
-// conditional
-symbol ⇛ : Prop → Set → Set;
-notation ⇛ infix right 0;
-rule ⊤ ⇛ $x ↪ $x
-with ⊥ ⇛ _  ↪ ∅;
-
-// substitution
-symbol subst_prd : El (idt ⤳ exp ⤳ prd ⤳ prd);
-symbol subst_exp : El (idt ⤳ exp ⤳ exp ⤳ exp);
-symbol subst_frm : El (idt ⤳ exp ⤳ frm ⤳ frm);
-
-rule (subst_prd $x $e ($p1 and $p2)) ↪ (subst_prd $x $e $p1) and (subst_prd $x $e $p2)
-with (subst_prd $x $e ($p1 or $p2)) ↪ (subst_prd $x $e $p1) or (subst_prd $x $e $p2)
-with (subst_prd $x $e ($p1 => $p2)) ↪ (subst_prd $x $e $p1) => (subst_prd $x $e $p2)
-with (subst_prd $x $e ($p1 <=> $p2)) ↪ (subst_prd $x $e $p1) <=> (subst_prd $x $e $p2)
-with (subst_prd $x $e (not $p)) ↪ not (subst_prd $x $e $p)
-with (subst_prd $x $e ($e1 = $e2)) ↪ (subst_exp $x $e $e1) = (subst_exp $x $e $e1);
-//with (subst_prd $x $e (! $xs $p)) ↪ ...
-//with (subst_prd $x $e (! $xs $p)) ↪ ...
-
-// ----- Misc symbols -----------------------
+symbol VRAI : El prd;
+symbol FAUX : El prd;
 
 // not equal
 injective symbol != (a b : El exp) ≔ not (a = b);
 notation !=  infix left 2;
 
-// booleans
-symbol VRAI : El prd;
-symbol FAUX : El prd;
 
-// mystery quantifiers
-injective symbol forall : El (vrb ⤳ prd ⤳ prd);  // aka. ♢
-injective symbol forall2 : El (vrb ⤳ prd ⤳ prd); // aka. ♡
+// ----- Arithmetic -----------------------
+// similarly for arithmetic relation symbols, why are these not in the grammar for prd?
 
-// some macros for quantifiers
-symbol ∀1 (s : String) : El (prd ⤳ prd) ≔ ! (s ∷ nil);
-symbol ∃1 (s : String) : El (prd ⤳ prd) ≔ # (s ∷ nil);
-symbol ♢1 (s : String) : El (prd ⤳ prd) ≔ forall (s ∷ nil);
-symbol ♡1 (s : String) : El (prd ⤳ prd) ≔ forall2 (s ∷ nil);
-
-symbol ∀2 (s1 s2 : String) : El (prd ⤳ prd) ≔ ! (s1 ∷ s2 ∷ nil);
-symbol ∃2 (s1 s2 : String) : El (prd ⤳ prd) ≔ # (s1 ∷ s2 ∷ nil);
-symbol ♢2 (s1 s2 : String) : El (prd ⤳ prd) ≔ forall (s1 ∷ s2 ∷ nil);
-symbol ♡2 (s1 s2 : String) : El (prd ⤳ prd) ≔ forall2 (s1 ∷ s2 ∷ nil);
-
-// arithmetic
 symbol > : El (exp ⤳ exp ⤳ prd);
 symbol ≤ : El (exp ⤳ exp ⤳ prd);
 symbol < : El (exp ⤳ exp ⤳ prd);
@@ -133,23 +89,84 @@ notation + infix 5;
 notation - infix 5;
 
 
+// ------ Sequents ---------------------------
+symbol seq : Set;
+symbol Seq ≔ El seq;
+injective symbol ⟝ : El ((list prd) ⤳ prd ⤳ seq);
+notation ⟝ infix 0;
+
+// sequent derivations
+injective symbol ▷ : El seq → TYPE;
+injective symbol ⊩ : El (list prd) → El prd → Set;
+notation ⊩ infix 0;
+rule El ($H ⊩ $P) ↪ ▷ ($H ⟝ $P);
+
+// type-level side-conditions
+symbol If : El bool → Set → TYPE;
+rule If ⊤ $X ↪ El $X;
+
+symbol Thm : Prd → TYPE ≔
+  λ p, (▷ (nil ⟝ p));
+
+
+// ---- Results ------------------------------
+injective symbol Res : Seq → TYPE;
+symbol obtain [Σ : Seq] : Res Σ → El prd;
+
+coerce_rule coerce (Res $Σ) Prd $ρ ↪ obtain $ρ;
 
 // ----- Operations on terms -----------------------
 
-// syntactic equality on predicates
-rule FAUX ≣ FAUX ↪ ⊤
-with VRAI ≣ VRAI ↪ ⊤
-with (not $p) ≣ (not $q)           ↪ ($p ≣ $q)
-with ($p1 and $p2) ≣ ($q1 and $q2) ↪ ($p1 ≣ $q1) ∧ ($p2 ≣ $q2)
-with ($p1 or $p2) ≣ ($q1 or $q2)   ↪ ($p1 ≣ $q1) ∧ ($p2 ≣ $q2)
-with ($p1 => $p2) ≣ ($q1 => $q2)   ↪ ($p1 ≣ $q1) ∧ ($p2 ≣ $q2)
-with ($p1 <=> $p2) ≣ ($q1 <=> $q2) ↪ ($p1 ≣ $q1) ∧ ($p2 ≣ $q2)
-with ($e1 = $e2) ≣ ($f1 = $f2)     ↪ ($e1 ≣ $f1) ∧ ($e2 ≣ $f2)
-with ($e1 != $e2) ≣ ($f1 != $f2)   ↪ ($e1 ≣ $f1) ∧ ($e2 ≣ $f2);
-//with (! $P) ≣ (! $Q) ↪ (`∀ x, ($P x ≣ $Q x))
-//with (# $P) ≣ (# $Q) ↪ (`∀ x, ($P x ≣ $Q x))
-//with (♢ $P) ≣ (♢ $Q) ↪ (`∀ x, ($P x ≣ $Q x))
-//with (♡ $P) ≣ (♡ $Q) ↪ (`∀ x, ($P x ≣ $Q x`));
+// syntactic equality on expressions and predicates.
+sequential symbol == [a : Set] : El (a ⤳ a ⤳ bool);
+sequential symbol !== [a : Set] : El (a ⤳ a ⤳ bool);
+
+notation == infix 5;
+notation !== infix 5;
+
+rule ($X !== $Y) ↪ ite ($X == $Y) ⊥ ⊤;
+
+rule ((==) [string] $x $x) ↪ ⊤
+with ((==) [string] _  _)  ↪ ⊥;
+
+rule FAUX == FAUX ↪ ⊤
+with VRAI == VRAI ↪ ⊤
+with (not $p) == (not $q)           ↪ ($p == $q)
+with ($p1 and $p2) == ($q1 and $q2) ↪ ($p1 == $q1) ∧ ($p2 == $q2)
+with ($p1 or $p2) == ($q1 or $q2)   ↪ ($p1 == $q1) ∧ ($p2 == $q2)
+with ($p1 => $p2) == ($q1 => $q2)   ↪ ($p1 == $q1) ∧ ($p2 == $q2)
+with ($p1 <=> $p2) == ($q1 <=> $q2) ↪ ($p1 == $q1) ∧ ($p2 == $q2)
+with ($e1 = $e2) == ($f1 = $f2)     ↪ ($e1 == $f1) ∧ ($e2 == $f2)
+with ($e1 != $e2) == ($f1 != $f2)   ↪ ($e1 == $f1) ∧ ($e2 == $f2);
+//with (! $P) == (! $Q) ↪ (`∀ x, ($P x == $Q x))
+//with (# $P) == (# $Q) ↪ (`∀ x, ($P x == $Q x))
+//with (♢ $P) == (♢ $Q) ↪ (`∀ x, ($P x == $Q x))
+//with (♡ $P) == (♡ $Q) ↪ (`∀ x, ($P x == $Q x`));
+
+
+// ------- free vars, substitution ----------------
+symbol free [a : Set] : El (idt ⤳ a ⤳ bool);
+rule free $x (AND $P $Q)  ↪ (free $x $P) ∨ (free $x $Q)
+with free $x (OR $P $Q)   ↪ (free $x $P) ∨ (free $x $Q)
+with free $x (IMPL $P $Q) ↪ (free $x $P) ∨ (free $x $Q)
+with free $x (IFF $P $Q)  ↪ (free $x $P) ∨ (free $x $Q)
+with free $x (NOT $P)     ↪ free $x $P
+with free $x (ALL $vs $P) ↪ (free $x $P) ∧ ¬($x ∈ $vs)
+with free $x (EXI $vs $P) ↪ (free $x $P) ∧ ¬($x ∈ $vs)
+with free $x (EQ $e1 $e2) ↪ (free $x $e1) ∨ (free $x $e2)
+with free $x (ATOM $f)    ↪ free $x $f;
+
+symbol subst [a : Set] : El (idt ⤳ exp ⤳ a ⤳ a);
+rule subst $x $t (VAR $y)     ↪ ite ($x == $y) $t (VAR $y)
+with subst $x $t (AND $P $Q)  ↪ AND (subst $x $t $P) (subst $x $t $Q)
+with subst $x $t (OR $P $Q)   ↪ OR (subst $x $t $P) (subst $x $t $Q)
+with subst $x $t (IMPL $P $Q) ↪ IMPL (subst $x $t $P) (subst $x $t $Q)
+with subst $x $t (IFF $P $Q)  ↪ IFF (subst $x $t $P) (subst $x $t $Q)
+with subst $x $t (NOT $P)     ↪ NOT (subst $x $t $P)
+with subst $x $t (ALL $vs $P) ↪ ite ($x ∈ $vs) (ALL $vs $P) (ALL $vs (subst $x $t $P))
+with subst $x $t (EXI $vs $P) ↪ ite ($x ∈ $vs) (EXI $vs $P) (EXI $vs (subst $x $t $P))
+with subst $x $t (EQ $e1 $e2) ↪ EQ (subst $x $t $e1) (subst $x $t $e2)
+with subst $x $t (ATOM $f)    ↪ ATOM (subst $x $t $f);
 
 // evaluation
 symbol ev [a : Set] [b : Set] : El (a ⤳ b);
@@ -158,11 +175,13 @@ symbol ev [a : Set] [b : Set] : El (a ⤳ b);
 symbol opair : El (exp ⤳ exp ⤳ exp);
 symbol eql_set : El (exp ⤳ exp ⤳ prd);
 
-sequential symbol unfold_conj : El (prd ⤳ list prd);
-rule unfold_conj ($x and $xs) ↪ cons $x (unfold_conj $xs)
-with unfold_conj $p           ↪ nil;
+// operations for finding/replacing a term within an n-ary conjunction.
+sequential symbol elem_conj : El (prd ⤳ prd ⤳ bool);
+rule elem_conj $P ($P and $xs) ↪ ⊤
+with elem_conj $P ($Q and $xs) ↪ elem_conj $P $xs
+with elem_conj $P _          ↪ ⊥;
 
-sequential symbol fold_conj : El (list prd ⤳ prd);
-rule fold_conj ($x ∷ nil) ↪ $x
-with fold_conj ($x ∷ $xs) ↪ $x and (fold_conj $xs)
-with fold_conj nil        ↪ FAUX;
+sequential symbol repl_conj : El (prd ⤳ prd ⤳ prd ⤳ prd);
+rule repl_conj $Q $Q' ($Q and $xs) ↪ ($Q' and $xs)
+with repl_conj $Q $Q' ($P and $xs) ↪ ($P  and (repl_conj $Q $Q' $xs))
+with repl_conj _  _   $R           ↪ $R;
