@@ -1,28 +1,70 @@
 require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 require open pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
 
-injective symbol ✓ : El prd → TYPE;
-// theorem, derivable sequent with no hypothesis.
-rule (✓ $P) ↪ ⟐ (nil ⟝ $P);
+coerce_rule coerce String (El exp) $x ↪ var $x;
+assert ⊢ ("x") : El exp;
+
+unif_rule El ($X) ≡ If $b ($X')
+  ↪ [$X ≡ $X'; $b ≡ true];
 
 
+symbol {|01.trace|} [p q : El prd] :
+  Thm (
+    not (p and q) => ((not p) or (not q))
+  ) ≔
+begin
+  assume p q;
+  apply AND1
+  {
+    apply IMP4;
+    apply OR4;
+    apply AXM4;
+  } {
+    apply IMP4;
+    apply OR4;
+    apply NOT1;
+    apply AXM1;
+  };
+end;
+
+symbol {|02.trace|} [p] :
+  Thm (not (p and (not p))) ≔
+begin
+  assume p;
+  apply AND2;
+  apply IMP4;
+  apply NOT2;
+  apply AXM3
+end;
+
+symbol {|03.trace|} [p q] :
+  Thm ((p and q) => (q and p)) ≔
+begin
+  assume p q;
+  apply AND3;
+  apply IMP4;
+  //apply AR10;
+abort;
+
+symbol {|04.trace|} [a c p q] :
+  Thm (a and p and (p => q) and (c => q)) ≔
+begin
+  assume a c p q;
+abort;
 
 
 symbol {|05.trace|} [p q] :
-  ✓ (not (p or q) => not p) ≔
+  Thm (not (p or q) => not p) ≔
 begin
   assume p q;
-  simplify;
   apply OR1;
   apply IMP4;
   apply AXM4;
-  simplify elem;
-  refine TOP;
 end;
 
 
 symbol {|06.trace|} [p q] :
-  ✓ (not (p and (not p) or (q and not q))) ≔
+  Thm (not (p and (not p) or (q and not q))) ≔
 begin
   assume p q;
   simplify;
@@ -32,21 +74,17 @@ begin
     apply IMP4;
     apply NOT2;
     apply AXM3;
-    simplify elem;
-    refine TOP;
   }{
     apply AND2;
     apply IMP4;
     apply NOT2;
     apply AXM3;
-    simplify elem;
-    refine TOP;
   };
 end;
 
 
 symbol {|07.trace|} [p q] :
-  ✓ ((p or q) => (q or p)) ≔
+  Thm ((p or q) => (q or p)) ≔
 begin
   assume p q;
   simplify;
@@ -55,19 +93,15 @@ begin
     apply IMP4;
     apply OR4;
     apply AXM2;
-    simplify elem;
-    refine TOP;
   }{
     apply IMP4;
     apply OR4;
     apply AXM4;
-    simplify elem;
-    refine TOP;
   };
 end;
 
 symbol {|08.trace|} [p q] :
-  ✓ (not (p => q) => not q) ≔
+  Thm (not (p => q) => not q) ≔
 begin
   assume p q;
   simplify;
@@ -78,7 +112,7 @@ end;
 
 
 symbol {|09.trace|} [p] :
-  ✓ (not ((p or not p) => (p and not p))) ≔
+  Thm (not ((p or not p) => (p and not p))) ≔
 begin
   assume p;
   simplify;
@@ -88,8 +122,6 @@ begin
     apply IMP4;
     apply NOT2;
     apply AXM3;
-    simplify elem;
-    refine TOP;
   }{
     apply OR4;
     apply AXM7;
@@ -98,26 +130,20 @@ end;
 
 
 symbol {|10.trace|} [p] :
-  ✓ (p => not p => not p) ≔
+  Thm (p => not p => not p) ≔
 begin
   assume p;
-  simplify;
   apply IMP3
-  {
-    apply AXM7;
-  }{
-    apply AXM7;
-  };
+  { apply AXM7 }
+  { apply AXM7 }
 end;
 
 symbol {|11.trace|} [p] :
-  ✓ (p => (p => p and p)) ≔
+  Thm (p => (p => p and p)) ≔
 begin
   assume p;
-  simplify;
   apply IMP4;
-
-  // apply IMP5 (1);
+  // apply IMP5;
   // apply AND4;
   // apply AXM3;
   // apply AXM3;

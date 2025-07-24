@@ -1,8 +1,5 @@
 require open pp2lp.Syntax;
 
-coerce_rule coerce String Exp $x ↪ VAR $x;
-assert ⊢ ("x" = "x") : Prd;
-
 // --- production rules -------------
 symbol STOP_1 [H : El (list prd)] [P : El prd] :
   Res (H ⟝ P);
@@ -89,6 +86,8 @@ begin
   };
 end;
 
+type ALL7 _ _;
+
 type AXM7;
 type NRM1;
 type NRM1 (AXM7);
@@ -106,18 +105,3 @@ type ALL2;
 assert
   ⊢ ALL2 (ALL6 (ALL7 (EVR2_1 (STOP_1)) (NRM1 (AXM7))))
   : Thm (not (! ("x" ⋅) (! ("y" ⋅) (not ("x" = "x")))));
-
-symbol {|22.trace|} : Thm (not (! ("x" ⋅) (! ("y" ⋅) (not ("x" = "x"))))) ≔
-begin
-  apply ALL2;
-  apply ALL6;
-  apply ALL7
-  {
-    apply EVR2_1;
-    apply STOP_1;
-  }
-  {
-    apply NRM1;
-    apply AXM7;
-  }
-end;
