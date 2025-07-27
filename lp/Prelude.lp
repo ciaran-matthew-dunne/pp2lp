@@ -6,13 +6,13 @@ builtin "P" ≔ Prf;
 
 // meta-level booleans
 symbol bool : Set;
+symbol Bool ≔ El bool;
 //rule El bool ↪ Prop;
 
-symbol ite [a : Set] :
-  El (bool ⤳ a ⤳ a ⤳ a);
+symbol ite [a : Set] : El (bool ⤳ a ⤳ a ⤳ a);
 
-symbol true  : El bool;
-symbol false : El bool;
+symbol true  : Bool;
+symbol false : Bool;
 
 rule ite true $x _ ↪ $x
 with ite false _ $y ↪ $y;
@@ -31,12 +31,10 @@ injective symbol list : Set → Set;
 injective symbol nil [a : Set] : El (list a);
 injective symbol cons [a : Set] : El (a ⤳ list a ⤳ list a);
 
+symbol ⋅ [a : Set] : El (a ⤳ list a);
+notation ⋅ postfix 10;
 
-injective symbol ∷ [a : Set] ≔ cons [a];
-symbol ⋅ [a : Set] (x : El a) ≔ cons x nil;
 symbol ⨾ [a : Set] (x y : El a) ≔ cons x (cons y nil);
-notation ∷ infix right 5;
-notation ⋅ postfix 0;
 notation ⨾ infix right 5;
 
 symbol concat [a : Set] : El (list a ⤳ list a ⤳ list a);
@@ -56,9 +54,9 @@ notation ∈ infix 0;
 sequential symbol replace [a : Set] :
   El (a ⤳ a ⤳ list a ⤳ list a);
 
-rule (replace  _ $y nil)          ↪ nil
-with (replace $x $y ($x ∷ $zs))   ↪ $y ∷ $zs
-with (replace $x $y ($z ∷ $zs))   ↪ $z ∷ (replace $x $y $zs);
+rule (replace  _ $y nil)             ↪ nil
+with (replace $x $y (cons $x $zs))   ↪ cons $y $zs
+with (replace $x $y (cons $z $zs))   ↪ cons $z (replace $x $y $zs);
 
 
 // `nub xs` removes duplicate elements from `xs`.

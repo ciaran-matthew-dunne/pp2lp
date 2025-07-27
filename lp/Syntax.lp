@@ -3,37 +3,11 @@ require open Logic.U.Arrow Logic.U.DepArrow Logic.U.Quant;
 require open pp2lp.Prelude;
 
 // ------ predicates, expressions, formulas ------
-symbol idt ≔ string;
-symbol vrb ≔ list idt;
-
-//symbol Frm : TYPE;
-
-//inductive Exp : TYPE ≔
-//  | VAR : El idt → Exp
-//  | ZERO : Exp
-//  | ONE : Exp
-//  | MINUS : Exp → Exp → Exp
-//  | ADD : Exp → Exp → Exp
-//  | SUB : Exp → Exp → Exp
-//with Prd : TYPE ≔
-//  | AND : Prd → Prd → Prd
-//  | OR  : Prd → Prd → Prd
-//  | IMPL : Prd → Prd → Prd
-//  | IFF  : Prd → Prd → Prd
-//  | NOT : Prd → Prd
-//  | ALL : El vrb → Prd → Prd
-//  | EXI : El vrb → Prd → Prd
-//  | EQ  : Exp → Exp → Prd
-//  | ATOM : Frm → Prd;
-
+symbol idt : Set ≔ string;
+symbol vrb : Set ≔ list idt;
 symbol prd : Set;
 symbol exp : Set;
 symbol frm : Set;
-
-//rule El prd ↪ Prd;
-//rule El exp ↪ Exp;
-//rule El frm ↪ Frm;
-
 
 // ------ primitive logical symbols --------------
 injective symbol and  : El (prd ⤳ prd ⤳ prd);
@@ -65,7 +39,6 @@ symbol FAUX : El prd;
 injective symbol != (a b : El exp) ≔ not (a = b);
 notation !=  infix left 2;
 
-
 // ----- Arithmetic -----------------------
 // similarly for arithmetic relation symbols, why are these not in the grammar for prd?
 symbol > : El (exp ⤳ exp ⤳ prd);
@@ -88,43 +61,53 @@ notation - infix 5;
 
 // ------ Sequents ---------------------------
 symbol seq : Set;
-symbol Seq ≔ El seq;
-injective symbol ⟝ : El (list prd ⤳ prd ⤳ seq);
-notation ⟝ infix 0;
+injective symbol ⟝ : El (list prd ⤳ prd ⤳ seq); notation ⟝ infix 0;
 
 // sequent derivations
-//injective symbol Drv : El seq → TYPE;
-injective symbol ▷ : Seq → Set;
-//rule El (▷ $Σ) ↪ Drv $Σ;
+injective symbol ✓ : El bool → El seq → TYPE;
+injective symbol ▷ : El seq → TYPE;
+rule (▷ $Σ) ↪ ✓ true $Σ;
 
-// type-level side-conditions
-injective symbol If : El bool → Set → TYPE;
-rule If true $X ↪ El $X;
-
-symbol Thm : El prd → TYPE;
-rule Thm $p ↪ El (▷ (nil ⟝ $p));
+injective symbol Thm : El prd → TYPE;
+rule Thm $p ↪ ▷ (nil ⟝ $p);
 
 
 // ---- Results ------------------------------
-injective symbol Res : Seq → TYPE;
-symbol obtain [Σ : Seq] : Res Σ → El prd;
+injective symbol Res : El seq → TYPE;
+symbol obtain [Σ : El seq] : Res Σ → El prd;
 symbol result [Σ : El seq] : El prd → Res Σ;
 
+rule obtain (result $P) ↪ $P;
 coerce_rule coerce (Res $Σ) (El prd) $ρ ↪ obtain $ρ;
 
 // ----- Operations on terms -----------------------
 
+// boolean disjunction
+sequential symbol <> : El (bool ⤳ bool ⤳ bool);
+notation <> infix 5;
+rule (true <> _)      ↪ true
+with (_ <> true)      ↪ true
+with (false <> false) ↪ false;
+
+// boolean conjunction
+sequential symbol && : El (bool ⤳ bool ⤳ bool);
+notation && infix 5;
+rule (true && true) ↪ true
+with (false && _)   ↪ false
+with (_ && false)   ↪ false;
+
+// boolean negation
+sequential symbol !! : El (bool ⤳ bool);
+rule (!! true) ↪ false
+with (!! false) ↪ true;
+
 // syntactic equality on expressions and predicates.
 sequential symbol == [a : Set] : El (a ⤳ a ⤳ bool);
-sequential symbol !== [a : Set] : El (a ⤳ a ⤳ bool);
-sequential symbol && : El (bool ⤳ bool ⤳ bool);
-sequential symbol !! : El (bool ⤳ bool);
-
 notation == infix 5;
-notation !== infix 5;
-notation && infix 5;
 
-rule ($X !== $Y) ↪ ite ($X == $Y) false true;
+symbol !== [a : Set] : El (a ⤳ a ⤳ bool)
+  ≔ λ x y, !! (x == y);
+notation !== infix 5;
 
 rule ((==) [string] $x $x) ↪ true
 with ((==) [string] _  _)  ↪ false;
@@ -146,15 +129,20 @@ with ($e1 != $e2) == ($f1 != $f2)   ↪ ($e1 == $f1) && ($e2 == $f2);
 
 // ------- free vars, substitution ----------------
 symbol free [a : Set] : El (idt ⤳ a ⤳ bool);
-//rule free $x (AND $P $Q)  ↪ (free $x $P) ∨ (free $x $Q)
-//with free $x (OR $P $Q)   ↪ (free $x $P) ∨ (free $x $Q)
-//with free $x (IMPL $P $Q) ↪ (free $x $P) ∨ (free $x $Q)
-//with free $x (IFF $P $Q)  ↪ (free $x $P) ∨ (free $x $Q)
-//with free $x (NOT $P)     ↪ free $x $P
-//with free $x (ALL $vs $P) ↪ (free $x $P) ∧ ¬($x ∈ $vs)
-//with free $x (EXI $vs $P) ↪ (free $x $P) ∧ ¬($x ∈ $vs)
-//with free $x (EQ $e1 $e2) ↪ (free $x $e1) ∨ (free $x $e2)
-//with free $x (ATOM $f)    ↪ free $x $f;
+
+rule free $x (var $y) ↪ ($x == $y);
+
+rule free $x ($P and $Q)  ↪ (free $x $P) <> (free $x $Q)
+with free $x ($P or $Q)   ↪ (free $x $P) <> (free $x $Q)
+with free $x ($P => $Q)   ↪ (free $x $P) <> (free $x $Q)
+with free $x ($P <=> $Q)  ↪ (free $x $P) <> (free $x $Q)
+with free $x (not $P)     ↪ free $x $P
+with free $x (! $vs $P)   ↪ (free $x $P) && !! ($x ∈ $vs)
+with free $x (# $vs $P)   ↪ (free $x $P) && !! ($x ∈ $vs)
+with free $x ($e1 = $e2)  ↪ (free $x $e1) <> (free $x $e2)
+with free $x (atom $f)    ↪ (free $x $f)
+with free $x FAUX ↪ false
+with free $x VRAI ↪ false;
 
 symbol subst [a : Set] : El (idt ⤳ exp ⤳ a ⤳ a);
 //rule subst $x $t (VAR $y)     ↪ ite ($x == $y) $t (VAR $y)
@@ -185,3 +173,74 @@ sequential symbol repl_conj : El (prd ⤳ prd ⤳ prd ⤳ prd);
 rule repl_conj $Q $Q' ($Q and $xs) ↪ ($Q' and $xs)
 with repl_conj $Q $Q' ($P and $xs) ↪ ($P  and (repl_conj $Q $Q' $xs))
 with repl_conj _  _   $R           ↪ $R;
+
+ constant symbol Tactic : TYPE;
+
+  constant symbol #admit : Tactic;
+  builtin "admit" ≔ #admit;
+
+  symbol & : Tactic → Tactic → Tactic;
+  builtin "and" ≔ &;
+  notation & infix right 10;
+
+  constant symbol #apply [p] : El p → Tactic;
+  builtin "apply" ≔ #apply;
+
+  constant symbol #assume : String → Tactic;
+  builtin "assume" ≔ #assume;
+
+  constant symbol #change [p] : Prf p → Tactic;
+  builtin "change" ≔ #change;
+
+  constant symbol #fail : Tactic;
+  builtin "fail" ≔ #fail;
+
+  constant symbol #generalize : Π [a], El a → Tactic;
+  builtin "generalize" ≔ #generalize;
+
+  constant symbol #have : String → Prop → Tactic;
+  builtin "have" ≔ #have;
+
+  constant symbol #induction : Tactic;
+  builtin "induction" ≔ #induction;
+
+  constant symbol #orelse : Tactic → Tactic → Tactic;
+  builtin "orelse" ≔ #orelse;
+
+  constant symbol #refine : String → Tactic;
+  builtin "refine" ≔ #refine;
+
+  constant symbol #reflexivity : Tactic;
+  builtin "reflexivity" ≔ #reflexivity;
+
+  constant symbol #remove : Π [a], Prf a → Tactic;
+  builtin "remove" ≔ #remove;
+
+  constant symbol #repeat : Tactic → Tactic;
+  builtin "repeat" ≔ #repeat;
+
+  constant symbol #rewrite_gen : String → String → Π [p], Prf p → Tactic;
+  builtin "rewrite" ≔ #rewrite_gen;
+
+  symbol #rewrite : Π [p], Prf p → Tactic ≔ @#rewrite_gen "" "";
+
+  constant symbol #set : String → Π [a], Prf a → Tactic;
+  builtin "set" ≔ #set;
+
+  constant symbol #simplify : /* Π [a], τ a → */ Tactic;
+  builtin "simplify" ≔ #simplify;
+
+  constant symbol #simplify_beta : Tactic;
+  builtin "simplify rule off" ≔ #simplify_beta;
+
+  constant symbol #solve : Tactic;
+  builtin "solve" ≔ #solve;
+
+  constant symbol #symmetry : Tactic;
+  builtin "symmetry" ≔ #symmetry;
+
+  constant symbol #try : Tactic → Tactic;
+  builtin "try" ≔ #try;
+
+  constant symbol #why3 : /*τ (option string) →*/ Tactic;
+  builtin "why3" ≔ #why3;
