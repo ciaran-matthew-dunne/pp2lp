@@ -61,7 +61,8 @@ notation - infix 5;
 
 // ------ Sequents ---------------------------
 symbol seq : Set;
-injective symbol ⟝ : El (list prd ⤳ prd ⤳ seq); notation ⟝ infix 0;
+injective symbol ⟝ : El (list prd ⤳ prd ⤳ seq);
+notation ⟝ infix 0;
 
 // sequent derivations
 injective symbol ✓ : El bool → El seq → TYPE;
@@ -81,26 +82,6 @@ rule obtain (result $P) ↪ $P;
 coerce_rule coerce (Res $Σ) (El prd) $ρ ↪ obtain $ρ;
 
 // ----- Operations on terms -----------------------
-
-// boolean disjunction
-sequential symbol <> : El (bool ⤳ bool ⤳ bool);
-notation <> infix 5;
-rule (true <> _)      ↪ true
-with (_ <> true)      ↪ true
-with (false <> false) ↪ false;
-
-// boolean conjunction
-sequential symbol && : El (bool ⤳ bool ⤳ bool);
-notation && infix 5;
-rule (true && true) ↪ true
-with (false && _)   ↪ false
-with (_ && false)   ↪ false;
-
-// boolean negation
-sequential symbol !! : El (bool ⤳ bool);
-rule (!! true) ↪ false
-with (!! false) ↪ true;
-
 // syntactic equality on expressions and predicates.
 sequential symbol == [a : Set] : El (a ⤳ a ⤳ bool);
 notation == infix 5;
@@ -119,13 +100,12 @@ with ($p1 and $p2) == ($q1 and $q2) ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($p1 or $p2) == ($q1 or $q2)   ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($p1 => $p2) == ($q1 => $q2)   ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($p1 <=> $p2) == ($q1 <=> $q2) ↪ ($p1 == $q1) && ($p2 == $q2)
-with ($e1 = $e2) == ($f1 = $f2)     ↪ ($e1 == $f1) && ($e2 == $f2)
-with ($e1 != $e2) == ($f1 != $f2)   ↪ ($e1 == $f1) && ($e2 == $f2);
+with ($e1 = $e2) == ($f1 = $f2)     ↪ ($e1 == $f1) && ($e2 == $f2);
+//with ($e1 !== $e2) == ($f1 !== $f2)   ↪ ($e1 == $f1) && ($e2 == $f2);
 //with (! $P) == (! $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (# $P) == (# $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (♢ $P) == (♢ $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (♡ $P) == (♡ $Q) ↪ (`∀ x, ($P x == $Q x`));
-
 
 // ------- free vars, substitution ----------------
 symbol free [a : Set] : El (idt ⤳ a ⤳ bool);

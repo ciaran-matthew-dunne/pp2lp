@@ -1,23 +1,5 @@
 require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 
-// setup for inductive types
-builtin "Prop" ≔ Prop;
-builtin "P" ≔ Prf;
-
-// meta-level booleans
-symbol bool : Set;
-symbol Bool ≔ El bool;
-//rule El bool ↪ Prop;
-
-symbol ite [a : Set] : El (bool ⤳ a ⤳ a ⤳ a);
-
-symbol true  : Bool;
-symbol false : Bool;
-
-rule ite true $x _ ↪ $x
-with ite false _ $y ↪ $y;
-
-
 // strings
 symbol String : TYPE;
 builtin "String" ≔ String;
@@ -25,6 +7,37 @@ builtin "String" ≔ String;
 constant symbol string : Set;
 rule El string ↪ String;
 
+// meta-level booleans
+symbol bool : Set;
+symbol Bool ≔ El bool;
+// ?? rule El bool ↪ Prop;
+
+symbol ite [a : Set] : El (bool ⤳ a ⤳ a ⤳ a);
+symbol true  : Bool;
+symbol false : Bool;
+
+rule ite true $x _ ↪ $x
+with ite false _ $y ↪ $y;
+
+
+// boolean disjunction
+sequential symbol <> : El (bool ⤳ bool ⤳ bool);
+notation <> infix 5;
+rule (true <> _)      ↪ true
+with (_ <> true)      ↪ true
+with (false <> false) ↪ false;
+
+// boolean conjunction
+sequential symbol && : El (bool ⤳ bool ⤳ bool);
+notation && infix 5;
+rule (true && true) ↪ true
+with (false && _)   ↪ false
+with (_ && false)   ↪ false;
+
+// boolean negation
+sequential symbol !! : El (bool ⤳ bool);
+rule (!! true) ↪ false
+with (!! false) ↪ true;
 
 // lists
 injective symbol list : Set → Set;
