@@ -1,0 +1,95 @@
+# LaTeX/TeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.figlist
+*.log
+*.lof
+*.lot
+*.makefile
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+*.out
+*.pdfsync
+*.synctex
+*.synctex(busy)
+*.synctex.gz
+*.synctex.gz(busy)
+*.pdftex
+*.nav
+*.snm
+*.vrb
+*.xdv
+*.run.xml
+
+# Atelier B build artifacts and temporary files
+*.bxml
+*.chk
+*.dep
+*.nf
+*.pmi
+*.po
+*.pog
+*.pos
+*.why
+*.db
+*.dot
+*.lib
+.lib
+.project
+.usedby_*
+aaaa*
+replay.*
+btraces
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build directories
+build/
+dist/
+out/
+target/
+
+# Logs
+*.log
+logs/
