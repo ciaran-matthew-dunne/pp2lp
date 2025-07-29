@@ -73,10 +73,10 @@ symbol IMP4 [H : El (list prd)] [P Q : El prd] :
   ▷ (H ⟝ P => Q);
 
 symbol IMP5 [H : El (list prd)] [P Q : El prd] :
-  ✓ (P ∈ H) (H ⟝ Q) →
+  ✓ (P ⋿ H) (H ⟝ Q) →
   ▷ (H ⟝ P => Q);
 
-symbol IMP4' [H : El (list prd)] [P Q : El prd] :
+symbol IMP4_1 [H : El (list prd)] [P Q : El prd] :
   Res (cons P H ⟝ Q) →
   Res (H ⟝ P => Q)
 ≔
@@ -120,22 +120,22 @@ symbol NOT2 [H : El (list prd)] [P : El prd] :
 // 5.6. Axioms
 // ----------------------------------------------
 symbol AXM1 [H : El (list prd)] [P Q : El prd] :
-  ✓ (not P ∈ H) (H ⟝ P => Q);
+  ✓ (not P ⋿ H) (H ⟝ P => Q);
 
 symbol AXM2 [H : El (list prd)] [P Q : El prd] :
-  ✓ (P ∈ H) (H ⟝ not P => Q);
+  ✓ (P ⋿ H) (H ⟝ not P => Q);
 
 symbol AXM3 [H : El (list prd)] [P : El prd] :
-  ✓ (P ∈ H) (H ⟝ P);
+  ✓ (P ⋿ H) (H ⟝ P);
 
 symbol AXM4 [H : El (list prd)] [P R : El prd] :
-  ✓ (R ∈ H) (H ⟝ P => R);
+  ✓ (R ⋿ H) (H ⟝ P => R);
 
 symbol AXM5 [H : El (list prd)] [P Q R : El prd] :
-  ✓ (not Q ∈ H) (H ⟝ P => (Q => R));
+  ✓ (not Q ⋿ H) (H ⟝ P => (Q => R));
 
 symbol AXM6 [H : El (list prd)] [P Q R : El prd] :
-  ✓ (Q ∈ H) (H ⟝ P => (not Q => R));
+  ✓ (Q ⋿ H) (H ⟝ P => (not Q => R));
 
 symbol AXM7 [H : El (list prd)] [P : El prd] :
   ▷ (H ⟝ P => P);
@@ -145,9 +145,14 @@ symbol AXM8 [H : El (list prd)] [P R : El prd] :
 
 // probably broken. need to handle side condition.
 // 'given E such that [x := E] P = R'
-symbol AXM9 [H : El (list prd)] [P Q R : El prd] [x : El idt] [E : El exp] :
-  ✓ (((! (x ⋅) (not (VRAI and P))) ∈ H) && (subst x E P == R))
-     (H ⟝ R => Q);
+symbol AXM9 [H : El (list prd)] [P Q R : El prd] [x : El idt] [E : El exp]
+:
+  ✓ (
+      (! (x ⋅) (not (VRAI and P)) ⋿ H)
+    &&
+      (subst x E P == R)
+    )
+    (H ⟝ R => Q);
 
 // ----------------------------------------------
 // 5.7. Universal quantification
@@ -168,9 +173,9 @@ symbol ALL4 [x y : El idt] [H : El (list prd)] [P : El prd] :
   ✓ (x !== y) (H ⟝ ! (x ⨾ y) P) →
   ▷ (H ⟝ ! (x ⋅) (! (y ⋅) P));
 
-symbol ALL5 [H : El (list prd)] [x : El idt] [P R : El prd] :
-  ▷ (H ⟝ ! (x ⋅) (not (P => R))) →
-  ▷ (H ⟝ (not (! (x ⋅) P)) => R);
+symbol ALL5 [H : El (list prd)] [P R : El prd] [xs : El vrb] :
+  ▷ (H ⟝ ! (xs) (not P => R)) →
+  ▷ (H ⟝ (not (! (xs) P)) => R);
 
 symbol ALL6 [H : El (list prd)] [P : El prd] [xs : El vrb] :
   ▷ (H ⟝ ! xs P => FAUX) →
@@ -185,9 +190,9 @@ symbol ALL8 [H : El (list prd)] [P : El prd] [xs : El vrb] :
   ▷ (H ⟝ P) →
   ▷ (H ⟝ ! xs P);
 
-symbol ALL9 [H : El (list prd)] [T Q : El prd] [x : El idt] :
-  ▷ (cons (! (x ⋅) T) H ⟝ Q) →
-  ▷ (H ⟝ ♡ (x ⋅) T => Q);
+symbol ALL9 [H : El (list prd)] [T Q : El prd] [xs : El vrb] :
+  ▷ (cons (! xs T) H ⟝ Q) →
+  ▷ (H ⟝ (♡ xs T) => Q);
 
 symbol ALL7_1 [H : El (list prd)] [P Q R S : El prd] [x : El idt] :
   Π R : Res (H ⟝ P),
@@ -196,13 +201,13 @@ symbol ALL7_1 [H : El (list prd)] [P Q R S : El prd] [x : El idt] :
 ≔
   (λ _ ρ, result (obtain ρ));
 
-symbol ALL8' [H : El (list prd)] [P Q : El prd] [x : El idt] :
+symbol ALL8_1 [H : El (list prd)] [P : El prd] [x : El idt] :
   Res (H ⟝ P) →
   Res (H ⟝ (! (x ⋅) P))
 ≔
   (λ ρ, result (! (x ⋅) (obtain ρ)));
 
-symbol ALL9' [H : El (list prd)] [P Q R : El prd] [x : El idt] :
+symbol ALL9_1 [H : El (list prd)] [P Q R : El prd] [x : El idt] :
   Res (cons (! (x ⋅) P) H ⟝ Q) →
   Res (H ⟝ (♡ (x ⋅) P) => Q)
 ≔
@@ -247,13 +252,19 @@ symbol XST7 [x : El idt] [H : El (list prd)] [P R : El prd] :
   ✓ (!! (free x R)) (H ⟝ ! (x ⋅) (P => R)) →
   ▷ (H ⟝ (# (x ⋅) P) => R);
 
+symbol XST7_1 [x : El idt] [H : El (list prd)] [P R : El prd] :
+  Res ((H ⟝ ! (x ⋅) (P => R))) →
+  Res (H ⟝ (# (x ⋅) P) => R)
+≔
+  (λ ρ, result (obtain ρ));
+
+
 symbol XST8 [x y : El idt] [H : El (list prd)] [P : El prd] :
   Π R : Res (H ⟝ not P),
   ▷ (H ⟝ (! (x ⋅) R) => FAUX) →
   ▷ (H ⟝ (# (x ⋅) P));
 
 // redundant rules.
-symbol XST7_1 [x : El idt] [H : El (list prd)] [P R Q : El prd] : TYPE;
 symbol XST8_1 [x y : El idt] [H : El (list prd)] [P R A : El prd] : TYPE;
 
 // ----------------------------------------------
@@ -346,7 +357,7 @@ symbol NRM7 [H : El (list prd)] [P Q S : El prd] [x : El idt] :
   ▷ (H ⟝ (♢ (x ⋅) (P and Q) => S));
 
 symbol NRM8 [H : El (list prd)] [Q S : El prd] [x y : El idt] :
-  ▷ (H ⟝ (♢ (x ⋅) (♢ (y ⋅) Q)) => S) →
+  ▷ (H ⟝ (♢ (x ⨾ y) Q) => S) →
   ▷ (H ⟝ (♢ (x ⋅) (! (y ⋅) Q)) => S);
 
 symbol NRM9 [H : El (list prd)] [P Q S : El prd] [x y : El idt] :
@@ -365,9 +376,9 @@ symbol NRM12 [H : El (list prd)] [P Q R : El prd] [x : El idt] :
   ▷ (H ⟝ ♡ (x ⋅) (not (P and Q) => R)) →
   ▷ (H ⟝ ♢ (x ⋅) ((P => not Q) => R));
 
-symbol NRM13 [H : El (list prd)] [P Q R : El prd] [x : El idt] :
-  ▷ (H ⟝ ♡ (x ⋅) not (P and not Q) => R) →
-  ▷ (H ⟝ ♢ (x ⋅) (P => Q) => R);
+symbol NRM13 [H : El (list prd)] [P Q R : El prd] [xs : El vrb] :
+  ▷ (H ⟝ ♡ (xs) (not (P and not Q)) => R) →
+  ▷ (H ⟝ ♢ (xs) (P => Q) => R);
 
 symbol NRM14 [H : El (list prd)] [P R : El prd] [x : El idt] :
   ▷ (H ⟝ ♡ (x ⋅) not (VRAI and P) => R) →
@@ -378,11 +389,11 @@ symbol NRM15 [H : El (list prd)] [P R : El prd] [x : El idt] :
   ▷ (H ⟝ (♢ (x ⋅) P) => R);
 
 symbol NRM16 [H : El (list prd)] [P : El prd] [Q : El prd] [x : El idt] :
-  ✓ ((! (x ⋅) P) ∈ H) (H ⟝ Q) →
+  ✓ ((! (x ⋅) P) ⋿ H) (H ⟝ Q) →
   ▷ (H ⟝ (♡ (x ⋅) P) => Q);
 
 symbol NRM17 [H : El (list prd)] [P Q R : El prd] [E : El exp] [x y : El idt] :
-  ✓ (((! (x ⋅) not (VRAI and P)) ∈ H) && (subst x E P == R))
+  ✓ (((! (x ⋅) not (VRAI and P)) ⋿ H) && (subst x E P == R))
     (H ⟝ (♡ (y ⋅) (not (VRAI and (not P))) => Q));
 
 // ----------------------------------------------
@@ -421,11 +432,11 @@ symbol EAXM3_2 [H : El (list prd)] [E F : El exp] [P : El prd] :
   ✓ (elem (not (F = E)) H) (H ⟝ not (E = F));
 
 symbol EIMP5_1 [H : El (list prd)] [E F : El exp] [P : El prd] :
-  ✓ ((not (F = E)) ∈ H) (H ⟝ P) →
+  ✓ ((not (F = E)) ⋿ H) (H ⟝ P) →
   ▷ (H ⟝ not (E = F) => P);
 
 symbol EIMP5_2 [H : El (list prd)] [E F : El exp] [P : El prd] :
-  ✓ ((F = E) ∈ H) (H ⟝ P) →
+  ✓ ((F = E) ⋿ H) (H ⟝ P) →
   ▷ (H ⟝ (E = F) => P);
 
 symbol EQC1 [H : El (list prd)] [a b c d : El exp] [P : El prd] :
@@ -459,7 +470,7 @@ symbol AR3 [a : El exp] [H : El (list prd)] [R : El prd] :
   ▷ (H ⟝ not (a ≤ 𝟎) => R);
 
 symbol AR4 [E F : El exp] [H : El (list prd)] [R : El prd] :
-  ✓ (((F ≤ 𝟎) ∈ H) && (ev ((E + F) > 𝟎))) (H ⟝ E ≤ 𝟎 => R);
+  ✓ (((F ≤ 𝟎) ⋿ H) && (ev ((E + F) > 𝟎))) (H ⟝ E ≤ 𝟎 => R);
 
 symbol AR5 [a : El exp] [H : El (list prd)] [R : El prd] :
   ✓ (elem (a ≪ 𝟎) H) (H ⟝ (a = 𝟎 => (⨪ a ≤ 𝟎 => R))) →

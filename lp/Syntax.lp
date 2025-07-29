@@ -58,6 +58,20 @@ notation ≪ infix 5;
 notation + infix 5;
 notation - infix 5;
 
+// TODO.
+// operator to apply set to obtain expression
+injective symbol ‵ : El (exp ⤳ exp ⤳ prd);
+notation ‵ infix 10;
+
+// operator to apply set to obtain predicate
+injective symbol ‶ : El (exp ⤳ exp ⤳ exp);
+notation ‶ infix 10;
+
+injective symbol ∈ : El (list exp ⤳ exp ⤳ prd);
+notation ∈ infix left 2;
+
+// ordered pairs
+symbol opair : El (exp ⤳ exp ⤳ exp);
 
 // ------ Sequents ---------------------------
 symbol seq : Set;
@@ -93,6 +107,8 @@ notation !== infix 5;
 rule ((==) [string] $x $x) ↪ true
 with ((==) [string] _  _)  ↪ false;
 
+rule (var $x == var $y) ↪ ($x == $y);
+
 rule FAUX == FAUX ↪ true
 with VRAI == VRAI ↪ true
 with (not $p) == (not $q)           ↪ ($p == $q)
@@ -101,11 +117,12 @@ with ($p1 or $p2) == ($q1 or $q2)   ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($p1 => $p2) == ($q1 => $q2)   ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($p1 <=> $p2) == ($q1 <=> $q2) ↪ ($p1 == $q1) && ($p2 == $q2)
 with ($e1 = $e2) == ($f1 = $f2)     ↪ ($e1 == $f1) && ($e2 == $f2);
-//with ($e1 !== $e2) == ($f1 !== $f2)   ↪ ($e1 == $f1) && ($e2 == $f2);
 //with (! $P) == (! $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (# $P) == (# $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (♢ $P) == (♢ $Q) ↪ (`∀ x, ($P x == $Q x))
 //with (♡ $P) == (♡ $Q) ↪ (`∀ x, ($P x == $Q x`));
+//
+rule ($e1 ‵ $e2) == ($f1 ‵ $f2) ↪ ($e1 == $f1) && ($e2 == $f2);
 
 // ------- free vars, substitution ----------------
 symbol free [a : Set] : El (idt ⤳ a ⤳ bool);
@@ -117,30 +134,38 @@ with free $x ($P or $Q)   ↪ (free $x $P) <> (free $x $Q)
 with free $x ($P => $Q)   ↪ (free $x $P) <> (free $x $Q)
 with free $x ($P <=> $Q)  ↪ (free $x $P) <> (free $x $Q)
 with free $x (not $P)     ↪ free $x $P
-with free $x (! $vs $P)   ↪ (free $x $P) && !! ($x ∈ $vs)
-with free $x (# $vs $P)   ↪ (free $x $P) && !! ($x ∈ $vs)
+with free $x (! $vs $P)   ↪ (free $x $P) && !! ($x ⋿ $vs)
+with free $x (# $vs $P)   ↪ (free $x $P) && !! ($x ⋿ $vs)
 with free $x ($e1 = $e2)  ↪ (free $x $e1) <> (free $x $e2)
 with free $x (atom $f)    ↪ (free $x $f)
+with free $x (opair $y $z) ↪ (free $x $y) <> (free $x $z)
 with free $x FAUX ↪ false
 with free $x VRAI ↪ false;
 
+
+rule free $x ($f ‵ $y) ↪ (free $x $f) <> (free $x $y)
+with free $x ($f ‶ $y) ↪ (free $x $f) <> (free $x $y)
+with free $x (cons [exp] $y $ys) ↪ ite (var $x == $y) true (free $x $ys)
+with free $x (nil)     ↪ false
+with free $x ($y ∈ $z) ↪ (free $x $y) <> (free $x $z);
+
 symbol subst [a : Set] : El (idt ⤳ exp ⤳ a ⤳ a);
-//rule subst $x $t (VAR $y)     ↪ ite ($x == $y) $t (VAR $y)
-//with subst $x $t (AND $P $Q)  ↪ AND (subst $x $t $P) (subst $x $t $Q)
-//with subst $x $t (OR $P $Q)   ↪ OR (subst $x $t $P) (subst $x $t $Q)
-//with subst $x $t (IMPL $P $Q) ↪ IMPL (subst $x $t $P) (subst $x $t $Q)
-//with subst $x $t (IFF $P $Q)  ↪ IFF (subst $x $t $P) (subst $x $t $Q)
-//with subst $x $t (NOT $P)     ↪ NOT (subst $x $t $P)
-//with subst $x $t (ALL $vs $P) ↪ ite ($x ∈ $vs) (ALL $vs $P) (ALL $vs (subst $x $t $P))
-//with subst $x $t (EXI $vs $P) ↪ ite ($x ∈ $vs) (EXI $vs $P) (EXI $vs (subst $x $t $P))
-//with subst $x $t (EQ $e1 $e2) ↪ EQ (subst $x $t $e1) (subst $x $t $e2)
-//with subst $x $t (ATOM $f)    ↪ ATOM (subst $x $t $f);
+rule subst $x $t (var $y)     ↪ ite ($x == $y) $t (var $y)
+with subst $x $t ($P and $Q)  ↪ (subst $x $t $P) and (subst $x $t $Q)
+with subst $x $t ($P or $Q)   ↪ (subst $x $t $P) or (subst $x $t $Q)
+with subst $x $t ($P => $Q)   ↪ (subst $x $t $P) => (subst $x $t $Q)
+with subst $x $t ($P <=> $Q)  ↪ (subst $x $t $P) <=> (subst $x $t $Q)
+with subst $x $t (not $P)     ↪ not (subst $x $t $P)
+with subst $x $t (! $vs $P)   ↪ ite ($x ⋿ $vs) (! $vs $P) (! $vs (subst $x $t $P))
+with subst $x $t (# $vs $P)   ↪ ite ($x ⋿ $vs) (# $vs $P) (# $vs (subst $x $t $P))
+with subst $x $t ($e1 = $e2)  ↪ (subst $x $t $e1) = (subst $x $t $e2)
+with subst $x $t (atom $f)    ↪ atom (subst $x $t $f)
+with subst $x $t ($f ‵ $y) ↪ (subst $x $t $f) ‵ (subst $x $t $y);
 
 // evaluation
 symbol ev [a : Set] [b : Set] : El (a ⤳ b);
 
 // ordered pairs, set equality ??
-symbol opair : El (exp ⤳ exp ⤳ exp);
 symbol eql_set : El (exp ⤳ exp ⤳ prd);
 
 // operations for finding/replacing a term within an n-ary conjunction.
@@ -153,74 +178,3 @@ sequential symbol repl_conj : El (prd ⤳ prd ⤳ prd ⤳ prd);
 rule repl_conj $Q $Q' ($Q and $xs) ↪ ($Q' and $xs)
 with repl_conj $Q $Q' ($P and $xs) ↪ ($P  and (repl_conj $Q $Q' $xs))
 with repl_conj _  _   $R           ↪ $R;
-
- constant symbol Tactic : TYPE;
-
-  constant symbol #admit : Tactic;
-  builtin "admit" ≔ #admit;
-
-  symbol & : Tactic → Tactic → Tactic;
-  builtin "and" ≔ &;
-  notation & infix right 10;
-
-  constant symbol #apply [p] : El p → Tactic;
-  builtin "apply" ≔ #apply;
-
-  constant symbol #assume : String → Tactic;
-  builtin "assume" ≔ #assume;
-
-  constant symbol #change [p] : Prf p → Tactic;
-  builtin "change" ≔ #change;
-
-  constant symbol #fail : Tactic;
-  builtin "fail" ≔ #fail;
-
-  constant symbol #generalize : Π [a], El a → Tactic;
-  builtin "generalize" ≔ #generalize;
-
-  constant symbol #have : String → Prop → Tactic;
-  builtin "have" ≔ #have;
-
-  constant symbol #induction : Tactic;
-  builtin "induction" ≔ #induction;
-
-  constant symbol #orelse : Tactic → Tactic → Tactic;
-  builtin "orelse" ≔ #orelse;
-
-  constant symbol #refine : String → Tactic;
-  builtin "refine" ≔ #refine;
-
-  constant symbol #reflexivity : Tactic;
-  builtin "reflexivity" ≔ #reflexivity;
-
-  constant symbol #remove : Π [a], Prf a → Tactic;
-  builtin "remove" ≔ #remove;
-
-  constant symbol #repeat : Tactic → Tactic;
-  builtin "repeat" ≔ #repeat;
-
-  constant symbol #rewrite_gen : String → String → Π [p], Prf p → Tactic;
-  builtin "rewrite" ≔ #rewrite_gen;
-
-  symbol #rewrite : Π [p], Prf p → Tactic ≔ @#rewrite_gen "" "";
-
-  constant symbol #set : String → Π [a], Prf a → Tactic;
-  builtin "set" ≔ #set;
-
-  constant symbol #simplify : /* Π [a], τ a → */ Tactic;
-  builtin "simplify" ≔ #simplify;
-
-  constant symbol #simplify_beta : Tactic;
-  builtin "simplify rule off" ≔ #simplify_beta;
-
-  constant symbol #solve : Tactic;
-  builtin "solve" ≔ #solve;
-
-  constant symbol #symmetry : Tactic;
-  builtin "symmetry" ≔ #symmetry;
-
-  constant symbol #try : Tactic → Tactic;
-  builtin "try" ≔ #try;
-
-  constant symbol #why3 : /*τ (option string) →*/ Tactic;
-  builtin "why3" ≔ #why3;

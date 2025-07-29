@@ -132,6 +132,7 @@ begin
   { apply AXM7 }
 end;
 
+
 // TODO!
 symbol {|11.trace|} [p] :
   Thm (p => (p => p and p)) ≔
@@ -144,6 +145,7 @@ begin
   // apply AXM3;
 abort;
 
+
 symbol {|12.trace|} [p q] :
   Thm (not (p <=> p) => q) ≔
 begin
@@ -152,6 +154,7 @@ begin
   { apply IMP4; apply AXM2 }
   { apply IMP4; apply AXM1 }
 end;
+
 
 symbol {|13.trace|} [p] :
   Thm (not (p <=> not p)) ≔
@@ -169,6 +172,7 @@ begin
   }
 end;
 
+
 symbol {|14.trace|} [p q] :
   Thm ((p <=> not(p)) => q) ≔
 begin
@@ -185,6 +189,7 @@ begin
   }
 end;
 
+
 symbol {|15.trace|} [p] :
   Thm (p <=> p) ≔
 begin
@@ -194,6 +199,7 @@ begin
   { apply AXM7 }
 end;
 
+
 symbol {|16.trace|} [p q r] :
   Thm (not q => (p => (q => r))) ≔
 begin
@@ -201,6 +207,7 @@ begin
   apply IMP4;
   apply AXM5
 end;
+
 
 symbol {|17.trace|} [p q r] :
   Thm (q => (p => (not q => r))) ≔
@@ -210,6 +217,7 @@ begin
   apply AXM6
 end;
 
+
 symbol {|18.trace|} [p] :
   Thm (
     ! ("a" ⋅) (
@@ -218,3 +226,67 @@ symbol {|18.trace|} [p] :
       (var "a" = var "a" => p)
     )
   );
+
+
+symbol {|19.trace|} [q : El prd] :
+  Thm (
+    ! ("a" ⋅) (
+      (
+        (! ("x" ⋅) (not (VRAI and ((var "p") ‵ (var "x")))))
+      and
+        (! ("x4" ⋅) (
+          (# ("x5" ⋅) ((var "x4" ⨾ var "x5") ∈ (var "p")))
+        =>
+          ((var "x4" ⨾ ((var "p") ‶ (var "x4"))) ∈ (var "p"))
+        ))
+      )
+    =>
+      (
+        ((var "p") ‵ (var "a")) => q
+      )
+    )
+  ) ≔
+begin
+  assume q;
+  simplify;
+  apply ALL8;
+  apply AND3;
+  apply ALL7 {
+    apply AND2_1;
+    apply VR3_1;
+    apply STOP_1;
+  } {
+    apply NRM14;
+    apply ALL9;
+    print;
+    apply ALL7 {
+      apply XST7_1;
+      apply ALL8_1;
+      apply IMP4_1;
+      apply STOP_1;
+    } {
+      simplify;print;
+      apply NRM8;
+      apply NRM13;
+      apply ALL9;
+      // AXM9 really needs guidance...
+      apply AXM9 [_] [var "p" ‵ var "x"] [_] [_] ["x"] [var "a"];
+    };
+  };
+end;
+
+symbol {|20.trace|} [p] :
+  Thm (
+    not (! ("x" ⋅) (! ("y" ⋅) (var "x" = var "y")))
+  =>
+    (p or (not p))
+  ) ≔
+begin
+  assume p;
+  apply ALL1;
+  apply ALL5;
+  apply ALL8;
+  apply IMP4;
+  apply OR4;
+  apply AXM7;
+end;

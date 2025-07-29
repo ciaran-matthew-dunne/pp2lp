@@ -44,7 +44,7 @@ injective symbol list : Set → Set;
 injective symbol nil [a : Set] : El (list a);
 injective symbol cons [a : Set] : El (a ⤳ list a ⤳ list a);
 
-symbol ⋅ [a : Set] : El (a ⤳ list a);
+symbol ⋅ [a : Set] (x : El a) ≔ cons x nil;
 notation ⋅ postfix 10;
 
 symbol ⨾ [a : Set] (x y : El a) ≔ cons x (cons y nil);
@@ -60,8 +60,8 @@ rule (elem _   nil)         ↪ false
 with (elem $x (cons $x _))  ↪ true
 with (elem $x (cons _ $ys)) ↪ (elem $x $ys);
 
-symbol ∈ [a : Set] ≔ elem [a];
-notation ∈ infix 0;
+symbol ⋿ [a : Set] ≔ elem [a];
+notation ⋿ infix 0;
 
 // `replace x y zs` replaces the first instance of `x` in `xs` with `y`.
 sequential symbol replace [a : Set] :
@@ -76,7 +76,7 @@ with (replace $x $y (cons $z $zs))   ↪ cons $z (replace $x $y $zs);
 symbol nub [a : Set] : El (list a ⤳ list a);
 rule nub nil ↪ nil
 with nub (cons $x $xs) ↪
-  ite ($x ∈ $xs)
+  ite ($x ⋿ $xs)
     (nub $xs)
     (cons $x (nub $xs));
 
