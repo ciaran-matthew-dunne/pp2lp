@@ -3,11 +3,24 @@ require open Logic.U.Arrow Logic.U.DepArrow Logic.U.Quant;
 require open pp2lp.Prelude;
 
 // ------ predicates, expressions, formulas ------
-symbol idt : Set ≔ string;
+symbol idt : Set;
 symbol vrb : Set ≔ list idt;
+
+symbol String : TYPE ≔ El idt;
+builtin "String" ≔ String;
+
 symbol prd : Set;
 symbol exp : Set;
 symbol frm : Set;
+
+// cast a formula to a predicate.
+injective symbol Φ : El frm → El prd;
+coerce_rule coerce (El frm) (El prd) $p ↪ Φ $p;
+
+// cast a formula to an expression.
+injective symbol Ψ : El frm → El exp;
+coerce_rule coerce (El frm) (El exp) $p ↪ Ψ $p;
+
 
 // ------ primitive logical symbols --------------
 injective symbol and  : El (prd ⤳ prd ⤳ prd);
@@ -16,10 +29,6 @@ injective symbol =>   : El (prd ⤳ prd ⤳ prd);
 injective symbol <=>  : El (prd ⤳ prd ⤳ prd);
 injective symbol not  : El (prd ⤳ prd);
 injective symbol =    : El (exp ⤳ exp ⤳ prd);
-injective symbol atom : El (frm ⤳ prd);
-injective symbol ! : El (vrb ⤳ prd ⤳ prd);
-injective symbol # : El (vrb ⤳ prd ⤳ prd);
-injective symbol var : El (idt ⤳ exp);
 
 notation =   infix left 2;
 notation and infix left 2;
@@ -27,6 +36,20 @@ notation or  infix left 2;
 notation =>  infix left 2;
 notation <=> infix left 1;
 notation not prefix 3;
+
+injective symbol var : El idt → El exp;
+coerce_rule coerce (El idt) (El exp) $str ↪ var $str;
+assert ⊢ "x" : El exp;
+
+injective symbol ! : El vrb → El prd → El prd;
+injective symbol # : El (vrb ⤳ prd ⤳ prd);
+
+symbol ⋅ : String → El vrb ≔ λ x, cons x nil;
+notation ⋅ postfix 10;
+
+symbol ⨾ : String → String → El vrb ≔ λ x y, cons x (cons y nil);
+notation ⨾ infix right 5;
+
 
 // mystery quantifiers
 injective symbol ♢ : El (vrb ⤳ prd ⤳ prd);  // aka. forall
@@ -60,8 +83,8 @@ notation - infix 5;
 
 // TODO.
 // operator to apply set to obtain expression
-injective symbol ‵ : El (exp ⤳ exp ⤳ prd);
-notation ‵ infix 10;
+injective symbol ‵ : El (frm ⤳ exp ⤳ frm);
+notation ‵ infix left 10;
 
 // operator to apply set to obtain predicate
 injective symbol ‶ : El (exp ⤳ exp ⤳ exp);
@@ -104,8 +127,8 @@ symbol !== [a : Set] : El (a ⤳ a ⤳ bool)
   ≔ λ x y, !! (x == y);
 notation !== infix 5;
 
-rule ((==) [string] $x $x) ↪ true
-with ((==) [string] _  _)  ↪ false;
+rule ((==) [idt] $x $x) ↪ true
+with ((==) [idt] _  _)  ↪ false;
 
 rule (var $x == var $y) ↪ ($x == $y);
 
@@ -123,9 +146,10 @@ with ($e1 = $e2) == ($f1 = $f2)     ↪ ($e1 == $f1) && ($e2 == $f2);
 //with (♡ $P) == (♡ $Q) ↪ (`∀ x, ($P x == $Q x`));
 //
 rule ($e1 ‵ $e2) == ($f1 ‵ $f2) ↪ ($e1 == $f1) && ($e2 == $f2);
+rule _ == _ ↪ false;
 
 // ------- free vars, substitution ----------------
-symbol free [a : Set] : El (idt ⤳ a ⤳ bool);
+sequential symbol free [a : Set] : El (idt ⤳ a ⤳ bool);
 
 rule free $x (var $y) ↪ ($x == $y);
 
@@ -137,17 +161,19 @@ with free $x (not $P)     ↪ free $x $P
 with free $x (! $vs $P)   ↪ (free $x $P) && !! ($x ⋿ $vs)
 with free $x (# $vs $P)   ↪ (free $x $P) && !! ($x ⋿ $vs)
 with free $x ($e1 = $e2)  ↪ (free $x $e1) <> (free $x $e2)
-with free $x (atom $f)    ↪ (free $x $f)
 with free $x (opair $y $z) ↪ (free $x $y) <> (free $x $z)
 with free $x FAUX ↪ false
 with free $x VRAI ↪ false;
 
 
-rule free $x ($f ‵ $y) ↪ (free $x $f) <> (free $x $y)
-with free $x ($f ‶ $y) ↪ (free $x $f) <> (free $x $y)
-with free $x (cons [exp] $y $ys) ↪ ite (var $x == $y) true (free $x $ys)
-with free $x (nil)     ↪ false
-with free $x ($y ∈ $z) ↪ (free $x $y) <> (free $x $z);
+rule free $x (Φ $p) ↪ (free $x $p)
+with free $x ($p ‵ $y) ↪ (free $x $y) <> (free $x $p)
+with free $x _ ↪ false;
+//with free $x ($f ‶ $y) ↪ (free $x $f) <> (free $x $y);
+
+rule free $x (cons [exp] $y $ys)
+  ↪ ite (var $x == $y) true (free $x $ys)
+with free $x (nil)     ↪ false;
 
 symbol subst [a : Set] : El (idt ⤳ exp ⤳ a ⤳ a);
 rule subst $x $t (var $y)     ↪ ite ($x == $y) $t (var $y)
@@ -159,8 +185,13 @@ with subst $x $t (not $P)     ↪ not (subst $x $t $P)
 with subst $x $t (! $vs $P)   ↪ ite ($x ⋿ $vs) (! $vs $P) (! $vs (subst $x $t $P))
 with subst $x $t (# $vs $P)   ↪ ite ($x ⋿ $vs) (# $vs $P) (# $vs (subst $x $t $P))
 with subst $x $t ($e1 = $e2)  ↪ (subst $x $t $e1) = (subst $x $t $e2)
-with subst $x $t (atom $f)    ↪ atom (subst $x $t $f)
 with subst $x $t ($f ‵ $y) ↪ (subst $x $t $f) ‵ (subst $x $t $y);
+
+symbol multisubst [a : Set] : El (vrb ⤳ list exp ⤳ a ⤳ a);
+rule multisubst nil _ $t ↪ $t
+with multisubst _ nil $t ↪ $t
+with multisubst (cons $x $xs) (cons $e $es) $t ↪
+  multisubst $xs $es (subst $x $e $t);
 
 // evaluation
 symbol ev [a : Set] [b : Set] : El (a ⤳ b);

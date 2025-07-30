@@ -1,12 +1,5 @@
 require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 
-// strings
-symbol String : TYPE;
-builtin "String" ≔ String;
-
-constant symbol string : Set;
-rule El string ↪ String;
-
 // meta-level booleans
 symbol bool : Set;
 symbol Bool ≔ El bool;
@@ -39,16 +32,13 @@ sequential symbol !! : El (bool ⤳ bool);
 rule (!! true) ↪ false
 with (!! false) ↪ true;
 
-// lists
+// ------- lists ------------------------------------------
+injective symbol 𝕃 : Set → TYPE;
 injective symbol list : Set → Set;
-injective symbol nil [a : Set] : El (list a);
-injective symbol cons [a : Set] : El (a ⤳ list a ⤳ list a);
+rule El (list $X) ↪ 𝕃 $X;
 
-symbol ⋅ [a : Set] (x : El a) ≔ cons x nil;
-notation ⋅ postfix 10;
-
-symbol ⨾ [a : Set] (x y : El a) ≔ cons x (cons y nil);
-notation ⨾ infix right 5;
+injective symbol nil [a : Set] : 𝕃 a;
+injective symbol cons [a : Set] : El a → 𝕃 a → 𝕃 a;
 
 symbol concat [a : Set] : El (list a ⤳ list a ⤳ list a);
 rule concat nil $ys ↪ $ys
@@ -59,6 +49,11 @@ sequential symbol elem [a : Set] : El (a ⤳ list a ⤳ bool);
 rule (elem _   nil)         ↪ false
 with (elem $x (cons $x _))  ↪ true
 with (elem $x (cons _ $ys)) ↪ (elem $x $ys);
+
+sequential symbol foreach [a : Set] :
+  El ((a ⤳ bool) ⤳ list a ⤳ bool);
+rule foreach $P nil ↪ true;
+rule foreach $P (cons $x $xs) ↪ ($P $x) && foreach $P $xs;
 
 symbol ⋿ [a : Set] ≔ elem [a];
 notation ⋿ infix 0;
@@ -83,3 +78,14 @@ with nub (cons $x $xs) ↪
 // `union xs ys` returns the (set-theoretic) union of `xs` and `ys`.
 symbol union [a : Set] (xs ys : El (list a)) ≔
   concat (nub xs) (nub ys);
+
+
+// ----- product types experiment ------------
+injective symbol ℿ : Set → Set → TYPE;
+symbol fst [X Y : Set] : (ℿ X Y) → El X;
+symbol snd [X Y : Set] : (ℿ X Y) → El Y;
+
+symbol × : Set → Set → Set;
+notation × infix 20;
+
+rule El ($X × $Y) ↪ ℿ $X $Y;

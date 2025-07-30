@@ -1,9 +1,6 @@
 require open Logic.U.Set Logic.U.Prop Logic.U.Arrow;
 require open pp2lp.Prelude pp2lp.Syntax pp2lp.Rules;
 
-coerce_rule coerce String (El exp) $x ↪ var $x;
-assert ⊢ ("x") : El exp;
-
 symbol {|01.trace|} [p q : El prd] :
   Thm (not (p and q) => ((not p) or (not q))) ≔
 begin
@@ -218,62 +215,76 @@ begin
 end;
 
 
-symbol {|18.trace|} [p] :
+symbol {|18.trace|} [p : El frm] :
+
   Thm (
     ! ("a" ⋅) (
-      (! ("x" ⋅) (not (VRAI and (var "x" = var "x"))))
+      (! ("x" ⋅) (not (VRAI and ("x" = "x"))))
     =>
-      (var "a" = var "a" => p)
-    )
-  );
-
-
-symbol {|19.trace|} [q : El prd] :
-  Thm (
-    ! ("a" ⋅) (
-      (
-        (! ("x" ⋅) (not (VRAI and ((var "p") ‵ (var "x")))))
-      and
-        (! ("x4" ⋅) (
-          (# ("x5" ⋅) ((var "x4" ⨾ var "x5") ∈ (var "p")))
-        =>
-          ((var "x4" ⨾ ((var "p") ‶ (var "x4"))) ∈ (var "p"))
-        ))
-      )
-    =>
-      (
-        ((var "p") ‵ (var "a")) => q
-      )
+      ("a" = "a" => p)
     )
   ) ≔
 begin
-  assume q;
-  simplify;
+  assume p;
   apply ALL8;
-  apply AND3;
   apply ALL7 {
     apply AND2_1;
     apply VR3_1;
+    apply EVR2_1;
     apply STOP_1;
   } {
-    apply NRM14;
-    apply ALL9;
+    apply NRM1;
+    apply FX3;
     print;
-    apply ALL7 {
-      apply XST7_1;
-      apply ALL8_1;
-      apply IMP4_1;
-      apply STOP_1;
-    } {
-      simplify;print;
-      apply NRM8;
-      apply NRM13;
-      apply ALL9;
-      // AXM9 really needs guidance...
-      apply AXM9 [_] [var "p" ‵ var "x"] [_] [_] ["x"] [var "a"];
-    };
   };
 end;
+
+//symbol {|19.trace|} [q : El prd] :
+//  Thm (
+//    ! ("a" ⋅) (
+//      (
+//        (! ("x" ⋅) (not (VRAI and ((var "p") ‵ (var "x")))))
+//      and
+//        (! ("x4" ⋅) (
+//          (# ("x5" ⋅) ((var "x4" ⨾ var "x5") ∈ (var "p")))
+//        =>
+//          ((var "x4" ⨾ ((var "p") ‶ (var "x4"))) ∈ (var "p"))
+//        ))
+//      )
+//    =>
+//      (
+//        ((var "p") ‵ (var "a")) => q
+//      )
+//    )
+//  ) ≔
+//begin
+//  assume q;
+//  simplify;
+//  apply ALL8;
+//  apply AND3;
+//  apply ALL7 {
+//    apply AND2_1;
+//    apply VR3_1;
+//    apply STOP_1;
+//  } {
+//    apply NRM14;
+//    apply ALL9;
+//    print;
+//    apply ALL7 {
+//      apply XST7_1;
+//      apply ALL8_1;
+//      apply IMP4_1;
+//      apply STOP_1;
+//    } {
+//      simplify;print;
+//      apply NRM8;
+//      apply NRM13;
+//      apply ALL9;
+//      // AXM9 really needs guidance...
+//      apply AXM9 [_] [var "p" ‵ var "x"] [_] [_] ["x"] [var "a"];
+//    };
+//  };
+//end;
 
 symbol {|20.trace|} [p] :
   Thm (
@@ -289,4 +300,106 @@ begin
   apply IMP4;
   apply OR4;
   apply AXM7;
+end;
+
+
+symbol {|21.trace|} [p q : El frm] :
+Thm (
+    ! ("x" ⋅) (! ("y" ⋅) (q ‵ "x" ‵ "y"))
+  and
+    ! ("x6" ⨾ "x5") (
+      # ("x7" ⋅) ("x7" = q ‵ "x6" ‵ "x5")
+    =>
+      (q ‵ "x6" ‵ "x5" = q ‵ "x6" ‵ "x5")
+    )
+  =>
+      (p or (not p))
+  ) ≔
+begin
+  assume p q;
+  apply AND3;
+  apply ALL7 { // (1)
+    apply STOP_1;
+  } {
+    apply NRM15;
+    print;
+    apply ALL9;
+    print;
+    apply ALL7 { // (3)
+      apply XST7_1; // (2)
+      apply ALL8_1; // (3)
+      apply IMP4_1;
+      apply STOP_1;
+    } {
+      print;
+      apply NRM8; // (2)
+      apply NRM13;
+      apply ALL9;
+      apply OR4;
+      apply AXM7;
+    }
+  }
+end;
+
+symbol {|22.trace|} : Thm (
+  not (! ("x" ⋅) (! ("y" ⋅ ) (not ("x" = "x"))))
+) ≔
+begin
+  apply ALL2;
+  apply ALL6;
+  print;
+  apply ALL7 {
+    apply EVR2_1;
+    apply STOP_1;
+  } {
+    apply NRM1;
+    apply AXM7;
+  }
+end;
+
+symbol {|23.trace|} [p : El frm] :
+  Thm (
+    ! ("a" ⨾ "b") (
+      not (# ("x" ⋅) (# ("y" ⋅) (p ‵ "x" ‵ "y")))
+    and
+      ! ("x6" ⨾ "x5") (
+        # ("x7" ⋅) ("x7" = p ‵ "x6" ‵ "x5")
+      =>
+        (p ‵ "x6" ‵ "x5" = p ‵ "x6" ‵ "x5")
+      )
+    =>
+      not (p ‵ "a" ‵ "b")
+    )
+  ) ≔
+begin
+  assume p;
+  apply ALL8;
+  apply AND3;
+  apply XST1;
+  apply XST5;
+  apply ALL7 {
+    apply STOP_1
+  } {
+    apply NRM14;
+    apply ALL9;
+    apply ALL7 {
+      apply XST7_1;
+      apply ALL8_1;
+      apply IMP4_1;
+      apply STOP_1;
+    } {
+      apply NRM8;
+      apply NRM13;
+      apply ALL9;
+      apply STOP;
+      apply NOT1;
+      print;
+      compute
+        multisubst ("x" ⨾ "y") (cons (var "a") (cons (var "b") nil))
+        Φ (p ‵ "a" ‵ "b");
+      apply AXM9 [_]
+        [Φ (p ‵ "x" ‵ "y")] [FAUX] [Φ (p ‵ "a" ‵ "b")] // P, Q, R : El prd
+        [("x" ⨾ "y")] [cons (var "a") (cons (var "b") nil)] // xs : El vrb, es : El (list exp);
+    };
+  };
 end;
