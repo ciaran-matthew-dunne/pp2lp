@@ -24,7 +24,7 @@ sequential symbol lookup [k v : Set] : El (k ⤳ map k v ⤳ v);
 rule lookup $x (cons (pair $x $y) $ys) ↪ $y
 with lookup $x (cons (pair _  _ ) $ys) ↪ lookup $x $ys;
 
-symbol interp [a b : Set] : El (map idt ι ⤳ a ⤳ b);
+symbol interp [a b : Set] : El (map str ι ⤳ a ⤳ b);
 
 rule interp [_] [bool] $m (AND $P $Q)  ↪ (interp $m $P) ∧ (interp $m $Q)
 with interp [_] [bool] $m (OR  $P $Q)  ↪ (interp $m $P) ∨ (interp $m $Q)

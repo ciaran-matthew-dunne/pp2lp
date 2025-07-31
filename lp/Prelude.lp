@@ -40,23 +40,31 @@ rule El (list $X) ↪ 𝕃 $X;
 injective symbol nil [a : Set] : 𝕃 a;
 injective symbol cons [a : Set] : El a → 𝕃 a → 𝕃 a;
 
-symbol concat [a : Set] : El (list a ⤳ list a ⤳ list a);
+symbol ∷ [a] ≔ cons [a];
+notation ∷ infix right 10;
+
+sequential symbol concat [a : Set] : El (list a ⤳ list a ⤳ list a);
 rule concat nil $ys ↪ $ys
 with concat (cons $x $xs) $ys ↪ cons $x (concat $xs $ys);
 
-// `elem x xs` iff
 sequential symbol elem [a : Set] : El (a ⤳ list a ⤳ bool);
 rule (elem _   nil)         ↪ false
 with (elem $x (cons $x _))  ↪ true
 with (elem $x (cons _ $ys)) ↪ (elem $x $ys);
 
+//sequential symbol reverse [a : Set] : El (list a ⤳ list a);
+//rule (reverse nil)  ↪ nil
+//with (reverse (cons $y $ys)) ↪ concat (reverse $ys) ($y) ;
+
+symbol ⋿ [a : Set] ≔ elem [a];
+notation ⋿ infix 0;
+
+// `foreach p xs` rewrites to `true` iff `p` holds for each `x` in `xs`.
 sequential symbol foreach [a : Set] :
   El ((a ⤳ bool) ⤳ list a ⤳ bool);
 rule foreach $P nil ↪ true;
 rule foreach $P (cons $x $xs) ↪ ($P $x) && foreach $P $xs;
 
-symbol ⋿ [a : Set] ≔ elem [a];
-notation ⋿ infix 0;
 
 // `replace x y zs` replaces the first instance of `x` in `xs` with `y`.
 sequential symbol replace [a : Set] :
