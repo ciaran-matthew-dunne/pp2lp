@@ -46,7 +46,7 @@ symbol {|04.trace|} [a c p q] :
   Thm ((a and p and (p => q) and c) => q) ≔
 begin
   assume a c p q;
-  apply AND5 p q;
+  apply AND5 p q; // needs explicit arguments!
   apply AXM8
 end;
 

@@ -1,4 +1,4 @@
-require open pp2lp.Syntax;
+require open pp2lp.Proof;
 
 // ----------------------------------------------
 // 5.1. Conjunction
@@ -143,16 +143,6 @@ symbol AXM7 [H : El (list prd)] [P : El prd] :
 
 symbol AXM8 [H : El (list prd)] [P R : El prd] :
   ✓ (elem_conj P R) (H ⟝ P => R);
-
-compute "x" ∥ "y" ∥ "z" ∥ "w";
-
-// convert a variable list to an expression.
-sequential symbol vars_aux : El (exp ⤳ vrb ⤳ exp);
-rule vars_aux $e nil           ↪ $e
-with vars_aux $e (cons $y $ys) ↪ vars_aux ($e ∥ var $y) $ys ;
-
-symbol vars : El (vrb ⤳ exp);
-rule vars (cons $x $xs) ↪ vars_aux (var $x) $xs;
 
 // probably broken. need to handle side condition.
 // 'given E such that [x := E] P = R'
@@ -500,7 +490,7 @@ symbol AR3 [a : El exp] [H : El (list prd)] [R : El prd] :
   ▷ (H ⟝ not (a ≤ 𝟎) => R);
 
 symbol AR4 [E F : El exp] [H : El (list prd)] [R : El prd] :
-  ✓ (((F ≤ 𝟎) ⋿ H) && (ev ((E + F) > 𝟎))) (H ⟝ E ≤ 𝟎 => R);
+  ✓ (((F ≤ 𝟎) ⋿ H) && (ev ((E + F) > 𝟎))) (H ⟝ (E ≤ 𝟎) => R);
 
 symbol AR5 [a : El exp] [H : El (list prd)] [R : El prd] :
   ✓ (elem (a ≪ 𝟎) H) (H ⟝ (a = 𝟎 => (⨪ a ≤ 𝟎 => R))) →
