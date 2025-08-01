@@ -22,7 +22,7 @@ rule obtain (AND2_1 $t) ↪ obtain $t;
 
 
 // ---- inference rules ------------------
-symbol ALL2 [H : El (list prd)] [x y : El idt] [P : El prd] :
+symbol ALL2 [H : El (list prd)] [x y : El str] [P : El prd] :
   If (x !== y) (
     (H ⊩ not (! (x ⨾ y) P)) ⤳
     (H ⊩ not (! (x ⋅) (! (y ⋅) P)))

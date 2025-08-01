@@ -28,7 +28,7 @@ injective symbol =    : El (exp ⤳ exp ⤳ prd);
 injective symbol ! : El (vrb ⤳ prd ⤳ prd);
 injective symbol # : El (vrb ⤳ prd ⤳ prd);
 //injective symbol atom : El (frm ⤳ prd);
-//injective symbol var : El (idt ⤳ exp);
+//injective symbol var : El (str ⤳ exp);
 
 notation =   infix left 2;
 notation and infix left 2;
