@@ -7,11 +7,14 @@ builtin "String" ≔ 𝕊; // bind string literals to this type.
 symbol str : Set;     // called `idt` in the PP docs.
 rule El str ↪ 𝕊;      //
 
+
 // set-codes for basic syntactic categories.
 symbol vrb : Set ≔ list str; // "variable binding"
 symbol prd : Set; // "predicate"
 symbol exp : Set; // "expression"
 symbol idv : Set; // "individual" - special type we use for "constants".
+
+assert [a : Set] ⊢ a : Set;
 
 // 'lift' an expression to a predicate.
 injective symbol Ψ : El exp → El prd;
@@ -23,7 +26,6 @@ coerce_rule coerce (El idv) (El exp) $x ↪ ι $x;
 coerce_rule coerce (El idv) (El prd) $x ↪ Ψ (ι $x);
 
 // ----- primitive logical symbols --------------
-
 // basic logical connectives.
 injective symbol VRAI : El prd;
 injective symbol FAUX : El prd;

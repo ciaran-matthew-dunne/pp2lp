@@ -271,7 +271,6 @@ begin
   } {
     apply NRM14;
     apply ALL9;
-    print;
     apply ALL7 {
       apply XST7_1;
       apply ALL8_1;

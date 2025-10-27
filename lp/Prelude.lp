@@ -29,6 +29,7 @@ sequential symbol !! : El (bool ⤳ bool);
 rule (!! true) ↪ false
 with (!! false) ↪ true;
 
+//
 // ------- lists ------------------------------------------
 // primitive type constructor for lists.
 injective symbol 𝕃 : Set → TYPE;
