@@ -121,25 +121,39 @@ following forms, called *sequent inferences* and
 *resultant inferences* respectively:
 ```
   ι ⦂ inf ⩴
-    | {T_1,...,T_n, Σ_1,...,Σ_m} ⇛ Σ
-    | {T_1,...,T_n} ⇛ T
+    | ⟦T_1,...,T_n, Σ_1,...,Σ_m⟧ ⇛ Σ
+    | ⟦T_1,...,T_n⟧ ⇛ T
 ```
-In either case, the members of the list(s) on the left-side
+In either case, the members of the set on the left-side
 of `⇛` are called *inputs*, and the sequent/resultant on
 the right-side is called the *output*.
 
 The inputs of sequent inferences are either resultants
-or sequents, and the inputs of a resultant inference are
+or sequents, and the inputs of resultant inferences are
 always resultants.
 <!--end-->
 
 <!--definition-->
-We can view the *inference rules* of PP as defining
-(infinite) sets of inferences by set-comprehension,
-which allows for side-conditions. e.g.;
+An *inference rule* is a function that returns inferences.
+<!--end-->
 
-Let `IMP5` be the set of inferences of the form:
-  `(H ⟝ P) ⇛ (H ⟝ P ⟹ Q)`
+<!--example: no resultants, no side conditions -->
+Let `IMP4` be the least function such that
+  `IMP4(H,P,Q) = ⟦H,P ⊢ Q⟧ ⇛ (H ⊢ P ⟹ Q)`
+for any `H ∈ list prd`, `P, Q ∈ prd`.
+<!--end-->
+
+<!--example: no resultants, side condition. -->
+Let `ALL1` be the least function such that:
+ `ALL1(H, P, R, x, y) =
+    ⟦H ⊢ ¬ (∀ (x,y) ⋅ P) ⟹ R⟧
+  ⇛ (H ⊢ ¬ (∀ x ⋅ ∀ y ⋅ P) ⟹ R)`
+for any `H ∈ list prd`, `P, R ∈ prd`, and `x,y ∈ idt`
+such that `x ≠ y`.
+<!--end-->
+
+ <!--be the set of inferences of the form:-->
+
 where `P` and `Q` are predicates and `H` is a list of
 predicates such that `P ⋿ H`.
 Or more formally:
