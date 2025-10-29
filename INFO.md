@@ -152,27 +152,20 @@ for any `H ∈ list prd`, `P, R ∈ prd`, and `x,y ∈ idt`
 such that `x ≠ y`.
 <!--end-->
 
- <!--be the set of inferences of the form:-->
-
-where `P` and `Q` are predicates and `H` is a list of
-predicates such that `P ⋿ H`.
-Or more formally:
-`IMP5 ≔
-  {
-    (H ⟝ P) ⇛ (H ⟝ P ⟹ Q)
-  ∣
-    H ∈ list prd, P,Q ∈ prd, P ∈ |H|
-  }`
-<!--end-->
 
 <!--definition-->
-A *derivation* is a well-founded tree `(Δ, ε, ℓ)`
-with a set `V` of vertices, an edge function `ε : Δ → 𝒫(Δ)`,
-and a labelling function `ℓ : Δ → (seq ∪ res)`.
+A *derivation* is a well-founded tree `T` with edges given
+by a function `ε : T → 𝒫(T)` and labelling `ℓ : T → inf`
+such that:
 
-A derivation `Δ` is *valid* wrt. a set of inferences `R` iff
-for each `v ∈ Δ` the inference `{ℓ(w_1)...ℓ(w_n)} ⇛ ℓ(v)`
-belongs to `R`, where `{w_1,...,w_n} = ε(v)`.
+  for any `n ∈ T`, and for any premise `ξ` of `ℓ(n)`,
+  there exists `m ∈ ε(T)` such that `ℓ(m)` concludes `ξ`.
+
+Let `R` be a set of inference rules.
+A derivation `T` is *valid* wrt. `R` iff
+  `∀ ι ∈ ℓ[T]. ∃ r ∈ R. ι ∈ ran(r)`.
+That is, every inference used in `T` belongs to the
+range of some rule in `R`.
 <!--end-->
 
 
