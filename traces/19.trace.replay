@@ -1,0 +1,25 @@
+[ALL8(1)] <!a.(!x.not(VRAI and p(x)) and !(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[AND3] <!x.not(VRAI and p(x)) and !(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)>
+[STOP_1] <not(p(x))>
+[VR3_1] <VRAI => not(p(x))>
+[AND2_1] <not(VRAI and p(x))>
+[ALL7(1)] <!x.not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[FIN(not(p(x)))] <FIN(not(p(x)) | (Hyp |- !x.not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))) | (Hyp |- forall(x).not(p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))) | 4)>
+[NRM14] <forall(x).not(p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[STOP_NORM] <forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[NRM] <forall(x).not(p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[FIN(forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)))] <FIN(forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)) | (Hyp |- forall(x).not(p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))) | (Hyp |- forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))) | 5)>
+[ALL9] <forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q))>
+[STOP_1] <x$4,p(x$4): p>
+[IMP4_1] <x$4,x$5: p => x$4,p(x$4): p>
+[ALL8_1(3)] <!(x$5).(x$4,x$5: p => x$4,p(x$4): p)>
+[XST7_1(2)] <#(x$5).(x$4,x$5: p) => x$4,p(x$4): p>
+[ALL7(3)] <!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)>
+[FIN(!(x$5).(x$4,x$5: p => x$4,p(x$4): p))] <FIN(!(x$5).(x$4,x$5: p => x$4,p(x$4): p) | (Hyp,!x.not(VRAI and p(x)) |- !(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)) | (Hyp,!x.not(VRAI and p(x)) |- forall(x$4).!(x$5).(x$4,x$5: p => x$4,p(x$4): p) => (p(a) => q)) | 7)>
+[NRM8(2)] <forall(x$4).!(x$5).(x$4,x$5: p => x$4,p(x$4): p) => (p(a) => q)>
+[NRM13] <forall(x$4,x$5).(x$4,x$5: p => x$4,p(x$4): p) => (p(a) => q)>
+[STOP_NORM] <forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q)>
+[NRM] <forall(x$4).!(x$5).(x$4,x$5: p => x$4,p(x$4): p) => (p(a) => q)>
+[FIN(forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q))] <FIN(forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q) | (Hyp,!x.not(VRAI and p(x)) |- forall(x$4).!(x$5).(x$4,x$5: p => x$4,p(x$4): p) => (p(a) => q)) | (Hyp,!x.not(VRAI and p(x)) |- forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q)) | 8)>
+[ALL9] <forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q)>
+[AXM9] <p(a) => q>

@@ -52,6 +52,16 @@ begin
   }
 end;
 ```
+### Replaying Proof Traces.
+
+We can also obtain a 'replay' thus:
+```bash
+krt -b REPLAY.kin replay.goal
+```
+where `replay.goal` is a file pointing to `phi.trace`:
+```
+Flag(FileOn("replay.res")) & ("phi.trace")
+```
 
 ### PP's Proof System
 
@@ -174,17 +184,3 @@ range of some rule in `R`.
 <!--todo:
   lambdapi encoding of syntax,
   lambdapi encoding of rules, side conditions, .... -->
-
-
-
-
-### Replaying Proof Traces.
-
-We can also obtain a 'replay' thus:
-```bash
-krt -b REPLAY.kin replay.goal
-```
-where `replay.goal` is a file pointing to `phi.trace`:
-```
-Flag(FileOn("replay.res")) & ("phi.trace")
-```

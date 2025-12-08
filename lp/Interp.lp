@@ -1,4 +1,5 @@
 require open pp2lp.Prelude pp2lp.Syntax;
+require open Logic.U.Prop;
 
 symbol ⇔ : Prop → Prop → Prop;
 notation ⇔ infix 0;

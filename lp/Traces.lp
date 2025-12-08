@@ -4,6 +4,7 @@ symbol {|01.trace|} [p q : El prd] :
   Thm (not (p and q) => ((not p) or (not q))) ≔
 begin
   assume p q;
+  change Thm (not(p and q) => (not(p) or not(q)));
   apply AND1
   {
     apply IMP4;
@@ -16,6 +17,7 @@ begin
     apply AXM1
   }
 end;
+
 
 symbol {|02.trace|} [p] :
   Thm (not (p and (not p))) ≔
@@ -34,6 +36,7 @@ begin
   apply AND3;
   apply IMP4;
   apply AR10 q;
+  print;
   apply IMP4;
   apply AND4 {
     apply AXM3
@@ -46,7 +49,9 @@ symbol {|04.trace|} [a c p q] :
   Thm ((a and p and (p => q) and c) => q) ≔
 begin
   assume a c p q;
+  print;
   apply AND5 p q; // needs explicit arguments!
+  print;
   apply AXM8
 end;
 
@@ -65,7 +70,6 @@ symbol {|06.trace|} [p q] :
   Thm (not (p and (not p) or (q and not q))) ≔
 begin
   assume p q;
-  simplify;
   apply OR2
   {
     apply AND2;
@@ -230,7 +234,9 @@ symbol {|18.trace|} [p : El exp] :
 begin
   assume p;
   apply ALL8;
+  print;
   apply ALL7 {
+    print;
     apply AND2_1;
     apply VR3_1;
     apply EVR2_1;
@@ -280,6 +286,7 @@ begin
       apply NRM8;
       apply NRM13;
       apply ALL9;
+      print;
       // AXM9 needs some guidance to find the right item in the hypothesis.
       apply AXM9 ("x" ⋅);
     };
@@ -343,7 +350,9 @@ symbol {|22.trace|} : Thm (
 ) ≔
 begin
   apply ALL2;
+  print;
   apply ALL6;
+  print;
   apply ALL7 {
     apply EVR2_1;
     apply STOP_1;
@@ -501,6 +510,7 @@ begin
   apply ALL8;
   apply AND3;
   apply IMP4;
+  print;
   apply ALL7 {
     apply XST7_1;
     apply ALL8_1;

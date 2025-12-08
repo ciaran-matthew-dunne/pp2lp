@@ -1,0 +1,12 @@
+[ALL8(1)] <!a.(!x.not(VRAI and x = x) => (a = a => p))>
+[STOP_1] <FAUX>
+[EVR2_1] <not(x = x)>
+[VR3_1] <VRAI => not(x = x)>
+[AND2_1] <not(VRAI and x = x)>
+[ALL7(1)] <!x.not(VRAI and x = x) => (a = a => p)>
+[FIN(FAUX)] <FIN(FAUX | (Hyp |- !x.not(VRAI and x = x) => (a = a => p)) | (Hyp |- forall(x).FAUX => (a = a => p)) | 3)>
+[NRM1] <forall(x).FAUX => (a = a => p)>
+[STOP_NORM] <FAUX => (a = a => p)>
+[NRM] <forall(x).FAUX => (a = a => p)>
+[FIN(FAUX => (a = a => p))] <FIN(FAUX => (a = a => p) | (Hyp |- forall(x).FAUX => (a = a => p)) | (Hyp |- FAUX => (a = a => p)) | 4)>
+[FX3] <FAUX => (a = a => p)>

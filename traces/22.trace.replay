@@ -1,0 +1,11 @@
+[ALL2] <not(!x.!y.not(x = x))>
+[ALL6] <not(!(x,y).not(x = x))>
+[STOP_1] <FAUX>
+[EVR2_1] <not(x = x)>
+[ALL7(1)] <!(x,y).not(x = x) => FAUX>
+[FIN(FAUX)] <FIN(FAUX | (Hyp |- !(x,y).not(x = x) => FAUX) | (Hyp |- forall(x,y).FAUX => FAUX) | 4)>
+[NRM1] <forall(x,y).FAUX => FAUX>
+[STOP_NORM] <FAUX => FAUX>
+[NRM] <forall(x,y).FAUX => FAUX>
+[FIN(FAUX => FAUX)] <FIN(FAUX => FAUX | (Hyp |- forall(x,y).FAUX => FAUX) | (Hyp |- FAUX => FAUX) | 5)>
+[AXM7] <FAUX => FAUX>

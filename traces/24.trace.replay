@@ -1,0 +1,19 @@
+[AND3] <#x.#y.p(x,y) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q)>
+[XST3] <#x.#y.p(x,y) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q))>
+[XST7(2)] <#(x,y).p(x,y) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q))>
+[ALL8(1)] <!(x,y).(p(x,y) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q)))>
+[IMP4] <p(x,y) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q))>
+[STOP_1] <x$6,x$5,p(x$6,x$5): p>
+[IMP4_1] <x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p>
+[ALL8_1(3)] <!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p)>
+[XST7_1(2)] <#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p>
+[ALL7(3)] <!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q)>
+[FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] <FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) | (Hyp,p(x,y) |- !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => q or not(q)) | (Hyp,p(x,y) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => q or not(q)) | 7)>
+[NRM8(2)] <forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => q or not(q)>
+[NRM13] <forall(x$6,x$5,x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => q or not(q)>
+[STOP_NORM] <forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q)>
+[NRM] <forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => q or not(q)>
+[FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q))] <FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q) | (Hyp,p(x,y) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => q or not(q)) | (Hyp,p(x,y) |- forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q)) | 8)>
+[ALL9] <forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => q or not(q)>
+[OR4] <q or not(q)>
+[AXM7] <not(q) => not(q)>

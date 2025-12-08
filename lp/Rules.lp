@@ -31,6 +31,7 @@ symbol AND5 [H : El (list prd)] [P R : El prd] :
   Π (A : El prd) (B : El prd),
   ✓ (elem_conj A P) (H ⟝ repl_conj (A => B) B P => R) →
   ▷ (H ⟝ P => R);
+
 // ----------------------------------------------
 // 5.2. Disjunction
 // ----------------------------------------------
@@ -182,6 +183,7 @@ symbol ALL7_ONE [H : El (list prd)] [P Q : El prd] [x : El str] :
     //✓ (free x P)
     ▷ (H ⟝ (♢ (x ⋅) R) => Q) →
     ▷ (H ⟝ (! (x ⋅) P) => Q);
+
 
 symbol ALL7 [H : El (list prd)] [P Q : El prd] [xs : El vrb] :
   Π R : Res (H ⟝ P),

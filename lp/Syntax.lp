@@ -32,6 +32,8 @@ injective symbol FAUX : El prd;
 injective symbol and  : El (prd ⤳ prd ⤳ prd);
 injective symbol or   : El (prd ⤳ prd ⤳ prd);
 injective symbol =>   : El (prd ⤳ prd ⤳ prd);
+
+
 injective symbol <=>  : El (prd ⤳ prd ⤳ prd);
 injective symbol not  : El (prd ⤳ prd);
 injective symbol =    : El (exp ⤳ exp ⤳ prd);

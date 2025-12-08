@@ -1,0 +1,5 @@
+[EQV1] <not(p <=> p) => q>
+[IMP4] <p => (not(p) => q)>
+[AXM2] <not(p) => q>
+[IMP4] <not(p) => (p => q)>
+[AXM1] <p => q>

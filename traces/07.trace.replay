@@ -1,0 +1,7 @@
+[OR3] <p or q => q or p>
+[IMP4] <q => q or p>
+[OR4] <q or p>
+[AXM2] <not(q) => p>
+[IMP4] <p => q or p>
+[OR4] <q or p>
+[AXM4] <not(q) => p>

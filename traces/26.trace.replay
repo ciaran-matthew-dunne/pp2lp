@@ -1,0 +1,6 @@
+[ALL8(1)] <!(a,b).(a = b => !x.!y.(x = y => (x = a => y = b)))>
+[OPR1(1)] <a = b => !x.!y.(x = y => (x = a => y = b))>
+[ALL4] <!x.!y.(x = y => (x = b => y = b))>
+[ALL8(1)] <!(x,y).(x = y => (x = b => y = b))>
+[OPR1(1)] <x = y => (x = b => y = b)>
+[AXM7] <y = b => y = b>
