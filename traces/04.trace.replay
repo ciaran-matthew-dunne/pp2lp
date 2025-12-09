@@ -1,4 +1,2 @@
-<a and p and (p => q) and c => q>
-  [AND5]
-<a and p and c and q => q>
-  [AXM8]
+[AND5] <a and p and (p => q) and c => q>
+[AXM8] <a and p and c and q => q>
