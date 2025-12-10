@@ -195,7 +195,11 @@
 [STOP_1] <FAUX>
 [EVR2_1] <not(x = x)>
 [ALL7(1)] <!(x,y).not(x = x) => FAUX>
-[FIN(FAUX)] <FIN(FAUX | (Hyp |- !(x,y).not(x = x) => FAUX) | (Hyp |- forall(x,y).FAUX => FAUX) | 4)>
+[FIN(FAUX)] <
+  FIN(FAUX
+  | (Hyp |- !(x,y).not(x = x) => FAUX)
+  | (Hyp |- forall(x,y).FAUX => FAUX)
+  | 4)>
 [NRM1] <forall(x,y).FAUX => FAUX>
 [STOP_NORM] <FAUX => FAUX>
 [NRM] <forall(x,y).FAUX => FAUX>
@@ -209,23 +213,40 @@
 [XST5] <not(#(x,y).p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
 [STOP_1] <not(p(x,y))>
 [ALL7(1)] <!(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
-[FIN(not(p(x,y)))] <FIN(not(p(x,y)) | (Hyp |- !(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))) | (Hyp |- forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))) | 6)>
+[FIN(not(p(x,y)))]
+  <FIN(not(p(x,y))
+  | (Hyp |- !(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))
+  | (Hyp |- forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))
+  | 6)
+  >
 [NRM14] <forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
 [STOP_NORM] <forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
 [NRM] <forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
-[FIN(forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))] <FIN(forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))) | (Hyp |- forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))) | (Hyp |- forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))) | 7)>
+[FIN(forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))]
+  <FIN(forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))
+  | (Hyp |- forall(x,y).not(p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))
+  | (Hyp |- forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))))
+  | 7)>
 [ALL9] <forall2(x,y).not(VRAI and p(x,y)) => (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))>
 [STOP_1] <x$6,x$5,p(x$6,x$5): p>
 [IMP4_1] <x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p>
 [ALL8_1(3)] <!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p)>
 [XST7_1(2)] <#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p>
 [ALL7(3)] <!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))>
-[FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] <FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) | (Hyp,!(x,y).not(VRAI and p(x,y)) |- !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))) | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))) | 9)>
+[FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))]
+  <FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p)
+  | (Hyp,!(x,y).not(VRAI and p(x,y)) |- !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))
+  | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))
+  | 9)>
 [NRM8(2)] <forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))>
 [NRM13] <forall(x$6,x$5,x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))>
 [STOP_NORM] <forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b))>
 [NRM] <forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))>
-[FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b)))] <FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b)) | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b))) | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b))) | 10)>
+[FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b)))] <
+  FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b))
+  | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall(x$6,x$5).!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p) => not(p(a,b)))
+  | (Hyp,!(x,y).not(VRAI and p(x,y)) |- forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b)))
+  | 10)>
 [ALL9] <forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(p(a,b))>
 [STOP] <not(p(a,b))>
 [NOT1] <not(not(p(a,b))) => FAUX>
@@ -319,4 +340,3 @@
 
 === 30.trace.replay ===
 [FX2] <not(FAUX)>
-

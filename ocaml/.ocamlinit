@@ -1,0 +1,12 @@
+#require "lambda-term";;
+#print_length 1000;;
+#print_depth 1000;;
+#utop_prompt_dummy;;
+let prompt = LTerm_text.(eval [B_fg (LTerm_style.green); S "# "]);;
+UTop.prompt := fst (React.S.create prompt);;
+open Pp2lp;;
+open Syntax_pp;;
+open Parse_pp;;
+Format.set_max_boxes 100;;
+Toploop.max_printer_depth := 1000;;
+(* Format.set_max_depth 1000;; *)

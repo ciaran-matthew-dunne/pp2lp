@@ -1,0 +1,13 @@
+(ocamllex lexer)
+(menhir
+ (modules parser)
+)
+
+(library
+ (name pp2lp)
+ (public_name pp2lp)
+ (modules
+   parser lexer parse_pp syntax_pp
+ )
+ (flags :standard -w -8 -w -27)
+)

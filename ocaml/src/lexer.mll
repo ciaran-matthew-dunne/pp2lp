@@ -3,13 +3,13 @@
 }
 
 let symbol =
-  ['a'-'z' 'A'-'Z']
-  ['a'-'z' 'A'-'Z' '0'-'9' '_' '$']*
-
+  ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '$']*
 let digit = ['0'-'9']
 let natural = digit+
 
 rule token = parse
+  | '\n' { Lexing.new_line lexbuf; token lexbuf }
+  | eof { EOF }
   (* punctuation *)
   | ',' { COMMA }
   | '.' { PERIOD }
@@ -18,6 +18,13 @@ rule token = parse
   | ')' { RPAREN }
   | '[' { LSQ }
   | ']' { RSQ }
+  | '<' { LANGLE }
+  | '>' { RANGLE }
+  (* FIN/sequents *)
+  | "|-"  { TURNSTILE }
+  | "|"   { PIPE }
+  | "Hyp" { HYP }
+  | "FIN" { FIN }
   (* logical connectives *)
   | "not" { NOT }
   | "and" { AND }
@@ -33,3 +40,4 @@ rule token = parse
   (* literals *)
   | symbol as s  { SYMBOL s }
   | natural as i { NATURAL (int_of_string i) }
+  | _ { token lexbuf }
