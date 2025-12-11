@@ -4,7 +4,6 @@ symbol {|01.trace|} [p q : El prd] :
   Thm (not (p and q) => ((not p) or (not q))) ≔
 begin
   assume p q;
-  change Thm (not(p and q) => (not(p) or not(q)));
   apply AND1
   {
     apply IMP4;
@@ -238,9 +237,13 @@ begin
   apply ALL7 {
     print;
     apply AND2_1;
+    print;
     apply VR3_1;
+    print;
     apply EVR2_1;
-    apply STOP_1
+    print;
+    apply STOP_1;
+    print;
   } {
     apply NRM1;
     apply FX3
@@ -280,6 +283,7 @@ begin
     apply ALL7 {
       apply XST7_1;
       apply ALL8_1;
+      print;
       apply IMP4_1;
       apply STOP_1;
     } {
@@ -528,6 +532,7 @@ begin
         apply STOP_1;
       } {
         apply NRM14;
+        print;
         apply NRM19 ("a" ∥ "b");
         //apply VR4; no remaining goals?
       }
