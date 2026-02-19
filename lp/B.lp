@@ -3,147 +3,329 @@ require open
   Stdlib.String
   Stdlib.Z;
 
-inductive bVar : TYPE ≔
-  | IDEN : String → bVar
-  | CONS : bVar → bVar → bVar;
-inductive bPrd : TYPE ≔
-  | AND : bPrd → bPrd → bPrd
-  | IMP : bPrd → bPrd → bPrd
-  | NOT : bPrd → bPrd
-  | ALL : bVar → bPrd → bPrd
-  | PSUB : bVar → bExp → bPrd → bPrd
-  | EQ : bExp → bExp → bPrd
-  | MEM : bExp → bSet → bPrd
-with bExp : TYPE ≔
-  | VAR : bVar → bExp
-  | ESUB : bVar → bExp → bExp → bExp
-  | PAIR : bExp → bExp → bExp
-  | CHOICE : bSet → bExp
-  | SET : bSet → bExp
-with bSet : TYPE ≔
-  | PROD : bSet → bSet → bSet
-  | POW : bSet → bSet
-  | BIG : bSet
-  | COMP : bVar → bPrd → bSet;
+// datatype for variable-lists.
+inductive Var : TYPE ≔
+  | id : String → Var
+  | ⨾ : Var → Var → Var;
+notation ⨾ infix right 5;
 
+// datatypes for predicates, expressions, and sets:
+inductive Prd : TYPE ≔
+  | ∧ : Prd → Prd → Prd
+  | ⇒ : Prd → Prd → Prd
+  | ¬ : Prd → Prd
+  | ∀ : Var → Prd → Prd
+  | = : Exp → Exp → Prd
+  | ∈ : Exp → Exp → Prd
+with Exp : TYPE ≔
+  | #var : Var → Exp
+  | ↦ : Exp → Exp → Exp
+  | × : Exp → Exp → Exp
+  | 𝒫 : Exp → Exp
+  | big : Exp
+  | choice : Exp → Exp
+  | comp : Var → Prd → Exp;
+
+symbol #id ≔ λ str, #var (id str);
+
+// coercion rules for variables and sets:
+coerce_rule coerce Var Exp $x ↪ #var $x;
+
+// infix notation for predicates:
+notation ¬ prefix 10;
+notation ∧ infix left 9;
+notation ⇒ infix left 8;
+
+// logical disjunction and equivalence.
+symbol ∨ ≔ λ p q, ¬ p ⇒ q;
+symbol ⇔ ≔ λ p q, (p ⇒ q) ∧ (q ⇒ p);
+notation ∨ infix left 9;
+notation ⇔ infix left 7;
+
+// infix notation for maplets and products.
+notation ↦ infix 5;
+notation × infix 5;
+
+// infix notation for membership and equality.
+notation ∈ infix left 15;
+notation = infix 5;
+
+
+sequential symbol bSet : Exp → 𝔹;
+rule bSet ($E ↦ $F) ↪ false
+with bSet (choice $E) ↪ bSet $E
+with bSet ($E × $F) ↪ (bSet $E) and (bSet $F)
+with bSet (𝒫 $E) ↪ bSet $E
+with bSet (comp $x $P) ↪ true
+with bSet big ↪ true;
+
+
+// define disequality.
+symbol != ≔ λ E F, ¬ (E = F);
+notation != infix 20;
+
+// define ⊆ inclusion.
+symbol ⊆ ≔ λ s t, s ∈ 𝒫 t;
+notation ⊆ infix 10;
+
+// define ⊂ inclusion.
+symbol ⊂ ≔ λ s t, (s ⊆ t) ∧ (s != t);
+notation ⊂ infix 10;
+
+// syntactic equality:
+sequential symbol var_eq : Var → Var → 𝔹;
+sequential symbol exp_eq : Exp → Exp → 𝔹;
+sequential symbol prd_eq : Prd → Prd → 𝔹;
+
+rule var_eq $x $x ↪ true
+with var_eq _ _ ↪ false;
+
+// core expressions.
+rule exp_eq (#var $x) (#var $y) ↪ var_eq $x $y
+with exp_eq ($E ↦ $F) ($G ↦ $H)
+  ↪ (exp_eq $E $G) and (exp_eq $F $H)
+with exp_eq (choice $s) (choice $t) ↪ exp_eq $s $t
+// set expressions.
+with exp_eq ($s × $t) ($u × $v)
+  ↪ (exp_eq $s $u) and (exp_eq $t $v)
+with exp_eq (𝒫 $s) (𝒫 $t) ↪ exp_eq $s $t
+with exp_eq (big) (big) ↪ true
+with exp_eq (comp $x $P) (comp $y $Q)
+  ↪ (var_eq $x $y) and (prd_eq $P $Q)
+with exp_eq _ _ ↪ false;
+
+
+// defined on predicates thus:
+rule prd_eq ($p ∧ $q) ($r ∧ $s)
+  ↪ (prd_eq $p $r) and (prd_eq $q $s)
+with prd_eq ($p ⇒ $q) ($r ⇒ $s)
+  ↪ (prd_eq $p $r) and (prd_eq $q $s)
+with prd_eq (¬ $p) (¬ $q)
+  ↪ (prd_eq $p $q)
+with prd_eq (∀ $x $p) (∀ $y $q)
+  ↪ (var_eq $x $y) and (prd_eq $p $q)
+with prd_eq ($e = $f) ($g = $h)
+  ↪ (exp_eq $e $g) and (exp_eq $f $h)
+with prd_eq ($e ∈ $s) ($f ∈ $t)
+  ↪ (exp_eq $e $f) and (exp_eq $s $t)
+with prd_eq _ _ ↪ false;
+// end.
+
+
+// datatype for B-formulas: i.e., either expr or pred.
+inductive Frm : TYPE ≔
+  | #exp : Exp → Frm
+  | #prd : Prd → Frm;
+
+// syntactic equality on formulas.
+sequential symbol == : Frm → Frm → 𝔹;
+notation == infix 10;
+rule (#exp $E == #exp $F) ↪ exp_eq $E $F
+with (#prd $P == #prd $Q) ↪ prd_eq $P $Q
+with (_ == _) ↪ false;
+
+// coercion rules for Exp -> Frm, Prd -> Frm.
+coerce_rule coerce Exp Frm $e ↪ #exp $e;
+coerce_rule coerce Prd Frm $p ↪ #prd $p;
+
+// boolean-guarded expression.
+symbol ?exp : Exp → 𝔹 → Exp;
+rule ?exp $E true ↪ $E;
+
+// boolean-guarded predicate.
+symbol ?prd : Prd → 𝔹 → Prd;
+rule ?prd $P true ↪ $P;
+
+// non-free. see NonFree.lp
+symbol nf : Var → Frm → 𝔹;
+symbol pnf : Var → Prd → 𝔹;
+symbol enf : Var → Exp → 𝔹;
+
+rule nf $x (#prd $P) ↪ pnf $x $P
+with nf $x (#exp $E) ↪ enf $x $E;
+
+// substitution. see Subst.lp
+symbol sub : Var → Exp → Frm → Frm;
+symbol psub : Var → Exp → Prd → Prd;
+symbol esub : Var → Exp → Exp → Exp;
+
+rule sub $x $E (#prd $P) ↪ #prd (psub $x $E $P)
+with sub $x $E (#exp $F) ↪ #exp (esub $x $E $F);
+
+// datatype for B-types.
 inductive bTyp : TYPE ≔
-  | SUPER : bSet → bTyp
-  | TY_EXP : bExp → bTyp
-  | TY_PROD : bTyp → bTyp → bTyp
-  | TY_POW : bTyp → bTyp
-  | TY_IDEN : String → bTyp;
+  | super : Exp → bTyp
+  | typ : Exp → bTyp
+  | ∗ : bTyp → bTyp → bTyp
+  | ℙ : bTyp → bTyp
+  | iden : String → bTyp;
 
+// infix notation for type-level product.
+notation ∗ infix right 10;
 
+// datatype for B-type-predicates.
 inductive bTypPrd : TYPE ≔
-  | CHECK : bPrd → bTypPrd
-  | TY_EQ : bTyp → bTyp → bTypPrd;
+  | check : Prd → bTypPrd
+  | ty_eq : bTyp → bTyp → bTypPrd;
 
+
+// `prf p` is the type of proofs of `p`
+constant symbol prf : Prd → TYPE;
+symbol ▷ ≔ prf; notation ▷ prefix 5;
+
+// `j : judge p` iff `j` derives the typing-predicate `p`.
 constant symbol judge : bTypPrd → TYPE;
-symbol ✓ (p : bPrd) : TYPE ≔ judge (CHECK p);
-symbol ≣ (t t' : bTyp) : TYPE ≔ judge (TY_EQ t t');
 
-symbol T1 [p q] : ✓ p → ✓ q → ✓ (AND p q);
-symbol T2 [p q] : ✓ p → ✓ q → ✓ (IMP p q);
-symbol T3 [p] : ✓ p → ✓ (NOT p);
+// `j : ✓ p` iff `j` derives `check p`.
+symbol ✓ (p : Prd) : TYPE ≔ judge (check p);
 
-
-
+// `j : t ≣ t'` iff `j` derives `ty_eq t t'`.
+symbol ≣ (t t' : bTyp) : TYPE ≔ judge (ty_eq t t');
+notation ≣ infix 5;
 
 
-symbol bprd : bPrd → Prop;
-rule bprd (AND $p $q)      ↪ bprd $p ∧ bprd $q
-with bprd (IMP $p $q)      ↪ bprd $p ⇒ bprd $q
-with bprd (NOT $p)         ↪ ¬ (bprd $p);
+symbol symm [U T] : (U ≣ T) → (T ≣ U);
 
-symbol bset : bSet → Set;
-symbol bexp [a] : bExp → τ a;
+symbol given : Exp → TYPE;
 
-symbol bexp_ty (ty : String → Set) : bExp → Set;
+symbol T1 [P Q : Prd]
+  : ✓ P → ✓ Q → ✓ (P ∧ Q);
 
-symbol bexp_tm [a]
-  (ty : String → Set) (tm : Π s : String, τ (ty s))
-  : bExp → τ a;
+symbol T2 [P Q : Prd]
+  : ✓ P → ✓ Q → ✓ (P ⇒ Q);
 
-rule bexp_aux $ty $tm (VAR (IDEN $s)) ↪ $μ $s;
+symbol T3 [P : Prd]
+  : ✓ P → ✓ (¬ P);
 
-// Abstract propositions for non-propositional constructors.
-constant symbol eq_  : bExp → bExp → Prop;
-constant symbol mem_ : bExp → bSet → Prop;
-constant symbol all_ : bVar → Prop → Prop;
-constant symbol psub_ : bVar → bExp → Prop → Prop;
+symbol T4 [x : Var] [s : Exp] [P : Prd]
+  : (▷ (x ∈ s) → ✓ P) → ✓ (∀ x (x ∈ s ⇒ P));
 
+symbol T5 [x y : Var] [s t : Exp] [P : Prd]
+  : ✓ (∀ x (x ∈ s ⇒ ∀ y (y ∈ t ⇒ P)))
+  → ✓ (∀ (x ⨾ y) ((x ↦ y) ∈ (s × t) ⇒ P));
 
-symbol Prf : bPrd → TYPE;
-rule Prf $p ↪ π (bprd     $p);
+symbol T6 [x : Var] [P Q R : Prd]
+  : ✓ (∀ x (P ⇒ Q ∧ R))
+  → ✓ (∀ x (P ∧ Q ⇒ R));
 
-inductive Hyp : TYPE ≔
-  | Prd : bPrd → Hyp
-  | HCONS : Hyp → Hyp → Hyp;
+symbol T7 [E F : Exp]
+  : (typ E ≣ typ F) → ✓ (E = F);
 
-inductive Seq : TYPE ≔
-  SEQ : Hyp → bPrd → Seq;
+symbol T8 [E s : Exp]
+  : (typ E ≣ super s) → ✓ (E ∈ s);
 
-symbol BR_1 [p] : (Prf p → Prf p) ≔
+symbol T8' [s t : Exp]
+  : (super s ≣ super t) → ✓ (s ⊆ t);
+
+symbol T9 [x : Var] [s : Exp] [U : bTyp]
+  : ▷ (x ∈ s) → (super s ≣ U) → (typ x ≣ U);
+
+symbol T10 [E F : Exp] [U : bTyp]
+  : (typ E ∗ typ F ≣ U) → (typ (E ↦ F) ≣ U);
+
+symbol T11 [s : Exp] [U : bTyp]
+  : (super s ≣ U) → (typ (choice s) ≣ U);
+
+symbol T12 [s : Exp] [U : bTyp]
+  : (ℙ (super s) ≣ U) → (typ s ≣ U);
+
+symbol T13 [x : Var] [s : Exp] [U : bTyp]
+  : ▷ (x ∈ s)
+  → (super s ≣ ℙ U)
+  → (super x ≣ U);
+
+symbol T13' [x : Var] [s : Exp] [U : bTyp]
+  : ▷ (x ∈ s)
+  → (ℙ U ≣ super s)
+  → (U ≣ super x)
+  ≔ λ h1 h2, symm (T13 h1 (symm h2));
+
+symbol T14 [s t : Exp] [U : bTyp]
+  : (super s ∗ super t ≣ U)
+  → (super (s × t) ≣ U);
+
+symbol T15 [s : Exp] [U : bTyp]
+  : (ℙ (super s) ≣ U)
+  → (super (𝒫 s) ≣ U);
+
+symbol T15' [s : Exp] [U : bTyp]
+  : (U ≣ ℙ (super s))
+  → (U ≣ super (𝒫 s))
+  ≔ λ h, symm (T15 (symm h));
+
+symbol T16 [x : Var] [s : Exp] [P : Prd] [U : bTyp]
+  : ✓ (∀ x (x ∈ s ⇒ P))
+  → (super s ≣ U)
+  → (super (comp x (x ∈ s ∧ P)) ≣ U);
+
+symbol T17 [I : String] [U : bTyp]
+  : given (#id I)
+  → (iden I ≣ U)
+  → (super (#id I) ≣ U);
+
+symbol T17' [I : String] [U : bTyp]
+  (h1 : given (#id I))
+  (h2 : U ≣ iden I)
+  : (U ≣ super (#id I))
+  ≔ symm (T17 h1 (symm h2));
+
+symbol T18 [s : Exp] [U : bTyp]
+  : (super s ≣ ℙ U)
+  → (super (choice s) ≣ U);
+
+symbol T19 [T U : bTyp]
+  : (T ≣ U)
+  → (ℙ T ≣ ℙ U);
+
+symbol T20 [T U V W : bTyp]
+  : (T ≣ U)
+  → (V ≣ W)
+  → (T ∗ V ≣ U ∗ W);
+
+symbol T21 [I : String]
+  : given (#id I)
+  → (iden I ≣ iden I);
+
+// example of a type-checking derivation.
+symbol tc_example
+  (h : given (#id "s"))
+  :
+  let a : Var ≔ id "a" in
+  let b : Var ≔ id "b" in
+  let x : Var ≔ id "x" in
+  let y : Var ≔ id "y" in
+  let s : Exp ≔ #id "s" in
+  ✓ (∀ (a ⨾ b) (
+    ((a ↦ b) ∈ ((𝒫 s) × (𝒫 s)))
+    ⇒ (comp x (x ∈ s ∧ (x ∈ a ∧ x ∈ b)) ⊆ s))
+  )
+  ≔
   begin
-    assume p h;
-    refine h;
+    assume h;
+    apply T5;
+    apply T4; assume a;
+    apply T4; assume b;
+    apply T8';
+    apply T17' h;
+    apply T16
+    {
+      apply T4; assume x;
+      apply T1
+      {
+        apply T8; apply T13' a;
+        apply T15'; apply T19;
+        apply T17' h; apply T9 x;
+        apply T17 h; apply T21 h;
+      } {
+        apply T8; apply T13' b;
+        apply T15'; apply T19;
+        apply T17' h; apply T9 x;
+        apply T17 h; apply T21 h;
+      }
+    }{
+      apply T17 h;
+      apply T21 h;
+    }
   end;
 
-//symbol BR_2 [p]
-symbol BR3 [p] (h1 : Prf p) : Prf p
-  ≔ BR_1 h1;
-
-symbol BR4 [p q] :
-  Prf p → (Prf p → Prf q) → Prf q ≔
-  begin
-    assume p q h1 h2;
-    refine h2 h1;
-    print;
-  end;
-
-symbol RULE_1 [p q] :
-  Prf p → Prf q → Prf (AND p q);
-//// ----- logic. ----------
-//symbol all : (bExp → Prop) → Prop;
-//notation all quantifier;
-//symbol eq : bExp → bExp → Prop;
-
-//// ----- bSet theory -----
-//constant symbol mem : bExp → bSet → Prop;
-//symbol ∈ ≔ mem; notation ∈ infix 10;
-
-//constant symbol Collect : (bExp → Prop) → bSet → bSet;
-
-//constant symbol Pow : bSet → bSet;
-//symbol 𝒫 ≔ Pow;
-
-//constant symbol choice : bSet → bExp;
-//constant symbol BIG : bSet;
-
-//// coerce a bSet to an bExpression.
-//constant symbol !bSet : bSet → bExp;
-
-
-//// ----- pairing and cartesian product -----
-//constant symbol pair : bExp → bExp → bExp;
-//constant symbol prod : bSet → bSet → bSet;
-//symbol ⨾ ≔ pair; notation ⨾ infix right 5;
-//symbol × ≔ prod; notation × infix right 5;
-
-//// ----- axioms ------------------------------
-//symbol bSet1 [E F s t] :
-//  π ((E ⨾ F) ∈ (s × t) ⇔ (E ∈ s ∧ F ∈ t));
-
-//symbol bSet2 [s t] :
-//  π (!bSet s ∈ 𝒫 t ⇔ `all x, (x ∈ s ⇒ x ∈ t));
-
-//symbol bSet3 [E s P] :
-//  π (E ∈ Collect P s ⇔ (E ∈ s ∧ P E));
-
-//symbol bSet4 [E s P] :
-//  π (E ∈ Collect P s ⇔ (E ∈ s ∧ P E));
-
-
-
-////type bSet;
-////type (⤳);
+type tc_example;
