@@ -1,3 +1,7 @@
+ocaml/_build
+ocaml/bin
+ocaml/lib
+
 # LaTeX/TeX build artifacts
 *.aux
 *.bbl
