@@ -2,6 +2,10 @@ ocaml/_build
 ocaml/bin
 ocaml/lib
 
+test/but
+test/replay
+test/trace
+
 # LaTeX/TeX build artifacts
 *.aux
 *.bbl
