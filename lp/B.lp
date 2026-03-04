@@ -1,5 +1,6 @@
 require open
   Stdlib.Bool
+  Stdlib.Set
   Stdlib.String;
 
 // datatype for variable-lists.
@@ -30,10 +31,8 @@ with Exp : TYPE ≔
   | choice : Exp → Exp
   | comp : Var → Prd → Exp;
 
-// `prf p` is the type of proofs of `p`
-symbol prf : Prd → TYPE;
-symbol ▷ ≔ prf; notation ▷ prefix 5;
 
+type ind_Prd;
 // infix notation. precedences given by pp-spec (§6.1).
 // higher number = tighter binding in lambdapi.
 // pp-spec order (loose→tight): ⇒(0) ⇔(1) ∧∨(2) ¬(3) =(4) ∈(5)
@@ -47,6 +46,11 @@ notation ¬ prefix 9;
 notation = infix left 10;
 notation ∈ infix left 15;
 
+// Set codes for the inductive types.
+symbol prd : Set; rule τ prd ↪ Prd;
+symbol exp : Set; rule τ exp ↪ Exp;
+symbol var : Set; rule τ var ↪ Var;
+
 // shorthand: string to expression via variable.
 symbol #id ≔ λ str, #var (id str);
 
@@ -58,8 +62,7 @@ coerce_rule coerce String Exp $str ↪ #var (id $str);
 coerce_rule coerce Var Exp $x ↪ #var $x;
 
 
-compute
-  ∀ "x" ("x" = "x");
+
 
 // define disequality.
 symbol != ≔ λ E F, ¬ (E = F);
@@ -82,6 +85,9 @@ sequential symbol prd_eq : Prd → Prd → 𝔹;
 inductive Trm : TYPE ≔
   | #exp : Exp → Trm
   | #prd : Prd → Trm;
+
+coerce_rule coerce Prd Trm $P ↪ #prd $P;
+coerce_rule coerce Exp Trm $E ↪ #exp $E;
 
 // syntactic equality.
 sequential symbol == : Trm → Trm → 𝔹; notation == infix 10;
@@ -113,3 +119,70 @@ rule ?exp $E true ↪ $E;
 // boolean-guarded predicate.
 symbol ?prd : Prd → 𝔹 → Prd;
 rule ?prd $P true ↪ $P;
+
+inductive Hyp : TYPE ≔
+  | ⦳ : Hyp
+  | ∷ : Hyp → Prd → Hyp; notation ∷ infix 1;
+
+symbol dans : Prd → Hyp → 𝔹; notation dans infix 1;
+rule ($P dans ⦳)         ↪ false
+with ($P dans ($H ∷ $Q)) ↪ prd_eq $P $Q or ($P dans $H);
+
+// containment: N is a conjunct of C (analogous to `dans` for Hyp).
+sequential symbol contient : Prd → Prd → 𝔹; notation contient infix 1;
+
+// removal: remove a conjunct from a conjunction.
+sequential symbol retirer : Prd → Prd → Prd;
+
+inductive Sqnt : TYPE ≔
+  | ⟝ : Hyp → Prd → Sqnt; notation ⟝ infix 1;
+
+symbol ▷ : Sqnt → TYPE;
+symbol ⊩ ≔ λ H P, ▷ (H ⟝ P); notation ⊩ infix 1;
+
+// boolean guard: `⁇ b` is inhabited iff `b` computes to `true`.
+symbol ⁇ (b : 𝔹) ≔ π (istrue b);
+
+// ---- Results ----
+// Some PP rules produce an ancillary result predicate alongside
+// their derivation. `Res Σ` is the type of result-derivations for
+// sequent Σ.  A value `ρ : Res Σ` encodes a proof of Σ together
+// with a result predicate extractable via `obtain ρ`.
+
+injective symbol Res : Sqnt → TYPE;
+
+// `result P` packages a predicate as a result-derivation.
+symbol result [Σ] : Prd → Res Σ;
+
+// `obtain ρ` extracts the result predicate.
+symbol obtain [Σ] : Res Σ → Prd;
+
+// `obtain` is the inverse of `result`.
+rule obtain (result $P) ↪ $P;
+
+// notational shorthand: Σ ⇝ R  means  "the proof of Σ gives result R".
+symbol ⇝ (Σ : Sqnt) (R : Prd) ≔ Res Σ; notation ⇝ infix 1;
+
+// --- predicates not yet in the inductive type ---
+// TRUE and FALSE as predicates.
+symbol TRUE : Prd;
+symbol FALSE : Prd;
+
+// arithmetic inequality (normalised form: E ≤ 0).
+symbol ≤ : Exp → Exp → Prd; notation ≤ infix left 10;
+// strict inequality marker (used to avoid looping in AR5–AR8).
+symbol ≪ : Exp → Exp → Prd; notation ≪ infix left 10;
+
+// set equality predicate (introduced by Set Translator).
+symbol eql_set : Exp → Exp → Prd;
+
+// arithmetic expression constructors.
+symbol 𝟎 : Exp;
+symbol 𝟏 : Exp;
+symbol + : Exp → Exp → Exp; notation + infix left 12;
+symbol - : Exp → Exp → Exp; notation - infix left 12;
+symbol ⨪ : Exp → Exp; notation ⨪ prefix 13;  // unary minus
+
+// B-method boolean values (expressions, not predicates).
+symbol BTRUE : Exp;
+symbol BFALSE : Exp;
