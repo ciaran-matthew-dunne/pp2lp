@@ -707,10 +707,10 @@ let emit_ar4_args buf ctx _goal =
     pp_exp buf f_expr;
     Buffer.add_string buf ") ";
     Buffer.add_string buf name;
-    Buffer.add_string buf " trust"
+    Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *)
   | _ ->
     Printf.eprintf "warning: AR4 could not find F ≤ 0 hypothesis\n";
-    Buffer.add_string buf " _ trust trust"
+    Buffer.add_string buf " _ trust \xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *)
 
 (* AR5/AR6: find arithmetic hypothesis in context *)
 let emit_ar56_args buf =

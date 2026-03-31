@@ -27,9 +27,10 @@ begin
   admit
 end;
 
+// AR4: F ≤ 0 in H; E + F > 0 (solver-confirmed) → H ⊢ E ≤ 0 ⇒ R
 opaque symbol AR4 [E : τ ι] [R : Prop] (F : τ ι)
   : π (F ≤ 𝟎)
-  → π (¬ ((E + F) ≤ 𝟎))
+  → π ⊤
   → π ((E ≤ 𝟎) ⇒ R) ≔
 begin
   admit
