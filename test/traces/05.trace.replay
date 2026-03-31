@@ -1,3 +1,0 @@
-[OR1] <not(p or q) => not(p)>
-[IMP4] <not(p) => (not(q) => not(p))>
-[AXM4] <not(q) => not(p)>

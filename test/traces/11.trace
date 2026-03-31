@@ -1,6 +1,0 @@
-﻿ [AXM3] &
- [AXM3] &
- [AND4] &
- [IMP5(1)] &
- [IMP4] &
-  (p => (p => p and p))

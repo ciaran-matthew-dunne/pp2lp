@@ -5,6 +5,9 @@ ocaml/lib
 test/gen/
 test/prv/gen/
 test/prv/*.res
+test/prv/*.trace
+test/traces/*.trace
+test/traces/*.replay
 
 lp-old
 lp/gen/

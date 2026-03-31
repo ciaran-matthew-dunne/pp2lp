@@ -1,4 +1,0 @@
-﻿ [AXM7] &
- [IMP4] &
- [IMP1] &
-  (not(p => q) => not(q))
