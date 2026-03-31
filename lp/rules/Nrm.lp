@@ -205,30 +205,57 @@ begin
   assume P Q hp hq ht; refine hq
 end;
 
-// NRM19: P in H; ∃E, [x := E] R = P → H ⊢ ♡x · ¬(TRUE ∧ R) ⇒ Q
-opaque symbol NRM19 [R : Prop] [Q : Prop]
-  : π R
-  → π Q
-  → π ((`♡ _ : τ ι, ¬ (⊤ ∧ R)) ⇒ Q) ≔
+opaque symbol NRM19 [Q : Prop] [R : τ ι → Prop] (E : τ ι)
+  : π (R E)
+  → π ((`♡ x, ¬ (⊤ ∧ R x)) ⇒ Q) ≔
 begin
-  assume R Q hr hq hf;
-  refine hq
-end;
+  assume Q R E hr hf;
+admitted;
+
+// NRM19_2: Two-variable version.
+opaque symbol NRM19_2 [Q : Prop] [R : τ ι → τ ι → Prop] (E F : τ ι)
+  : π (R E F)
+  → π ((`♡ x, `♡ y, ¬ (⊤ ∧ R x y)) ⇒ Q) ≔
+begin
+  assume Q R E F hr;
+admitted;
 
 // ---- NRM20-23: Equality elimination under ♡ ----
 
-// NRM20: x not free in E; H ⊢ ♡y · ¬[x := E]P ⇒ Q → H ⊢ ♡(x, y) · ¬(P ∧ x = E) ⇒ Q
-opaque symbol NRM20 [P : τ ι → Prop] [S : Prop] (E : τ ι)
-  : π ((`♡ _ : τ ι, ¬ (P E)) ⇒ S)
-  → π ((`♢ x, ¬ (P x ∧ (x = E))) ⇒ S) ≔
+opaque symbol NRM20 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
+  : π ((`♡ y, ¬ (P E y)) ⇒ Q)
+  → π ((`♡ x, `♡ y, ¬ (P x y ∧ (x = E))) ⇒ Q) ≔
 begin
   assume P S E h1 h2;
-  refine h1 (λ _, λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
-end;
+  //refine h1 (λ _, λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
+admitted;
+
+opaque symbol NRM21 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
+  : π ((`♡ y, ¬ (P E y)) ⇒ Q)
+  → π ((`♡ x, `♡ y, ¬ (P x y ∧ (E = x))) ⇒ Q) ≔
+begin
+  assume P S E h1 h2;
+  //refine h1 (λ _, λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
+admitted;
+
+opaque symbol NRM22 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
+  : π (¬ (P E) ⇒ Q)
+  → π ((`♡ x, ¬ (P x ∧ (x = E))) ⇒ Q) ≔
+begin
+  //refine h1 (λ _, λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
+admitted;
+
+opaque symbol NRM23 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
+  : π (¬ (P E) ⇒ Q)
+  → π ((`♡ x, ¬ (P x ∧ (E = x))) ⇒ Q) ≔
+begin
+  //refine h1 (λ _, λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
+admitted;
 
 // ---- NRM24-26: Simple transformations ----
 
-// NRM24: P is not of the form A ∧ B; H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ Q → H ⊢ ♡x · ¬P ⇒ Q
+// NRM24: P is not of the form A ∧ B;
+// H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ Q → H ⊢ ♡x · ¬P ⇒ Q
 opaque symbol NRM24 [P : τ ι → Prop] [Q : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ Q)
   → π ((`♡ x, ¬ (P x)) ⇒ Q) ≔

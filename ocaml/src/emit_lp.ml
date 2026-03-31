@@ -3,7 +3,6 @@ open Proof_tree
 
 (* ---- Identifier emission ---- *)
 
-(* Lambdapi needs {|...|} escaping for identifiers with special chars *)
 let is_simple_ident s =
   s <> "" &&
   (let c = s.[0] in (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c = '_') &&
@@ -54,7 +53,7 @@ let rec pp_exp buf e =
     pp_exp buf e2;
     Buffer.add_char buf ')'
   | Neg e1 ->
-    Buffer.add_string buf "(\xe2\x80\x94 "; (* — (em dash = unary minus in B.lp) *)
+    Buffer.add_string buf "(\xe2\x80\x94 "; (* — *)
     pp_exp buf e1;
     Buffer.add_char buf ')'
   | SetImage (e1, e2) ->
@@ -87,14 +86,12 @@ and pp_exp_args buf = function
     Buffer.add_char buf ')'
   | [] -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 as fallback *)
 
-(* ---- Conjunction flattening ---- *)
+(* ---- Conjunction helpers ---- *)
 
-(* Flatten a left-associative And tree into a list of conjuncts *)
 let rec flatten_conj = function
   | Binary (And, p1, p2) -> flatten_conj p1 @ flatten_conj p2
   | p -> [p]
 
-(* Emit a list of conjuncts left-associatively: ((a ∧ b) ∧ c) ∧ d *)
 let rec pp_conj_left buf = function
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
   | [p] -> pp_prd buf p
@@ -116,14 +113,12 @@ and pp_prd buf p =
   | Lift (Var "FAUX") | Lift (Var "FALSE") ->
     Buffer.add_string buf "\xe2\x8a\xa5" (* ⊥ *)
   | Lift (App (f, args)) ->
-    (* In B, f(x) in predicate position is membership: x ϵ f *)
     Buffer.add_char buf '(';
     pp_exp_args buf args;
     Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
     pp_ident buf f;
     Buffer.add_char buf ')'
   | Lift (Var s) ->
-    (* Free predicate variable — bare identifier *)
     pp_ident buf s
   | Lift e ->
     pp_exp buf e
@@ -170,7 +165,6 @@ and pp_prd buf p =
     Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
     pp_exp buf e;
     Buffer.add_char buf ')'
-  (* Quantifiers: HOAS style — `∀ x : τ ι, body *)
   | Bind (binder, xs, body) ->
     let qsym = match binder with
       | Forall0 -> "`\xe2\x88\x80" (* `∀ *)
@@ -191,7 +185,7 @@ and pp_prd buf p =
     in
     emit_vars xs
 
-(* ---- Left-associative conjunction helpers ----
+(* ---- Left-associative conjunction extraction/reconstruction ----
    For n conjuncts [c₀; c₁; ...; cₙ₋₁], left-assoc tree is:
      ((...(c₀ ∧ c₁) ∧ c₂) ∧ ...) ∧ cₙ₋₁
 
@@ -201,41 +195,33 @@ and pp_prd buf p =
      k = n-1:     ∧ₑ₂ var                   — just right projection
 *)
 
-(* Emit a chain of n applications of ∧ₑ₁ to var *)
 let rec emit_e1_chain buf var n =
   if n = 0 then Buffer.add_string buf var
   else begin
-    (* \xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81 = ∧ₑ₁ *)
-    Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81 ";
+    Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81 "; (* ∧ₑ₁ *)
     if n > 1 then Buffer.add_char buf '(';
     emit_e1_chain buf var (n - 1);
     if n > 1 then Buffer.add_char buf ')'
   end
 
-(* Emit extraction of k-th element from n-element left-assoc conjunction *)
 let emit_extract buf var n k =
   if n = 1 then Buffer.add_string buf var
   else
     let d = if k = 0 then n - 1 else n - 1 - k in
     if k > 0 then begin
-      (* \xe2\x88\xa7\xe2\x82\x91\xe2\x82\x82 = ∧ₑ₂ *)
-      Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x82 ";
+      Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x82 "; (* ∧ₑ₂ *)
       if d > 0 then Buffer.add_char buf '(';
       emit_e1_chain buf var d;
       if d > 0 then Buffer.add_char buf ')'
     end else
       emit_e1_chain buf var d
 
-(* Emit a left-assoc conjunction of the given element emitters.
-   Each element emitter writes one conjunct to buf (already parenthesized). *)
 let emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
   match elts with
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
   | [e] -> e buf
   | first :: rest ->
-    (* \xe2\x88\xa7\xe1\xb5\xa2 = ∧ᵢ *)
-    (* n-1 ∧ᵢ applications for n elements; open n-2 wrapping parens *)
-    List.iter (fun _ -> Buffer.add_string buf "(\xe2\x88\xa7\xe1\xb5\xa2 ") rest;
+    List.iter (fun _ -> Buffer.add_string buf "(\xe2\x88\xa7\xe1\xb5\xa2 ") rest; (* ∧ᵢ *)
     first buf;
     List.iter (fun e ->
       Buffer.add_char buf ' ';
@@ -243,16 +229,12 @@ let emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
       Buffer.add_char buf ')'
     ) rest
 
-(* Emit AND5 forward function: remove element j, apply modus ponens,
-   append result at end.  Matches PP semantics: rem_nth c j ++ [b]. *)
 let emit_and5_fwd buf var n i j =
-  (* Build element list: skip j, append modus ponens result *)
   let elts = ref [] in
   for k = n - 1 downto 0 do
     if k <> j then
       elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n k; Buffer.add_char buf ')') :: !elts
   done;
-  (* Append b = (extract_j h)(extract_i h) *)
   elts := !elts @ [(fun buf ->
     Buffer.add_string buf "((";
     emit_extract buf var n j;
@@ -261,26 +243,15 @@ let emit_and5_fwd buf var n i j =
     Buffer.add_string buf "))")];
   emit_conj_from_elts buf !elts
 
-(* Emit AND5 backward function: given C' = rem_nth c j ++ [b],
-   reconstruct C by inserting (λ _, extract_last h) at position j. *)
 let emit_and5_bwd buf var n j =
-  (* C' has n elements: the ones from C minus j, plus b at the end.
-     We need to rebuild C's n elements. *)
-  let n' = n in (* C' has same number of elements *)
-  (* Mapping: C'[k'] corresponds to:
-     - C'[k'] = C[k] for k' < j (where k = k')
-     - C'[k'] = C[k+1] for j <= k' < n-1 (where k = k'+1)
-     - C'[n-1] = b *)
+  let n' = n in
   let elts = ref [] in
   for k = n - 1 downto 0 do
     if k < j then
-      (* Same position in C' *)
       elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' k; Buffer.add_char buf ')') :: !elts
     else if k > j then
-      (* Shifted left by 1 in C' *)
       elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' (k - 1); Buffer.add_char buf ')') :: !elts
     else
-      (* k = j: need A⇒B, construct as (λ _, extract_{n'-1} h) *)
       elts := (fun buf ->
         Buffer.add_string buf "(\xce\xbb _, "; (* λ _, *)
         emit_extract buf var n' (n' - 1);
@@ -342,7 +313,7 @@ let rec collect_prd_fv bound fv = function
 
 let free_vars_of_prd p = collect_prd_fv SS.empty empty_fv p
 
-(* ---- Hypothesis extraction and pattern matching ---- *)
+(* ---- Hypothesis context ---- *)
 
 let rec collect_conj_hyps acc = function
   | Binary (And, l, r) ->
@@ -354,10 +325,8 @@ let rec extract_theorem_hyps = function
   | Binary (Imp, hyps, _) -> collect_conj_hyps [] hyps
   | _ -> []
 
-(* ---- Hypothesis context for proof emission ---- *)
-
 type hyp_ctx = {
-  entries: (string * prd) list;  (* name, predicate *)
+  entries: (string * prd) list;
   counter: int;
 }
 
@@ -369,7 +338,6 @@ let fresh_hyp ctx p =
                counter = ctx.counter + 1 } in
   (name, ctx')
 
-(* Search hypothesis context for a predicate matching target *)
 let find_hyp ctx target =
   let rec search = function
     | [] -> None
@@ -378,292 +346,438 @@ let find_hyp ctx target =
   in
   search ctx.entries
 
-(* Find hypothesis for an AXM rule based on rule name and goal *)
+(* ---- AST substitution ---- *)
+
+let rec subst_exp x y = function
+  | Var s when s = x -> Var y
+  | Var _ | Nat _ as e -> e
+  | App (f, args) -> App (f, List.map (subst_exp x y) args)
+  | AOp (op, e1, e2) -> AOp (op, subst_exp x y e1, subst_exp x y e2)
+  | Neg e -> Neg (subst_exp x y e)
+  | SetImage (e1, e2) -> SetImage (subst_exp x y e1, subst_exp x y e2)
+  | Inter (e1, e2) -> Inter (subst_exp x y e1, subst_exp x y e2)
+  | Union (e1, e2) -> Union (subst_exp x y e1, subst_exp x y e2)
+
+let rec subst_prd x y = function
+  | Lift e -> Lift (subst_exp x y e)
+  | Unary (op, p) -> Unary (op, subst_prd x y p)
+  | Binary (op, p1, p2) -> Binary (op, subst_prd x y p1, subst_prd x y p2)
+  | Bind (b, xs, body) ->
+    if List.mem x xs then Bind (b, xs, body)
+    else Bind (b, xs, subst_prd x y body)
+  | Mem (es, e) -> Mem (List.map (subst_exp x y) es, subst_exp x y e)
+  | Eq (e1, e2) -> Eq (subst_exp x y e1, subst_exp x y e2)
+  | Leq (e1, e2) -> Leq (subst_exp x y e1, subst_exp x y e2)
+
+(* ---- Variant selection ----
+   Selects the effective LP rule name based on goal shape and context.
+   Handles _2 variants, NRM8+NRM13 fusion, and HOAS identity skip. *)
+
+let is_hoas_identity = function
+  | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
+  | "XST1" | "XST2" | "XST3" | "XST4" -> true
+  | _ -> false
+
+let binding_vars = function
+  | Binary (Imp, Bind (_, xs, _), _) -> xs
+  | Bind (_, xs, _) -> xs
+  | _ -> []
+
+let select_variant rule goal children flat =
+  match rule, children with
+  (* NRM8 + NRM13 fusion *)
+  | "NRM8", [Apply { rule = "NRM13"; _ }] ->
+    let rec count_vars = function
+      | Binary (Imp, Bind (_, xs, body), _) ->
+        List.length xs + count_inner body
+      | _ -> 0
+    and count_inner = function
+      | Bind (_, xs, body) -> List.length xs + count_inner body
+      | _ -> 0
+    in
+    if count_vars goal >= 3 then "NRM8_13_3" else "NRM8_13"
+  (* ALL7/XST8: 2-var compound binding → _2 variant *)
+  | "ALL7", _ ->
+    begin match goal with
+    | Binary (Imp, Bind (_, xs, _), _)
+      when List.length xs >= 2 && flat = 0 -> "ALL7_2"
+    | _ -> rule
+    end
+  | "XST8", _ ->
+    begin match goal with
+    | Bind (Exists, xs, _)
+      when List.length xs >= 2 && flat = 0 -> "XST8_2"
+    | _ -> rule
+    end
+  (* XST5/XST6: 2-var compound ∃ → _2 variant *)
+  | "XST5", _ ->
+    begin match goal with
+    | Binary (Imp, Unary (Not, Bind (Exists, xs, _)), _)
+      when List.length xs >= 2 -> "XST5_2"
+    | _ -> rule
+    end
+  | "XST6", _ ->
+    begin match goal with
+    | Unary (Not, Bind (Exists, xs, _))
+      when List.length xs >= 2 -> "XST6_2"
+    | _ -> rule
+    end
+  (* NRM14/NRM15/NRM19: 2-var compound binding → _2 variant *)
+  | ("NRM14" | "NRM15" | "NRM19"), _ ->
+    begin match goal with
+    | Binary (Imp, Bind (_, xs, _), _)
+      when List.length xs >= 2 -> rule ^ "_2"
+    | _ -> rule
+    end
+  | _ -> rule
+
+(* ---- Child flat propagation ---- *)
+
+let compute_child_flat rule flat =
+  match rule with
+  | "ALL5" | "XST5" | "XST7" -> flat + 1
+  | "XST5_2" -> 0
+  | _ when is_hoas_identity rule -> flat
+  | _ -> 0
+
+(* ---- Hypothesis/variable introduction ----
+   Emits assume lines for IMP4, ALL9, ALL8 and returns updated context. *)
+
+let introduce buf pad ctx rule goal flat =
+  (* IMP4: introduce antecedent as hypothesis *)
+  let ctx =
+    if rule = "IMP4" || rule = "IMP4_1" then
+      match goal with
+      | Binary (Imp, p, _) ->
+        let (name, ctx') = fresh_hyp ctx p in
+        Buffer.add_string buf ";\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "assume ";
+        Buffer.add_string buf name;
+        ctx'
+      | _ -> ctx
+    else ctx
+  in
+  (* ALL9: introduce ♡-hypothesis *)
+  let ctx =
+    if rule = "ALL9" then
+      match goal with
+      | Binary (Imp, p, _) ->
+        let (name, ctx') = fresh_hyp ctx p in
+        Buffer.add_string buf ";\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "assume ";
+        Buffer.add_string buf name;
+        ctx'
+      | _ -> ctx
+    else ctx
+  in
+  (* ALL8: introduce bound variables (with flat adjustment) *)
+  if rule = "ALL8" || rule = "ALL8_1" then begin
+    match goal with
+    | Bind (_, xs, _) ->
+      let vars = if flat > 0 && List.length xs > flat
+        then List.filteri (fun i _ -> i < List.length xs - flat) xs
+        else xs
+      in
+      Buffer.add_string buf ";\n";
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "assume";
+      List.iter (fun x ->
+        Buffer.add_char buf ' ';
+        pp_ident buf x) vars
+    | _ -> ()
+  end;
+  ctx
+
+(* ---- Dynamic argument emitters ---- *)
+
+let strip_suffix rule =
+  let len = String.length rule in
+  if len > 2 then
+    let s = String.sub rule (len - 2) 2 in
+    if s = "_1" || s = "_2" then String.sub rule 0 (len - 2)
+    else rule
+  else rule
+
+let is_primed rule =
+  let len = String.length rule in
+  len > 2 && String.sub rule (len - 2) 2 = "_1"
+
+(* AXM hypothesis lookup *)
 let find_axm_hyp ctx rule goal =
   match rule, goal with
-  (* AXM1: π (¬ P) → π (P ⇒ Q) — need ¬P *)
   | "AXM1", Binary (Imp, p, _) -> find_hyp ctx (Unary (Not, p))
-  (* AXM2: π P → π (¬ P ⇒ Q) — need P *)
   | "AXM2", Binary (Imp, Unary (Not, p), _) -> find_hyp ctx p
-  (* AXM3: π P → π P — need P *)
   | "AXM3", p -> find_hyp ctx p
-  (* AXM4: π R → π (P ⇒ R) — need R *)
   | "AXM4", Binary (Imp, _, r) -> find_hyp ctx r
-  | "AXM4", p -> find_hyp ctx p  (* fallback: goal IS the hypothesis *)
-  (* AXM5: π (¬ Q) → π (P ⇒ (Q ⇒ R)) — need ¬Q *)
+  | "AXM4", p -> find_hyp ctx p
   | "AXM5", Binary (Imp, _, Binary (Imp, q, _)) ->
     find_hyp ctx (Unary (Not, q))
-  (* AXM6: π Q → π (P ⇒ (¬ Q ⇒ R)) — need Q *)
   | "AXM6", Binary (Imp, _, Binary (Imp, Unary (Not, q), _)) ->
     find_hyp ctx q
-  (* NOT2: π P → π (¬P) = π (P → ⊥) — need the P that contradicts *)
   | "NOT2", Unary (Not, p) -> find_hyp ctx p
   | "NOT2", Binary (Imp, p, _) -> find_hyp ctx p
   | _ -> None
 
-(* ---- AND5/AXM8 index computation ---- *)
-
-(* Extract conjunction list from the antecedent of an implication goal *)
-let conj_list_of_goal = function
-  | Binary (Imp, ante, _) -> flatten_conj ante
-  | _ -> []
-
-(* Find AND5 indices: j = index of (a ⇒ b), i = index of a.
-   We compare the parent goal with the child goal to find which
-   implication was eliminated. *)
-let find_and5_indices (goal : prd) (child_goal : prd) =
-  let parent_list = conj_list_of_goal goal in
-  let child_list = conj_list_of_goal child_goal in
-  (* The child list is rem_nth parent j ++ [b].
-     Find the element in parent that's missing from child (that's at index j).
-     The new element appended to child is b. *)
-  let n = List.length parent_list in
-  (* Find index j: the element in parent_list not in child_list prefix *)
-  let rec find_j pi ci j =
-    if pi >= n then None
-    else
-      let p_elt = List.nth parent_list pi in
-      if ci < List.length child_list && p_elt = List.nth child_list ci then
-        find_j (pi + 1) (ci + 1) j
-      else
-        (* This is the removed element at index pi *)
-        Some pi
-  in
-  match find_j 0 0 0 with
-  | None -> None
-  | Some j ->
-    let removed = List.nth parent_list j in
-    (* removed should be (a ⇒ b) *)
-    match removed with
-    | Binary (Imp, a, _b) ->
-      (* Find index i where a appears in parent_list *)
-      let rec find_i idx = function
-        | [] -> None
-        | elt :: rest ->
-          if elt = a && idx <> j then Some idx
-          else find_i (idx + 1) rest
-      in
-      begin match find_i 0 parent_list with
-      | Some i -> Some (i, j)
-      | None -> None
-      end
-    | _ -> None
-
-(* Find AXM8 index: which conjunct is equal to r (the consequent) *)
-let find_axm8_index (goal : prd) =
-  let conjs = conj_list_of_goal goal in
+(* AXM8: extract i-th conjunct via lambda *)
+let emit_axm8_args buf goal =
+  let conjs = match goal with
+    | Binary (Imp, ante, _) -> flatten_conj ante | _ -> [] in
+  let n = List.length conjs in
   let r = match goal with Binary (Imp, _, r) -> Some r | _ -> None in
   match r with
-  | None -> None
   | Some r ->
     let rec find idx = function
-      | [] -> None
-      | elt :: rest ->
-        if elt = r then Some idx
-        else find (idx + 1) rest
+      | [] -> None | elt :: rest ->
+        if elt = r then Some idx else find (idx + 1) rest
     in
-    find 0 conjs
+    begin match find 0 conjs with
+    | Some i ->
+      Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+      emit_extract buf "h" n i;
+      Buffer.add_char buf ')'
+    | None -> Buffer.add_string buf " _"
+    end
+  | None -> Buffer.add_string buf " _"
 
+(* AXM9: find ∀x.¬(⊤ ∧ ...) hypothesis, select _2 variant *)
+let emit_axm9_args buf ctx =
+  let rec has_true_and = function
+    | Unary (Not, Binary (And, Lift (Var ("VRAI"|"TRUE")), _)) -> true
+    | Bind (_, _, body) -> has_true_and body
+    | _ -> false
+  in
+  let rec count_bind_depth = function
+    | Bind (_, xs, body) -> List.length xs + count_bind_depth body
+    | _ -> 0
+  in
+  let rec search = function
+    | [] -> None
+    | (name, (Bind (_, _, body) as p)) :: rest ->
+      if has_true_and body then Some (name, count_bind_depth p)
+      else search rest
+    | _ :: rest -> search rest
+  in
+  match search ctx.entries with
+  | Some (name, nvars) when nvars >= 2 ->
+    Buffer.add_string buf "_2 _ _ ";
+    Buffer.add_string buf name
+  | Some (name, _) ->
+    Buffer.add_string buf " _ ";
+    Buffer.add_string buf name
+  | None ->
+    Buffer.add_string buf " _ _"
 
-(* ---- Rule argument emission ---- *)
-
-let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
-  match node with
-  | Apply { rule = _; goal; _ } ->
-    let rule = eff_rule in
-    let is_primed =
-      String.length rule > 2
-      && String.sub rule (String.length rule - 2) 2 = "_1"
+(* AND5: forward/backward conjunction permutation lambdas *)
+let emit_and5_args buf goal node ~primed =
+  let children = match node with Apply { children; _ } -> children in
+  let child_goal = match children with
+    | [Apply { goal; _ }] -> Some goal | _ -> None in
+  let conjs = match goal with
+    | Binary (Imp, ante, _) -> flatten_conj ante | _ -> [] in
+  let n = List.length conjs in
+  let find_and5_indices child_goal =
+    let parent_list = conjs in
+    let child_list = match child_goal with
+      | Binary (Imp, ante, _) -> flatten_conj ante | _ -> [] in
+    let rec find_j pi ci =
+      if pi >= n then None
+      else
+        let p_elt = List.nth parent_list pi in
+        if ci < List.length child_list && p_elt = List.nth child_list ci then
+          find_j (pi + 1) (ci + 1)
+        else Some pi
     in
-    let base_rule =
-      if is_primed
-      then String.sub rule 0 (String.length rule - 2)
-      else rule
-    in
-    (* Primed (_1) variants: most need no explicit args, but
-       AXM8_1 and AND5_1 need extraction/reconstruction functions. *)
-    if is_primed then begin
-      let db = Rule_db.get () in
-      let ea = Rule_db.emit_args db base_rule in
-      match ea with
-      | Some "dynamic:axm8" ->
-        let conjs = conj_list_of_goal goal in
-        let n = List.length conjs in
-        begin match find_axm8_index goal with
-        | Some i ->
-          Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
-          emit_extract buf "h" n i;
-          Buffer.add_char buf ')'
-        | None -> Buffer.add_string buf " _"
+    match find_j 0 0 with
+    | None -> None
+    | Some j ->
+      match List.nth parent_list j with
+      | Binary (Imp, a, _) ->
+        let rec find_i idx = function
+          | [] -> None | elt :: rest ->
+            if elt = a && idx <> j then Some idx
+            else find_i (idx + 1) rest
+        in
+        begin match find_i 0 parent_list with
+        | Some i -> Some (i, j) | None -> None
         end
-      | Some "dynamic:and5" ->
-        let children = match node with Apply { children; _ } -> children in
-        let child_goal = match children with
-          | [Apply { goal; _ }] -> Some goal
+      | _ -> None
+  in
+  match child_goal with
+  | Some cg ->
+    begin match find_and5_indices cg with
+    | Some (i, j) ->
+      Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+      emit_and5_fwd buf "h" n i j;
+      Buffer.add_char buf ')';
+      if primed then begin
+        Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+        emit_and5_bwd buf "h" n j;
+        Buffer.add_char buf ')'
+      end
+    | None ->
+      Buffer.add_string buf (if primed then " _ _" else " _")
+    end
+  | None ->
+    Buffer.add_string buf (if primed then " _ _" else " _")
+
+(* ALL7/XST8: emit R normalisation predicate lambda *)
+let emit_quant_r_args buf rule node =
+  match node with
+  | Apply { children; _ } ->
+    let r_opt = match children with
+      | [_; Apply { goal = Binary (Imp, Bind ((Forall0|Forall1|Forall2), xs, r_body), _); _ }] ->
+        if rule = "ALL7_2" || rule = "XST8_2" then
+          Some (xs, [], r_body)
+        else
+          let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
+          let inner_vars = (match xs with _ :: rest -> rest | [] -> []) in
+          Some (lambda_vars, inner_vars, r_body)
+      | _ -> None
+    in
+    begin match r_opt with
+    | Some (lambda_vars, inner_vars, r_body) ->
+      Buffer.add_string buf " (\xce\xbb"; (* (λ *)
+      List.iter (fun x ->
+        Buffer.add_char buf ' ';
+        pp_ident buf x) lambda_vars;
+      Buffer.add_string buf ", ";
+      if inner_vars <> [] then begin
+        Buffer.add_string buf "(`\xe2\x88\x80 "; (* (`∀ *)
+        List.iter (fun x ->
+          pp_ident buf x;
+          Buffer.add_string buf " : \xcf\x84 \xce\xb9, " (* : τ ι, *)
+        ) inner_vars;
+        pp_prd buf r_body;
+        Buffer.add_char buf ')'
+      end else
+        pp_prd buf r_body;
+      Buffer.add_char buf ')'
+    | None -> ()
+    end
+
+(* OPR1/OPR2: emit substitution predicate lambda *)
+let emit_opr_args buf opr_rule goal =
+  let decompose = match goal with
+    | Binary (Imp, Eq (Var x, _), body) when opr_rule = "OPR1" -> Some (x, body)
+    | Binary (Imp, Eq (_, Var x), body) when opr_rule = "OPR2" -> Some (x, body)
+    | _ -> None
+  in
+  match decompose with
+  | Some (x, body) ->
+    let z = "__z" in
+    let body' = subst_prd x z body in
+    Buffer.add_string buf " (\xce\xbb "; (* (λ  *)
+    Buffer.add_string buf z;
+    Buffer.add_string buf ", ";
+    pp_prd buf body';
+    Buffer.add_char buf ')'
+  | None ->
+    Buffer.add_string buf " _"
+
+(* NRM19: find witness and hypothesis for ♡-body instantiation *)
+let emit_nrm19_args buf ctx goal =
+  let nrm19_body = match goal with
+    | Binary (Imp, Bind (Forall2, xs, Unary (Not, Binary (And, _, body))), _) ->
+      Some (xs, body)
+    | _ -> None
+  in
+  match nrm19_body with
+  | Some (bvars, body) ->
+    let rec search = function
+      | [] -> None
+      | (name, hyp_prd) :: rest ->
+        let try_match body hyp_prd = match body, hyp_prd with
+          | Lift (App (f1, args1)), Lift (App (f2, args2))
+            when f1 = f2 && List.length args1 = List.length args2 ->
+            let pairs = List.combine args1 args2 in
+            let mapping = List.filter_map (fun (a, h) ->
+              match a with
+              | Var v when List.mem v bvars -> Some (v, h)
+              | _ -> None) pairs in
+            if List.length mapping = List.length bvars then
+              let body' = List.fold_left (fun acc (v, e) ->
+                subst_prd v (match e with Var s -> s | _ -> "_") acc
+              ) body mapping in
+              if body' = hyp_prd then Some (List.map snd mapping) else None
+            else None
+          | Mem (es1, e1), Mem (es2, e2)
+            when List.length es1 = List.length es2 ->
+            let pairs = List.combine (es1 @ [e1]) (es2 @ [e2]) in
+            let mapping = List.filter_map (fun (a, h) ->
+              match a with
+              | Var v when List.mem v bvars -> Some (v, h)
+              | _ -> None) pairs in
+            if List.length mapping = List.length bvars then
+              let body' = List.fold_left (fun acc (v, e) ->
+                subst_prd v (match e with Var s -> s | _ -> "_") acc
+              ) body mapping in
+              if body' = hyp_prd then Some (List.map snd mapping) else None
+            else None
           | _ -> None
         in
-        begin match child_goal with
-        | Some cg ->
-          begin match find_and5_indices goal cg with
-          | Some (i, j) ->
-            let conjs = conj_list_of_goal goal in
-            let n = List.length conjs in
-            (* Forward: remove j, append (extract_j h)(extract_i h) *)
-            Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
-            emit_and5_fwd buf "h" n i j;
-            Buffer.add_char buf ')';
-            (* Backward: insert (λ _, extract_last h) at position j *)
-            Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
-            emit_and5_bwd buf "h" n j;
-            Buffer.add_char buf ')'
-          | None ->
-            Buffer.add_string buf " _ _"
-          end
-        | None ->
-          Buffer.add_string buf " _ _"
+        begin match try_match body hyp_prd with
+        | Some witness_exps -> Some (name, witness_exps)
+        | None -> search rest
         end
-      | _ -> ()
-    end
-    else
-    (* Check JSON emit_args for this rule *)
-    let db = Rule_db.get () in
-    let ea = Rule_db.emit_args db base_rule in
-    match ea with
-    (* Dynamic argument handlers *)
-    | Some "dynamic:hyp" ->
-      begin match find_axm_hyp ctx base_rule goal with
-      | Some name ->
+    in
+    begin match search ctx.entries with
+    | Some (hyp_name, witness_exps) ->
+      List.iter (fun e ->
         Buffer.add_char buf ' ';
-        Buffer.add_string buf name
-      | None ->
-        Buffer.add_string buf " _"
-      end
+        pp_exp buf e) witness_exps;
+      Buffer.add_char buf ' ';
+      Buffer.add_string buf hyp_name
+    | None ->
+      List.iter (fun _ -> Buffer.add_string buf " _") bvars;
+      Buffer.add_string buf " _"
+    end
+  | None ->
+    Buffer.add_string buf " _ _"
 
-    | Some "dynamic:axm8" ->
-      let conjs = conj_list_of_goal goal in
-      let n = List.length conjs in
-      begin match find_axm8_index goal with
-      | Some i ->
-        Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
-        emit_extract buf "h" n i;
-        Buffer.add_char buf ')'
+(* ---- Unified rule argument emission ---- *)
+
+let emit_rule_args buf ctx eff_rule (node : proof_node) =
+  match node with
+  | Apply { goal; _ } ->
+    let base = strip_suffix eff_rule in
+    let primed = is_primed eff_rule in
+    let db = Rule_db.get () in
+    let ea = Rule_db.emit_args db base in
+    match ea with
+    (* Shared primed+base handlers *)
+    | Some "dynamic:axm8" -> emit_axm8_args buf goal
+    | Some "dynamic:and5" -> emit_and5_args buf goal node ~primed
+    (* Primed-only: no other dynamic args needed *)
+    | _ when primed -> ()
+    (* Base-only handlers *)
+    | Some "dynamic:hyp" ->
+      begin match find_axm_hyp ctx base goal with
+      | Some name -> Buffer.add_char buf ' '; Buffer.add_string buf name
       | None -> Buffer.add_string buf " _"
       end
-
-    | Some "dynamic:axm9" ->
-      let hyp_result =
-        let rec has_true_and = function
-          | Unary (Not, Binary (And, Lift (Var ("VRAI"|"TRUE")), _)) -> true
-          | Bind (_, _, body) -> has_true_and body
-          | _ -> false
-        in
-        let rec count_bind_depth = function
-          | Bind (_, xs, body) -> List.length xs + count_bind_depth body
-          | _ -> 0
-        in
-        let rec search = function
-          | [] -> None
-          | (name, (Bind (_, _, body) as p)) :: rest ->
-            if has_true_and body then
-              Some (name, count_bind_depth p)
-            else search rest
-          | _ :: rest -> search rest
-        in
-        search ctx.entries
-      in
-      begin match hyp_result with
-      | Some (name, nvars) when nvars >= 2 ->
-        Buffer.add_string buf "_2 _ _ ";
-        Buffer.add_string buf name
-      | Some (name, _) ->
-        Buffer.add_string buf " _ ";
-        Buffer.add_string buf name
-      | None ->
-        Buffer.add_string buf " _ _"
-      end
-
-    | Some "dynamic:and5" ->
-      let children = match node with Apply { children; _ } -> children in
-      let child_goal = match children with
-        | [Apply { goal; _ }] -> Some goal
-        | _ -> None
-      in
-      begin match child_goal with
-      | Some cg ->
-        begin match find_and5_indices goal cg with
-        | Some (i, j) ->
-          let conjs = conj_list_of_goal goal in
-          let n = List.length conjs in
-          (* Forward: remove j, append (extract_j h)(extract_i h) *)
-          Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
-          emit_and5_fwd buf "h" n i j;
-          Buffer.add_char buf ')'
-        | None ->
-          Buffer.add_string buf " _"
-        end
-      | None ->
-        Buffer.add_string buf " _"
-      end
-
+    | Some "dynamic:axm9" -> emit_axm9_args buf ctx
     | Some "dynamic:all7" | Some "dynamic:xst8" ->
-      begin match node with
-      | Apply { children; _ } ->
-        let r_opt = match children with
-          | [_; Apply { goal = Binary (Imp, Bind (Forall1, xs, r_body), _); _ }] ->
-            if rule = "ALL7_2" then
-              Some (xs, [], r_body)
-            else
-              let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
-              let inner_vars = (match xs with _ :: rest -> rest | [] -> []) in
-              Some (lambda_vars, inner_vars, r_body)
-          | _ -> None
-        in
-        begin match r_opt with
-        | Some (lambda_vars, inner_vars, r_body) ->
-          Buffer.add_string buf " (\xce\xbb"; (* (λ *)
-          List.iter (fun x ->
-            Buffer.add_char buf ' ';
-            pp_ident buf x) lambda_vars;
-          Buffer.add_string buf ", ";
-          if inner_vars <> [] then begin
-            Buffer.add_string buf "(`\xe2\x88\x80 "; (* (`∀ *)
-            List.iter (fun x ->
-              pp_ident buf x;
-              Buffer.add_string buf " : \xcf\x84 \xce\xb9, " (* : τ ι,  *)
-            ) inner_vars;
-            pp_prd buf r_body;
-            Buffer.add_char buf ')'
-          end else
-            pp_prd buf r_body;
-          Buffer.add_char buf ')'
-        | None -> ()
-        end
-      end
-
-    (* Static args from JSON (e.g. "⊤ᵢ", "⊤ᵢ ⊤ᵢ", "_ _ ⊤ᵢ ⊤ᵢ") *)
+      emit_quant_r_args buf eff_rule node
+    | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
+    | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
+    | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
+    (* Static args from JSON *)
     | Some args ->
       Buffer.add_char buf ' ';
       Buffer.add_string buf args
-
-    (* No args *)
     | None -> ()
 
 (* ---- Proof node emission ---- *)
 
-let emit_refine_rule buf rule =
-  Buffer.add_string buf "refine ";
-  Buffer.add_string buf rule
-
-(* Extract the antecedent of an implication from a goal predicate *)
-let imp_antecedent = function
-  | Binary (Imp, p, _) -> Some p
-  | _ -> None
-
-let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proof_node) =
+let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
+    (node : proof_node) =
   match node with
-  | Apply { rule; arg = _node_arg; goal; children; _ } ->
+  | Apply { rule; goal; children; _ } ->
     let pad = String.make indent ' ' in
     let first_pad = if inline then "" else pad in
+    let eff_rule = select_variant rule goal children flat in
     begin match children with
     | [] when rule = "SORRY" ->
       Printf.eprintf "warning: emitting admit for incomplete proof\n";
@@ -673,14 +787,30 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proo
     | [] ->
       (* Leaf *)
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf rule;
-      emit_rule_args buf thm_hyps ctx rule node
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node
+
+    | [child] when is_hoas_identity rule ->
+      (* ALL1-4, ALL6, XST1-4: skip entirely, just emit child *)
+      let child_flat = compute_child_flat rule flat in
+      emit_node buf thm_hyps ctx indent ~inline ~flat:child_flat child
+
+    | [Apply { rule = "NRM13"; children = [grandchild]; _ }]
+      when rule = "NRM8" ->
+      (* NRM8 + NRM13 fused *)
+      Buffer.add_string buf first_pad;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2 _;\n"; (* ⊤ᵢ _ *)
+      emit_node buf thm_hyps ctx indent grandchild
 
     | [child] when Proof_tree.is_branching_quantifier rule ->
-      (* ALL7/XST8 with only primed child *)
+      (* ALL7/XST8 with only primed child — admit second branch *)
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf rule;
-      emit_rule_args buf thm_hyps ctx rule node;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf rule;
+      emit_rule_args buf ctx rule node;
       Buffer.add_string buf " _ _\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ ";
@@ -689,195 +819,56 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proo
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ admit }"
 
-    | [Apply { rule = child_rule; children = [grandchild]; _ } as _child]
-      when rule = "NRM8" && child_rule = "NRM13" ->
-      (* NRM8 + NRM13 combined: count total ∀ variables *)
-      let nrm_rule =
-        (* Count variables in the goal's leading quantifier chain *)
-        let rec count_bind_vars = function
-          | Binary (Imp, Bind (_, xs, body), _) ->
-            List.length xs + count_bind_vars_inner body
-          | _ -> 0
-        and count_bind_vars_inner = function
-          | Bind (_, xs, body) -> List.length xs + count_bind_vars_inner body
-          | Binary (Imp, _, _) -> 0
-          | _ -> 0
-        in
-        let n = count_bind_vars goal in
-        if n >= 3 then "NRM8_13_3"
-        else "NRM8_13"
-      in
-      Buffer.add_string buf first_pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf nrm_rule;
-      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2 _";
-      Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx indent grandchild
-
-    | [child] when rule = "XST5" ->
-      (* XST5 on compound ∃: use XST5_2 for 2-var compounds *)
-      let actual_rule = match goal with
-        | Binary (Imp, Unary (Not, Bind (Exists, xs, _)), _)
-          when List.length xs >= 2 -> "XST5_2"
-        | _ -> "XST5"
-      in
-      Buffer.add_string buf first_pad;
-      emit_refine_rule buf actual_rule;
-      emit_rule_args buf thm_hyps ctx actual_rule node;
-      Buffer.add_string buf " _";
-      let child_flat = if actual_rule = "XST5_2" then 0 else flat + 1 in
-      Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx indent ~flat:child_flat child
-
-    | [child] when rule = "XST6" ->
-      (* XST6 on compound ∃: use XST6_2 for 2-var compounds *)
-      let actual_rule = match goal with
-        | Unary (Not, Bind (Exists, xs, _)) when List.length xs >= 2 -> "XST6_2"
-        | _ -> "XST6"
-      in
-      Buffer.add_string buf first_pad;
-      emit_refine_rule buf actual_rule;
-      emit_rule_args buf thm_hyps ctx actual_rule node;
-      Buffer.add_string buf " _";
-      Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx indent child
-
-    | [child] when (rule = "NRM14" || rule = "NRM15") ->
-      (* NRM14/NRM15 on compound ♢: use _2 variant for 2-var compounds *)
-      let actual_rule = match goal with
-        | Binary (Imp, Bind (_, xs, _), _) when List.length xs >= 2 ->
-          rule ^ "_2"
-        | _ -> rule
-      in
-      Buffer.add_string buf first_pad;
-      emit_refine_rule buf actual_rule;
-      emit_rule_args buf thm_hyps ctx actual_rule node;
-      Buffer.add_string buf " _;\n";
-      emit_node buf thm_hyps ctx indent child
-
     | [child] when rule = "NRM1" ->
-      (* NRM1: strips one ♢ level. For compound ♢(x,y,...) where the body
-         doesn't use the extra variables, need extra NRM1s. *)
-      let extra_nrm1 = match goal with
+      (* NRM1: extra applications for compound ♢(x,y,...) *)
+      let extra = match goal with
         | Binary (Imp, Bind (_, xs, body), _) when List.length xs > 1 ->
-          (* Only add extra NRM1 if body doesn't use the extra vars *)
           let fv = free_vars_of_prd body in
           let extra = List.tl xs in
-          let body_uses_extra = List.exists (fun v ->
-            SS.mem v fv.prop_vars || SS.mem v fv.exp_vars) extra in
-          if body_uses_extra then 0
-          else List.length extra
+          if List.exists (fun v ->
+            SS.mem v fv.prop_vars || SS.mem v fv.exp_vars) extra
+          then 0 else List.length extra
         | _ -> 0
       in
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf rule;
-      emit_rule_args buf thm_hyps ctx rule node;
-      Buffer.add_string buf " _";
-      for _ = 1 to extra_nrm1 do
+      Buffer.add_string buf "refine NRM1 _";
+      for _ = 1 to extra do
         Buffer.add_string buf ";\n";
         Buffer.add_string buf pad;
         Buffer.add_string buf "refine NRM1 _"
       done;
       Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx indent ~flat:0 child
+      emit_node buf thm_hyps ctx indent child
 
     | [child] ->
-      (* Single child — sequential *)
+      (* Generic single child *)
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf rule;
-      emit_rule_args buf thm_hyps ctx rule node;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node;
       Buffer.add_string buf " _";
-      (* IMP4 introduces a hypothesis *)
-      let ctx' =
-        if rule = "IMP4" || rule = "IMP4_1" then begin
-          match imp_antecedent goal with
-          | Some p ->
-            let (name, ctx') = fresh_hyp ctx p in
-            Buffer.add_string buf ";\n";
-            Buffer.add_string buf pad;
-            Buffer.add_string buf "assume ";
-            Buffer.add_string buf name;
-            ctx'
-          | None -> ctx
-        end else ctx
-      in
-      (* ALL9: introduces the ♡-hypothesis via ⇒ → function type *)
-      let ctx' =
-        if rule = "ALL9" then begin
-          match imp_antecedent goal with
-          | Some p ->
-            let (name, ctx') = fresh_hyp ctx' p in
-            Buffer.add_string buf ";\n";
-            Buffer.add_string buf pad;
-            Buffer.add_string buf "assume ";
-            Buffer.add_string buf name;
-            ctx'
-          | None -> ctx'
-        end else ctx'
-      in
-      (* ALL8: introduces bound variables.
-         If flattening rules consumed some ∀ levels (flat > 0),
-         assume fewer variables. *)
-      let () =
-        if rule = "ALL8" || rule = "ALL8_1" then begin
-          match goal with
-          | Bind (_, xs, _) ->
-            let vars = if flat > 0 && List.length xs > flat
-              then List.filteri (fun i _ -> i < List.length xs - flat) xs
-              else xs
-            in
-            Buffer.add_string buf ";\n";
-            Buffer.add_string buf pad;
-            Buffer.add_string buf "assume";
-            List.iter (fun x ->
-              Buffer.add_char buf ' ';
-              pp_ident buf x) vars
-          | _ -> ()
-        end
-      in
-      (* Propagate flat count for rules that split compound bindings.
-         ALL5 and XST5 peel one level from a compound binding.
-         ALL1-4, ALL6, XST1-4 are identity in HOAS and pass through. *)
-      let child_flat =
-        match rule with
-        | "ALL5" | "XST5" | "XST7" -> flat + 1
-        | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
-        | "XST1" | "XST2" | "XST3" | "XST4" -> flat
-        | _ -> 0
-      in
+      let ctx' = introduce buf pad ctx rule goal flat in
+      let child_flat = compute_child_flat rule flat in
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx' indent ~flat:child_flat child
 
     | [child1; child2] when Proof_tree.is_branching_quantifier rule ->
-      (* ALL7/XST8: first child needs assume for bound vars *)
-      (* Use ALL7_2 when the HOAS goal has ∀x.∀y at top level.
-         This is the case when the compound binding has 2+ vars and
-         no splitting rule (ALL5/XST5) has consumed a level (flat=0). *)
-      let eff_rule =
-        if rule = "ALL7" then
-          match goal with
-          | Binary (Imp, Bind (_, xs, _), _)
-            when List.length xs >= 2 && flat = 0 -> "ALL7_2"
-          | _ -> rule
-        else rule
-      in
+      (* ALL7/XST8 with two children *)
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf eff_rule;
-      emit_rule_args buf thm_hyps ctx eff_rule node;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node;
       Buffer.add_string buf " _ _\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ ";
-      (* Extract bound vars from the ∀/∃ in the goal's antecedent.
-         In HOAS, ALL7/XST8 handles 1 variable. For compound bindings,
-         extra variables are introduced via ALL8_1 if R uses them. *)
-      let bvars = match goal with
-        | Binary (Imp, Bind (_, xs, _), _) ->
-          (* For ALL7 (1 var), only assume the first variable.
-             For ALL7_2 (2 vars), assume all compound variables. *)
-          if eff_rule = "ALL7" && List.length xs > 1 then
-            (match xs with x :: _ -> [x] | [] -> [])
-          else xs
-        | _ -> []
+      (* Introduce bound vars in first child *)
+      let bvars = binding_vars goal in
+      let bvars =
+        (* 1-var variants only assume first var from compound binding *)
+        if (eff_rule = "ALL7" || eff_rule = "XST8")
+           && List.length bvars > 1
+        then (match bvars with x :: _ -> [x] | [] -> [])
+        else bvars
       in
       if bvars <> [] then begin
         Buffer.add_string buf "assume";
@@ -894,10 +885,11 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proo
       Buffer.add_string buf " }"
 
     | [child1; child2] ->
-      (* Two children — branching *)
+      (* Generic two children *)
       Buffer.add_string buf first_pad;
-      emit_refine_rule buf rule;
-      emit_rule_args buf thm_hyps ctx rule node;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node;
       Buffer.add_string buf " _ _\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ ";
@@ -922,11 +914,9 @@ let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
   let thm_hyps = extract_theorem_hyps goal in
   let fv = free_vars_of_prd goal in
 
-  (* Symbol declaration with free variable parameters *)
   Buffer.add_string buf "opaque symbol ";
   Buffer.add_string buf name;
 
-  (* Emit parameter lists *)
   let prop_list = SS.elements fv.prop_vars in
   let exp_list = SS.elements fv.exp_vars in
   let all_params = ref [] in
@@ -947,15 +937,12 @@ let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
     all_params := !all_params @ exp_list
   end;
 
-  (* Type annotation *)
   Buffer.add_string buf " :\n  \xcf\x80 ("; (* π *)
   pp_prd buf goal;
   Buffer.add_string buf ") \xe2\x89\x94\n"; (* ≔ *)
 
-  (* Proof body *)
   Buffer.add_string buf "begin\n";
 
-  (* Assume all parameters *)
   if !all_params <> [] then begin
     Buffer.add_string buf "  assume ";
     List.iteri (fun i v ->
@@ -970,6 +957,5 @@ let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
   Buffer.add_string buf "end;\n";
   Buffer.contents buf
 
-(* Backwards compat: emit header + single symbol *)
 let emit_lp (name : string) (goal : prd) (tree : proof_node) : string =
   lp_header ^ "\n" ^ emit_symbol name goal tree

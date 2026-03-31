@@ -210,11 +210,11 @@ opaque symbol {|26|} :
 begin
   refine ALL8 _;
   assume a b;
-  refine @OPR1 _ _ (λ z, `∀ x : τ ι, `∀ y : τ ι, (x = y) ⇒ ((x = z) ⇒ (y = b))) _;
+  refine OPR1 (λ z, `∀ x : τ ι, `∀ y : τ ι, (x = y) ⇒ ((x = z) ⇒ (y = b))) _;
   // ALL4 is identity in HOAS
   refine ALL8 _;
   assume x y;
-  refine @OPR1 _ _ (λ z, (z = b) ⇒ (y = b)) _;
+  refine OPR1 (λ z, (z = b) ⇒ (y = b)) _;
   refine AXM7
 end;
 

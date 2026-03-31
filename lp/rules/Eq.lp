@@ -128,7 +128,7 @@ end;
 
 // ---- OPR (one-point rules / substitution from equality) ----
 
-opaque symbol OPR1 [E x : τ ι] [P : τ ι → Prop]
+opaque symbol OPR1 [E x : τ ι] (P : τ ι → Prop)
   : π (P E)
   → π ((x = E) ⇒ P x) ≔
 begin
@@ -136,7 +136,7 @@ begin
   rewrite heq; refine hpe
 end;
 
-opaque symbol OPR2 [E x : τ ι] [P : τ ι → Prop]
+opaque symbol OPR2 [E x : τ ι] (P : τ ι → Prop)
   : π (P E)
   → π ((E = x) ⇒ P x) ≔
 begin

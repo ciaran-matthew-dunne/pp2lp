@@ -31,11 +31,10 @@ opaque symbol XST3 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
   → π ((`∃ x, `∃ y, P x y) ⇒ R) ≔
 begin assume P R nf h; refine h end;
 
-// XST4: Q ⇒ ∃(x,y)·P → Q ⇒ ∃x·∃y·P (identity)
-opaque symbol XST4 [P : τ ι → τ ι → Prop] [Q : Prop] (nf : π ⊤)
-  : π (Q ⇒ `∃ x, `∃ y, P x y)
-  → π (Q ⇒ `∃ x, `∃ y, P x y) ≔
-begin assume P Q nf h; refine h end;
+opaque symbol XST4 [P : τ ι → τ ι → Prop](nf : π ⊤)
+  : π (`∃ x, `∃ y, P x y)
+  → π (`∃ x, `∃ y, P x y) ≔
+begin assume P nf h; refine h end;
 
 // ---- Base rules ----
 
@@ -115,6 +114,18 @@ begin
   refine ¬¬ₑ (`∃ x, P x) _;
   assume hne;
   refine h2 (λ x, =⇒ (h1 x) (λ hpx, hne (∃ᵢ x hpx)))
+end;
+
+// XST8_2: Two-variable version for compound ∃(x,y).
+opaque symbol XST8_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop)
+  : π (`∀ x, `∀ y, ¬ (P x y) = R x y)
+  → π ((`∀ x, `∀ y, R x y) ⇒ ⊥)
+  → π (`∃ x, `∃ y, P x y) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ (`∃ x, `∃ y, P x y) _;
+  assume hne;
+  refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
 end;
 
 // ---- Primed variants (equality-based) ----
