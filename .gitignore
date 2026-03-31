@@ -4,6 +4,7 @@ ocaml/lib
 
 test/gen/
 test/prv/gen/
+test/prv/*.res
 
 lp-old
 lp/gen/
