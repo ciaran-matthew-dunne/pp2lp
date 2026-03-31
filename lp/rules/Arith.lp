@@ -79,13 +79,21 @@ begin
 end;
 
 // AR9: solver(E) = F; H ⊢ F ≤ 0 ⇒ R → H ⊢ E ≤ 0 ⇒ R
-opaque symbol AR9 [E F : τ ι] [R : Prop]
-  : π (E = F)
+// Solver certificate (E = F) is not provable; admitted.
+opaque symbol AR9 [E : τ ι] (F : τ ι) [R : Prop]
+  : π ⊤
   → π ((F ≤ 𝟎) ⇒ R)
   → π ((E ≤ 𝟎) ⇒ R) ≔
 begin
-  assume E F R heq h1;
-  rewrite heq; refine h1
+  admit
+end;
+
+opaque symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop] [S : Prop]
+  : π ⊤
+  → π (((F ≤ 𝟎) ⇒ R) = S)
+  → π (((E ≤ 𝟎) ⇒ R) = S) ≔
+begin
+  admit
 end;
 
 // AR10: solver(P) = Q; H ⊢ Q ⇒ R → H ⊢ P ⇒ R

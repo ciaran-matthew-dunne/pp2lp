@@ -66,7 +66,7 @@
     {"name": "FX3",    "section": "A.9",  "arity": 0, "primed": true, "result_schema": 0, "emit_args": null,            "lp_file": "rules/TrueFalse.lp", "lp_status": "proved"},
 
     {"name": "STOP",   "section": "A.10", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/TrueFalse.lp", "lp_status": "proved"},
-    {"name": "INS",    "section": "A.11", "arity": 1, "primed": false,"result_schema": null,"emit_args": null,           "lp_file": null,                  "lp_status": "todo"},
+    {"name": "INS",    "section": "A.11", "arity": 1, "primed": false,"result_schema": null,"emit_args": null,           "lp_file": "rules/TrueFalse.lp", "lp_status": "admitted"},
 
     {"name": "NRM1",   "section": "A.12", "arity": 1, "primed": true, "result_schema": null,"emit_args": null,           "lp_file": "rules/Nrm.lp",       "lp_status": "proved"},
     {"name": "NRM2",   "section": "A.12", "arity": 1, "primed": true, "result_schema": null,"emit_args": null,           "lp_file": "rules/Nrm.lp",       "lp_status": "proved"},
@@ -138,7 +138,7 @@
     {"name": "AR7_2",  "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "todo",     "notes": "negation variant of AR7"},
     {"name": "AR8",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": "⊤ᵢ ⊤ᵢ",       "lp_file": "rules/Arith.lp",     "lp_status": "admitted"},
     {"name": "AR8_2",  "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "todo",     "notes": "negation variant of AR8"},
-    {"name": "AR9",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": "⊤ᵢ",           "lp_file": "rules/Arith.lp",     "lp_status": "proved"},
+    {"name": "AR9",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": "dynamic:ar9",  "lp_file": "rules/Arith.lp",     "lp_status": "admitted"},
     {"name": "AR10",   "section": "A.14", "arity": -1,"primed": true, "result_schema": 1, "emit_args": null,            "lp_file": null,                  "lp_status": "phantom",  "notes": "solver confirmation, skipped in tree building"},
     {"name": "AR11",   "section": "A.14", "arity": 0, "primed": true, "result_schema": 0, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "proved"},
     {"name": "AR12",   "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "proved"},

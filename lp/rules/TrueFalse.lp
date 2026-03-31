@@ -136,8 +136,9 @@ end;
 
 // INS: Determination of instantiations Q₁,...,Qₙ;
 //      H ⊢ Q₁ ⇒ (Q₂ ⇒ ... (Qₙ ⇒ FALSE)...) → H ⊢ FALSE
-// In the shallow encoding, the emitter provides the instantiated
-// hypothesis P as a proof term. INS just uses it to prove Q.
+// The emitter resolves INS dynamically by finding the contradicting
+// hypotheses (¬P and P) in context and applying modus ponens.
+// The INS LP symbol is not used directly — kept for reference.
 opaque symbol INS [P Q : Prop]
   : π P
   → π (P ⇒ Q)

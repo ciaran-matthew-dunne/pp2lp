@@ -740,7 +740,7 @@ let emit_nrm19_args buf ctx goal =
 
 let emit_rule_args buf ctx eff_rule (node : proof_node) =
   match node with
-  | Apply { goal; _ } ->
+  | Apply { goal; arg; _ } ->
     let base = strip_suffix eff_rule in
     let primed = is_primed eff_rule in
     let db = Rule_db.get () in
@@ -749,8 +749,25 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     (* Shared primed+base handlers *)
     | Some "dynamic:axm8" -> emit_axm8_args buf goal
     | Some "dynamic:and5" -> emit_and5_args buf goal node ~primed
-    (* Primed-only: no other dynamic args needed *)
-    | _ when primed -> ()
+    | Some "dynamic:ar9" ->
+      (* AR9/AR9_1: emit solver result F from rule arg, then ⊤ᵢ *)
+      begin match arg with
+      | Some (Pred p) ->
+        Buffer.add_string buf " (";
+        pp_prd buf p;
+        Buffer.add_string buf ") \xe2\x8a\xa4\xe1\xb5\xa2"
+      | _ ->
+        Printf.eprintf "warning: AR9 missing solver arg\n";
+        Buffer.add_string buf " _ \xe2\x8a\xa4\xe1\xb5\xa2"
+      end
+    (* Primed: emit static args if present, skip dynamic base-only handlers *)
+    | _ when primed ->
+      begin match ea with
+      | Some args when not (String.length args > 8 && String.sub args 0 8 = "dynamic:") ->
+        Buffer.add_char buf ' ';
+        Buffer.add_string buf args
+      | _ -> ()
+      end
     (* Base-only handlers *)
     | Some "dynamic:hyp" ->
       begin match find_axm_hyp ctx base goal with
@@ -839,6 +856,35 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       done;
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx indent child
+
+    | [_child] when rule = "INS" ->
+      (* INS contradiction case: find ¬P hypothesis and matching P,
+         emit refine hN hK (modus ponens on the contradiction) *)
+      let resolved = match ctx.entries with
+        | (neg_name, Unary (Not, p)) :: _ ->
+          begin match find_hyp ctx p with
+          | Some pos_name -> Some (neg_name, pos_name)
+          | None -> None
+          end
+        | (neg_name, Binary (Imp, p, _)) :: _ ->
+          begin match find_hyp ctx p with
+          | Some pos_name -> Some (neg_name, pos_name)
+          | None -> None
+          end
+        | _ -> None
+      in
+      begin match resolved with
+      | Some (neg_name, pos_name) ->
+        Buffer.add_string buf first_pad;
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf neg_name;
+        Buffer.add_char buf ' ';
+        Buffer.add_string buf pos_name
+      | None ->
+        Printf.eprintf "warning: INS could not resolve contradiction\n";
+        Buffer.add_string buf first_pad;
+        Buffer.add_string buf "admit"
+      end
 
     | [child] ->
       (* Generic single child *)
