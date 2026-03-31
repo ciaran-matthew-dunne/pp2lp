@@ -831,8 +831,9 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_node buf thm_hyps ctx indent grandchild
 
     | [_child] when Proof_tree.is_branching_quantifier rule ->
-      (* ALL7/XST8 with only primed child (no base proof in replay).
-         In HOAS, just IMP4-strip the quantified hypothesis and admit. *)
+      (* ALL7/XST8 with only primed child — replay is truncated.
+         Emit admit; these tests should be excluded from the benchmark. *)
+      Printf.eprintf "warning: truncated replay at %s (no base child)\n" rule;
       Buffer.add_string buf first_pad;
       Buffer.add_string buf "admit"
 

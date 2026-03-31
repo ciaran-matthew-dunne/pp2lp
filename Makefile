@@ -1,4 +1,4 @@
-.PHONY: build unit-test test test-each test-prv test-prv-each gen-prv clean
+.PHONY: build unit-test test test-each test-prv test-prv-each test-prv-complete gen-prv clean
 
 PP2LP := dune exec --root ocaml -- pp2lp
 LP_CHECK = lambdapi check --json
@@ -17,48 +17,42 @@ test-%: build
 	$(PP2LP) emit test/traces/$*.trace.replay > lp/gen/trace_$*.lp
 	cd lp && $(LP_CHECK) gen/trace_$*.lp
 
-# --- Test all 30 traces individually, report PASS/FAIL ---
+# --- Test all 30 traces (stop on first failure) ---
 test-each: build
 	@mkdir -p lp/gen
-	@pass=0; fail=0; fails=""; \
+	@pass=0; \
 	for r in test/traces/*.trace.replay; do \
 	  n=$$(basename $$r .trace.replay); \
-	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp; \
+	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp 2>/dev/null; \
 	  if (cd lp && $(LP_CHECK) gen/trace_$$n.lp) >/dev/null 2>&1; then \
 	    pass=$$((pass+1)); \
 	  else \
-	    fail=$$((fail+1)); fails="$$fails $$n"; \
+	    echo "FAIL trace $$n ($$pass passed before failure)"; \
+	    echo "  Debug: make test-$$n"; \
+	    exit 1; \
 	  fi; \
 	done; \
-	echo "$$pass pass, $$fail fail"; \
-	if [ -n "$$fails" ]; then echo "FAIL:$$fails"; fi
+	echo "$$pass pass, 0 fail"
 
-# --- Test all traces in one file (original behavior) ---
+# --- Test all traces in one file ---
 test: build
 	@mkdir -p lp/gen
 	$(PP2LP) emit test/traces/*.trace.replay > lp/gen/Traces.lp
 	cd lp && $(LP_CHECK) gen/Traces.lp
 
 # --- Test single PRV replay: make prv-arith_ineq_001, etc. ---
-# Generates lp/gen/prv/<name>.lp for inspection with lambdapi_check/goals.
 prv-%: build
 	@mkdir -p lp/gen/prv
 	$(PP2LP) emit test/prv/gen/replay/$*.replay > lp/gen/prv/$*.lp
 	cd lp && $(LP_CHECK) gen/prv/$*.lp
 
-# --- Test PRV replays ---
-# Usage:
-#   make test-prv                    # test all PRV replays
-#   make test-prv FILTER=arith       # test only arith_* replays
+# --- Test PRV replays (all, summary) ---
 test-prv: build
 	@mkdir -p lp/gen/prv
 	$(PP2LP) emit $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay) > lp/gen/prv/Traces.lp
 	cd lp && $(LP_CHECK) gen/prv/Traces.lp
 
 # --- Test PRV replays individually, report PASS/FAIL ---
-# Usage:
-#   make test-prv-each                 # test all PRV replays
-#   make test-prv-each FILTER=arith    # test only arith_* replays
 test-prv-each: build
 	@mkdir -p lp/gen/prv
 	@pass=0; fail=0; fails=""; \
@@ -76,6 +70,26 @@ test-prv-each: build
 	echo "---"; \
 	echo "$$pass pass, $$fail fail"; \
 	if [ -n "$$fails" ]; then echo "FAIL:$$fails"; fi
+
+# --- Test complete PRV replays (stop on first failure) ---
+# Only tests replays where REPLAY fully expanded the trace.
+# List maintained in test/prv/complete_replays.txt.
+PRV_COMPLETE := $(shell grep -v '^\#' test/prv/complete_replays.txt 2>/dev/null | sed '/^$$/d')
+test-prv-complete: build
+	@mkdir -p lp/gen/prv
+	@pass=0; \
+	for n in $(PRV_COMPLETE); do \
+	  r=test/prv/gen/replay/$$n.replay; \
+	  if $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null && \
+	     (cd lp && $(LP_CHECK) gen/prv/$$n.lp) >/dev/null 2>&1; then \
+	    pass=$$((pass+1)); \
+	  else \
+	    echo "FAIL $$n ($$pass passed before failure)"; \
+	    echo "  Debug: make prv-$$n"; \
+	    exit 1; \
+	  fi; \
+	done; \
+	echo "$$pass pass, 0 fail (of $$(echo $(PRV_COMPLETE) | wc -w) complete replays)"
 
 # --- Generate PRV traces and replays from .but files ---
 gen-prv:
