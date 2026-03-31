@@ -830,19 +830,11 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2 _;\n"; (* ⊤ᵢ _ *)
       emit_node buf thm_hyps ctx indent grandchild
 
-    | [child] when Proof_tree.is_branching_quantifier rule ->
-      (* ALL7/XST8 with only primed child — admit second branch *)
+    | [_child] when Proof_tree.is_branching_quantifier rule ->
+      (* ALL7/XST8 with only primed child (no base proof in replay).
+         In HOAS, just IMP4-strip the quantified hypothesis and admit. *)
       Buffer.add_string buf first_pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf eff_rule;
-      emit_rule_args buf ctx eff_rule node;
-      Buffer.add_string buf " _ _\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ ";
-      emit_node buf thm_hyps ctx (indent + 2) ~inline:true child;
-      Buffer.add_string buf " }\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ admit }"
+      Buffer.add_string buf "admit"
 
     | [child] when rule = "NRM1" ->
       (* NRM1: extra applications for compound ♢(x,y,...) *)
