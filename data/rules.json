@@ -127,7 +127,7 @@
 
     {"name": "AR1",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "proved"},
     {"name": "AR2",    "section": "A.14", "arity": 0, "primed": true, "result_schema": 0, "emit_args": "trust",        "lp_file": "rules/Arith.lp",     "lp_status": "admitted"},
-    {"name": "AR3",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": null,            "lp_file": "rules/Arith.lp",     "lp_status": "proved"},
+    {"name": "AR3",    "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": "dynamic:ar3",  "lp_file": "rules/Arith.lp",     "lp_status": "admitted"},
     {"name": "AR3_F",  "section": "A.14", "arity": 1, "primed": false,"result_schema": null,"emit_args": null,           "lp_file": null,                  "lp_status": "identity", "notes": "AR3 inside forall2 body, identity in HOAS"},
     {"name": "AR3_F",  "section": "A.14", "arity": 1, "primed": true, "result_schema": 1, "emit_args": "⊤ᵢ",           "lp_file": "rules/Arith.lp",     "lp_status": "admitted", "notes": "project variant of AR3"},
     {"name": "AR4",    "section": "A.14", "arity": 0, "primed": true, "result_schema": 0, "emit_args": "dynamic:ar4",  "lp_file": "rules/Arith.lp",     "lp_status": "admitted"},

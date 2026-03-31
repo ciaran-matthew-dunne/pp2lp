@@ -20,8 +20,10 @@ begin
   admit
 end;
 
-opaque symbol AR3 [a : τ ι] [R : Prop]
-  : π (((𝟏 - a) ≤ 𝟎) ⇒ R)
+// AR3: ¬(a ≤ 0) ⇒ R → (b ≤ 0) ⇒ R where b = 1-a (solver-simplified)
+opaque symbol AR3 [a : τ ι] (b : τ ι) [R : Prop]
+  : π (b = (𝟏 - a))
+  → π ((b ≤ 𝟎) ⇒ R)
   → π (¬ (a ≤ 𝟎) ⇒ R) ≔
 begin
   admit

@@ -695,6 +695,17 @@ let emit_opr_args buf opr_rule goal =
   | None ->
     Buffer.add_string buf " _"
 
+(* AR3: emit simplified result from pipe arg *)
+let emit_ar3_args buf node =
+  match node with
+  | Apply { arg = Some (PipeArg (_a_expr, result_expr)); _ } ->
+    Buffer.add_string buf " (";
+    pp_exp buf result_expr;
+    Buffer.add_string buf ") trust"
+  | _ ->
+    Printf.eprintf "warning: AR3 missing pipe arg\n";
+    Buffer.add_string buf " _ trust"
+
 (* AR4: find F from a Leq hypothesis in context *)
 let emit_ar4_args buf ctx _goal =
   (* Goal is (E ≤ 0) ⇒ R. Find F ≤ 0 in context. *)
@@ -823,6 +834,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       emit_quant_r_args buf eff_rule node
     | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
     | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
+    | Some "dynamic:ar3" -> emit_ar3_args buf node
     | Some "dynamic:ar4" -> emit_ar4_args buf ctx goal
     | Some "dynamic:ar56" -> emit_ar56_args buf
     | Some "dynamic:ar78" -> emit_ar78_args buf
