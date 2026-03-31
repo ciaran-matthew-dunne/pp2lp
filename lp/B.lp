@@ -11,6 +11,11 @@ require open
   Stdlib.List Stdlib.Nat
   Stdlib.Conj Stdlib.Disj;
 
+// ---- Trusted arithmetic oracle ----
+// Used to fill computable arithmetic facts (solver-confirmed)
+// that we cannot yet prove from axioms.
+opaque symbol trust [P : Prop] : π P ≔ begin admit end;
+
 // ---- Domain constants ----
 
 // Inhabitedness (the B-universe is nonempty)

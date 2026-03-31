@@ -27,7 +27,7 @@ begin
   admit
 end;
 
-opaque symbol AR4 [E F : τ ι] [R : Prop]
+opaque symbol AR4 [E : τ ι] [R : Prop] (F : τ ι)
   : π (F ≤ 𝟎)
   → π (¬ ((E + F) ≤ 𝟎))
   → π ((E ≤ 𝟎) ⇒ R) ≔
@@ -37,19 +37,17 @@ end;
 
 // ---- AR5/AR6: Antisymmetry decomposition ----
 
-// AR5: a ≤ 0 in H; H ⊢ −a ≪ 0 ⇒ (a=0 ⇒ R) → H ⊢ −a ≤ 0 ⇒ R
 opaque symbol AR5 [a : τ ι] [R : Prop]
-  : π (a ≤ 𝟎)
-  → π (((— a) ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
+  : π (a ≪ 𝟎)
+  → π (a = 𝟎 ⇒ ((— a ≤ 𝟎) ⇒ R))
   → π ((— a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-// AR6: −a ≤ 0 in H; H ⊢ a ≪ 0 ⇒ (a=0 ⇒ R) → H ⊢ a ≤ 0 ⇒ R
 opaque symbol AR6 [a : τ ι] [R : Prop]
-  : π ((— a) ≤ 𝟎)
-  → π ((a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
+  : π ((— a) ≪ 𝟎)
+  → π ((a = 𝟎) ⇒ ((a ≤ 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
@@ -57,31 +55,26 @@ end;
 
 // ---- AR7/AR8: Antisymmetry with offset ----
 
-// AR7: c+b ≤ 0 in H; a+c=0; H ⊢ b=a ⇒ (a−b ≪ 0 ⇒ R) → H ⊢ a−b ≤ 0 ⇒ R
-
 opaque symbol AR7 [a b c : τ ι] [R : Prop]
-  : π ((c + b) ≤ 𝟎)
+  : π ((c + b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((b = a) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
+  → π ((a = b) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
   → π (((a - b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-// AR8: a−b ≤ 0 in H; a+c=0; H ⊢ b=a ⇒ (c+b ≪ 0 ⇒ R) → H ⊢ c+b ≤ 0 ⇒ R
 opaque symbol AR8 [a b c : τ ι] [R : Prop]
-  : π ((a - b) ≤ 𝟎)
+  : π ((a - b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((b = a) ⇒ (((c + b) ≪ 𝟎) ⇒ R))
+  → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
   → π (((c + b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-// AR9: solver(E) = F; H ⊢ F ≤ 0 ⇒ R → H ⊢ E ≤ 0 ⇒ R
-// Solver certificate (E = F) is not provable; admitted.
 opaque symbol AR9 [E : τ ι] (F : τ ι) [R : Prop]
-  : π ⊤
+  : π (E = F)
   → π ((F ≤ 𝟎) ⇒ R)
   → π ((E ≤ 𝟎) ⇒ R) ≔
 begin

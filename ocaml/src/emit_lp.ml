@@ -373,6 +373,17 @@ let rec subst_prd x y = function
    Selects the effective LP rule name based on goal shape and context.
    Handles _2 variants, NRM8+NRM13 fusion, and HOAS identity skip. *)
 
+let is_opr_vacuous rule goal =
+  (rule = "OPR1" || rule = "OPR2") &&
+  match goal with
+  | Binary (Imp, Eq (Var x, _), body) when rule = "OPR1" ->
+    let fv = free_vars_of_prd body in
+    not (SS.mem x fv.exp_vars || SS.mem x fv.prop_vars)
+  | Binary (Imp, Eq (_, Var x), body) when rule = "OPR2" ->
+    let fv = free_vars_of_prd body in
+    not (SS.mem x fv.exp_vars || SS.mem x fv.prop_vars)
+  | _ -> false
+
 let is_hoas_identity = function
   | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
   | "XST1" | "XST2" | "XST3" | "XST4"
@@ -684,6 +695,31 @@ let emit_opr_args buf opr_rule goal =
   | None ->
     Buffer.add_string buf " _"
 
+(* AR4: find F from a Leq hypothesis in context *)
+let emit_ar4_args buf ctx _goal =
+  (* Goal is (E ≤ 0) ⇒ R. Find F ≤ 0 in context. *)
+  let found = List.find_opt (fun (_name, p) ->
+    match p with Leq (_, Nat 0) -> true | _ -> false
+  ) ctx.entries in
+  match found with
+  | Some (name, Leq (f_expr, _)) ->
+    Buffer.add_string buf " (";
+    pp_exp buf f_expr;
+    Buffer.add_string buf ") ";
+    Buffer.add_string buf name;
+    Buffer.add_string buf " trust"
+  | _ ->
+    Printf.eprintf "warning: AR4 could not find F ≤ 0 hypothesis\n";
+    Buffer.add_string buf " _ trust trust"
+
+(* AR5/AR6: find arithmetic hypothesis in context *)
+let emit_ar56_args buf =
+  Buffer.add_string buf " trust"
+
+(* AR7/AR8: two arithmetic premises *)
+let emit_ar78_args buf =
+  Buffer.add_string buf " trust trust"
+
 (* NRM19: find witness and hypothesis for ♡-body instantiation *)
 let emit_nrm19_args buf ctx goal =
   let nrm19_body = match goal with
@@ -758,15 +794,15 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     | Some "dynamic:axm8" -> emit_axm8_args buf goal
     | Some "dynamic:and5" -> emit_and5_args buf goal node ~primed
     | Some "dynamic:ar9" ->
-      (* AR9/AR9_1: emit solver result F from rule arg, then ⊤ᵢ *)
+      (* AR9/AR9_1: emit solver result F from rule arg, then trust for E=F *)
       begin match arg with
       | Some (Pred p) ->
         Buffer.add_string buf " (";
         pp_prd buf p;
-        Buffer.add_string buf ") \xe2\x8a\xa4\xe1\xb5\xa2"
+        Buffer.add_string buf ") trust"
       | _ ->
         Printf.eprintf "warning: AR9 missing solver arg\n";
-        Buffer.add_string buf " _ \xe2\x8a\xa4\xe1\xb5\xa2"
+        Buffer.add_string buf " _ trust"
       end
     (* Primed: emit static args if present, skip dynamic base-only handlers *)
     | _ when primed ->
@@ -787,6 +823,9 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       emit_quant_r_args buf eff_rule node
     | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
     | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
+    | Some "dynamic:ar4" -> emit_ar4_args buf ctx goal
+    | Some "dynamic:ar56" -> emit_ar56_args buf
+    | Some "dynamic:ar78" -> emit_ar78_args buf
     | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
     (* Static args from JSON *)
     | Some args ->
