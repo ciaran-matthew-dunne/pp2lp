@@ -61,25 +61,25 @@ Prefer these over shell commands for all Lambdapi work.
 
 ## Current Test Status
 
+**Traces:** 28/30 pass. **PRV benchmarks:** 6/86 pass. **OCaml unit tests:** 118 pass.
+
 | Traces | Status | Notes |
 |--------|--------|-------|
 | 01–25 | PASS | Propositional, quantifier, equality |
-| 26 | FAIL | Missing subproofs — XST8 reconstruction with nested quantifiers |
-| 27 | FAIL | Unification error — nested ∃ with maplet |
+| 26 | FAIL | OPR1 substitution fails inside nested ALL8 with 2 bound vars |
+| 27 | FAIL | IMP4 continuation wraps around ∃ instead of matching it (maplet) |
 | 28–30 | PASS | TRUE/FALSE/STOP |
 
-28/30 traces pass. OCaml tests: 118 tests, all pass.
+PRV: The dominant failure pattern (~80 tests) is `?X and ?Y` unification failures — the emitter doesn't decompose multi-hypothesis contexts correctly for AND1. The 6 passing PRV tests are simple cases that avoid this pattern.
 
 ## Directory Structure
 
 ```
 lp/                         Lambdapi encoding
-├── B.lp                    Foundation: Prd, Exp, Var (shallow encoding using Stdlib)
-├── Eq.lp                   Syntactic equality rewrite rules
-├── NonFree.lp              Non-freeness checking
-├── Subst.lp                Capture-avoiding substitution
-├── Proof.lp                (Mostly empty in shallow encoding)
-├── Interp.lp               Semantic interpretation (soundness bridge)
+├── B.lp                    Foundation: domain ι, membership, arithmetic (shallow encoding)
+├── NonFree.lp              Stub (HOAS handles non-freeness implicitly)
+├── Subst.lp                Stub (HOAS application replaces explicit substitution)
+├── Proof.lp                Stub (shallow encoding uses plain functions)
 ├── Traces.lp               30 hand-written proof reconstructions
 ├── Rules.lp                Aggregates all rule modules
 ├── Test.lp                 Small test proofs
@@ -160,19 +160,38 @@ Rules applied backwards (bottom-up from goal). Multi-premise rules cause branchi
 
 ## Critical: No Axioms
 
-All Lambdapi work must be strictly definitional. Never introduce axioms (unproved `symbol` declarations used as lemmas) without explicit permission. The only unproved symbols are the PP inference rules themselves (deep encoding layer) — not logical axioms.
+All Lambdapi work must be strictly definitional. Never introduce axioms (unproved `symbol` declarations used as lemmas) without explicit permission. The only unproved symbols are:
+- Domain axioms in B.lp (pair injectivity, set extensionality, arithmetic ordering)
+- Admitted PP rules (AR2–AR8, AR13, EQS2) — tracked in `data/rules.json` with `lp_status: "admitted"`
 
 ## Roadmap
 
 ### Current state
-- Lambdapi encoding complete: all PP rules formalised with base + primed variants
-- OCaml parser complete: parses all 86 PRV replays successfully
-- Automated reconstruction: 28/30 traces pass, 2 fail (traces 26, 27)
+- Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
+- OCaml parser complete: parses all 86 PRV replays
+- Rule metadata centralised in `data/rules.json`
+- Automated reconstruction: 28/30 traces, 6/86 PRV
 
-### Next
-1. Fix traces 26–27 (nested quantifier/maplet reconstruction)
-2. Extended rules: equality, arithmetic, boolean against 86 PRV replays
-3. Polish: batch mode, error handling, verification suite
+### Admitted LP rules (proved via `admit`)
+- **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
+- **Set equality** (EQS2, EQS2_1): need `¬(eql_set E F) → ⊥` direction of set extensionality
+
+### P0 — Unblock PRV benchmarks
+1. **Fix AND1 hypothesis reconstruction** — the emitter fails to decompose multi-hypothesis contexts, causing `?X ∧ ?Y` unification failures in ~80/86 PRV tests. This is the single biggest blocker.
+2. **Implement INS rule** — 276 occurrences in PRV replays, currently unimplemented. Takes determined instantiations Q₁…Qₙ.
+
+### P1 — Fix remaining traces
+3. **Trace 26** — OPR1 substitution predicate not generated correctly inside nested ALL8 with multi-variable bindings.
+4. **Trace 27** — IMP4 continuation incorrectly wraps around existential quantifier instead of matching it directly (nested ∃ + maplet).
+
+### P2 — Prove arithmetic rules
+5. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR2–AR8.
+6. **Prove AR2–AR8, AR13** — replace `admit` with proofs using the new axioms.
+
+### P3 — Generalise and harden
+7. **N-ary quantifier flattening** — replace ad-hoc ALL7_2, XST5_2, NRM14_2 etc. with systematic n-variable handling.
+8. **Implement remaining NRM rules** — NRM10, NRM17–18, NRM21–23, NRM27–30 (arithmetic solver dispatch). Currently unused by benchmarks but needed for completeness.
+9. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces.
 
 ## Key References
 
