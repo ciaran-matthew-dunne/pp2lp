@@ -12,5 +12,5 @@
    rule_db proof_tree emit_lp reconstruct
    check cache batch
  )
- (flags :standard -w -8 -w -27)
+ (flags :standard)
 )

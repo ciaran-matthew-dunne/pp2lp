@@ -118,12 +118,14 @@ let build (lines : line list) : proof_node =
   in
 
   let rec go pos ctx =
-    if pos >= n then
+    if pos >= n then begin
       (* Replay ended — return a sentinel leaf for incomplete proofs *)
+      Printf.eprintf "warning: incomplete proof, inserting SORRY\n";
       (Apply { rule = "SORRY"; arg = None;
                goal = Lift (Var "incomplete"); ctx;
                children = [] },
        pos)
+    end
     else
       let ((rule_name, arg), rhs) = arr.(pos) in
       let arity = rule_arity rule_name in
@@ -228,5 +230,7 @@ let build (lines : line list) : proof_node =
       | _ -> pos
   in
 
-  let (tree, _final_pos) = go 0 Base in
+  let (tree, final_pos) = go 0 Base in
+  if final_pos < n then
+    Printf.eprintf "warning: %d unconsumed lines in proof tree\n" (n - final_pos);
   tree

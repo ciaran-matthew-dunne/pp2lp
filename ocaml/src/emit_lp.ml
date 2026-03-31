@@ -544,11 +544,12 @@ let imp_antecedent = function
 
 let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proof_node) =
   match node with
-  | Apply { rule; arg = node_arg; goal; children; _ } ->
+  | Apply { rule; arg = _node_arg; goal; children; _ } ->
     let pad = String.make indent ' ' in
     let first_pad = if inline then "" else pad in
     begin match children with
     | [] when rule = "SORRY" ->
+      Printf.eprintf "warning: emitting admit for incomplete proof\n";
       Buffer.add_string buf first_pad;
       Buffer.add_string buf "admit"
 

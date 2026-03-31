@@ -18,7 +18,7 @@ test-each: build
 	@pass=0; fail=0; fails=""; \
 	for r in test/traces/*.trace.replay; do \
 	  n=$$(basename $$r .trace.replay); \
-	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp 2>/dev/null; \
+	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp; \
 	  if (cd lp && lambdapi check gen/trace_$$n.lp) >/dev/null 2>&1; then \
 	    pass=$$((pass+1)); \
 	  else \
