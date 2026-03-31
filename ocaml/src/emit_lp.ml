@@ -405,9 +405,12 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
        Their single premise is always inferred via _. *)
     if is_primed then ()
     else
-    begin match base_rule with
-    (* AXM1-6: pass hypothesis proof (leaves only) *)
-    | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" ->
+    (* Check JSON emit_args for this rule *)
+    let db = Rule_db.get () in
+    let ea = Rule_db.emit_args db base_rule in
+    match ea with
+    (* Dynamic argument handlers *)
+    | Some "dynamic:hyp" ->
       begin match find_axm_hyp ctx base_rule goal with
       | Some name ->
         Buffer.add_char buf ' ';
@@ -416,26 +419,18 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
         Buffer.add_string buf " _"
       end
 
-    (* AXM7: no args (tautology P⇒P) *)
-    | "AXM7" -> ()
-
-    (* AXM8: needs explicit list + index + identity proof *)
-    | "AXM8" ->
+    | Some "dynamic:axm8" ->
       let conjs = conj_list_of_goal goal in
       begin match find_axm8_index goal with
       | Some i ->
         Buffer.add_char buf ' ';
         pp_prd_list buf conjs;
         emit_nat buf i;
-        (* nth ⊤ c i = r, so the proof of (nth ⊤ c i ⇒ r) is the identity *)
         Buffer.add_string buf " (\xce\xbb x, x)" (* λ x, x *)
       | None -> Buffer.add_string buf " _"
       end
 
-    (* AXM9: (e : τ ι) → π (∀x, ¬(⊤ ∧ P x)) → π (P e ⇒ Q) *)
-    (* e is inferred from goal, hypothesis from context *)
-    | "AXM9" ->
-      (* Find hypothesis matching ∀x, ¬(⊤ ∧ P x) pattern *)
+    | Some "dynamic:axm9" ->
       let hyp_result =
         let rec has_true_and = function
           | Unary (Not, Binary (And, Lift (Var ("VRAI"|"TRUE")), _)) -> true
@@ -458,7 +453,6 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
       in
       begin match hyp_result with
       | Some (name, nvars) when nvars >= 2 ->
-        (* Append "_2" to make "AXM9_2", add extra _ for e2 *)
         Buffer.add_string buf "_2 _ _ ";
         Buffer.add_string buf name
       | Some (name, _) ->
@@ -468,8 +462,7 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
         Buffer.add_string buf " _ _"
       end
 
-    (* AND5: needs explicit list + a b i j (eq_refl _) (eq_refl _) *)
-    | "AND5" ->
+    | Some "dynamic:and5" ->
       let children = match node with Apply { children; _ } -> children in
       let child_goal = match children with
         | [Apply { goal; _ }] -> Some goal
@@ -485,7 +478,6 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
             | Binary (Imp, a, b) -> (a, b)
             | _ -> failwith "AND5: element at j is not an implication"
           in
-          (* Emit: list a b i j (eq_refl _) (eq_refl _) *)
           Buffer.add_char buf ' ';
           pp_prd_list buf conjs;
           Buffer.add_char buf ' ';
@@ -502,17 +494,14 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
         Buffer.add_string buf " _ _ _ _ (eq_refl _) (eq_refl _)"
       end
 
-    (* ALL7: emit R as explicit lambda, extracted from second child's goal *)
-    | "ALL7" | "ALL7_2" ->
+    | Some "dynamic:all7" | Some "dynamic:xst8" ->
       begin match node with
       | Apply { children; _ } ->
         let r_opt = match children with
           | [_; Apply { goal = Binary (Imp, Bind (Forall1, xs, r_body), _); _ }] ->
             if rule = "ALL7_2" then
-              (* ALL7_2: R takes all compound vars *)
               Some (xs, [], r_body)
             else
-              (* ALL7: R takes 1 var, wraps rest in ∀ *)
               let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
               let inner_vars = (match xs with _ :: rest -> rest | [] -> []) in
               Some (lambda_vars, inner_vars, r_body)
@@ -540,37 +529,13 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
         end
       end
 
-    (* ALL1-4 need ⊤ᵢ (compound variable flattening) *)
-    | "ALL1" | "ALL2" | "ALL3" | "ALL4" ->
-      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
+    (* Static args from JSON (e.g. "⊤ᵢ", "⊤ᵢ ⊤ᵢ", "_ _ ⊤ᵢ ⊤ᵢ") *)
+    | Some args ->
+      Buffer.add_char buf ' ';
+      Buffer.add_string buf args
 
-    (* XST rules: compound flattening needs ⊤ᵢ *)
-    | "XST1" | "XST2" | "XST3" | "XST4" ->
-      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-
-    (* NRM rules *)
-    | s when String.length s >= 3 && String.sub s 0 3 = "NRM" ->
-      begin match s with
-      | "NRM8" | "NRM8c" ->
-        Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-      | "NRM19" -> Buffer.add_string buf " _ _ \xe2\x8a\xa4\xe1\xb5\xa2 \xe2\x8a\xa4\xe1\xb5\xa2"
-      | _ -> ()
-      end
-
-    (* AR rules *)
-    | "AR3_F" -> Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-    | "AR4" -> Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-    | "AR5" | "AR6" -> Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-    | "AR7" | "AR8" ->
-      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2 \xe2\x8a\xa4\xe1\xb5\xa2"
-    | "AR9" -> Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2"
-
-    (* OPR rules: P is inferred *)
-    | "OPR1" | "OPR2" -> ()
-
-    (* Everything else: no explicit args *)
-    | _ -> ()
-    end
+    (* No args *)
+    | None -> ()
 
 (* ---- Proof node emission ---- *)
 

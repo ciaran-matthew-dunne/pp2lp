@@ -11,75 +11,13 @@ type proof_node =
       children: proof_node list;
     }
 
-(* Rule arity: how many sub-goals does this rule consume? *)
-(* 0 = leaf, 1 = one child, 2 = two children (branching) *)
-(* -1 = skip this line entirely (phantom/no-op) *)
+(* Rule metadata is loaded from data/rules.json via Rule_db *)
 
 let rule_arity (name : string) : int =
-  match name with
-  (* Leaves (0 children) *)
-  | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" | "AXM7"
-  | "AXM8" | "AXM9"
-  | "NRM19"
-  | "VR1" | "VR4" | "FX2" | "FX3"
-  | "EVR1" | "EVR4" | "EVR11"
-  | "ECTR1" | "ECTR2" | "ECTR3" | "ECTR4" | "ECTR5" | "ECTR6"
-  | "AR2" | "AR4" | "AR11"
-  | "BOOL51" | "BOOL52" -> 0
+  Rule_db.rule_arity (Rule_db.get ()) name
 
-  (* 2 children (branching) *)
-  | "AND1" | "AND4"
-  | "OR2" | "OR3"
-  | "IMP2" | "IMP3"
-  | "EQV1" | "EQV2" | "EQV3" | "EQV4"
-  | "ALL7" | "ALL7f"
-  | "XST8" | "XST8f" -> 2
-
-  (* Skip lines *)
-  | "FIN" | "STOP_NORM" | "NRM" -> -1
-
-  (* No-op: AR10 is a solver confirmation, skip it *)
-  | "AR10" -> -1
-
-  (* Everything else: 1 child *)
-  | _ -> 1
-
-(* Whether a rule has a primed (_1) variant *)
-let has_primed name =
-  match name with
-  | "AND1" | "AND2" | "AND3" | "AND4" | "AND5"
-  | "OR1" | "OR2" | "OR3" | "OR4"
-  | "IMP1" | "IMP2" | "IMP3" | "IMP4" | "IMP5"
-  | "EQV1" | "EQV2" | "EQV3" | "EQV4"
-  | "NOT1" | "NOT2"
-  | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" | "AXM7"
-  | "AXM8" | "AXM9"
-  | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL5" | "ALL5f"
-  | "ALL6" | "ALL7" | "ALL7f" | "ALL8" | "ALL8f" | "ALL9"
-  | "XST1" | "XST2" | "XST3" | "XST4" | "XST5" | "XST51"
-  | "XST6" | "XST61" | "XST7" | "XST7f" | "XST8" | "XST8f"
-  | "VR1" | "VR2" | "VR3" | "VR4" | "FX1" | "FX2" | "FX3"
-  | "STOP"
-  | "EVR1" | "EVR2" | "EVR3" | "EVR4" | "EVR11"
-  | "EAXM1" | "EAXM2" | "EAXM31" | "EAXM32"
-  | "EIMP51" | "EIMP52"
-  | "EAXM91" | "EAXM92"
-  | "ECTR1" | "ECTR2" | "ECTR3" | "ECTR4" | "ECTR5" | "ECTR6"
-  | "NRM1" | "NRM2" | "NRM3" | "NRM4" | "NRM5" | "NRM6" | "NRM7"
-  | "NRM8" | "NRM8c" | "NRM8f" | "NRM9" | "NRM9f"
-  | "NRM10" | "NRM11" | "NRM12"
-  | "NRM13" | "NRM14" | "NRM15" | "NRM16" | "NRM17" | "NRM18"
-  | "NRM19" | "NRM20" | "NRM21" | "NRM22" | "NRM23" | "NRM24"
-  | "NRM25" | "NRM26" | "NRM27" | "NRM28" | "NRM29" | "NRM30"
-  | "AR1" | "AR2" | "AR3" | "AR3_F" | "AR4" | "AR5" | "AR6" | "AR7" | "AR8"
-  | "AR9" | "AR10" | "AR11" | "AR12" | "AR13"
-  | "AR5_2" | "AR6_2" | "AR7_2" | "AR8_2"
-  | "OPR1" | "OPR2"
-  | "EQC1" | "EQC2" | "EQS1" | "EQS2"
-  | "BOOL11" | "BOOL12" | "BOOL21" | "BOOL22"
-  | "BOOL31" | "BOOL32" | "BOOL41" | "BOOL42"
-  | "BOOL51" | "BOOL52" -> true
-  | _ -> false
+let has_primed (name : string) : bool =
+  Rule_db.has_primed (Rule_db.get ()) name
 
 (* Resolve rule name based on context *)
 let resolve_rule (name : string) (ctx : ctx) : string =

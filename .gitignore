@@ -1,6 +1,4 @@
 ocaml/_build
-ocaml/bin
-ocaml/lib
 
 test/gen/
 test/prv/gen/

@@ -4,6 +4,8 @@ open Pp2lp.Proof_tree
 open Pp2lp.Emit_lp
 open Pp2lp.Reconstruct
 
+let () = Pp2lp.Rule_db.auto_init ()
+
 let tests_passed = ref 0
 let tests_failed = ref 0
 
