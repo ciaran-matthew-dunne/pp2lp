@@ -44,6 +44,7 @@ make test-each                      # all 30 traces, summary output
 make test                           # all traces in one file (fails on first error)
 make test-prv                       # all 86 PRV replays
 make test-prv FILTER=arith          # filtered PRV subset
+make test-prv-each                  # per-file PRV PASS/FAIL summary
 make gen-prv                        # regenerate PRV traces from .but files
 ```
 
@@ -67,7 +68,7 @@ Prefer these over shell commands for all Lambdapi work.
 | 27 | FAIL | Unification error — nested ∃ with maplet |
 | 28–30 | PASS | TRUE/FALSE/STOP |
 
-28/30 traces pass. OCaml tests: 509 tests, all pass.
+28/30 traces pass. OCaml tests: 118 tests, all pass.
 
 ## Directory Structure
 
@@ -99,12 +100,16 @@ lp/                         Lambdapi encoding
     ├── Arith.lp            §A.14 Arithmetic (AR1–13)
     └── Bool.lp             §A.15 Boolean (BOOL*)
 
+data/
+└── rules.json              PP rule catalog (arity, primed, emit args, LP status)
+
 ocaml/                      OCaml parser and reconstruction
 ├── src/
 │   ├── syntax_pp.ml        AST: prd, exp, line = lhs * rhs
 │   ├── lexer.mll           ocamllex lexer for PP trace syntax
 │   ├── parser.mly          menhir parser (entry: line_eof)
 │   ├── parse_pp.ml         Driver: parse_pp_replay, parse_pp_string
+│   ├── rule_db.ml          Rule metadata loaded from data/rules.json
 │   ├── proof_tree.ml       Proof tree type + builder from line list
 │   ├── emit_lp.ml          Lambdapi pretty-printer
 │   └── reconstruct.ml      Reconstruction driver: replay → .lp
