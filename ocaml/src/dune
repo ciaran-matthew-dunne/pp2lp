@@ -6,8 +6,11 @@
 (library
  (name pp2lp)
  (public_name pp2lp)
+ (libraries unix)
  (modules
    parser lexer parse_pp syntax_pp
+   proof_tree emit_lp reconstruct
+   check cache batch
  )
  (flags :standard -w -8 -w -27)
 )

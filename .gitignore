@@ -2,9 +2,18 @@ ocaml/_build
 ocaml/bin
 ocaml/lib
 
-test/but
-test/replay
-test/trace
+test/gen/
+test/prv/gen/
+
+lp-old
+lp/gen/
+*.lpo
+
+# Private / large binary files
+admin/
+doc/*.pdf
+doc/*.tar.gz
+tex/**/*.pdf
 
 # LaTeX/TeX build artifacts
 *.aux
@@ -66,6 +75,7 @@ btraces
 # Editor and IDE files
 .vscode/
 .idea/
+.zed/
 *.swp
 *.swo
 *~

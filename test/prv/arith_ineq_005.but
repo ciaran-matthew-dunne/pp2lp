@@ -1,0 +1,1 @@
+﻿Flag(TypeOn("Proof_Rules_Validator_4.1.HDDydl")) & Flag(FileOn("Proof_Rules_Validator_4.1.DWWIso1.res")) & Set(Valid.1 | Rule(Implication | not(a = 0) & _delta_e(a) & 0<=a & _delta_e(a) & _delta_e(a) | ? | ? | 1<=a | nn))

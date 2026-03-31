@@ -1,0 +1,1 @@
+﻿Flag(TypeOn("Proof_Rules_Validator_4.1.CajPUs")) & Flag(FileOn("Proof_Rules_Validator_4.1.bdssgO1.res")) & Set(Valid.1 | Rule(Implication | 0<=a-b+c & _delta_e(a) & _delta_e(b) & _delta_e(c) & a<=d & _delta_e(a) & _delta_e(d) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) | ? | ? | a: b-c..d | nn))

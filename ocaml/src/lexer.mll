@@ -18,8 +18,11 @@ rule token = parse
   | ')' { RPAREN }
   | '[' { LSQ }
   | ']' { RSQ }
-  | '<' { LANGLE }
-  | '>' { RANGLE }
+  (* angle brackets and comparison — longest match handles <=>/<=/<  *)
+  | "<=>" { IFF }
+  | "<="  { LEQ }
+  | '<'   { LANGLE }
+  | '>'   { RANGLE }
   (* FIN/sequents *)
   | "|-"  { TURNSTILE }
   | "|"   { PIPE }
@@ -30,8 +33,13 @@ rule token = parse
   | "and" { AND }
   | "or"  { OR }
   | "=>"  { IMP }
-  | "<=>" { IFF }
   | '='   { EQ }
+  (* arithmetic *)
+  | '+'   { PLUS }
+  | '-'   { MINUS }
+  (* set operators *)
+  | "/\\" { INTER }
+  | "\\/" { UNION }
   (* binders *)
   | "#"        { EXISTS  }
   | '!'        { FORALL0 }

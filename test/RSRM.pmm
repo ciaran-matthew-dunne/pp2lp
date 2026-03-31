@@ -1,0 +1,1292 @@
+﻿THEORY SMT_Rules IS
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = FALSE => d*e <: f),
+band(binhyp(c = FALSE),
+binhyp(a = b)))
+=>
+(d*e <: f)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = TRUE => d : {e,f}),
+band(binhyp(c = TRUE),
+binhyp(a = b)))
+=>
+(d : {e,f})
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = TRUE => d : {e,f}),
+band(binhyp(g = TRUE => a = b & c = TRUE),
+binhyp(g = TRUE)))
+=>
+(d : {e,f})
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE => b : {c,d}),
+binhyp(a = TRUE))
+=>
+(b : {c,d})
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(h = TRUE => d = e & i = TRUE),
+band(binhyp(not(f = g) => f = a),
+band(binhyp(d = e => not(f = g)),
+band(binhyp(a : {b,c}),
+binhyp(h = TRUE)))))
+=>
+(f : {b,c})
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => d-e..f+e <: g),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+(d-e..f+e <: g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d,e,f,g}*(h-i..j+i) <: k),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d,e,f,g}*(h-i..j+i) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d}*(e-f..g+f) <: h),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d}*(e-f..g+f) <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e-f..g+f <: h),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e-f..g+f <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE => d-e..f+e <: g),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(h = i => a = b),
+binhyp(h = i))))
+=>
+(d-e..f+e <: g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(f = TRUE => d = e & g = TRUE),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(d = e => a = b),
+binhyp(f = TRUE))))
+=>
+(c = TRUE)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d}*(e..f+g) <: h),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d}*(e..f+g) <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d,e,f,g}*(h..i+j) <: k),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d,e,f,g}*(h..i+j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d}*(e-f..g) <: h),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d}*(e-f..g) <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => {d,e,f,g}*(h-i..j) <: k),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+({d,e,f,g}*(h-i..j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => h*(i-j..k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+(h*(i-j..k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => g*(h-i..j) <: k),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+(g*(h-i..j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => h*(i..j+k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+(h*(i..j+k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) => g<=h),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+binhyp(b = c))))
+=>
+(g<=h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => d..e+f <: g),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+(d..e+f <: g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(0<=c-b),
+binhyp(a<=b))
+=>
+(b : a..c)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(0<=a-b+c),
+binhyp(a<=d))
+=>
+(a : b-c..d)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f => g(h) = f),
+band(binhyp(g(h) = i),
+band(binhyp(e = f),
+band(binhyp(c = d),
+binhyp(a = b)))))
+=>
+(i = f)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e..f+g <: h),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e..f+g <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c => d-e..f <: g),
+band(binhyp(a = TRUE),
+binhyp(b = c)))
+=>
+(d-e..f <: g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE => {d,e,f,g}*h <: i),
+band(binhyp(l = TRUE => j = k & m = TRUE),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(j = k => a = b),
+binhyp(l = TRUE)))))
+=>
+({d,e,f,g}*h <: i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e-f..g <: h),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e-f..g <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE => {d,e,f,g}*h <: i),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(j = k => a = b),
+binhyp(j = k))))
+=>
+({d,e,f,g}*h <: i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE & d = e => f..g+h <: i),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(j = k => a = b),
+band(binhyp(d = e),
+binhyp(j = k)))))
+=>
+(f..g+h <: i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(not(c) => d = e),
+band(binhyp(a = b => not(c)),
+band(binhyp(a = b),
+binhyp(d = f))))
+=>
+(e = f)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE & d = e => f-g..h <: i),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(j = k => a = b),
+band(binhyp(d = e),
+binhyp(j = k)))))
+=>
+(f-g..h <: i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & h = i => e(f) = i),
+band(binhyp(a = b & c = d => e(f) = g),
+band(binhyp(a = b),
+band(binhyp(c = d),
+binhyp(h = i)))))
+=>
+(g = i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h}*(i..j+k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h}*(i..j+k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h,i,j}*(k..l+m) <: n),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h,i,j}*(k..l+m) <: n)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h,i}*(j..k+l) <: m),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h,i}*(j..k+l) <: m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h}*(i-j..k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h}*(i-j..k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h,i,j}*(k-l..m) <: n),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h,i,j}*(k-l..m) <: n)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e(f) & f = g => {h,i}*(j-k..l) <: m),
+band(binhyp(a = TRUE),
+band(binhyp(d = e(f)),
+band(binhyp(b = c),
+binhyp(f = g)))))
+=>
+({h,i}*(j-k..l) <: m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g}*(h-i..j) <: k),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g}*(h-i..j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g,h,i}*(j-k..l) <: m),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g,h,i}*(j-k..l) <: m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g,h}*(i-j..k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g,h}*(i-j..k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g,h,i}*(j..k+l) <: m),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g,h,i}*(j..k+l) <: m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+binhyp(a(b)<=c(b))
+=>
+(d<=a(b) => d<=c(b))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c<=min(d[e\/f])),
+binhyp(a = b))
+=>
+(c<=min(d[e\/f]))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c\/d <: e(f)),
+binhyp(a = b))
+=>
+(c\/d <: e(f))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f => g(h) = f),
+band(binhyp(c = d),
+band(binhyp(a = b),
+band(binhyp(i = e),
+binhyp(e = f)))))
+=>
+(i = g(h))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+binhyp(a)
+=>
+(a)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f(g) & g = h => i..j+k <: l\/m),
+band(binhyp(e = f(g)),
+band(binhyp(a = b),
+band(binhyp(c = d),
+binhyp(g = h)))))
+=>
+(i..j+k <: l\/m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f(g) & g = h => i-j..k <: l\/m),
+band(binhyp(e = f(g)),
+band(binhyp(a = b),
+band(binhyp(c = d),
+binhyp(g = h)))))
+=>
+(i-j..k <: l\/m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f & f = g => h-i..j <: k\/l),
+band(binhyp(c = d),
+band(binhyp(a = b),
+band(binhyp(e = f),
+binhyp(f = g)))))
+=>
+(h-i..j <: k\/l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = k & l = m(n) & n = o => p..q+g <: r\/s),
+band(binhyp(a = b & c = TRUE => d = e & f = g & h = i),
+band(binhyp(j = TRUE => a = b & c = TRUE),
+band(binhyp(j = TRUE),
+band(binhyp(l = m(n)),
+band(binhyp(d = k),
+binhyp(n = o)))))))
+=>
+(p..q+g <: r\/s)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(g = h & n = o & p = q => i(j) = k),
+band(binhyp(g = h & i(j) = k => l = 1+f),
+band(binhyp(g = h & 1<=a => a<=1+m-l),
+band(binhyp(b = c => d = TRUE),
+band(binhyp(d = TRUE => e<=f),
+band(binhyp(g = h => b = c),
+band(binhyp(not(a = 0)),
+band(binhyp(n = o),
+band(binhyp(p = q),
+band(binhyp(g = h),
+binhyp(0<=a)))))))))))
+=>
+(e+a<=m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f => g(h) = i),
+band(binhyp(c = d),
+band(binhyp(a = b),
+binhyp(e = f))))
+=>
+(g(h) = i)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = k & l = m(n) & n = o => p-g..q <: r\/s),
+band(binhyp(a = b & c = TRUE => d = e & f = g & h = i),
+band(binhyp(j = TRUE => a = b & c = TRUE),
+band(binhyp(j = TRUE),
+band(binhyp(l = m(n)),
+band(binhyp(d = k),
+binhyp(n = o)))))))
+=>
+(p-g..q <: r\/s)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c(d) = e => 0 = f-g & g = h-1),
+band(binhyp(a = b & i = j & k = l => c(d) = e),
+band(binhyp(a = b),
+band(binhyp(i = j),
+binhyp(k = l)))))
+=>
+(g = h-1)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(b = c & 1<=a => a<=1+d-e),
+band(binhyp(not(a = 0)),
+band(binhyp(b = c),
+binhyp(0<=a))))
+=>
+(a<=1+d-e)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(b = c & 1<=a & d(e) = f => g\/h = i..j),
+band(binhyp(b = c & k = l & m = n => d(e) = f),
+band(binhyp(not(a = 0)),
+band(binhyp(b = c),
+band(binhyp(m = n),
+band(binhyp(k = l),
+binhyp(0<=a)))))))
+=>
+(g\/h = i..j)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(b = c & 1<=a & d(e) = f => g\/h = i..j),
+band(binhyp(not(a = 0)),
+band(binhyp(d(e) = f),
+band(binhyp(b = c),
+binhyp(0<=a)))))
+=>
+(g\/h = i..j)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e(f) = g(h)),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e(f) = g(h))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(h = TRUE => f = g & i = TRUE),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+binhyp(h = TRUE)))))
+=>
+(d<=e)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & h(i) = j => 0 = k-l & l = d-1),
+band(binhyp(m = TRUE & q = r => h(i) = s),
+band(binhyp(m = TRUE => f = g & n = TRUE),
+band(binhyp(f = g & 1<=o => o<=1+l-p),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(m = TRUE),
+band(binhyp(q = r),
+band(binhyp(s = j),
+binhyp(1<=o)))))))))))
+=>
+(p<=e-o)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(b = c & 1<=e & f(g) = h => i\/j = k..l),
+band(binhyp(a = TRUE => b = c & d = TRUE),
+band(binhyp(a = TRUE & m = n => f(g) = o),
+band(binhyp(a = TRUE),
+band(binhyp(o = h),
+band(binhyp(m = n),
+binhyp(1<=e)))))))
+=>
+(i\/j = k..l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(e = TRUE => a = b & f = TRUE),
+band(binhyp(c = d => g <: h),
+band(binhyp(a = b => c = d),
+binhyp(e = TRUE))))
+=>
+(g <: h)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE => d <: e),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(f = g => a = b),
+binhyp(f = g))))
+=>
+(d <: e)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & h(i) = j => 0 = k-l & l = d-1),
+band(binhyp(f = g & o = p => h(i) = q),
+band(binhyp(f = g & 1<=m => m<=1+l-n),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(o = p),
+band(binhyp(q = j),
+band(binhyp(f = g),
+binhyp(1<=m))))))))))
+=>
+(n<=e-m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => g*(h..i+j) <: k),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+(g*(h..i+j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e => f<=g),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+binhyp(d = e))))
+=>
+(f<=g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & c = TRUE => d = e & f = g & h = i),
+band(binhyp(j = TRUE & d = k & l = m => n<=f),
+band(binhyp(j = TRUE => a = b & c = TRUE),
+band(binhyp(j = TRUE),
+band(binhyp(l = m),
+binhyp(d = k))))))
+=>
+(n<=g)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g}*(h..i+j) <: k),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g}*(h..i+j) <: k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = f & n = c & c = o => {p,q,r}*(s..t+u) <: v),
+band(binhyp(a = b & e = g => not(h(i) = j)),
+band(binhyp(k = TRUE & m = f => h(i) = c),
+band(binhyp(k = TRUE => a = b & l = TRUE),
+band(binhyp(not(c = d) => c = j),
+band(binhyp(a = b => not(c = d)),
+band(binhyp(a = b => e : {f,g}),
+band(binhyp(k = TRUE),
+band(binhyp(m = f),
+band(binhyp(n = c),
+binhyp(c = o)))))))))))
+=>
+({p,q,r}*(s..t+u) <: v)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => {g,h}*(i..j+k) <: l),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+({g,h}*(i..j+k) <: l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE & b = c & d = e & e = f => g..h+i <: j\/k),
+band(binhyp(a = TRUE),
+band(binhyp(b = c),
+band(binhyp(d = e),
+binhyp(e = f)))))
+=>
+(g..h+i <: j\/k)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE => {b}*(c\/d) <: e),
+binhyp(a = TRUE))
+=>
+({b}*(c\/d) <: e)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f & f = g => {h,i,j}*(k..l+m) <: n),
+band(binhyp(c = d),
+band(binhyp(a = b),
+band(binhyp(e = f),
+binhyp(f = g)))))
+=>
+({h,i,j}*(k..l+m) <: n)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & c = d & e = f & f = g & !h.(h : i..j+k => l(h)<=min({m,n})) => {o}*(i..j+k) <: p),
+band(binhyp(!q.(q : i..j+k => l(q)<=min({m,n}))),
+band(binhyp(e = f),
+band(binhyp(f = g),
+band(binhyp(a = b),
+binhyp(c = d)))))) &
+h \(i,j,k,l,m,n) &
+q \(i,j,k,l,m,n)
+=>
+({o}*(i..j+k) <: p)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f & f = g => {h,i}*(j..k+l) <: m),
+band(binhyp(c = d),
+band(binhyp(a = b),
+band(binhyp(e = f),
+binhyp(f = g)))))
+=>
+({h,i}*(j..k+l) <: m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+binhyp(0 =  -1+a-b)
+=>
+(b+1 = a)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e(f) = g),
+band(binhyp(c = d),
+band(binhyp(a = b),
+binhyp(h = g))))
+=>
+(h = e(f))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c(d) = TRUE),
+binhyp(a = b))
+=>
+(c(d) = TRUE)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = g => not(h(i) = j)),
+band(binhyp(k = TRUE & m = f => h(i) = c),
+band(binhyp(k = TRUE => a = b & l = TRUE),
+band(binhyp(not(c = d) => c = j),
+band(binhyp(a = b => not(c = d)),
+band(binhyp(a = b => e : {f,g}),
+band(binhyp(k = TRUE),
+binhyp(m = f))))))))
+=>
+(e = f)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = TRUE => b = c & d = TRUE),
+binhyp(a = TRUE))
+=>
+(b = c)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = TRUE => d = e & f = g & h = i),
+band(binhyp(j = TRUE => a = b & c = TRUE),
+binhyp(j = TRUE)))
+=>
+(d = e)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f & f = g => h..i+j <: k\/l),
+band(binhyp(c = d),
+band(binhyp(a = b),
+band(binhyp(e = f),
+binhyp(f = g)))))
+=>
+(h..i+j <: k\/l)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = f & n = c & c = o => p..q+r <: s\/t),
+band(binhyp(a = b & e = g => not(h(i) = j)),
+band(binhyp(k = TRUE & m = f => h(i) = c),
+band(binhyp(k = TRUE => a = b & l = TRUE),
+band(binhyp(not(c = d) => c = j),
+band(binhyp(a = b => not(c = d)),
+band(binhyp(a = b => e : {f,g}),
+band(binhyp(k = TRUE),
+band(binhyp(m = f),
+band(binhyp(n = c),
+binhyp(c = o)))))))))))
+=>
+(p..q+r <: s\/t)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b & e = f & c = n => o..p+q <: r\/s),
+band(binhyp(a = b & e = g => not(h(i) = j)),
+band(binhyp(k = TRUE & m = f => h(i) = c),
+band(binhyp(k = TRUE => a = b & l = TRUE),
+band(binhyp(not(c = d) => c = j),
+band(binhyp(a = b => not(c = d)),
+band(binhyp(a = b => e : {f,g}),
+band(binhyp(k = TRUE),
+band(binhyp(m = f),
+binhyp(c = n))))))))))
+=>
+(o..p+q <: r\/s)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & h(i) = j => k = 1+e),
+band(binhyp(f = g & n = o => h(i) = p),
+band(binhyp(f = g & 1<=l => l<=1+m-k),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(n = o),
+band(binhyp(p = j),
+band(binhyp(f = g),
+binhyp(1<=l))))))))))
+=>
+(d+l<=m)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: YES */
+binhyp(a = 1+b)
+=>
+(b+1 = a)
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = TRUE => !b.(b : c & b : d => e|->b : f)),
+binhyp(a = TRUE)) &
+b \(c,d,e,f) &
+g \(c,d,e,f)
+=>
+(!g.(g : c & g : d => e|->g : f))
+;
+
+/* /usr/bin/z3 UFNIA */
+/* ## Automatic Proof: NO */
+binhyp( -1+a-min(b[c\/d])+1<=0)
+=>
+(a<=min(b[c\/d]))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c <: d(e)),
+binhyp(a = b))
+=>
+(c <: d(e))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d & e = f => g..h+i <: j\/k),
+band(binhyp(c = d),
+band(binhyp(a = b),
+binhyp(e = f))))
+=>
+(g..h+i <: j\/k)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => {c,d}*(e\/f) <: g),
+binhyp(a = b))
+=>
+({c,d}*(e\/f) <: g)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & 1<=l => 0<=m-k-l & l<=1+n-k),
+band(binhyp(f = g & h(i) = j => k = 1+e),
+band(binhyp(f = g & o = p => h(i) = q),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(o = p),
+band(binhyp(q = j),
+band(binhyp(f = g),
+binhyp(1<=l))))))))))
+=>
+(d+l<=n)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g => 0<=l-k-m & m<=1+n-k),
+band(binhyp(f = g & h(i) = j => k = 1+e),
+band(binhyp(f = g & o = p => h(i) = q),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(f = g),
+band(binhyp(o = p),
+binhyp(q = j)))))))))
+=>
+(d+m<=n)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & h(i) = j => k = 1+e),
+band(binhyp(f = g & l = m => h(i) = n),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(l = m),
+band(binhyp(f = g),
+binhyp(n = j))))))))
+=>
+(d<=k)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(f = g & h(i) = j => k = 1+e),
+band(binhyp(f = g & n = o => h(i) = p),
+band(binhyp(f = g & 1<=l => k<=m),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+band(binhyp(n = o),
+band(binhyp(p = j),
+band(binhyp(f = g),
+binhyp(1<=l))))))))))
+=>
+(d<=m)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & 1<=c => d<=e),
+band(binhyp(a = b),
+binhyp(1<=c)))
+=>
+(d<=e)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => 0<=c-d-e & e<=1+f-d),
+binhyp(a = b))
+=>
+(e<=1+f-d)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e = 0),
+band(binhyp(not(e = 0)),
+binhyp(a = b)))
+=>
+(not(c = d))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & 1<=c & d(e) = f => g\/h = i..j),
+band(binhyp(a = b & k = l => d(e) = m),
+band(binhyp(a = b),
+band(binhyp(k = l),
+band(binhyp(m = f),
+binhyp(1<=c))))))
+=>
+(g\/h = i..j)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = TRUE => not(f = g)),
+band(binhyp(a = b => c = TRUE),
+band(binhyp(d = e => a = b),
+binhyp(d = e))))
+=>
+(not(f = g))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c(d) = e => f = 1+g),
+band(binhyp(c(d) = e),
+binhyp(a = b)))
+=>
+(g+1 = f)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & 1<=c => not(d = e)),
+band(binhyp(a = b),
+binhyp(1<=c)))
+=>
+(not(d = e))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c(d) = e => f = 1+g),
+band(binhyp(c(d) = e),
+binhyp(a = b)))
+=>
+(f = 1+g)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & 1<=c & d(e) = f => g\/h = i..j),
+band(binhyp(d(e) = f),
+band(binhyp(a = b),
+binhyp(1<=c))))
+=>
+(g\/h = i..j)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e(f) = g),
+band(binhyp(c = d),
+band(binhyp(a = b),
+binhyp(g = h))))
+=>
+(e(f) = h)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(not(a = 0)),
+binhyp(0<=a))
+=>
+(1<=a)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(not(c) => d = e),
+band(binhyp(not(c) => f = d),
+band(binhyp(a = b => not(c)),
+band(binhyp(g(h) = e),
+binhyp(a = b)))))
+=>
+(f = g(h))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e(f) = g),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e(f) = g)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = d => e <: f),
+band(binhyp(a = b => c = d),
+binhyp(a = b)))
+=>
+(e <: f)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c = d => e = 0),
+band(binhyp(c = d),
+binhyp(a = b)))
+=>
+(e = 0)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: NO */
+band(binhyp(a = b => c = d..e & c/\f = g & #(h,i).(h : j & i : j & k = h..i)),
+binhyp(a = b)) &
+h \(j,k) &
+i \(j,k)
+=>
+(c = d..e)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c<=card(d)),
+binhyp(a = b))
+=>
+(c<=card(d))
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c = TRUE),
+band(binhyp(c = TRUE => d<=e),
+band(binhyp(f = g => a = b),
+binhyp(f = g))))
+=>
+(d<=e)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b & c(d) = e => f\/g = h..i),
+band(binhyp(c(d) = e),
+binhyp(a = b)))
+=>
+(f\/g = h..i)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c\/d <: e),
+binhyp(a = b))
+=>
+(c\/d <: e)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => {c,d,e,f}*g <: h),
+binhyp(a = b))
+=>
+({c,d,e,f}*g <: h)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => {c}*d <: e),
+binhyp(a = b))
+=>
+({c}*d <: e)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(a = b => c <: d),
+binhyp(a = b))
+=>
+(c <: d)
+;
+
+/* /usr/bin/z3 QF_UFNIA */
+/* ## Automatic Proof: YES */
+band(binhyp(c = d => e = TRUE),
+band(binhyp(a = b => c = d),
+binhyp(a = b)))
+=>
+(e = TRUE)
+
+END 
+
+&
+
+THEORY Interval IS
+    band(binhyp(c <= a),
+        binhyp(b <= d))
+    =>
+    a..b <: c..d
+    ;
+    band(binhyp(a <= b),
+        band(binhyp(b+1=c),
+            binhyp(c <= d))) &
+    blvar(Q) &
+    Q\(a,b,c,d)
+    =>
+    a..b\/c..d == a..d
+    ;
+    band(binhyp(not(P = {}),
+    band(binhyp(not(Q = {})),
+    band(binhyp(P = a..b),
+    band(binhyp(Q = c..d),
+         binhyp(b+1 = c))))))
+    =>
+    P\/Q = a..d
+END
+&
+THEORY ArithMin IS
+    band(binhyp(x: E),
+        binhyp(a<=min(f[E])))
+    => 
+    a<=f(x)
+END
+&
+THEORY ApplyFun IS
+    blvar(Q) &
+    Q\(x,y,a,b)
+    =>({x|->a,y|->b}(x) == a)
+    ;
+    blvar(Q) &
+    Q\(x,y,a,b)
+    =>({x|->a,y|->b}(y) == b)
+END

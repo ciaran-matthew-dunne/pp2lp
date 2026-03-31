@@ -19,17 +19,18 @@ Or from any location:
 
 OUTPUT STRUCTURE
 ================
-The script creates the following subdirectories in the target directory:
+The script creates a gen/ subdirectory in the target directory:
 
     target/
     ├── *.but              # Original proof goals (unchanged)
-    ├── trace/             # .trace files from PP
-    ├── replay/            # .replay files from REPLAY
-    ├── replay-failures/   # Cases where PP succeeds but REPLAY fails
-    │   ├── *.but          # Copy of original proof goal
-    │   ├── *.trace        # Copy of trace from PP
-    │   └── *.replay.goal  # Goal file for manual REPLAY testing
-    └── misc/              # Files with no extension (if any)
+    └── gen/               # All generated output
+        ├── trace/         # .trace files from PP
+        ├── replay/        # .replay files from REPLAY
+        ├── replay-failures/
+        │   ├── *.but      # Copy of original proof goal
+        │   ├── *.trace    # Copy of trace from PP
+        │   └── *.replay.goal
+        └── misc/          # Files with no extension (if any)
 
 REQUIREMENTS
 ============
@@ -205,6 +206,7 @@ class OutputDirs:
             replay_failures=base_dir / "replay-failures",
             misc=base_dir / "misc",
         )
+        base_dir.mkdir(parents=True, exist_ok=True)
         dirs.trace.mkdir(exist_ok=True)
         dirs.replay.mkdir(exist_ok=True)
         dirs.replay_failures.mkdir(exist_ok=True)
@@ -813,18 +815,18 @@ def main():
         description="Benchmark suite for PP trace generation and replay",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Output structure:
-  trace/           .trace files from PP
-  replay/          .replay files from REPLAY
-  replay-failures/ Cases where PP succeeds but REPLAY fails
-  misc/            Files with no extension
+Output structure (under gen/ by default):
+  gen/trace/           .trace files from PP
+  gen/replay/          .replay files from REPLAY
+  gen/replay-failures/ Cases where PP succeeds but REPLAY fails
+  gen/misc/            Files with no extension
 
 Examples:
-  %(prog)s .                        Process current directory
-  %(prog)s -t 30 .                  30 second timeout for both stages
-  %(prog)s --clean .                Clean and reprocess
-  %(prog)s --analyze-only .         Only analyze existing failures
-  %(prog)s -v --json results.json . Verbose with JSON output
+  %(prog)s but/                     Process but/ directory
+  %(prog)s -t 30 but/               30 second timeout for both stages
+  %(prog)s --clean but/             Clean and reprocess
+  %(prog)s --analyze-only but/      Only analyze existing failures
+  %(prog)s -v --json results.json but/  Verbose with JSON output
         """
     )
     parser.add_argument("directory", nargs="?", default=".",
@@ -847,7 +849,7 @@ Examples:
     parser.add_argument("--clean", action="store_true",
                         help="Clean output directories before processing")
     parser.add_argument("-o", "--output-dir", metavar="DIR",
-                        help="Base directory for output (default: same as input)")
+                        help="Base directory for output (default: <input>/gen/)")
     parser.add_argument("--analyze-only", action="store_true",
                         help="Only analyze existing replay-failures (skip processing)")
     parser.add_argument("--convert-only", action="store_true",
@@ -865,7 +867,7 @@ Examples:
 
     # Setup directories
     directory = Path(args.directory).resolve()
-    output_base = Path(args.output_dir).resolve() if args.output_dir else directory
+    output_base = Path(args.output_dir).resolve() if args.output_dir else directory / "gen"
 
     # Convert-only mode (doesn't need krt or kin files)
     if args.convert_only:

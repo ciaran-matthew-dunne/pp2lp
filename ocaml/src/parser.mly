@@ -12,14 +12,23 @@
 %token LANGLE RANGLE
 
 %token HYP TURNSTILE PIPE FIN
-%token NOT AND OR IMP IFF EQ
+%token NOT AND OR IMP IFF EQ LEQ
+%token PLUS MINUS
+%token INTER UNION
 %token FORALL0 FORALL1 FORALL2 EXISTS
 
-%left IMP
-%left IFF
-%left OR AND
+%nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
+%nonassoc COMMA
+%left IMP           (* !x.P => Q = (∀x.P) => Q *)
+%left IFF           (* !x.P <=> Q = (∀x.P) <=> Q *)
+%left OR AND          (* PP spec: ∧ and ∨ have same priority (2), both left-assoc *)
+%right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
+%left UNION
+%left INTER
+%left PLUS MINUS
+%nonassoc UMINUS
+%nonassoc LSQ
 
-%right PERIOD
 %start <line option> line_eof
 %%
 var_seq:
@@ -30,8 +39,24 @@ var_seq:
 exp:
   | x = SYMBOL
   { Var x }
-  | x = SYMBOL; LPAREN; xs = var_seq; RPAREN
-  { App (x, List.map (fun x -> Var x) xs) }
+  | i = NATURAL
+  { Nat i }
+  | x = SYMBOL; LPAREN; es = exp_seq; RPAREN
+  { App (x, es) }
+  | FIN; LPAREN; es = exp_seq; RPAREN
+  { App ("FIN", es) }
+  | e1 = exp; PLUS; e2 = exp
+  { AOp (Add, e1, e2) }
+  | e1 = exp; MINUS; e2 = exp
+  { AOp (Sub, e1, e2) }
+  | MINUS; e = exp %prec UMINUS
+  { Neg e }
+  | e1 = exp; LSQ; e2 = exp; RSQ
+  { SetImage (e1, e2) }
+  | e1 = exp; INTER; e2 = exp
+  { Inter (e1, e2) }
+  | e1 = exp; UNION; e2 = exp
+  { Union (e1, e2) }
 exp_seq:
   | e = exp
   { [e] }
@@ -54,7 +79,7 @@ prd:
   | LPAREN; p = raw_prd; RPAREN { p }
 raw_prd:
   | e = exp
-  { Lift e }
+  { Lift e } %prec LIFT_EXP
   | NOT; LPAREN; t = prd; RPAREN
   { Unary (Not,t) }
   | t1 = prd; IMP; t2 = prd
@@ -67,28 +92,49 @@ raw_prd:
   { Binary (Or,t1,t2) }
   | e1 = exp; EQ; e2 = exp
   { Eq (e1, e2) }
+  | e1 = exp; LEQ; e2 = exp
+  { Leq (e1, e2) }
   | es = exp_seq; COLON; e = exp
   { Mem (es,e)}
   | t = binding
-  { t }
+  { t } %prec PERIOD
 
 
-index:
-  | LPAREN; i = NATURAL; RPAREN { i }
+lhs_arg:
+  | p = prd
+  { Pred p }
+  | e1 = exp; PIPE; e2 = exp
+  { PipeArg (e1, e2) }
 lhs:
   | LSQ; FIN; LPAREN; p = prd; RPAREN; RSQ
   { ("FIN", Some (Pred p)) }
   | LSQ; str = SYMBOL; RSQ
   { (str, None) }
-  | LSQ; str = SYMBOL; idx = index; RSQ
-  { (str, Some (Index idx)) }
-  | LSQ; str = SYMBOL; p = prd; RSQ
-  { (str, Some (Pred p)) }
+  | LSQ; str = SYMBOL; LPAREN; a = lhs_arg; RPAREN; RSQ
+  { (str, Some a) }
 
 
+(* Hypothesis predicates: restricted form that avoids COMMA ambiguity
+   with exp_seq in membership. Multi-element membership (x,y: S) must
+   be parenthesized at the top level of a hypothesis. *)
+hyp_prd:
+  | e = exp
+  { Lift e }
+  | LPAREN; p = raw_prd; RPAREN
+  { p }
+  | t = binding
+  { t }
+  | NOT; LPAREN; t = prd; RPAREN
+  { Unary (Not, t) }
+  | e1 = exp; EQ; e2 = exp
+  { Eq (e1, e2) }
+  | e1 = exp; LEQ; e2 = exp
+  { Leq (e1, e2) }
+  | e = exp; COLON; e2 = exp
+  { Mem ([e], e2) }
 hyps:
   | HYP { [] }
-  | hs = hyps; COMMA; p = prd { p :: hs }
+  | hs = hyps; COMMA; p = hyp_prd { p :: hs }
 sequent:
   | LPAREN; h = hyps; TURNSTILE; p = prd; RPAREN
   { (h, p) }
