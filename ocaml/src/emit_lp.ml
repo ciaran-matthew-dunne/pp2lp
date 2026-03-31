@@ -89,7 +89,7 @@ and pp_exp_args buf = function
 (* ---- Conjunction helpers ---- *)
 
 let rec flatten_conj = function
-  | Binary (And, p1, p2) -> flatten_conj p1 @ flatten_conj p2
+  | Binary (And, p1, p2) -> flatten_conj p1 @ [p2]
   | p -> [p]
 
 let rec pp_conj_left buf = function
