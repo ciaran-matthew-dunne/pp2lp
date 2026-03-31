@@ -1,4 +1,4 @@
-.PHONY: build test test-each test-prv gen-prv clean
+.PHONY: build test test-each test-prv test-prv-each gen-prv clean
 
 PP2LP := dune exec --root ocaml -- pp2lp
 
@@ -42,6 +42,28 @@ test-prv: build
 	@mkdir -p lp/gen/prv
 	$(PP2LP) emit $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay) > lp/gen/prv/Traces.lp
 	cd lp && lambdapi check gen/prv/Traces.lp
+
+# --- Test PRV replays individually, report PASS/FAIL ---
+# Usage:
+#   make test-prv-each                 # test all PRV replays
+#   make test-prv-each FILTER=arith    # test only arith_* replays
+test-prv-each: build
+	@mkdir -p lp/gen/prv
+	@pass=0; fail=0; fails=""; \
+	for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
+	  n=$$(basename $$r .replay); \
+	  if $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null && \
+	     (cd lp && lambdapi check gen/prv/$$n.lp) >/dev/null 2>&1; then \
+	    printf "PASS %s\n" "$$n"; \
+	    pass=$$((pass+1)); \
+	  else \
+	    printf "FAIL %s\n" "$$n"; \
+	    fail=$$((fail+1)); fails="$$fails $$n"; \
+	  fi; \
+	done; \
+	echo "---"; \
+	echo "$$pass pass, $$fail fail"; \
+	if [ -n "$$fails" ]; then echo "FAIL:$$fails"; fi
 
 # --- Generate PRV traces and replays from .but files ---
 gen-prv:

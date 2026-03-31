@@ -150,12 +150,6 @@ and pp_prd buf p =
     Buffer.add_string buf " \xe2\x87\x94 "; (* ⇔ *)
     pp_prd buf p2;
     Buffer.add_char buf ')'
-  | Binary (Eq, p1, p2) ->
-    Buffer.add_char buf '(';
-    pp_prd buf p1;
-    Buffer.add_string buf " \xe2\x87\x94 "; (* ⇔ *)
-    pp_prd buf p2;
-    Buffer.add_char buf ')'
   | Eq (e1, e2) ->
     Buffer.add_char buf '(';
     pp_exp buf e1;
@@ -539,10 +533,6 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
 
 (* ---- Proof node emission ---- *)
 
-let effective_rule_name _hyps (node : proof_node) =
-  match node with
-  | Apply { rule; _ } -> rule
-
 let emit_refine_rule buf rule =
   Buffer.add_string buf "refine ";
   Buffer.add_string buf rule
@@ -554,8 +544,7 @@ let imp_antecedent = function
 
 let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0) (node : proof_node) =
   match node with
-  | Apply { rule = _; arg = node_arg; goal; children; _ } ->
-    let rule = effective_rule_name thm_hyps node in
+  | Apply { rule; arg = node_arg; goal; children; _ } ->
     let pad = String.make indent ' ' in
     let first_pad = if inline then "" else pad in
     begin match children with

@@ -2,7 +2,7 @@
 type uop =
   | Not
 and bop =
-  | Eq | Or | And | Imp | Iff
+  | Or | And | Imp | Iff
 and aop =
   | Add | Sub
 and binder =
@@ -27,9 +27,7 @@ and exp =
   | Union of exp * exp
 
 type arg =
-  | Index of int
   | Pred of prd
-  | Exp of string
   | PipeArg of exp * exp
 and sequent =
   prd list * prd

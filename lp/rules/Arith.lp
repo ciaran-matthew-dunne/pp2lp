@@ -38,7 +38,7 @@ end;
 // ---- AR5/AR6: Antisymmetry decomposition ----
 
 // AR5: a ≤ 0 in H; H ⊢ −a ≪ 0 ⇒ (a=0 ⇒ R) → H ⊢ −a ≤ 0 ⇒ R
-symbol AR5 [a : τ ι] [R : Prop]
+opaque symbol AR5 [a : τ ι] [R : Prop]
   : π (a ≤ 𝟎)
   → π (((— a) ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((— a ≤ 𝟎) ⇒ R) ≔
@@ -47,7 +47,7 @@ begin
 end;
 
 // AR6: −a ≤ 0 in H; H ⊢ a ≪ 0 ⇒ (a=0 ⇒ R) → H ⊢ a ≤ 0 ⇒ R
-symbol AR6 [a : τ ι] [R : Prop]
+opaque symbol AR6 [a : τ ι] [R : Prop]
   : π ((— a) ≤ 𝟎)
   → π ((a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
@@ -59,7 +59,7 @@ end;
 
 // AR7: c+b ≤ 0 in H; a+c=0; H ⊢ b=a ⇒ (a−b ≪ 0 ⇒ R) → H ⊢ a−b ≤ 0 ⇒ R
 
-symbol AR7 [a b c : τ ι] [R : Prop]
+opaque symbol AR7 [a b c : τ ι] [R : Prop]
   : π ((c + b) ≤ 𝟎)
   → π ((a + c) = 𝟎)
   → π ((b = a) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
@@ -69,7 +69,7 @@ begin
 end;
 
 // AR8: a−b ≤ 0 in H; a+c=0; H ⊢ b=a ⇒ (c+b ≪ 0 ⇒ R) → H ⊢ c+b ≤ 0 ⇒ R
-symbol AR8 [a b c : τ ι] [R : Prop]
+opaque symbol AR8 [a b c : τ ι] [R : Prop]
   : π ((a - b) ≤ 𝟎)
   → π ((a + c) = 𝟎)
   → π ((b = a) ⇒ (((c + b) ≪ 𝟎) ⇒ R))
@@ -115,7 +115,7 @@ begin
 end;
 
 // AR13: solver(1−a) = b; b ≤ 0 → ¬(a ≪ 0)
-symbol AR13 [a b : τ ι]
+opaque symbol AR13 [a b : τ ι]
   : π ((𝟏 - a) = b)
   → π (b ≤ 𝟎)
   → π (¬ (a ≪ 𝟎)) ≔
