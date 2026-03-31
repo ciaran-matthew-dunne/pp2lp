@@ -398,10 +398,11 @@ let select_variant rule goal children flat =
     in
     if count_vars goal >= 3 then "NRM8_13_3" else "NRM8_13"
   (* ALL7/XST8: 2-var compound binding → _2 variant *)
-  | "ALL7", _ ->
+  | ("ALL7" | "ALL7_1"), _ ->
     begin match goal with
     | Binary (Imp, Bind (_, xs, _), _)
-      when List.length xs >= 2 && flat = 0 -> "ALL7_2"
+      when List.length xs >= 2 && flat = 0 ->
+      if rule = "ALL7_1" then "ALL7_1_2" else "ALL7_2"
     | _ -> rule
     end
   | "XST8", _ ->
@@ -627,14 +628,20 @@ let emit_and5_args buf goal node ~primed =
 let emit_quant_r_args buf rule node =
   match node with
   | Apply { children; _ } ->
-    let r_opt = match children with
-      | [_; Apply { goal = Binary (Imp, Bind ((Forall0|Forall1|Forall2), xs, r_body), _); _ }] ->
+    let extract_r child_goal =
+      match child_goal with
+      | Binary (Imp, Bind ((Forall0|Forall1|Forall2), xs, r_body), _) ->
         if rule = "ALL7_2" || rule = "XST8_2" then
           Some (xs, [], r_body)
         else
           let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
           let inner_vars = (match xs with _ :: rest -> rest | [] -> []) in
           Some (lambda_vars, inner_vars, r_body)
+      | _ -> None
+    in
+    let r_opt = match children with
+      | [_; Apply { goal; _ }] -> extract_r goal
+      | [Apply { goal; _ }] -> extract_r goal
       | _ -> None
     in
     begin match r_opt with
@@ -827,8 +834,8 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       (* ALL7/XST8 with only primed child — admit second branch *)
       Buffer.add_string buf first_pad;
       Buffer.add_string buf "refine ";
-      Buffer.add_string buf rule;
-      emit_rule_args buf ctx rule node;
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node;
       Buffer.add_string buf " _ _\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ ";
