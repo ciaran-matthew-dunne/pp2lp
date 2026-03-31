@@ -375,7 +375,8 @@ let rec subst_prd x y = function
 
 let is_hoas_identity = function
   | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
-  | "XST1" | "XST2" | "XST3" | "XST4" -> true
+  | "XST1" | "XST2" | "XST3" | "XST4"
+  | "AR3_F" -> true
   | _ -> false
 
 let binding_vars = function
