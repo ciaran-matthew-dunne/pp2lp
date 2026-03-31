@@ -67,13 +67,13 @@ end;
 
 // ---- AXM8: Conjunction membership ----
 
-// AXM8: P ∧ ··· contains R → H ⊢ P ∧ ··· ⇒ R
-opaque symbol AXM8 [r : Prop] (c : 𝕃 o) (i : ℕ)
-  : π ((nth ⊤ c i) ⇒ r)
-  → π ((conj c) ⇒ r) ≔
+// AXM8: extract a conjunct from the antecedent.
+// The caller supplies an extraction function (chain of ∧ₑ₁/∧ₑ₂).
+opaque symbol AXM8 [C r : Prop]
+  : (π C → π r)
+  → π (C ⇒ r) ≔
 begin
-  assume r c i h1 h2;
-  refine h1 (conj_nth c i h2)
+  assume C r f hc; refine f hc
 end;
 
 // ---- AXM9: Universal instantiation from hypothesis ----
@@ -172,14 +172,15 @@ begin
   { assume h0 h1 hnq; refine ⊥ₑ (hnq hq) }
 end;
 
-// AXM8_1: leaf, computes (conj c ⇒ nth ⊤ c i) = ⊤.
-opaque symbol AXM8_1 [r : Prop] (c : 𝕃 o) (i : ℕ)
-  : π ((conj c ⇒ nth ⊤ c i) = ⊤) ≔
+// AXM8_1: leaf, computes (C ⇒ r) = ⊤ when r is a conjunct of C.
+opaque symbol AXM8_1 [C r : Prop]
+  : (π C → π r)
+  → π ((C ⇒ r) = ⊤) ≔
 begin
-  assume r c i;
+  assume C r f;
   refine propExt _ _ _ _
   { assume h0; refine ⊤ᵢ }
-  { assume h0 hc; refine conj_nth c i hc }
+  { assume h0 hc; refine f hc }
 end;
 
 // AXM9_1: leaf, computes (P(e) ⇒ Q) = ⊤ when ∀x.¬(⊤∧P(x)) is known.

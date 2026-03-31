@@ -94,16 +94,18 @@ let rec flatten_conj = function
   | Binary (And, p1, p2) -> flatten_conj p1 @ flatten_conj p2
   | p -> [p]
 
-(* Emit a list of conjuncts right-associatively: a ∧ (b ∧ (c ∧ d)) *)
-let rec pp_conj_right buf = function
-  | [p] -> pp_prd buf p
-  | p :: rest ->
-    Buffer.add_char buf '(';
-    pp_prd buf p;
-    Buffer.add_string buf " \xe2\x88\xa7 "; (* ∧ *)
-    pp_conj_right buf rest;
-    Buffer.add_char buf ')'
+(* Emit a list of conjuncts left-associatively: ((a ∧ b) ∧ c) ∧ d *)
+let rec pp_conj_left buf = function
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
+  | [p] -> pp_prd buf p
+  | first :: rest ->
+    List.iter (fun _ -> Buffer.add_char buf '(') rest;
+    pp_prd buf first;
+    List.iter (fun p ->
+      Buffer.add_string buf " \xe2\x88\xa7 "; (* ∧ *)
+      pp_prd buf p;
+      Buffer.add_char buf ')'
+    ) rest
 
 (* ---- Predicate pretty-printing (shallow encoding) ---- *)
 
@@ -131,7 +133,7 @@ and pp_prd buf p =
     Buffer.add_char buf ')'
   | Binary (And, _, _) ->
     let elts = flatten_conj p in
-    pp_conj_right buf elts
+    pp_conj_left buf elts
   | Binary (Or, p1, p2) ->
     Buffer.add_char buf '(';
     pp_prd buf p1;
@@ -189,15 +191,102 @@ and pp_prd buf p =
     in
     emit_vars xs
 
-(* Emit a list of predicates as a Lambdapi list literal: (a ∷ b ∷ c ∷ □) *)
-let pp_prd_list buf prds =
-  Buffer.add_char buf '(';
-  List.iter (fun p ->
-    pp_prd buf p;
-    Buffer.add_string buf " \xe2\x88\xb7 " (* ∷ *)
-  ) prds;
-  Buffer.add_string buf "\xe2\x96\xa1"; (* □ *)
-  Buffer.add_char buf ')'
+(* ---- Left-associative conjunction helpers ----
+   For n conjuncts [c₀; c₁; ...; cₙ₋₁], left-assoc tree is:
+     ((...(c₀ ∧ c₁) ∧ c₂) ∧ ...) ∧ cₙ₋₁
+
+   Extraction of element k from proof variable var:
+     k = 0:       ∧ₑ₁ (∧ₑ₁ (... var))     — (n-1) left projections
+     k > 0, k<n-1: ∧ₑ₂ (∧ₑ₁^(n-1-k) var)  — lefts then right
+     k = n-1:     ∧ₑ₂ var                   — just right projection
+*)
+
+(* Emit a chain of n applications of ∧ₑ₁ to var *)
+let rec emit_e1_chain buf var n =
+  if n = 0 then Buffer.add_string buf var
+  else begin
+    (* \xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81 = ∧ₑ₁ *)
+    Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81 ";
+    if n > 1 then Buffer.add_char buf '(';
+    emit_e1_chain buf var (n - 1);
+    if n > 1 then Buffer.add_char buf ')'
+  end
+
+(* Emit extraction of k-th element from n-element left-assoc conjunction *)
+let emit_extract buf var n k =
+  if n = 1 then Buffer.add_string buf var
+  else
+    let d = if k = 0 then n - 1 else n - 1 - k in
+    if k > 0 then begin
+      (* \xe2\x88\xa7\xe2\x82\x91\xe2\x82\x82 = ∧ₑ₂ *)
+      Buffer.add_string buf "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x82 ";
+      if d > 0 then Buffer.add_char buf '(';
+      emit_e1_chain buf var d;
+      if d > 0 then Buffer.add_char buf ')'
+    end else
+      emit_e1_chain buf var d
+
+(* Emit a left-assoc conjunction of the given element emitters.
+   Each element emitter writes one conjunct to buf (already parenthesized). *)
+let emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
+  match elts with
+  | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
+  | [e] -> e buf
+  | first :: rest ->
+    (* \xe2\x88\xa7\xe1\xb5\xa2 = ∧ᵢ *)
+    (* n-1 ∧ᵢ applications for n elements; open n-2 wrapping parens *)
+    List.iter (fun _ -> Buffer.add_string buf "(\xe2\x88\xa7\xe1\xb5\xa2 ") rest;
+    first buf;
+    List.iter (fun e ->
+      Buffer.add_char buf ' ';
+      e buf;
+      Buffer.add_char buf ')'
+    ) rest
+
+(* Emit AND5 forward function: remove element j, apply modus ponens,
+   append result at end.  Matches PP semantics: rem_nth c j ++ [b]. *)
+let emit_and5_fwd buf var n i j =
+  (* Build element list: skip j, append modus ponens result *)
+  let elts = ref [] in
+  for k = n - 1 downto 0 do
+    if k <> j then
+      elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n k; Buffer.add_char buf ')') :: !elts
+  done;
+  (* Append b = (extract_j h)(extract_i h) *)
+  elts := !elts @ [(fun buf ->
+    Buffer.add_string buf "((";
+    emit_extract buf var n j;
+    Buffer.add_string buf ") (";
+    emit_extract buf var n i;
+    Buffer.add_string buf "))")];
+  emit_conj_from_elts buf !elts
+
+(* Emit AND5 backward function: given C' = rem_nth c j ++ [b],
+   reconstruct C by inserting (λ _, extract_last h) at position j. *)
+let emit_and5_bwd buf var n j =
+  (* C' has n elements: the ones from C minus j, plus b at the end.
+     We need to rebuild C's n elements. *)
+  let n' = n in (* C' has same number of elements *)
+  (* Mapping: C'[k'] corresponds to:
+     - C'[k'] = C[k] for k' < j (where k = k')
+     - C'[k'] = C[k+1] for j <= k' < n-1 (where k = k'+1)
+     - C'[n-1] = b *)
+  let elts = ref [] in
+  for k = n - 1 downto 0 do
+    if k < j then
+      (* Same position in C' *)
+      elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' k; Buffer.add_char buf ')') :: !elts
+    else if k > j then
+      (* Shifted left by 1 in C' *)
+      elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' (k - 1); Buffer.add_char buf ')') :: !elts
+    else
+      (* k = j: need A⇒B, construct as (λ _, extract_{n'-1} h) *)
+      elts := (fun buf ->
+        Buffer.add_string buf "(\xce\xbb _, "; (* λ _, *)
+        emit_extract buf var n' (n' - 1);
+        Buffer.add_char buf ')') :: !elts
+  done;
+  emit_conj_from_elts buf !elts
 
 let prd_to_string p =
   let buf = Buffer.create 256 in
@@ -375,10 +464,6 @@ let find_axm8_index (goal : prd) =
     in
     find 0 conjs
 
-(* Emit a natural number literal *)
-let emit_nat buf n =
-  Buffer.add_char buf ' ';
-  Buffer.add_string buf (string_of_int n)
 
 (* ---- Rule argument emission ---- *)
 
@@ -395,9 +480,50 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
       then String.sub rule 0 (String.length rule - 2)
       else rule
     in
-    (* Primed (_1) variants take equality proofs, not ⊤ᵢ.
-       Their single premise is always inferred via _. *)
-    if is_primed then ()
+    (* Primed (_1) variants: most need no explicit args, but
+       AXM8_1 and AND5_1 need extraction/reconstruction functions. *)
+    if is_primed then begin
+      let db = Rule_db.get () in
+      let ea = Rule_db.emit_args db base_rule in
+      match ea with
+      | Some "dynamic:axm8" ->
+        let conjs = conj_list_of_goal goal in
+        let n = List.length conjs in
+        begin match find_axm8_index goal with
+        | Some i ->
+          Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+          emit_extract buf "h" n i;
+          Buffer.add_char buf ')'
+        | None -> Buffer.add_string buf " _"
+        end
+      | Some "dynamic:and5" ->
+        let children = match node with Apply { children; _ } -> children in
+        let child_goal = match children with
+          | [Apply { goal; _ }] -> Some goal
+          | _ -> None
+        in
+        begin match child_goal with
+        | Some cg ->
+          begin match find_and5_indices goal cg with
+          | Some (i, j) ->
+            let conjs = conj_list_of_goal goal in
+            let n = List.length conjs in
+            (* Forward: remove j, append (extract_j h)(extract_i h) *)
+            Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+            emit_and5_fwd buf "h" n i j;
+            Buffer.add_char buf ')';
+            (* Backward: insert (λ _, extract_last h) at position j *)
+            Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+            emit_and5_bwd buf "h" n j;
+            Buffer.add_char buf ')'
+          | None ->
+            Buffer.add_string buf " _ _"
+          end
+        | None ->
+          Buffer.add_string buf " _ _"
+        end
+      | _ -> ()
+    end
     else
     (* Check JSON emit_args for this rule *)
     let db = Rule_db.get () in
@@ -415,12 +541,12 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
 
     | Some "dynamic:axm8" ->
       let conjs = conj_list_of_goal goal in
+      let n = List.length conjs in
       begin match find_axm8_index goal with
       | Some i ->
-        Buffer.add_char buf ' ';
-        pp_prd_list buf conjs;
-        emit_nat buf i;
-        Buffer.add_string buf " (\xce\xbb x, x)" (* λ x, x *)
+        Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+        emit_extract buf "h" n i;
+        Buffer.add_char buf ')'
       | None -> Buffer.add_string buf " _"
       end
 
@@ -467,25 +593,16 @@ let emit_rule_args buf _thm_hyps ctx eff_rule (node : proof_node) =
         begin match find_and5_indices goal cg with
         | Some (i, j) ->
           let conjs = conj_list_of_goal goal in
-          let imp_elt = List.nth conjs j in
-          let (a_prd, b_prd) = match imp_elt with
-            | Binary (Imp, a, b) -> (a, b)
-            | _ -> failwith "AND5: element at j is not an implication"
-          in
-          Buffer.add_char buf ' ';
-          pp_prd_list buf conjs;
-          Buffer.add_char buf ' ';
-          pp_prd buf a_prd;
-          Buffer.add_char buf ' ';
-          pp_prd buf b_prd;
-          emit_nat buf i;
-          emit_nat buf j;
-          Buffer.add_string buf " (eq_refl _) (eq_refl _)"
+          let n = List.length conjs in
+          (* Forward: remove j, append (extract_j h)(extract_i h) *)
+          Buffer.add_string buf " (\xce\xbb h, "; (* λ h, *)
+          emit_and5_fwd buf "h" n i j;
+          Buffer.add_char buf ')'
         | None ->
-          Buffer.add_string buf " _ _ _ _ (eq_refl _) (eq_refl _)"
+          Buffer.add_string buf " _"
         end
       | None ->
-        Buffer.add_string buf " _ _ _ _ (eq_refl _) (eq_refl _)"
+        Buffer.add_string buf " _"
       end
 
     | Some "dynamic:all7" | Some "dynamic:xst8" ->

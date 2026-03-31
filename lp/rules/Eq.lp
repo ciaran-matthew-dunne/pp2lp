@@ -128,25 +128,20 @@ end;
 
 // ---- OPR (one-point rules / substitution from equality) ----
 
-// OPR1: x not free in H,E; Q=[x:=E]P; H ⊢ Q → H ⊢ (x=E) ⇒ P
-// With HOAS: from E=F and P(F), derive P(E).
-opaque symbol OPR1 [E F : τ ι] (P : τ ι → Prop)
-  : π (E = F)
-  → π (P F)
-  → π (P E) ≔
+opaque symbol OPR1 [E x : τ ι] [P : τ ι → Prop]
+  : π (P E)
+  → π ((x = E) ⇒ P x) ≔
 begin
-  assume E F P h1 h2;
-  rewrite h1; refine h2
+  assume E x P hpe heq;
+  rewrite heq; refine hpe
 end;
 
-// OPR2: symmetric. From F=E and P(E), derive P(F).
-opaque symbol OPR2 [E F : τ ι] (P : τ ι → Prop)
-  : π (F = E)
-  → π (P E)
-  → π (P F) ≔
+opaque symbol OPR2 [E x : τ ι] [P : τ ι → Prop]
+  : π (P E)
+  → π ((E = x) ⇒ P x) ≔
 begin
-  assume E F P h1 h2;
-  rewrite h1; refine h2
+  assume E x P hpe heq;
+  rewrite left heq; refine hpe
 end;
 
 // ---- EQC (pair equality decomposition) ----
@@ -217,7 +212,8 @@ opaque symbol ECTR1 [E F : τ ι] (Q : τ ι → Prop) [P]
   → π ((E = F) ⇒ P) ≔
 begin
   assume E F Q P hnq hr heq;
-  refine ⊥ₑ (hnq (OPR1 Q heq hr))
+  have hqe : π (Q E) { rewrite heq; refine hr };
+  refine ⊥ₑ (hnq hqe)
 end;
 
 // ECTR2: ¬Q in H; [E→F]Q = R in H → H ⊢ (F=E) ⇒ P
@@ -227,7 +223,8 @@ opaque symbol ECTR2 [E F : τ ι] (Q : τ ι → Prop) [P]
   → π ((F = E) ⇒ P) ≔
 begin
   assume E F Q P hnq hr heq;
-  refine ⊥ₑ (hnq (OPR1 Q (eq_sym heq) hr))
+  have hqe : π (Q E) { rewrite left heq; refine hr };
+  refine ⊥ₑ (hnq hqe)
 end;
 
 // ECTR3: (E=F) in H; [E→F]P = R in H → H ⊢ ¬P ⇒ Q
@@ -238,7 +235,8 @@ opaque symbol ECTR3 [E F : τ ι] (P : τ ι → Prop) [Q]
   → π (¬ (P E) ⇒ Q) ≔
 begin
   assume E F P Q heq hr hnp;
-  refine ⊥ₑ (hnp (OPR1 P heq hr))
+  have hpe : π (P E) { rewrite heq; refine hr };
+  refine ⊥ₑ (hnp hpe)
 end;
 
 // ECTR4: (F=E) in H; [E→F]P = R in H → H ⊢ ¬P ⇒ Q
@@ -248,7 +246,8 @@ opaque symbol ECTR4 [E F : τ ι] (P : τ ι → Prop) [Q]
   → π (¬ (P E) ⇒ Q) ≔
 begin
   assume E F P Q heq hr hnp;
-  refine ⊥ₑ (hnp (OPR1 P (eq_sym heq) hr))
+  have hpe : π (P E) { rewrite left heq; refine hr };
+  refine ⊥ₑ (hnp hpe)
 end;
 
 // ECTR5: (E=F) in H; [E→F]P = R; ¬R in H → H ⊢ P ⇒ Q
@@ -516,7 +515,9 @@ begin
   assume E F Q P hnq hr;
   refine propExt _ _ _ _
   { assume h0; refine ⊤ᵢ }
-  { assume h0 heq; refine ⊥ₑ (hnq (OPR1 Q heq hr)) }
+  { assume h0 heq;
+    have hqe : π (Q E) { rewrite heq; refine hr };
+    refine ⊥ₑ (hnq hqe) }
 end;
 
 opaque symbol ECTR2_1 [E F : τ ι] (Q : τ ι → Prop) [P]
@@ -527,7 +528,9 @@ begin
   assume E F Q P hnq hr;
   refine propExt _ _ _ _
   { assume h0; refine ⊤ᵢ }
-  { assume h0 heq; refine ⊥ₑ (hnq (OPR1 Q (eq_sym heq) hr)) }
+  { assume h0 heq;
+    have hqe : π (Q E) { rewrite left heq; refine hr };
+    refine ⊥ₑ (hnq hqe) }
 end;
 
 opaque symbol ECTR3_1 [E F : τ ι] (P : τ ι → Prop) [Q]
@@ -538,7 +541,9 @@ begin
   assume E F P Q heq hr;
   refine propExt _ _ _ _
   { assume h0; refine ⊤ᵢ }
-  { assume h0 hnp; refine ⊥ₑ (hnp (OPR1 P heq hr)) }
+  { assume h0 hnp;
+    have hpe : π (P E) { rewrite heq; refine hr };
+    refine ⊥ₑ (hnp hpe) }
 end;
 
 opaque symbol ECTR4_1 [E F : τ ι] (P : τ ι → Prop) [Q]
@@ -549,7 +554,9 @@ begin
   assume E F P Q heq hr;
   refine propExt _ _ _ _
   { assume h0; refine ⊤ᵢ }
-  { assume h0 hnp; refine ⊥ₑ (hnp (OPR1 P (eq_sym heq) hr)) }
+  { assume h0 hnp;
+    have hpe : π (P E) { rewrite left heq; refine hr };
+    refine ⊥ₑ (hnp hpe) }
 end;
 
 opaque symbol ECTR5_1 [E F : τ ι] (P : τ ι → Prop) [Q]

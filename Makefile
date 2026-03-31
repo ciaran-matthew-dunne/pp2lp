@@ -1,16 +1,21 @@
-.PHONY: build test test-each test-prv test-prv-each gen-prv clean
+.PHONY: build unit-test test test-each test-prv test-prv-each gen-prv clean
 
 PP2LP := dune exec --root ocaml -- pp2lp
+LP_CHECK = lambdapi check --json
 
 # --- Build ---
 build:
 	cd ocaml && dune build
 
+# --- OCaml unit tests ---
+unit-test: build
+	dune exec --root ocaml -- ../ocaml/_build/default/test/test_pp2lp.exe
+
 # --- Test single trace: make test-01, make test-14, etc. ---
 test-%: build
 	@mkdir -p lp/gen
 	$(PP2LP) emit test/traces/$*.trace.replay > lp/gen/trace_$*.lp
-	cd lp && lambdapi check gen/trace_$*.lp
+	cd lp && $(LP_CHECK) gen/trace_$*.lp
 
 # --- Test all 30 traces individually, report PASS/FAIL ---
 test-each: build
@@ -19,7 +24,7 @@ test-each: build
 	for r in test/traces/*.trace.replay; do \
 	  n=$$(basename $$r .trace.replay); \
 	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp; \
-	  if (cd lp && lambdapi check gen/trace_$$n.lp) >/dev/null 2>&1; then \
+	  if (cd lp && $(LP_CHECK) gen/trace_$$n.lp) >/dev/null 2>&1; then \
 	    pass=$$((pass+1)); \
 	  else \
 	    fail=$$((fail+1)); fails="$$fails $$n"; \
@@ -32,7 +37,14 @@ test-each: build
 test: build
 	@mkdir -p lp/gen
 	$(PP2LP) emit test/traces/*.trace.replay > lp/gen/Traces.lp
-	cd lp && lambdapi check gen/Traces.lp
+	cd lp && $(LP_CHECK) gen/Traces.lp
+
+# --- Test single PRV replay: make prv-arith_ineq_001, etc. ---
+# Generates lp/gen/prv/<name>.lp for inspection with lambdapi_check/goals.
+prv-%: build
+	@mkdir -p lp/gen/prv
+	$(PP2LP) emit test/prv/gen/replay/$*.replay > lp/gen/prv/$*.lp
+	cd lp && $(LP_CHECK) gen/prv/$*.lp
 
 # --- Test PRV replays ---
 # Usage:
@@ -41,7 +53,7 @@ test: build
 test-prv: build
 	@mkdir -p lp/gen/prv
 	$(PP2LP) emit $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay) > lp/gen/prv/Traces.lp
-	cd lp && lambdapi check gen/prv/Traces.lp
+	cd lp && $(LP_CHECK) gen/prv/Traces.lp
 
 # --- Test PRV replays individually, report PASS/FAIL ---
 # Usage:
@@ -53,7 +65,7 @@ test-prv-each: build
 	for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
 	  n=$$(basename $$r .replay); \
 	  if $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null && \
-	     (cd lp && lambdapi check gen/prv/$$n.lp) >/dev/null 2>&1; then \
+	     (cd lp && $(LP_CHECK) gen/prv/$$n.lp) >/dev/null 2>&1; then \
 	    printf "PASS %s\n" "$$n"; \
 	    pass=$$((pass+1)); \
 	  else \

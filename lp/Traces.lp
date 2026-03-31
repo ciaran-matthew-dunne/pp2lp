@@ -208,10 +208,14 @@ opaque symbol {|26|} :
     (a = b) ⇒ (`∀ x : τ ι, `∀ y : τ ι,
       (x = y) ⇒ ((x = a) ⇒ (y = b)))) ≔
 begin
-  assume a b hab x y hxy hxa;
-  // Chain: y = x = a = b.
-  have hxb : π (x = b) { rewrite hxa; refine hab };
-  rewrite (eq_sym hxy); refine hxb
+  refine ALL8 _;
+  assume a b;
+  refine @OPR1 _ _ (λ z, `∀ x : τ ι, `∀ y : τ ι, (x = y) ⇒ ((x = z) ⇒ (y = b))) _;
+  // ALL4 is identity in HOAS
+  refine ALL8 _;
+  assume x y;
+  refine @OPR1 _ _ (λ z, (z = b) ⇒ (y = b)) _;
+  refine AXM7
 end;
 
 // ---- Trace 28: ¬⊤ ⇒ p ----

@@ -18,8 +18,8 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 
 ### Editing OCaml code (ocaml/src/)
 1. Edit the source file
-2. `cd ocaml && dune build` to check it compiles
-3. `cd ocaml && dune test` to run unit tests (~500 tests)
+2. `make build` to check it compiles
+3. `make unit-test` to run unit tests (118 tests)
 4. `make test-NN` on the specific trace you're targeting
 
 ### Debugging a failing trace
@@ -30,27 +30,30 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 5. Fix in `emit_lp.ml`, rebuild, re-test
 
 ### Verifying nothing is broken
-- `cd ocaml && dune test` — OCaml correctness
+- `make unit-test` — OCaml unit tests
 - `make test-each` — all 30 traces with per-trace PASS/FAIL summary
 - `make test-prv FILTER=xxx` — PRV benchmark subset
 
 ## Build & Test Commands
 
 ```bash
-cd ocaml && dune build              # build OCaml parser/emitter
-cd ocaml && dune test               # run unit tests
+make build                          # build OCaml parser/emitter
+make unit-test                      # run OCaml unit tests (118 tests)
 make test-NN                        # test single trace (e.g. make test-14)
 make test-each                      # all 30 traces, summary output
 make test                           # all traces in one file (fails on first error)
+make prv-NAME                       # single PRV test (e.g. make prv-arith_ineq_001)
 make test-prv                       # all 86 PRV replays
 make test-prv FILTER=arith          # filtered PRV subset
 make test-prv-each                  # per-file PRV PASS/FAIL summary
 make gen-prv                        # regenerate PRV traces from .but files
 ```
 
+All commands run from the **project root** (`/home/ciaran/prog/pp2lp`). Do not `cd ocaml` — the Makefile handles build directories.
+
 ## MCP Tools (lambdapi_*)
 
-Prefer these over shell commands for all Lambdapi work.
+Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a reference guide. Prefer MCP tools over shell `lambdapi` commands: they return structured output and are cheaper on tokens.
 
 - `lambdapi_check file` — type-check a file. Returns OK or first error with proof context.
 - `lambdapi_goals file line` — hypotheses + goals at a proof line. Essential for debugging.
@@ -58,6 +61,13 @@ Prefer these over shell commands for all Lambdapi work.
 - `lambdapi_query file line query` — `compute`/`type`/`print`/`search` at a line.
 - `lambdapi_symbols file` — all symbols in scope. Useful when you need a rule name.
 - `lambdapi_axioms files` — audit for unproved assumptions. Run before committing.
+
+## Token-Saving Notes
+
+- **Never read generated LP files** (`lp/gen/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
+- **PRV replay files** (`test/prv/gen/replay/`) can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
+- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/prv/name.lp` and shows the error. Then use `lambdapi_check lp/gen/prv/name.lp` and `lambdapi_goals` to inspect — don't read the generated file.
+- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~900 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
 
 ## Current Test Status
 
@@ -70,7 +80,7 @@ Prefer these over shell commands for all Lambdapi work.
 | 27 | FAIL | IMP4 continuation wraps around ∃ instead of matching it (maplet) |
 | 28–30 | PASS | TRUE/FALSE/STOP |
 
-PRV: The dominant failure pattern (~80 tests) is `?X and ?Y` unification failures — the emitter doesn't decompose multi-hypothesis contexts correctly for AND1. The 6 passing PRV tests are simple cases that avoid this pattern.
+PRV: 80 tests fail due to a mix of unimplemented INS rule (~276 occurrences), OPR1 substitution issues, and missing branching support. The conjunction associativity issue (AND3 chains) was fixed by switching to left-associative ∧ emission.
 
 ## Directory Structure
 
@@ -142,7 +152,7 @@ Dependencies: `Stdlib` → `B.lp` → `{Eq,NonFree,Subst,Proof,Interp}.lp` → `
 - **`syntax_pp.ml`** — AST types. `prd` (predicates), `exp` (expressions), `line = lhs * rhs`.
 - **`lexer.mll`** / **`parser.mly`** — Tokenise and parse PP replay lines.
 - **`proof_tree.ml`** — Builds proof tree from flat replay lines using rule arity for branching.
-- **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi. Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒).
+- **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi. Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒). Conjunctions are emitted **left-associatively** (`((a ∧ b) ∧ c)`) so AND3 chains peel conjuncts correctly, even though Stdlib's `∧` notation is right-associative. AND5/AXM8 use generated `∧ₑ₁`/`∧ₑ₂`/`∧ᵢ` lambdas instead of `conj` lists.
 - **`reconstruct.ml`** — Wires parse → tree → emit.
 
 ## PP Trace Format
@@ -177,8 +187,8 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 - **Set equality** (EQS2, EQS2_1): need `¬(eql_set E F) → ⊥` direction of set extensionality
 
 ### P0 — Unblock PRV benchmarks
-1. **Fix AND1 hypothesis reconstruction** — the emitter fails to decompose multi-hypothesis contexts, causing `?X ∧ ?Y` unification failures in ~80/86 PRV tests. This is the single biggest blocker.
-2. **Implement INS rule** — 276 occurrences in PRV replays, currently unimplemented. Takes determined instantiations Q₁…Qₙ.
+1. ~~**Fix conjunction associativity**~~ — DONE. Emitter now generates left-associative ∧, AND5/AXM8 rewritten to use extraction lambdas instead of `conj` lists.
+2. **Implement INS rule** — 276 occurrences in PRV replays, currently unimplemented. Takes determined instantiations Q₁…Qₙ. This is now the single biggest blocker.
 
 ### P1 — Fix remaining traces
 3. **Trace 26** — OPR1 substitution predicate not generated correctly inside nested ALL8 with multi-variable bindings.
