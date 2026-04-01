@@ -96,6 +96,8 @@ constant symbol eapp : τ ι → τ ι → τ ι;
 constant symbol set_image : τ ι;
 constant symbol inter : τ ι;
 constant symbol union : τ ι;
+constant symbol FIN : τ ι;
+constant symbol card : τ ι;
 
 // ---- PP normalisation quantifiers ----
 // ♢ and ♡ are both semantically ∀, distinguished in PP

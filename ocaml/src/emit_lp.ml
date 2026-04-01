@@ -815,6 +815,8 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
         Printf.eprintf "warning: AR9 missing solver arg\n";
         Buffer.add_string buf " _ trust"
       end
+    | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
+    | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
     (* Primed: emit static args if present, skip dynamic base-only handlers *)
     | _ when primed ->
       begin match ea with
@@ -832,8 +834,6 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     | Some "dynamic:axm9" -> emit_axm9_args buf ctx
     | Some "dynamic:all7" | Some "dynamic:xst8" ->
       emit_quant_r_args buf eff_rule node
-    | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
-    | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
     | Some "dynamic:ar3" -> emit_ar3_args buf node
     | Some "dynamic:ar4" -> emit_ar4_args buf ctx goal
     | Some "dynamic:ar56" -> emit_ar56_args buf

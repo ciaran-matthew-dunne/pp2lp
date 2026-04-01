@@ -71,16 +71,13 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 ## Current Test Status
 
-**Traces:** 28/30 pass. **PRV benchmarks:** 6/86 pass. **OCaml unit tests:** 118 pass.
+**Traces:** 30/30 pass. **PRV benchmarks:** 39/86 pass. **OCaml unit tests:** 118 pass.
 
 | Traces | Status | Notes |
 |--------|--------|-------|
-| 01–25 | PASS | Propositional, quantifier, equality |
-| 26 | FAIL | OPR1 substitution fails inside nested ALL8 with 2 bound vars |
-| 27 | FAIL | IMP4 continuation wraps around ∃ instead of matching it (maplet) |
-| 28–30 | PASS | TRUE/FALSE/STOP |
+| 01–30 | PASS | All traces pass |
 
-PRV: 80 tests fail due to a mix of unimplemented INS rule (~276 occurrences), OPR1 substitution issues, and missing branching support. The conjunction associativity issue (AND3 chains) was fixed by switching to left-associative ∧ emission.
+PRV: 47 tests fail. Dominated by set_product (23), range_subset (7), equality (7). Remaining failures spread across arith_ineq, set_type, set_subset, bool_eq, cardinality, negation.
 
 ## Directory Structure
 
@@ -180,19 +177,17 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
 - OCaml parser complete: parses all 86 PRV replays
 - Rule metadata centralised in `data/rules.json`
-- Automated reconstruction: 28/30 traces, 6/86 PRV
+- Automated reconstruction: 30/30 traces, 39/86 PRV
 
 ### Admitted LP rules (proved via `admit`)
 - **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
 - **Set equality** (EQS2, EQS2_1): need `¬(eql_set E F) → ⊥` direction of set extensionality
 
-### P0 — Unblock PRV benchmarks
-1. ~~**Fix conjunction associativity**~~ — DONE. Emitter now generates left-associative ∧, AND5/AXM8 rewritten to use extraction lambdas instead of `conj` lists.
-2. **Implement INS rule** — 276 occurrences in PRV replays, currently unimplemented. Takes determined instantiations Q₁…Qₙ. This is now the single biggest blocker.
-
-### P1 — Fix remaining traces
-3. **Trace 26** — OPR1 substitution predicate not generated correctly inside nested ALL8 with multi-variable bindings.
-4. **Trace 27** — IMP4 continuation incorrectly wraps around existential quantifier instead of matching it directly (nested ∃ + maplet).
+### P0 — Unblock PRV benchmarks (partially done)
+1. ~~**Fix conjunction associativity**~~ — DONE.
+2. ~~**Implement INS rule**~~ — DONE (basic support). Contributed to jump from 6 → 39 PRV passing.
+3. ~~**Fix traces 26, 27**~~ — DONE. All 30 traces now pass.
+4. **Fix remaining 47 PRV failures** — dominated by set_product (23), range_subset (7), equality (7). Need to diagnose common failure patterns.
 
 ### P2 — Prove arithmetic rules
 5. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR2–AR8.
