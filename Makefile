@@ -71,6 +71,19 @@ test-prv-each: build
 	echo "$$pass pass, $$fail fail"; \
 	if [ -n "$$fails" ]; then echo "FAIL:$$fails"; fi
 
+# --- Show error messages for failing PRV tests ---
+test-prv-errors: build
+	@mkdir -p lp/gen/prv
+	@for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
+	  n=$$(basename $$r .replay); \
+	  $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null; \
+	  out=$$(cd lp && $(LP_CHECK) gen/prv/$$n.lp 2>&1); \
+	  if ! echo "$$out" | grep -q '"status":"ok"'; then \
+	    msg=$$(echo "$$out" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(d.get('message','?').split(chr(10))[0][:120])" 2>/dev/null || echo "$$out" | head -c 120); \
+	    printf "FAIL %-25s %s\n" "$$n" "$$msg"; \
+	  fi; \
+	done
+
 # --- Test complete PRV replays (stop on first failure) ---
 # Only tests replays where REPLAY fully expanded the trace.
 # List maintained in test/prv/complete_replays.txt.
