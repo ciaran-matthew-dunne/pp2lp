@@ -71,19 +71,19 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 ## Current Test Status
 
-**Traces:** 30/30 pass. **PRV benchmarks:** 70/86 pass. **OCaml unit tests:** 118 pass.
+**Traces:** 30/30 pass. **PRV benchmarks:** 79/86 pass. **OCaml unit tests:** 118 pass.
 
 | Traces | Status | Notes |
 |--------|--------|-------|
 | 01–30 | PASS | All traces pass |
 
-PRV: 16 failures by root cause:
+PRV: 7 failures by root cause:
 
 | Root Cause | Count | Tests |
 |---|---|---|
-| AND_CONJ (top-level conjunction in element proof) | 10 | set_product_005/007/011/016/019/020/022/023/024, arith_ineq_006 |
 | Missing subproofs (ALL7 truncation, AR8) | 4 | equality_007/013/014/018 |
 | AR12 `≪`/`≤` mismatch | 2 | equality_004, negation_003 |
+| Nested ∀ + OR3 quantifier unification | 1 | arith_ineq_006 |
 
 ## Directory Structure
 
@@ -183,7 +183,7 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
 - OCaml parser complete: parses all 86 PRV replays
 - Rule metadata centralised in `data/rules.json`
-- Automated reconstruction: 30/30 traces, 70/86 PRV
+- Automated reconstruction: 30/30 traces, 79/86 PRV
 
 ### Admitted LP rules (proved via `admit`)
 - **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
