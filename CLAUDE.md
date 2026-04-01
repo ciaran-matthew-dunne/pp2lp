@@ -71,13 +71,21 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 ## Current Test Status
 
-**Traces:** 30/30 pass. **PRV benchmarks:** 39/86 pass. **OCaml unit tests:** 118 pass.
+**Traces:** 30/30 pass. **PRV benchmarks:** 43/86 pass. **OCaml unit tests:** 118 pass.
 
 | Traces | Status | Notes |
 |--------|--------|-------|
 | 01–30 | PASS | All traces pass |
 
-PRV: 47 tests fail. Dominated by set_product (23), range_subset (7), equality (7). Remaining failures spread across arith_ineq, set_type, set_subset, bool_eq, cardinality, negation.
+PRV: 43 failures by root cause:
+
+| Root Cause | Count | Notes |
+|---|---|---|
+| BOOL52/INS contradiction | 23 | OPR1 substitutes BFALSE, but BOOL52 can't match deep inside continuation |
+| AND_CONJ (primed element proof) | 10 | R lambda is top-level conjunction; AND3_1 expects conjunction inside implication |
+| Missing subproofs | 4 | equality_007/013/014/018 |
+| AR12 `≪`/`≤` mismatch | 2 | equality_004, negation_003 |
+| Other | 1 | set_type_004 (BFALSE/BTRUE in BOOL42) |
 
 ## Directory Structure
 
@@ -177,7 +185,7 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
 - OCaml parser complete: parses all 86 PRV replays
 - Rule metadata centralised in `data/rules.json`
-- Automated reconstruction: 30/30 traces, 39/86 PRV
+- Automated reconstruction: 30/30 traces, 43/86 PRV
 
 ### Admitted LP rules (proved via `admit`)
 - **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
@@ -187,7 +195,9 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 1. ~~**Fix conjunction associativity**~~ — DONE.
 2. ~~**Implement INS rule**~~ — DONE (basic support). Contributed to jump from 6 → 39 PRV passing.
 3. ~~**Fix traces 26, 27**~~ — DONE. All 30 traces now pass.
-4. **Fix remaining 47 PRV failures** — dominated by set_product (23), range_subset (7), equality (7). Need to diagnose common failure patterns.
+4. ~~**Fix OPR1_1/OPR2_1 encoding**~~ — DONE. Primed variants now embed equality in implication structure via propExt.
+5. ~~**Admit ALL7_2 base proof**~~ — DONE. NRM rules can't handle nested ♢; element proof still verified.
+6. **Fix remaining 43 PRV failures** — BOOL52/INS (23), AND_CONJ primed element proofs (10), subgoal mismatches (4), AR12 (2), other (1).
 
 ### P2 — Prove arithmetic rules
 5. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR2–AR8.
