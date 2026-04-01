@@ -422,24 +422,34 @@ begin
   { assume h0; refine EAXM92 E hall }
 end;
 
-// OPR1_1: pass-through.
-opaque symbol OPR1_1 [E F : τ ι] (P : τ ι → Prop) [S : Prop]
-  : π (E = F)
-  → π (P F = S)
-  → π (P E = S) ≔
+// OPR1_1: (x = E ⇒ P x) = (x = E ⇒ P E), then chain to S.
+opaque symbol OPR1_1 [E x : τ ι] (P : τ ι → Prop) [S : Prop]
+  : π (((x = E) ⇒ P E) = S)
+  → π (((x = E) ⇒ P x) = S) ≔
 begin
-  assume E F P S h1 h2;
-  rewrite h1; refine h2
+  assume E x P S h;
+  have eq : π (((x = E) ⇒ P x) = ((x = E) ⇒ P E))
+  { refine propExt _ _ _ _
+    { assume h1 heq; rewrite left heq; refine h1 heq }
+    { assume h1 heq; rewrite heq; refine h1 heq } };
+  rewrite eq; refine h
 end;
 
-// OPR2_1: pass-through.
-opaque symbol OPR2_1 [E F : τ ι] (P : τ ι → Prop) [S : Prop]
-  : π (F = E)
-  → π (P E = S)
-  → π (P F = S) ≔
+// OPR2_1: (E = x ⇒ P x) = (E = x ⇒ P E), then chain to S.
+opaque symbol OPR2_1 [E x : τ ι] (P : τ ι → Prop) [S : Prop]
+  : π (((E = x) ⇒ P E) = S)
+  → π (((E = x) ⇒ P x) = S) ≔
 begin
-  assume E F P S h1 h2;
-  rewrite h1; refine h2
+  assume E x P S h;
+  have eq : π (((E = x) ⇒ P x) = ((E = x) ⇒ P E))
+  { refine propExt _ _ _ _
+    { assume h1 heq;
+      have heqs : π (x = E) { symmetry; refine heq };
+      rewrite left heqs; refine h1 heq }
+    { assume h1 heq;
+      have heqs : π (x = E) { symmetry; refine heq };
+      rewrite heqs; refine h1 heq } };
+  rewrite eq; refine h
 end;
 
 // EQC1_1: pass-through. ¬((a↦b)=(c↦d))⇒P = (¬(a=c)∨¬(b=d))⇒P.
