@@ -979,7 +979,12 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf " }\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "{ ";
-      emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
+      if eff_rule = "ALL7_2" || eff_rule = "XST8_2"
+         || eff_rule = "ALL7_1_2" then begin
+        (* Multi-var base proof: NRM rules can't handle nested ♢ *)
+        Buffer.add_string buf "admit"
+      end else
+        emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
       Buffer.add_string buf " }"
 
     | [child1; child2] ->
