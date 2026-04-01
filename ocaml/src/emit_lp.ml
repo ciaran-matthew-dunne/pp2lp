@@ -636,6 +636,13 @@ let emit_and5_args buf goal node ~primed =
     Buffer.add_string buf (if primed then " _ _" else " _")
 
 (* ALL7/XST8: emit R normalisation predicate lambda *)
+(* Right-reassociate ∧: ((a∧b)∧c)∧d → a∧(b∧(c∧d))
+   Needed because OR3_1 produces right-associated conjunctions. *)
+let rec right_assoc_conj = function
+  | Binary (And, Binary (And, a, b), c) ->
+    right_assoc_conj (Binary (And, a, Binary (And, b, c)))
+  | p -> p
+
 let emit_quant_r_args buf rule node =
   match node with
   | Apply { children; _ } ->
@@ -643,11 +650,11 @@ let emit_quant_r_args buf rule node =
       match child_goal with
       | Binary (Imp, Bind ((Forall0|Forall1|Forall2), xs, r_body), _) ->
         if rule = "ALL7_2" || rule = "XST8_2" then
-          Some (xs, [], r_body)
+          Some (xs, [], right_assoc_conj r_body)
         else
           let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
           let inner_vars = (match xs with _ :: rest -> rest | [] -> []) in
-          Some (lambda_vars, inner_vars, r_body)
+          Some (lambda_vars, inner_vars, right_assoc_conj r_body)
       | _ -> None
     in
     let r_opt = match children with
