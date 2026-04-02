@@ -49,37 +49,61 @@ begin
   refine h1 (eq_sym h2)
 end;
 
-// ---- BOOL31/32: Negation (provable with ϵ BOOL) ----
+// ---- BOOL31/32: Negation (proved via bool_cases + ϵ BOOL) ----
 
 // BOOL31: H ⊢ (v=FALSE) ⇒ P → H ⊢ ¬(v=TRUE) ⇒ P
 opaque symbol BOOL31 [V : τ ι] [P : Prop]
+  (hb : π (V ϵ BOOL))
   : π ((V = BFALSE) ⇒ P)
   → π (¬ (V = BTRUE) ⇒ P) ≔
 begin
-admitted;
+  assume V P hb h1 hnt;
+  have hcases : π (V = BTRUE ∨ V = BFALSE) { refine bool_cases V hb };
+  refine ∨ₑ hcases _ _
+  { assume hvt; refine ⊥ₑ (hnt hvt) }
+  { assume hvf; refine h1 hvf }
+end;
 
 // BOOL32: H ⊢ (v=TRUE) ⇒ P → H ⊢ ¬(v=FALSE) ⇒ P
 opaque symbol BOOL32 [V : τ ι] [P : Prop]
- : π ((V = BTRUE) ⇒ P)
+  (hb : π (V ϵ BOOL))
+  : π ((V = BTRUE) ⇒ P)
   → π (¬ (V = BFALSE) ⇒ P) ≔
 begin
-admitted;
+  assume V P hb h1 hnt;
+  have hcases : π (V = BTRUE ∨ V = BFALSE) { refine bool_cases V hb };
+  refine ∨ₑ hcases _ _
+  { assume hvt; refine h1 hvt }
+  { assume hvf; refine ⊥ₑ (hnt hvf) }
+end;
 
-// ---- BOOL41/42: Negation + symmetry (provable with ϵ BOOL) ----
+// ---- BOOL41/42: Negation + symmetry (proved via bool_cases + ϵ BOOL) ----
 
 // BOOL41: H ⊢ (v=FALSE) ⇒ P → H ⊢ ¬(TRUE=v) ⇒ P
 opaque symbol BOOL41 [v : τ ι] [P : Prop]
+  (hb : π (v ϵ BOOL))
   : π ((v = BFALSE) ⇒ P)
   → π (¬ (BTRUE = v) ⇒ P) ≔
 begin
-  admitted;
+  assume v P hb h1 hnt;
+  have hcases : π (v = BTRUE ∨ v = BFALSE) { refine bool_cases v hb };
+  refine ∨ₑ hcases _ _
+  { assume hvt; refine ⊥ₑ (hnt (eq_sym hvt)) }
+  { assume hvf; refine h1 hvf }
+end;
 
 // BOOL42: H ⊢ (v=TRUE) ⇒ P → H ⊢ ¬(FALSE=v) ⇒ P
 opaque symbol BOOL42 [v : τ ι] [P : Prop]
+  (hb : π (v ϵ BOOL))
   : π ((v = BTRUE) ⇒ P)
   → π (¬ (BFALSE = v) ⇒ P) ≔
 begin
-admitted;
+  assume v P hb h1 hnt;
+  have hcases : π (v = BTRUE ∨ v = BFALSE) { refine bool_cases v hb };
+  refine ∨ₑ hcases _ _
+  { assume hvt; refine h1 hvt }
+  { assume hvf; refine ⊥ₑ (hnt (eq_sym hvf)) }
+end;
 // ---- BOOL51/52: Absurd boolean equality (leaf rules, arity 0) ----
 // BOOL51: H ⊢ (TRUE = FALSE) ⇒ P
 opaque symbol BOOL51 [P : Prop]

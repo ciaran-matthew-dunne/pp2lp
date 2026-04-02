@@ -1,114 +1,157 @@
-.PHONY: build unit-test test test-each test-prv test-prv-each test-prv-complete gen-prv clean
+.PHONY: build unit-test check check-% gen gen-prv errors-prv trace-% prv-% clean
 
-PP2LP := dune exec --root ocaml -- pp2lp
-LP_CHECK = lambdapi check --json
+PP2LP        := dune exec --root ocaml -- pp2lp
+LP_CHECK      = lambdapi check --json
+FORMAT_ERROR  = PP2LP_ROOT=$(CURDIR) python3 test/format_error.py
 
-# --- Build ---
+# -- Expected failures (known issues, tolerated by check) ---------------------
+XFAIL =
+
+# -- Job configuration --------------------------------------------------------
+# Add new replay jobs by defining REPLAYS_<name>, GENDIR_<name>, EXT_<name>
+REPLAYS_og  = test/traces/*.trace.replay
+GENDIR_og   = lp/gen
+EXT_og      = .trace.replay
+
+# PRV categories (auto-derived from test/prv/gen/replay/ filenames)
+PRV_CATS = arith_ineq bool_eq cardinality equality general negation \
+           range_eq range_subset set_product set_subset set_type
+
+$(foreach c,$(PRV_CATS),\
+  $(eval REPLAYS_prv-$(c) = test/prv/gen/replay/$(c)_*.replay)\
+  $(eval GENDIR_prv-$(c)  = lp/gen/prv)\
+  $(eval EXT_prv-$(c)     = .replay))
+
+# prv = all PRV categories combined
+REPLAYS_prv = test/prv/gen/replay/*.replay
+GENDIR_prv  = lp/gen/prv
+EXT_prv     = .replay
+
+PRV_JOBS = $(addprefix prv-,$(PRV_CATS))
+JOBS = og $(PRV_JOBS)
+
+# -- Full pipeline -------------------------------------------------------------
+# make check                    - build + all jobs (og + all prv categories)
+# make check JOB=prv            - all PRV categories
+# make check JOB=prv-equality   - one PRV category
+# make check JOB=og             - 30 original traces only
+JOB ?= all
+
+ifeq ($(JOB),all)
+  CHECK_JOBS = $(JOBS)
+else ifeq ($(JOB),prv)
+  CHECK_JOBS = $(PRV_JOBS)
+else
+  CHECK_JOBS = $(JOB)
+endif
+
+check: build
+	@T0=$$(date +%s); \
+	for j in $(CHECK_JOBS); do \
+	  $(MAKE) -s --no-print-directory check-$$j || exit 1; \
+	  echo ""; \
+	done; \
+	echo "total: $$(( $$(date +%s) - T0 ))s"
+
+# -- Generic job checker (pattern rule) ----------------------------------------
+check-%: build
+	@echo "=== $* ==="; \
+	t=$$(date +%s); \
+	ext="$(EXT_$*)"; \
+	mkdir -p "$(GENDIR_$*)"; \
+	pass=0; fail=0; xfail=0; \
+	lp_tmp=$$(mktemp); \
+	trap "rm -f $$lp_tmp" EXIT; \
+	for r in $(REPLAYS_$*); do \
+	  n=$$(basename "$$r" "$$ext"); \
+	  outfile="$(GENDIR_$*)/$$n.lp"; \
+	  emit_warn=$$({ $(PP2LP) emit "$$r" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	  (cd lp && $(LP_CHECK) "$${outfile#lp/}") 2>"$$lp_tmp"; \
+	  if grep -q '"status":"ok"' "$$lp_tmp"; then \
+	    pass=$$((pass+1)); \
+	  else \
+	    is_xfail=0; \
+	    for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
+	    if [ $$is_xfail -eq 1 ]; then \
+	      xfail=$$((xfail+1)); \
+	    else \
+	      fail=$$((fail+1)); \
+	      echo "FAIL $$n"; \
+	      $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp" || echo "  (no details)"; \
+	      echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; \
+	      exit 1; \
+	    fi; \
+	  fi; \
+	done; \
+	msg="$$pass passed, $$fail failed"; \
+	[ $$xfail -gt 0 ] && msg="$$msg, $$xfail xfail"; \
+	echo "$$msg ($$(( $$(date +%s) - t ))s)"
+
+# -- Build ---------------------------------------------------------------------
 build:
-	cd ocaml && dune build
+	@cd ocaml && dune build
 
-# --- OCaml unit tests ---
 unit-test: build
 	dune exec --root ocaml -- ../ocaml/_build/default/test/test_pp2lp.exe
 
-# --- Test single trace: make test-01, make test-14, etc. ---
-test-%: build
-	@mkdir -p lp/gen
-	$(PP2LP) emit test/traces/$*.trace.replay > lp/gen/trace_$*.lp
-	cd lp && $(LP_CHECK) gen/trace_$*.lp
+# -- Generation ----------------------------------------------------------------
+gen: gen-prv
 
-# --- Test all 30 traces (stop on first failure) ---
-test-each: build
-	@mkdir -p lp/gen
-	@pass=0; \
-	for r in test/traces/*.trace.replay; do \
-	  n=$$(basename $$r .trace.replay); \
-	  $(PP2LP) emit $$r > lp/gen/trace_$$n.lp 2>/dev/null; \
-	  if (cd lp && $(LP_CHECK) gen/trace_$$n.lp) >/dev/null 2>&1; then \
-	    pass=$$((pass+1)); \
-	  else \
-	    echo "FAIL trace $$n ($$pass passed before failure)"; \
-	    echo "  Debug: make test-$$n"; \
-	    exit 1; \
-	  fi; \
-	done; \
-	echo "$$pass pass, 0 fail"
-
-# --- Test all traces in one file ---
-test: build
-	@mkdir -p lp/gen
-	$(PP2LP) emit test/traces/*.trace.replay > lp/gen/Traces.lp
-	cd lp && $(LP_CHECK) gen/Traces.lp
-
-# --- Test single PRV replay: make prv-arith_ineq_001, etc. ---
-prv-%: build
-	@mkdir -p lp/gen/prv
-	$(PP2LP) emit test/prv/gen/replay/$*.replay > lp/gen/prv/$*.lp
-	cd lp && $(LP_CHECK) gen/prv/$*.lp
-
-# --- Test PRV replays (all, summary) ---
-test-prv: build
-	@mkdir -p lp/gen/prv
-	$(PP2LP) emit $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay) > lp/gen/prv/Traces.lp
-	cd lp && $(LP_CHECK) gen/prv/Traces.lp
-
-# --- Test PRV replays individually, report PASS/FAIL ---
-test-prv-each: build
-	@mkdir -p lp/gen/prv
-	@pass=0; fail=0; fails=""; \
-	for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
-	  n=$$(basename $$r .replay); \
-	  if $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null && \
-	     (cd lp && $(LP_CHECK) gen/prv/$$n.lp) >/dev/null 2>&1; then \
-	    printf "PASS %s\n" "$$n"; \
-	    pass=$$((pass+1)); \
-	  else \
-	    printf "FAIL %s\n" "$$n"; \
-	    fail=$$((fail+1)); fails="$$fails $$n"; \
-	  fi; \
-	done; \
-	echo "---"; \
-	echo "$$pass pass, $$fail fail"; \
-	if [ -n "$$fails" ]; then echo "FAIL:$$fails"; fi
-
-# --- Show error messages for failing PRV tests ---
-test-prv-errors: build
-	@mkdir -p lp/gen/prv
-	@for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
-	  n=$$(basename $$r .replay); \
-	  $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null; \
-	  out=$$(cd lp && $(LP_CHECK) gen/prv/$$n.lp 2>&1); \
-	  if ! echo "$$out" | grep -q '"status":"ok"'; then \
-	    msg=$$(echo "$$out" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(d.get('message','?').split(chr(10))[0][:120])" 2>/dev/null || echo "$$out" | head -c 120); \
-	    printf "FAIL %-25s %s\n" "$$n" "$$msg"; \
-	  fi; \
-	done
-
-# --- Test complete PRV replays (stop on first failure) ---
-# Only tests replays where REPLAY fully expanded the trace.
-# List maintained in test/prv/complete_replays.txt.
-PRV_COMPLETE := $(shell grep -v '^\#' test/prv/complete_replays.txt 2>/dev/null | sed '/^$$/d')
-test-prv-complete: build
-	@mkdir -p lp/gen/prv
-	@pass=0; \
-	for n in $(PRV_COMPLETE); do \
-	  r=test/prv/gen/replay/$$n.replay; \
-	  if $(PP2LP) emit $$r > lp/gen/prv/$$n.lp 2>/dev/null && \
-	     (cd lp && $(LP_CHECK) gen/prv/$$n.lp) >/dev/null 2>&1; then \
-	    pass=$$((pass+1)); \
-	  else \
-	    echo "FAIL $$n ($$pass passed before failure)"; \
-	    echo "  Debug: make prv-$$n"; \
-	    exit 1; \
-	  fi; \
-	done; \
-	echo "$$pass pass, 0 fail (of $$(echo $(PRV_COMPLETE) | wc -w) complete replays)"
-
-# --- Generate PRV traces and replays from .but files ---
 gen-prv:
 	python3 test/gen_traces.py test/prv
 
-# --- Clean ---
+# -- Individual tests ----------------------------------------------------------
+trace-%: build
+	@mkdir -p lp/gen
+	@emit_warn=$$({ $(PP2LP) emit test/traces/$*.trace.replay > lp/gen/trace_$*.lp; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	lp_tmp=$$(mktemp); \
+	trap "rm -f $$lp_tmp" EXIT; \
+	(cd lp && $(LP_CHECK) gen/trace_$*.lp) 2>"$$lp_tmp"; \
+	if grep -q '"status":"ok"' "$$lp_tmp"; then \
+	  echo "OK trace_$*"; \
+	else \
+	  echo "FAIL trace_$*"; \
+	  $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp"; \
+	  exit 1; \
+	fi
+
+prv-%: build
+	@mkdir -p lp/gen/prv
+	@emit_warn=$$({ $(PP2LP) emit test/prv/gen/replay/$*.replay > lp/gen/prv/$*.lp; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	lp_tmp=$$(mktemp); \
+	trap "rm -f $$lp_tmp" EXIT; \
+	(cd lp && $(LP_CHECK) gen/prv/$*.lp) 2>"$$lp_tmp"; \
+	if grep -q '"status":"ok"' "$$lp_tmp"; then \
+	  echo "OK $*"; \
+	else \
+	  echo "FAIL $*"; \
+	  $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp"; \
+	  exit 1; \
+	fi
+
+# -- Diagnostics ---------------------------------------------------------------
+# Show ALL failing PRV tests (doesn't stop on first failure)
+errors-prv: build
+	@mkdir -p lp/gen/prv; \
+	pass=0; fail=0; \
+	lp_tmp=$$(mktemp); \
+	trap "rm -f $$lp_tmp" EXIT; \
+	for r in $(if $(FILTER),$(wildcard test/prv/gen/replay/$(FILTER)*.replay),test/prv/gen/replay/*.replay); do \
+	  n=$$(basename $$r .replay); \
+	  emit_warn=$$({ $(PP2LP) emit $$r > lp/gen/prv/$$n.lp; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	  (cd lp && $(LP_CHECK) gen/prv/$$n.lp) 2>"$$lp_tmp"; \
+	  if grep -q '"status":"ok"' "$$lp_tmp"; then \
+	    pass=$$((pass+1)); \
+	  else \
+	    fail=$$((fail+1)); \
+	    echo "FAIL $$n"; \
+	    $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp" || echo "  (no details)"; \
+	    echo ""; \
+	  fi; \
+	done; \
+	echo "$$pass passed, $$fail failed"
+
+# -- Misc ----------------------------------------------------------------------
 clean:
 	cd ocaml && dune clean
 	rm -rf lp/gen

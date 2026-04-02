@@ -436,7 +436,7 @@ let select_variant rule goal children flat =
     | _ -> rule
     end
   (* NRM14/NRM15/NRM19: 2-var compound binding → _2 variant *)
-  | ("NRM14" | "NRM15" | "NRM19"), _ ->
+  | ("NRM5" | "NRM7" | "NRM13" | "NRM14" | "NRM15" | "NRM19"), _ ->
     begin match goal with
     | Binary (Imp, Bind (_, xs, _), _)
       when List.length xs >= 2 -> rule ^ "_2"
@@ -460,6 +460,20 @@ let introduce buf pad ctx rule goal flat =
   (* IMP4: introduce antecedent as hypothesis *)
   let ctx =
     if rule = "IMP4" || rule = "IMP4_1" then
+      match goal with
+      | Binary (Imp, p, _) ->
+        let (name, ctx') = fresh_hyp ctx p in
+        Buffer.add_string buf ";\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "assume ";
+        Buffer.add_string buf name;
+        ctx'
+      | _ -> ctx
+    else ctx
+  in
+  (* AR12: introduce ≤ hypothesis (AR12 converts ≪⇒P to ≤→P) *)
+  let ctx =
+    if rule = "AR12" || rule = "AR12_1" then
       match goal with
       | Binary (Imp, p, _) ->
         let (name, ctx') = fresh_hyp ctx p in
@@ -734,9 +748,29 @@ let emit_ar4_args buf ctx _goal =
 let emit_ar56_args buf =
   Buffer.add_string buf " trust"
 
-(* AR7/AR8: two arithmetic premises *)
-let emit_ar78_args buf =
-  Buffer.add_string buf " trust trust"
+(* AR7/AR8: explicit parameter + two trusted arithmetic premises.
+   AR7 takes explicit c (unused in child, provide 𝟎).
+   AR8 takes explicit a (appears in child equality, extract from child). *)
+let emit_ar78_args buf base (node : proof_node) =
+  match base with
+  | "AR8" ->
+    (* Extract a from child's leading equality: (b = a) ⇒ ... *)
+    let a_exp = match node with
+      | Apply { children = [Apply { goal = Binary (Imp, Eq (_, e2), _); _ }]; _ } ->
+        Some e2
+      | _ -> None
+    in
+    begin match a_exp with
+    | Some e ->
+      Buffer.add_string buf " (";
+      pp_exp buf e;
+      Buffer.add_string buf ") trust trust"
+    | None ->
+      Printf.eprintf "warning: AR8 could not extract a from child equality\n";
+      Buffer.add_string buf " _ trust trust"
+    end
+  | _ -> (* AR7: c is not constrained by child, provide 𝟎 *)
+    Buffer.add_string buf " \xf0\x9d\x9f\x8e trust trust" (* 𝟎 *)
 
 (* NRM19: find witness and hypothesis for ♡-body instantiation *)
 let emit_nrm19_args buf ctx goal =
@@ -844,7 +878,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     | Some "dynamic:ar3" -> emit_ar3_args buf node
     | Some "dynamic:ar4" -> emit_ar4_args buf ctx goal
     | Some "dynamic:ar56" -> emit_ar56_args buf
-    | Some "dynamic:ar78" -> emit_ar78_args buf
+    | Some "dynamic:ar78" -> emit_ar78_args buf base node
     | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
     (* Static args from JSON *)
     | Some args ->
@@ -885,7 +919,7 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf first_pad;
       Buffer.add_string buf "refine ";
       Buffer.add_string buf eff_rule;
-      Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2 _;\n"; (* ⊤ᵢ _ *)
+      Buffer.add_string buf " _;\n";
       emit_node buf thm_hyps ctx indent grandchild
 
     | [_child] when Proof_tree.is_branching_quantifier rule ->
@@ -917,9 +951,11 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_node buf thm_hyps ctx indent child
 
     | [_child] when rule = "INS" ->
-      (* INS contradiction case: find ¬P hypothesis and matching P,
-         emit refine hN hK (modus ponens on the contradiction) *)
-      let resolved = match ctx.entries with
+      (* INS contradiction: derive ⊥ from context hypotheses.
+         Strategy 1: simple ¬P + P pair.
+         Strategy 2: ♡-hyp (∀ xs, ¬(C₁∧...∧Cₙ)) with conjuncts in context. *)
+      let simple_resolve () =
+        match ctx.entries with
         | (neg_name, Unary (Not, p)) :: _ ->
           begin match find_hyp ctx p with
           | Some pos_name -> Some (neg_name, pos_name)
@@ -932,7 +968,106 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
           end
         | _ -> None
       in
-      begin match resolved with
+      (* Find ♡-hyp: scan entries from most recent, collecting conjuncts
+         until we hit a Bind(Forall2, vars, Unary(Not, conj)) entry
+         whose conjunction arity matches the conjunct count. *)
+      let heart_resolve () =
+        let rec count_bind_vars = function
+          | Bind (Forall2, xs, inner) ->
+            List.length xs + count_bind_vars inner
+          | _ -> 0
+        in
+        let rec extract_neg_body = function
+          | Bind (Forall2, _, inner) -> extract_neg_body inner
+          | Unary (Not, body) -> Some body
+          | _ -> None
+        in
+        let rec flatten_conj_leaves = function
+          | Binary (And, l, r) -> flatten_conj_leaves l @ flatten_conj_leaves r
+          | p -> [p]
+        in
+        (* Check that each conjunct hypothesis matches the corresponding
+           conjunction leaf at the top-level constructor (Unary/Leq/Mem/Eq).
+           This avoids emitting wrong terms when AR3 has normalized ¬(E≤0)
+           to (F≤0), changing the shape. *)
+        (* Compare structure ignoring quantifier-bound variable names.
+           Bound variables from ♡/∀ always contain '$' in their name. *)
+        let skeleton _bvars =
+          let is_bound v = String.contains v '$' in
+          let rec exp_skel = function
+            | Var v when is_bound v -> Var "_"
+            | Var v -> Var v
+            | Nat n -> Nat n
+            | App (f, args) -> App (f, List.map exp_skel args)
+            | AOp (op, e1, e2) -> AOp (op, exp_skel e1, exp_skel e2)
+            | Neg e -> Neg (exp_skel e)
+            | SetImage (e1, e2) -> SetImage (exp_skel e1, exp_skel e2)
+            | Inter (e1, e2) -> Inter (exp_skel e1, exp_skel e2)
+            | Union (e1, e2) -> Union (exp_skel e1, exp_skel e2)
+          in
+          let rec prd_skel = function
+            | Lift e -> Lift (exp_skel e)
+            | Unary (op, p) -> Unary (op, prd_skel p)
+            | Binary (op, p1, p2) -> Binary (op, prd_skel p1, prd_skel p2)
+            | Bind (b, _, body) -> Bind (b, ["_"], prd_skel body)
+            | Mem (es, e) -> Mem (List.map exp_skel es, exp_skel e)
+            | Eq (e1, e2) -> Eq (exp_skel e1, exp_skel e2)
+            | Leq (e1, e2) -> Leq (exp_skel e1, exp_skel e2)
+          in
+          prd_skel
+        in
+        let rec collect_bind_vars = function
+          | Bind (Forall2, xs, inner) -> xs @ collect_bind_vars inner
+          | _ -> []
+        in
+        let shapes_match bvars leaves hyp_prds =
+          let skel = skeleton bvars in
+          List.length leaves = List.length hyp_prds &&
+          List.for_all2 (fun leaf hyp ->
+            skel leaf = skel hyp
+          ) leaves hyp_prds
+        in
+        let build_term heart n_vars conjs =
+          let conj_term = match conjs with
+            | [] -> assert false
+            | first :: rest ->
+              List.fold_left (fun acc c ->
+                Printf.sprintf "(\xe2\x88\xa7\xe1\xb5\xa2 %s %s)" acc c (* ∧ᵢ *)
+              ) first rest
+          in
+          let underscores = String.concat "" (List.init n_vars (fun _ -> " _")) in
+          Printf.sprintf "%s%s %s" heart underscores conj_term
+        in
+        (* Scan entries: collect non-♡ as conjuncts, try each ♡-hyp.
+           Skip non-matching ♡-hyps (different set, wrong arity, etc.)
+           without adding them to conjuncts. *)
+        let rec scan conjs conj_prds = function
+          | [] -> None
+          | (name, (Bind (Forall2, _, _) as p)) :: rest ->
+            let n_vars = count_bind_vars p in
+            let matches = match extract_neg_body p with
+              | Some body ->
+                let leaves = flatten_conj_leaves body in
+                (* Reject if any leaf is Leq — arithmetic expressions may
+                   differ between the emitter's AST (post AR3_F/AR9
+                   normalization) and the LP proof state (original). *)
+                let bvars = collect_bind_vars p in
+                let no_arith = List.for_all (fun l ->
+                  match l with Leq _ -> false | _ -> true
+                ) leaves in
+                no_arith && shapes_match bvars leaves conj_prds
+              | None -> false
+            in
+            if matches && conjs <> [] then
+              Some (build_term name n_vars conjs)
+            else
+              (* Skip this ♡-hyp (don't add to conjuncts) and keep looking *)
+              scan conjs conj_prds rest
+          | (name, p) :: rest -> scan (name :: conjs) (p :: conj_prds) rest
+        in
+        scan [] [] ctx.entries
+      in
+      begin match simple_resolve () with
       | Some (neg_name, pos_name) ->
         Buffer.add_string buf first_pad;
         Buffer.add_string buf "refine ";
@@ -940,9 +1075,16 @@ let rec emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
         Buffer.add_char buf ' ';
         Buffer.add_string buf pos_name
       | None ->
-        Printf.eprintf "warning: INS could not resolve contradiction\n";
-        Buffer.add_string buf first_pad;
-        Buffer.add_string buf "admit"
+        begin match heart_resolve () with
+        | Some term ->
+          Buffer.add_string buf first_pad;
+          Buffer.add_string buf "refine ";
+          Buffer.add_string buf term
+        | None ->
+          Printf.eprintf "warning: INS could not resolve contradiction\n";
+          Buffer.add_string buf first_pad;
+          Buffer.add_string buf "admit"
+        end
       end
 
     | [child] ->

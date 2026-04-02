@@ -17,7 +17,7 @@ opaque symbol AR2 [a b : τ ι] [R : Prop]
   : π (¬ (a ≤ b))
   → π ((a ≤ b) ⇒ R) ≔
 begin
-  admit
+  assume a b R hn h; refine ⊥ₑ (hn h)
 end;
 
 // AR3: ¬(a ≤ 0) ⇒ R → (b ≤ 0) ⇒ R where b = 1-a (solver-simplified)
@@ -41,16 +41,16 @@ end;
 // ---- AR5/AR6: Antisymmetry decomposition ----
 
 opaque symbol AR5 [a : τ ι] [R : Prop]
-  : π (a ≪ 𝟎)
-  → π (a = 𝟎 ⇒ ((— a ≤ 𝟎) ⇒ R))
+  : π (a ≤ 𝟎)
+  → π ((— a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((— a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
 opaque symbol AR6 [a : τ ι] [R : Prop]
-  : π ((— a) ≪ 𝟎)
-  → π ((a = 𝟎) ⇒ ((a ≤ 𝟎) ⇒ R))
+  : π ((— a) ≤ 𝟎)
+  → π ((a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
@@ -58,19 +58,19 @@ end;
 
 // ---- AR7/AR8: Antisymmetry with offset ----
 
-opaque symbol AR7 [a b c : τ ι] [R : Prop]
-  : π ((c + b) ≪ 𝟎)
+opaque symbol AR7 [a b : τ ι] (c : τ ι) [R : Prop]
+  : π ((c + b) ≤ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((a = b) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
+  → π ((b = a) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
   → π (((a - b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-opaque symbol AR8 [a b c : τ ι] [R : Prop]
-  : π ((a - b) ≪ 𝟎)
+opaque symbol AR8 (a : τ ι) [b c : τ ι] [R : Prop]
+  : π ((a - b) ≤ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
+  → π ((b = a) ⇒ (((c + b) ≪ 𝟎) ⇒ R))
   → π (((c + b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit
@@ -81,7 +81,9 @@ opaque symbol AR9 [E : τ ι] (F : τ ι) [R : Prop]
   → π ((F ≤ 𝟎) ⇒ R)
   → π ((E ≤ 𝟎) ⇒ R) ≔
 begin
-  admit
+  assume E F R heq hf h;
+  have h2 : π (F ≤ 𝟎) { rewrite left heq; refine h };
+  refine hf h2
 end;
 
 opaque symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop] [S : Prop]

@@ -194,8 +194,7 @@ opaque symbol EQS2 [E F : τ ι] [R]
   → π (¬ eql_set E F ⇒ R) ≔
 begin
   assume E F R h1 h2;
-  refine h1 (⊥ₑ _);
-  admit
+  refine h1 (λ heq, ⊥ₑ (h2 (∧ₑ₁ (set_ext E F) heq)))
 end;
 
 // ---- ECTR (contradiction due to equalities) ----
@@ -504,16 +503,18 @@ begin
   rewrite eq; refine h
 end;
 
-// EQS2_1: pass-through.
-// Note: EQS2 uses admit (see base rule), so this primed variant
-// inherits that limitation.
+// EQS2_1: structural variant of EQS2.
+// Mirrors EQS2: ¬(E=F)⇒R ↔ ¬(eql_set E F)⇒R via set_ext.
 opaque symbol EQS2_1 [E F : τ ι] [R S : Prop]
-  : π ((⊥ ⇒ R) = S)
+  : π ((¬ (E = F) ⇒ R) = S)
   → π ((¬ (`∀ x : τ ι, (x ϵ E) ⇔ (x ϵ F)) ⇒ R) = S) ≔
 begin
   assume E F R S h;
-  // Same issue as EQS2: ¬eql_set is not necessarily ⊥.
-  admit
+  have eq : π ((¬ (`∀ x : τ ι, (x ϵ E) ⇔ (x ϵ F)) ⇒ R) = (¬ (E = F) ⇒ R))
+    { refine propExt _ _ _ _
+      { assume h1 h2; refine h1 (λ heqs, ⊥ₑ (h2 (∧ₑ₂ (set_ext E F) heqs))) }
+      { assume h1 h2; refine h1 (λ heq, ⊥ₑ (h2 (∧ₑ₁ (set_ext E F) heq))) } };
+  rewrite eq; refine h
 end;
 
 // ECTR1_1–ECTR6_1: all leaf (schema 0).

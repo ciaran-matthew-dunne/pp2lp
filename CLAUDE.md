@@ -20,33 +20,33 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 1. Edit the source file
 2. `make build` to check it compiles
 3. `make unit-test` to run unit tests (118 tests)
-4. `make test-NN` on the specific trace you're targeting
+4. `make check JOB=og` to verify traces still pass
 
 ### Debugging a failing trace
-1. `make test-NN` to reproduce (generates `lp/gen/trace_NN.lp`)
-2. `lambdapi_check lp/gen/trace_NN.lp` for the error
-3. `lambdapi_goals lp/gen/trace_NN.lp LINE` to see proof state at failure
-4. Compare with the hand-written version in `lp/Traces.lp`
-5. Fix in `emit_lp.ml`, rebuild, re-test
+1. `make check` output shows file:line:col + full error on failure
+2. `lambdapi_goals FILE LINE` to see proof state at failure
+3. Compare with the hand-written version in `lp/Traces.lp`
+4. Fix in `emit_lp.ml`, rebuild, re-test
 
 ### Verifying nothing is broken
-- `make unit-test` — OCaml unit tests
-- `make test-each` — all 30 traces with per-trace PASS/FAIL summary
-- `make test-prv FILTER=xxx` — PRV benchmark subset
+- `make check` — build + all jobs (og traces + PRV), halts on first **unexpected** failure. Known failures listed in `XFAIL` (Makefile) are tolerated and reported as `xfail`.
+- `make unit-test` — OCaml unit tests (standalone)
+- **Always use `make check` for the tight feedback loop.** Never use `make errors-prv` during development — it runs all tests without fast-fail and is slow. Reserve it for periodic audits only.
 
 ## Build & Test Commands
 
 ```bash
+make check                          # build + all jobs (og + all prv categories)
+make check JOB=og                   # build + 30 original traces only
+make check JOB=prv                  # build + all 86 PRV replays
+make check JOB=prv-equality         # build + one PRV category only
 make build                          # build OCaml parser/emitter
 make unit-test                      # run OCaml unit tests (118 tests)
-make test-NN                        # test single trace (e.g. make test-14)
-make test-each                      # all 30 traces, summary output
-make test                           # all traces in one file (fails on first error)
+make trace-NN                       # single trace (e.g. make trace-14)
 make prv-NAME                       # single PRV test (e.g. make prv-arith_ineq_001)
-make test-prv                       # all 86 PRV replays
-make test-prv FILTER=arith          # filtered PRV subset
-make test-prv-each                  # per-file PRV PASS/FAIL summary
+make errors-prv                     # all PRV failures with error messages
 make gen-prv                        # regenerate PRV traces from .but files
+make clean                          # remove build artifacts and lp/gen/
 ```
 
 All commands run from the **project root** (`/home/ciaran/prog/pp2lp`). Do not `cd ocaml` — the Makefile handles build directories.
@@ -66,24 +66,14 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 - **Never read generated LP files** (`lp/gen/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
 - **PRV replay files** (`test/prv/gen/replay/`) can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/prv/name.lp` and shows the error. Then use `lambdapi_check lp/gen/prv/name.lp` and `lambdapi_goals` to inspect — don't read the generated file.
+- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/prv/name.lp` and shows the error. Or run `make check JOB=prv` which shows file:line:col + full error on first failure. Then use `lambdapi_goals` to inspect — don't read the generated file.
 - **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~900 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
 
 ## Current Test Status
 
-**Traces:** 30/30 pass. **PRV benchmarks:** 79/86 pass. **OCaml unit tests:** 118 pass.
+**Traces:** 30/30 pass. **PRV benchmarks:** 86/86 pass. **OCaml unit tests:** 118 pass.
 
-| Traces | Status | Notes |
-|--------|--------|-------|
-| 01–30 | PASS | All traces pass |
-
-PRV: 7 failures by root cause:
-
-| Root Cause | Count | Tests |
-|---|---|---|
-| Missing subproofs (ALL7 truncation, AR8) | 4 | equality_007/013/014/018 |
-| AR12 `≪`/`≤` mismatch | 2 | equality_004, negation_003 |
-| Nested ∀ + OR3 quantifier unification | 1 | arith_ineq_006 |
+Known failures are listed in the Makefile `XFAIL` variable and tolerated by `make check`.
 
 ## Directory Structure
 
@@ -175,7 +165,7 @@ Rules applied backwards (bottom-up from goal). Multi-premise rules cause branchi
 
 All Lambdapi work must be strictly definitional. Never introduce axioms (unproved `symbol` declarations used as lemmas) without explicit permission. The only unproved symbols are:
 - Domain axioms in B.lp (pair injectivity, set extensionality, arithmetic ordering)
-- Admitted PP rules (AR2–AR8, AR13, EQS2) — tracked in `data/rules.json` with `lp_status: "admitted"`
+- Admitted PP rules (AR3–AR8, AR9_1, AR13) — tracked in `data/rules.json` with `lp_status: "admitted"`
 
 ## Roadmap
 
@@ -183,29 +173,28 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
 - OCaml parser complete: parses all 86 PRV replays
 - Rule metadata centralised in `data/rules.json`
-- Automated reconstruction: 30/30 traces, 79/86 PRV
+- Automated reconstruction: 30/30 traces, 86/86 PRV (all passing)
+- NRM rules fully proved (0 admits in Nrm.lp)
+- Eq rules fully proved (0 admits in Eq.lp)
+- AR2, AR9 proved in Arith.lp
 
 ### Admitted LP rules (proved via `admit`)
-- **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
-- **Set equality** (EQS2, EQS2_1): need `¬(eql_set E F) → ⊥` direction of set extensionality
+- **Arithmetic** (AR3–AR8, AR9_1, AR13): need integer arithmetic axioms in B.lp or encode solver-confirmed facts
+- AR5/AR6 child type uses `≪` but proof needs `≤` — structural gap in rule type
+- AR3/AR4/AR9_1 side conditions encoded as `π ⊤` — no recoverable information
 
-### P0 — Unblock PRV benchmarks (partially done)
-1. ~~**Fix conjunction associativity**~~ — DONE.
-2. ~~**Implement INS rule**~~ — DONE (basic support). Contributed to jump from 6 → 39 PRV passing.
-3. ~~**Fix traces 26, 27**~~ — DONE. All 30 traces now pass.
-4. ~~**Fix OPR1_1/OPR2_1 encoding**~~ — DONE. Primed variants now embed equality in implication structure via propExt.
-5. ~~**Admit ALL7_2 base proof**~~ — DONE. NRM rules can't handle nested ♢; element proof still verified.
-6. ~~**Fix BOOL51/52 encoding**~~ — DONE. Replaced boolean case analysis helpers with correct PP spec leaf rules for absurd equality.
-7. **Fix remaining 16 PRV failures** — AND_CONJ element proofs (10), missing subproofs (4), AR12 mismatch (2).
+### P1 — Reduce generated proof admits
+1. **BOOL31/42 `trust` elimination** (3,400+ uses) — emitter needs to find `v ∈ BOOL` hypothesis in context
+2. **INS contradiction resolution** — 62 remaining (26 fixed via ♡-hyp matching); blocked cases involve AR3_F arithmetic normalization mismatch between emitter AST and LP proof state
+3. **ALL7_2 base proof admits** (~100) — needs n-ary quantifier flattening
 
 ### P2 — Prove arithmetic rules
-5. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR2–AR8.
-6. **Prove AR2–AR8, AR13** — replace `admit` with proofs using the new axioms.
+4. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR5–AR8.
+5. **Prove AR5–AR8, AR13** — replace `admit` with proofs using the new axioms.
 
 ### P3 — Generalise and harden
-7. **N-ary quantifier flattening** — replace ad-hoc ALL7_2, XST5_2, NRM14_2 etc. with systematic n-variable handling.
-8. **Implement remaining NRM rules** — NRM10, NRM17–18, NRM21–23, NRM27–30 (arithmetic solver dispatch). Currently unused by benchmarks but needed for completeness.
-9. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces.
+6. **N-ary quantifier flattening** — replace ad-hoc ALL7_2, XST5_2, NRM14_2 etc. with systematic n-variable handling.
+7. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces.
 
 ## Key References
 
