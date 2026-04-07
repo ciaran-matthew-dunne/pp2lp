@@ -8,8 +8,7 @@ require open
   Stdlib.Eq Stdlib.String
   Stdlib.FOL Stdlib.HOL
   Stdlib.Impred
-  Stdlib.List Stdlib.Nat
-  Stdlib.Conj Stdlib.Disj;
+  Stdlib.List Stdlib.Nat;
 
 // ---- Trusted arithmetic oracle ----
 // Used to fill computable arithmetic facts (solver-confirmed)
