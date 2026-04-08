@@ -18,9 +18,31 @@ let pp_ident buf s =
     Buffer.add_string buf "|}"
   end
 
+(* ---- Precedence-aware pretty-printing ----
+
+   Lambdapi precedences (higher = tighter binding):
+     ¬     prefix 35       =,≠   infix 10 (no assoc)
+     ∧     infix right 7   —     prefix 7
+     ∨     infix right 6   +,-   infix left 6    ↦  infix right 6
+     ⇒,⇔   infix right 5   ϵ,≤,≪ infix 5 (no assoc)
+
+   Key traps:  = (10) binds TIGHTER than + (6), so a + b = c ≠ (a+b) = c.
+               ∧,∨ are RIGHT-assoc in LP — left-assoc chains need explicit parens.
+
+   min_bp = minimum binding power the context requires.  Default 100 (= always
+   parenthesise) so every external call site keeps its current behaviour.
+   Internal recursive calls pass the real threshold to drop redundant parens. *)
+
+let bp_max = 100 (* atoms, parenthesised groups — never need outer parens *)
+
+let wrap buf need f =
+  if need then Buffer.add_char buf '(';
+  f ();
+  if need then Buffer.add_char buf ')'
+
 (* ---- Expression pretty-printing (shallow encoding) ---- *)
 
-let rec pp_exp buf e =
+let rec pp_exp ?(min_bp = bp_max) buf e =
   match e with
   | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
   | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
@@ -40,22 +62,20 @@ let rec pp_exp buf e =
     Buffer.add_char buf ' ';
     pp_exp_args buf args;
     Buffer.add_char buf ')'
-  | AOp (Add, e1, e2) ->
-    Buffer.add_char buf '(';
-    pp_exp buf e1;
-    Buffer.add_string buf " + ";
-    pp_exp buf e2;
-    Buffer.add_char buf ')'
-  | AOp (Sub, e1, e2) ->
-    Buffer.add_char buf '(';
-    pp_exp buf e1;
-    Buffer.add_string buf " - ";
-    pp_exp buf e2;
-    Buffer.add_char buf ')'
-  | Neg e1 ->
-    Buffer.add_string buf "(\xe2\x80\x94 "; (* — *)
-    pp_exp buf e1;
-    Buffer.add_char buf ')'
+  | AOp (Add, e1, e2) ->           (* infix left 6 *)
+    wrap buf (6 < min_bp) (fun () ->
+      pp_exp ~min_bp:6 buf e1;
+      Buffer.add_string buf " + ";
+      pp_exp ~min_bp:7 buf e2)
+  | AOp (Sub, e1, e2) ->           (* infix left 6 *)
+    wrap buf (6 < min_bp) (fun () ->
+      pp_exp ~min_bp:6 buf e1;
+      Buffer.add_string buf " - ";
+      pp_exp ~min_bp:7 buf e2)
+  | Neg e1 ->                      (* prefix 7 *)
+    wrap buf (7 < min_bp) (fun () ->
+      Buffer.add_string buf "\xe2\x80\x94 "; (* — *)
+      pp_exp ~min_bp:8 buf e1)
   | SetImage (e1, e2) ->
     Buffer.add_string buf "(eapp set_image (";
     pp_exp buf e1;
@@ -92,79 +112,83 @@ let rec flatten_conj = function
   | Binary (And, p1, p2) -> flatten_conj p1 @ [p2]
   | p -> [p]
 
-let rec pp_conj_left buf = function
+(* Left-associative conjunction: ((c₀ ∧ c₁) ∧ c₂) ∧ … ∧ cₙ₋₁
+   Inner parens enforce left-assoc (essential — LP's ∧ is right-assoc).
+   Outer parens are conditional on the surrounding context. *)
+let rec pp_conj_left ?(min_bp = bp_max) buf elts =
+  match elts with
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
-  | [p] -> pp_prd buf p
+  | [p] -> pp_prd ~min_bp buf p
   | first :: rest ->
-    List.iter (fun _ -> Buffer.add_char buf '(') rest;
-    pp_prd buf first;
+    let need_outer = 7 < min_bp in
+    let n = List.length rest in
+    let n_open = n - 1 + (if need_outer then 1 else 0) in
+    for _ = 1 to n_open do Buffer.add_char buf '(' done;
+    pp_prd ~min_bp:8 buf first;    (* left child of right-assoc ∧ *)
+    let closes_left = ref n_open in
     List.iter (fun p ->
       Buffer.add_string buf " \xe2\x88\xa7 "; (* ∧ *)
-      pp_prd buf p;
-      Buffer.add_char buf ')'
+      pp_prd ~min_bp:8 buf p;      (* each conjunct *)
+      if !closes_left > 0 then begin
+        Buffer.add_char buf ')';
+        decr closes_left
+      end
     ) rest
 
 (* ---- Predicate pretty-printing (shallow encoding) ---- *)
 
-and pp_prd buf p =
+and pp_prd ?(min_bp = bp_max) buf p =
   match p with
   | Lift (Var "VRAI") | Lift (Var "TRUE") ->
     Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
   | Lift (Var "FAUX") | Lift (Var "FALSE") ->
     Buffer.add_string buf "\xe2\x8a\xa5" (* ⊥ *)
-  | Lift (App (f, args)) ->
-    Buffer.add_char buf '(';
-    pp_exp_args buf args;
-    Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
-    pp_ident buf f;
-    Buffer.add_char buf ')'
+  | Lift (App (f, args)) ->         (* ϵ — infix 5 no assoc *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_exp_args buf args;
+      Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
+      pp_ident buf f)
   | Lift (Var s) ->
     pp_ident buf s
   | Lift e ->
-    pp_exp buf e
-  | Unary (Not, p1) ->
-    Buffer.add_string buf "(\xc2\xac "; (* ¬ *)
-    pp_prd buf p1;
-    Buffer.add_char buf ')'
-  | Binary (And, _, _) ->
+    pp_exp ~min_bp buf e
+  | Unary (Not, p1) ->              (* prefix 35 *)
+    wrap buf (35 < min_bp) (fun () ->
+      Buffer.add_string buf "\xc2\xac "; (* ¬ *)
+      pp_prd ~min_bp:36 buf p1)
+  | Binary (And, _, _) ->           (* infix right 7 *)
     let elts = flatten_conj p in
-    pp_conj_left buf elts
-  | Binary (Or, p1, p2) ->
-    Buffer.add_char buf '(';
-    pp_prd buf p1;
-    Buffer.add_string buf " \xe2\x88\xa8 "; (* ∨ *)
-    pp_prd buf p2;
-    Buffer.add_char buf ')'
-  | Binary (Imp, p1, p2) ->
-    Buffer.add_char buf '(';
-    pp_prd buf p1;
-    Buffer.add_string buf " \xe2\x87\x92 "; (* ⇒ *)
-    pp_prd buf p2;
-    Buffer.add_char buf ')'
-  | Binary (Iff, p1, p2) ->
-    Buffer.add_char buf '(';
-    pp_prd buf p1;
-    Buffer.add_string buf " \xe2\x87\x94 "; (* ⇔ *)
-    pp_prd buf p2;
-    Buffer.add_char buf ')'
-  | Eq (e1, e2) ->
-    Buffer.add_char buf '(';
-    pp_exp buf e1;
-    Buffer.add_string buf " = ";
-    pp_exp buf e2;
-    Buffer.add_char buf ')'
-  | Leq (e1, e2) ->
-    Buffer.add_char buf '(';
-    pp_exp buf e1;
-    Buffer.add_string buf " \xe2\x89\xa4 "; (* ≤ *)
-    pp_exp buf e2;
-    Buffer.add_char buf ')'
-  | Mem (es, e) ->
-    Buffer.add_char buf '(';
-    pp_exp_args buf es;
-    Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
-    pp_exp buf e;
-    Buffer.add_char buf ')'
+    pp_conj_left ~min_bp buf elts
+  | Binary (Or, p1, p2) ->          (* infix right 6 *)
+    wrap buf (6 < min_bp) (fun () ->
+      pp_prd ~min_bp:7 buf p1;
+      Buffer.add_string buf " \xe2\x88\xa8 "; (* ∨ *)
+      pp_prd ~min_bp:6 buf p2)
+  | Binary (Imp, p1, p2) ->         (* infix right 5 *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_prd ~min_bp:6 buf p1;
+      Buffer.add_string buf " \xe2\x87\x92 "; (* ⇒ *)
+      pp_prd ~min_bp:5 buf p2)
+  | Binary (Iff, p1, p2) ->         (* infix right 5 *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_prd ~min_bp:6 buf p1;
+      Buffer.add_string buf " \xe2\x87\x94 "; (* ⇔ *)
+      pp_prd ~min_bp:5 buf p2)
+  | Eq (e1, e2) ->                  (* infix 10 no assoc *)
+    wrap buf (10 < min_bp) (fun () ->
+      pp_exp ~min_bp:11 buf e1;
+      Buffer.add_string buf " = ";
+      pp_exp ~min_bp:11 buf e2)
+  | Leq (e1, e2) ->                 (* infix 5 no assoc *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_exp ~min_bp:6 buf e1;
+      Buffer.add_string buf " \xe2\x89\xa4 "; (* ≤ *)
+      pp_exp ~min_bp:6 buf e2)
+  | Mem (es, e) ->                   (* ϵ — infix 5 no assoc *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_exp_args buf es;
+      Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
+      pp_exp ~min_bp:6 buf e)
   | Bind (binder, xs, body) ->
     let qsym = match binder with
       | Forall0 -> "`\xe2\x88\x80" (* `∀ *)
@@ -172,6 +196,7 @@ and pp_prd buf p =
       | Forall2 -> "`\xe2\x99\xa1"  (* `♡ *)
       | Exists   -> "`\xe2\x88\x83"  (* `∃ *)
     in
+    (* Quantifier body extends rightward — always parenthesise for safety *)
     let rec emit_vars = function
       | [] -> pp_prd buf body
       | x :: rest ->
@@ -268,6 +293,78 @@ let exp_to_string e =
   let buf = Buffer.create 64 in
   pp_exp buf e;
   Buffer.contents buf
+
+(* ---- Block-formatted predicate printing ----
+   Like pp_prd but inserts line breaks at structural points (⇒, ∧, ∨).
+   Used only for the theorem-header goal — proof terms stay compact. *)
+
+let rec pp_prd_block ?(min_bp = 0) ind buf p =
+  let pad = String.make ind ' ' in
+  match p with
+  | Binary (Imp, p1, p2) ->         (* infix right 5 *)
+    wrap buf (5 < min_bp) (fun () ->
+      pp_prd_block ~min_bp:6 ind buf p1;
+      Buffer.add_char buf '\n';
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "\xe2\x87\x92 "; (* ⇒ *)
+      pp_prd_block ~min_bp:5 ind buf p2)
+  | Binary (And, _, _) ->           (* infix right 7 *)
+    let elts = flatten_conj p in
+    pp_conj_left_block ~min_bp ind buf elts
+  | Binary (Or, p1, p2) ->          (* infix right 6 *)
+    wrap buf (6 < min_bp) (fun () ->
+      pp_prd_block ~min_bp:7 ind buf p1;
+      Buffer.add_char buf '\n';
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "\xe2\x88\xa8 "; (* ∨ *)
+      pp_prd_block ~min_bp:6 ind buf p2)
+  | Bind (binder, xs, body) ->
+    let qsym = match binder with
+      | Forall0 -> "`\xe2\x88\x80" (* `∀ *)
+      | Forall1 -> "`\xe2\x99\xa2"  (* `♢ *)
+      | Forall2 -> "`\xe2\x99\xa1"  (* `♡ *)
+      | Exists   -> "`\xe2\x88\x83"  (* `∃ *)
+    in
+    let rec emit_vars = function
+      | [] ->
+        Buffer.add_char buf '\n';
+        Buffer.add_string buf (String.make (ind + 2) ' ');
+        pp_prd_block (ind + 2) buf body
+      | x :: rest ->
+        Buffer.add_char buf '(';
+        Buffer.add_string buf qsym;
+        Buffer.add_char buf ' ';
+        pp_ident buf x;
+        Buffer.add_string buf " : \xcf\x84 \xce\xb9, "; (* τ ι *)
+        emit_vars rest;
+        Buffer.add_char buf ')'
+    in
+    emit_vars xs
+  | _ ->
+    pp_prd ~min_bp buf p
+
+and pp_conj_left_block ?(min_bp = 0) ind buf elts =
+  match elts with
+  | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
+  | [p] -> pp_prd_block ~min_bp ind buf p
+  | first :: rest ->
+    let need_outer = 7 < min_bp in
+    let pad = String.make ind ' ' in
+    let n = List.length rest in
+    let n_open = n - 1 + (if need_outer then 1 else 0) in
+    for _ = 1 to n_open do Buffer.add_char buf '(' done;
+    pp_prd_block ~min_bp:8 ind buf first;
+    let closes_left = ref n_open in
+    List.iter (fun p ->
+      Buffer.add_char buf '\n';
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "\xe2\x88\xa7 "; (* ∧ *)
+      pp_prd ~min_bp:8 buf p;
+      if !closes_left > 0 then begin
+        Buffer.add_char buf ')';
+        decr closes_left
+      end
+    ) rest
 
 (* ---- Free variable analysis ---- *)
 
@@ -1398,6 +1495,45 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx indent child
 
+    | [child] when rule = "NRM5" ->
+      (* Detect NRM5 chain: NRM5^n + NRM13 → collapsed NRM53/NRM54/...
+         The current node is already NRM5, so total = 1 (this) + extra + 2 (NRM13). *)
+      let rec count_nrm5 n node = match node with
+        | Apply { rule = "NRM5"; children = [child]; _ } ->
+          count_nrm5 (n + 1) child
+        | _ -> (n, node)
+      in
+      let (extra, terminal) = count_nrm5 0 child in
+      let total = 3 + extra in (* this NRM5 + extra NRM5s + 2 from NRM13 *)
+      begin match terminal with
+      | Apply { rule = "NRM13"; children = [grandchild]; _ }
+        when total <= 4 ->
+        (* Emit combined rule: NRM53 for arity 3, NRM54 for arity 4 *)
+        let combined = Printf.sprintf "NRM5%d" total in
+        emit_comment ();
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "// (NRM5";
+        for _ = 2 to extra do Buffer.add_string buf "+NRM5" done;
+        Buffer.add_string buf "+NRM13 collapsed)\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf combined;
+        Buffer.add_string buf " _;\n";
+        emit_node buf thm_hyps ctx indent grandchild
+      | _ ->
+        (* Fallback: emit individual NRM5 *)
+        emit_comment ();
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf eff_rule;
+        emit_rule_args buf ctx eff_rule node;
+        Buffer.add_string buf " _";
+        let ctx' = introduce buf pad ctx rule goal flat in
+        let child_flat = compute_child_flat rule flat in
+        Buffer.add_string buf ";\n";
+        emit_node buf thm_hyps ctx' indent ~flat:child_flat child
+      end
+
     | [_child] when rule = "INS" ->
       emit_comment ();
       emit_ins buf pad ctx
@@ -1486,7 +1622,7 @@ let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
   end;
 
   Buffer.add_string buf " :\n  \xcf\x80 ("; (* π *)
-  pp_prd buf goal;
+  pp_prd_block 4 buf goal;
   Buffer.add_string buf ") \xe2\x89\x94\n"; (* ≔ *)
 
   Buffer.add_string buf "begin\n";

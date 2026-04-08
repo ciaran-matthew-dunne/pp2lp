@@ -364,7 +364,7 @@ let () =
                 Unary (Not, Binary (And, Lift (Var "p"), Lift (Var "q"))),
                 Binary (Or, Unary (Not, Lift (Var "p")),
                             Unary (Not, Lift (Var "q"))))) =
-     "((\xc2\xac (p \xe2\x88\xa7 q)) \xe2\x87\x92 ((\xc2\xac p) \xe2\x88\xa8 (\xc2\xac q)))")
+     "(\xc2\xac (p \xe2\x88\xa7 q) \xe2\x87\x92 \xc2\xac p \xe2\x88\xa8 \xc2\xac q)")
 
 
 (* ===================================================================

@@ -158,13 +158,32 @@ begin
   refine h1 (λ x hpq, h2 x (∧ₑ₁ hpq) (∧ₑ₂ hpq))
 end;
 
-// NRM13: H ⊢ ♡x · ¬(P ∧ ¬Q) ⇒ R → H ⊢ ♢x · (P ⇒ Q) ⇒ R
+// NRM13: ♢x.(P⇒Q)⇒R → ♡x.¬(P∧¬Q)⇒R  (2-premise)
 opaque symbol NRM13 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ ¬ (Q x))) ⇒ R)
   → π ((`♢ x, P x ⇒ Q x) ⇒ R) ≔
 begin
   assume P Q R h1 h2;
-  refine h1 (λ x hpnq, (∧ₑ₂ hpnq) (h2 x (∧ₑ₁ hpnq)))
+  refine h1 (λ x hc, (∧ₑ₂ hc) (h2 x (∧ₑ₁ hc)))
+end;
+
+// NRM53: ♢x.(P₁⇒P₂⇒Q)⇒R → ♡x.¬((P₁∧P₂)∧¬Q)⇒R  (3-premise = NRM5+NRM13)
+opaque symbol NRM53 [P1 P2 Q : τ ι → Prop] [R : Prop]
+  : π ((`♡ x, ¬ ((P1 x ∧ P2 x) ∧ ¬ (Q x))) ⇒ R)
+  → π ((`♢ x, P1 x ⇒ P2 x ⇒ Q x) ⇒ R) ≔
+begin
+  assume P1 P2 Q R h1 h2;
+  refine h1 (λ x hc, (∧ₑ₂ hc) (h2 x (∧ₑ₁ (∧ₑ₁ hc)) (∧ₑ₂ (∧ₑ₁ hc))))
+end;
+
+// NRM54: ♢x.(P₁⇒P₂⇒P₃⇒Q)⇒R → ♡x.¬(((P₁∧P₂)∧P₃)∧¬Q)⇒R  (4-premise = NRM5²+NRM13)
+opaque symbol NRM54 [P1 P2 P3 Q : τ ι → Prop] [R : Prop]
+  : π ((`♡ x, ¬ (((P1 x ∧ P2 x) ∧ P3 x) ∧ ¬ (Q x))) ⇒ R)
+  → π ((`♢ x, P1 x ⇒ P2 x ⇒ P3 x ⇒ Q x) ⇒ R) ≔
+begin
+  assume P1 P2 P3 Q R h1 h2;
+  refine h1 (λ x hc,
+    (∧ₑ₂ hc) (h2 x (∧ₑ₁ (∧ₑ₁ (∧ₑ₁ hc))) (∧ₑ₂ (∧ₑ₁ (∧ₑ₁ hc))) (∧ₑ₂ (∧ₑ₁ hc))))
 end;
 
 // NRM13_2: Two-variable version.
