@@ -9,6 +9,7 @@ test/traces/*.replay
 
 lp-old
 lp/gen/
+replay/
 *.lpo
 
 # Private / large binary files
