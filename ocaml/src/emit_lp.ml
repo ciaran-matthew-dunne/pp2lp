@@ -1044,6 +1044,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
     let base = strip_suffix rule in
     let schema = match Rule_db.find db base with
       | Some r -> r.result_schema | None -> Some 1 in
+    (* Emit comment showing the PP rule *)
+    Buffer.add_string buf "// ";
+    Buffer.add_string buf rule;
+    Buffer.add_string buf "\n";
+    Buffer.add_string buf pad;
     begin match rule, children with
     (* STOP_1: end of chain → reflexivity *)
     | "STOP_1", [] ->
@@ -1319,25 +1324,34 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
     let pad = String.make indent ' ' in
     let first_pad = if inline then "" else pad in
     let eff_rule = select_variant rule goal children flat in
+    (* Emit rule comment for non-trivial nodes *)
+    let emit_comment () =
+      Buffer.add_string buf first_pad;
+      Buffer.add_string buf "// ";
+      Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"
+    in
     begin match children with
     | [] when rule = "SORRY" ->
       Printf.eprintf "warning: emitting admit for incomplete proof\n";
       Buffer.add_string buf first_pad;
       Buffer.add_string buf "admit"
 
-    | [] ->
-      Buffer.add_string buf first_pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf eff_rule;
-      emit_rule_args buf ctx eff_rule node
-
     | [child] when is_hoas_identity rule ->
       let child_flat = compute_child_flat rule flat in
       emit_node buf thm_hyps ctx indent ~inline ~flat:child_flat child
 
+    | [] ->
+      emit_comment ();
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf eff_rule;
+      emit_rule_args buf ctx eff_rule node
+
     | [Apply { rule = "NRM13"; children = [grandchild]; _ }]
       when rule = "NRM8" ->
-      Buffer.add_string buf first_pad;
+      emit_comment ();
+      Buffer.add_string buf pad;
       Buffer.add_string buf "refine ";
       Buffer.add_string buf eff_rule;
       Buffer.add_string buf " _;\n";
@@ -1345,12 +1359,14 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
 
     | [_child] when Proof_tree.is_branching_quantifier rule ->
       Printf.eprintf "warning: truncated replay at %s (no base child)\n" rule;
-      Buffer.add_string buf first_pad;
+      emit_comment ();
+      Buffer.add_string buf pad;
       Buffer.add_string buf "admit"
 
     | [child] when rule = "NRM1" ->
+      emit_comment ();
       let extra = nrm1_extra_count goal in
-      Buffer.add_string buf first_pad;
+      Buffer.add_string buf pad;
       Buffer.add_string buf "refine NRM1 _";
       for _ = 1 to extra do
         Buffer.add_string buf ";\n";
@@ -1361,16 +1377,16 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_node buf thm_hyps ctx indent child
 
     | [_child] when rule = "INS" ->
-      emit_ins buf first_pad ctx
+      emit_comment ();
+      emit_ins buf pad ctx
 
     | [child] when rule = "OPR1" || rule = "OPR2" ->
-      (* OPR1/OPR2: inline assume+rewrite instead of passing P lambda.
-         Vacuous case (x not free in body): just assume, no rewrite. *)
+      emit_comment ();
       let eq_hyp = match goal with
         | Binary (Imp, eq, _) -> eq
         | _ -> Lift (Var "eq") in
       let (hname, ctx') = fresh_hyp ctx eq_hyp in
-      Buffer.add_string buf first_pad;
+      Buffer.add_string buf pad;
       Buffer.add_string buf "assume ";
       Buffer.add_string buf hname;
       if not (is_opr_vacuous rule goal) then begin
@@ -1388,7 +1404,8 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_node buf thm_hyps ctx' indent child
 
     | [child] ->
-      Buffer.add_string buf first_pad;
+      emit_comment ();
+      Buffer.add_string buf pad;
       Buffer.add_string buf "refine ";
       Buffer.add_string buf eff_rule;
       emit_rule_args buf ctx eff_rule node;
@@ -1399,15 +1416,18 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_node buf thm_hyps ctx' indent ~flat:child_flat child
 
     | [child1; child2] when Proof_tree.is_branching_quantifier rule ->
-      emit_branching_quant buf thm_hyps ctx indent first_pad pad
+      emit_comment ();
+      emit_branching_quant buf thm_hyps ctx indent pad pad
         eff_rule node goal child1 child2
 
     | [child1; child2] ->
-      emit_two_children buf thm_hyps ctx indent first_pad pad
+      emit_comment ();
+      emit_two_children buf thm_hyps ctx indent pad pad
         eff_rule node child1 child2
 
     | _ ->
-      Buffer.add_string buf first_pad;
+      emit_comment ();
+      Buffer.add_string buf pad;
       Buffer.add_string buf "admit (* too many children *)"
     end
 
