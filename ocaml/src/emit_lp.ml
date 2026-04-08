@@ -1064,18 +1064,40 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Printf.eprintf "warning: Schema 0 leaf %s in primed chain (needs prop_true)\n" base;
       Buffer.add_string buf "admit"
 
-    (* IMP4 — structural: congruence under implication *)
+    (* IMP4 — structural: congruence under implication.
+       If the child's rewrite lemma already handles the ⇒R form
+       (e.g. and3_eq: (P∧Q)⇒R = P⇒Q⇒R), skip imp_cong and let
+       the child rewrite directly. Otherwise use imp_cong to scope
+       the child's rewrite under the implication. *)
     | _, [child] when base = "IMP4" ->
-      Buffer.add_string buf "refine imp_cong _;\n";
-      Buffer.add_string buf pad;
-      let hyp_prd = match goal with
-        | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
-      let (hname, ctx') = fresh_hyp ctx hyp_prd in
-      Buffer.add_string buf "assume ";
-      Buffer.add_string buf hname;
-      Buffer.add_string buf ";\n";
-      Buffer.add_string buf pad;
-      emit_primed_chain buf ctx' pad child
+      let child_base = match child with
+        | Apply { rule; _ } -> strip_suffix rule in
+      let child_handles_imp = match child_base with
+        | "AND1" | "AND3" | "OR1" | "OR3" | "IMP1" | "IMP3"
+        | "EQV1" | "EQV3" | "NOT1" | "EVR3" | "EQC1" | "EQC2"
+        | "EQS1" | "EQS2" | "EIMP51" | "EIMP52"
+        | "AR9" | "XST7" -> true
+        | _ -> false
+      in
+      if child_handles_imp then begin
+        (* Child's lemma already handles ⇒R — pass through, adding
+           the antecedent hypothesis to context for inner steps. *)
+        let hyp_prd = match goal with
+          | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
+        let (_hname, ctx') = fresh_hyp ctx hyp_prd in
+        emit_primed_chain buf ctx' pad child
+      end else begin
+        Buffer.add_string buf "refine imp_cong _;\n";
+        Buffer.add_string buf pad;
+        let hyp_prd = match goal with
+          | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
+        let (hname, ctx') = fresh_hyp ctx hyp_prd in
+        Buffer.add_string buf "assume ";
+        Buffer.add_string buf hname;
+        Buffer.add_string buf ";\n";
+        Buffer.add_string buf pad;
+        emit_primed_chain buf ctx' pad child
+      end
 
     (* IMP5 — structural: trivial congruence (hypothesis in scope) *)
     | _, [child] when base = "IMP5" ->
