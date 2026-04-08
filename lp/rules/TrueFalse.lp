@@ -68,81 +68,15 @@ begin
   assume P h; refine ¬¬ₑ P h
 end;
 
-// ---- Primed variants (equality-based) ----
-// Results are predicates equivalent to the consequent.
-// STOP_1: result = P (reflexivity).
-// Schema 0 (leaf): result = ⊤ (the goal is a tautology).
-// Schema 1 (pass-through): consequent = antecedent, so transitivity.
-
-opaque symbol STOP_1 [P : Prop]
-  : π (P = P) ≔
-begin
-  assume P; reflexivity
-end;
-
-// VR1_1: result = ⊤. ¬⊤⇒R is a tautology (¬⊤ is ⊥).
-opaque symbol VR1_1 [R : Prop]
-  : π ((¬ ⊤ ⇒ R) = ⊤) ≔
-begin
-  assume R; rewrite ¬⊤; refine ⊥⇒ R
-end;
-
-// VR2_1: pass-through. ¬⊤ = ⊥.
-opaque symbol VR2_1 [S : Prop]
-  : π (⊥ = S)
-  → π (¬ ⊤ = S) ≔
-begin
-  assume S h; rewrite ¬⊤; refine h
-end;
-
-// VR3_1: pass-through. (⊤ ⇒ R) = R.
-opaque symbol VR3_1 [R S : Prop]
-  : π (R = S)
-  → π ((⊤ ⇒ R) = S) ≔
-begin
-  assume R S h; rewrite ⊤⇒; refine h
-end;
-
-// VR4_1: result = ⊤. ⊤ = ⊤.
-opaque symbol VR4_1
-  : π (⊤ = ⊤) ≔
-begin
-  reflexivity
-end;
-
-// FX1_1: pass-through. (¬⊥ ⇒ R) = R.
-opaque symbol FX1_1 [R S : Prop]
-  : π (R = S)
-  → π ((¬ ⊥ ⇒ R) = S) ≔
-begin
-  assume R S h; rewrite ¬⊥; rewrite ⊤⇒; refine h
-end;
-
-// FX2_1: result = ⊤. ¬⊥ = ⊤.
-opaque symbol FX2_1
-  : π (¬ ⊥ = ⊤) ≔
-begin
-  refine ¬⊥
-end;
-
-// FX3_1: result = ⊤. (⊥ ⇒ R) = ⊤.
-opaque symbol FX3_1 [R : Prop]
-  : π ((⊥ ⇒ R) = ⊤) ≔
-begin
-  assume R; refine ⊥⇒ R
-end;
-
 // ---- INS (§A.11) ----
 
-// INS: Determination of instantiations Q₁,...,Qₙ;
-//      H ⊢ Q₁ ⇒ (Q₂ ⇒ ... (Qₙ ⇒ FALSE)...) → H ⊢ FALSE
-// The emitter resolves INS dynamically by finding the contradicting
-// hypotheses (¬P and P) in context and applying modus ponens.
-// The INS LP symbol is not used directly — kept for reference.
-opaque symbol INS [P Q : Prop]
-  : π P
-  → π (P ⇒ Q)
-  → π Q ≔
+// INS: instantiation contradiction.
+// Derives ⊥ from contradictory hypotheses; the emitter resolves the
+// contradiction from the hypothesis context, so INS is a no-op in LP.
+// The proof term is constructed directly by the emitter (emit_ins).
+opaque symbol INS [P]
+  : π ⊥
+  → π P ≔
 begin
-  assume P Q hp hpq; refine hpq hp
+  assume P h; refine ⊥ₑ h
 end;

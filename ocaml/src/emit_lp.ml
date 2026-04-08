@@ -613,7 +613,7 @@ let emit_and5_args buf goal node ~primed =
 
 (* ALL7/XST8: emit R normalisation predicate lambda *)
 (* Right-reassociate ∧: ((a∧b)∧c)∧d → a∧(b∧(c∧d))
-   Needed because OR3_1 produces right-associated conjunctions. *)
+   Needed because OR3 in primed context produces right-associated conjunctions. *)
 let rec right_assoc_conj = function
   | Binary (And, Binary (And, a, b), c) ->
     right_assoc_conj (Binary (And, a, Binary (And, b, c)))
@@ -989,10 +989,10 @@ let nrm1_extra_count goal =
   | _ -> 0
 
 (* ---- Primed chain emission (rewrite-based) ----
-   Walks the primed subtree emitting rewrite calls instead of _1 rule
-   applications. Each passthrough step emits `rewrite lemma_eq;`, branching
-   steps use `refine conj_eq _ _ { ... } { ... }`, and leaves use the
-   existing _1 leaf symbols via `rewrite (LEAF_1 args)`. *)
+   Walks the primed subtree emitting rewrite calls using equation lemmas
+   from Rw.lp. Passthrough steps emit `rewrite lemma_eq;`, branching
+   steps use `refine conj_eq _ _ { ... } { ... }`, and structural steps
+   use `refine imp_cong/forall_cong _`. *)
 
 (* Map base rule name to its rewrite lemma name in Rw.lp.
    Returns None for rules handled specially (HOAS identity, structural). *)
@@ -1053,14 +1053,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
     | _, [child] when is_hoas_identity base ->
       emit_primed_chain buf ctx pad child
 
-    (* Schema 0 — leaf: rewrite using _1 rule (existing conditional equation) *)
+    (* Schema 0 — leaf: prove formula = ⊤ from hypotheses.
+       TODO: emit direct proof + prop_true when needed. *)
     | _, [] when schema = Some 0 ->
-      Buffer.add_string buf "rewrite (";
-      Buffer.add_string buf rule;
-      emit_rule_args buf ctx rule node;
-      Buffer.add_string buf ");\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "reflexivity"
+      Printf.eprintf "warning: Schema 0 leaf %s in primed chain (needs prop_true)\n" base;
+      Buffer.add_string buf "admit"
 
     (* IMP4 — structural: congruence under implication *)
     | _, [child] when base = "IMP4" ->
@@ -1196,15 +1193,6 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx' pad child
-
-    (* Fallback: use _1 rule directly as a rewrite *)
-    | _, [child] when false (* placeholder — currently no rules use this *) ->
-      Buffer.add_string buf "rewrite (";
-      Buffer.add_string buf rule;
-      emit_rule_args buf ctx rule node;
-      Buffer.add_string buf ");\n";
-      Buffer.add_string buf pad;
-      emit_primed_chain buf ctx pad child
 
     (* AND4 — Schema 2: commutativity + conj_eq *)
     | _, [child1; child2] when base = "AND4" ->

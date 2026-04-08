@@ -98,29 +98,3 @@ opaque symbol ALL9 [T : τ ι → Prop] [Q : Prop]
 begin
   assume T Q h; refine h
 end;
-
-// ---- Primed variants (equality-based) ----
-// Results are predicates equivalent to the consequent.
-// Primed variants prove consequent = result.
-
-// ALL8_1: result = ∀x.R(x). Congruence of ∀.
-opaque symbol ALL8_1 [P R : τ ι → Prop]
-  : π (`∀ x, P x = R x)
-  → π ((`∀ x, P x) = (`∀ x, R x)) ≔
-begin
-  assume P R h;
-  refine propExt _ _ _ _
-    { assume hP x; refine =⇒ (h x) (hP x) }
-    { assume hR x; refine =⇒ (eq_sym (h x)) (hR x) }
-end;
-
-// ALL9_1: result = (♡x.T(x)) ⇒ R. Congruence of ⇒ under hypothesis.
-opaque symbol ALL9_1 [T : τ ι → Prop] [Q R : Prop]
-  : (π (`♡ x, T x) → π (Q = R))
-  → π (((`♡ x, T x) ⇒ Q) = ((`♡ x, T x) ⇒ R)) ≔
-begin
-  assume T Q R h;
-  refine propExt _ _ _ _
-    { assume h1 ht; refine =⇒ (h ht) (h1 ht) }
-    { assume h1 ht; refine =⇒ (eq_sym (h ht)) (h1 ht) }
-end;

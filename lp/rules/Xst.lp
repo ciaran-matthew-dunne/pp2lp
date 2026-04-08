@@ -127,18 +127,3 @@ begin
   assume hne;
   refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
 end;
-
-// ---- Primed variants (equality-based) ----
-
-// XST7_1: pass-through. (∃x.P(x))⇒R = (∀x.P(x)⇒R).
-opaque symbol XST7_1 [P : τ ι → Prop] [R : Prop] [S : Prop]
-  : π (((`∀ x, P x ⇒ R)) = S)
-  → π (((`∃ x, P x) ⇒ R) = S) ≔
-begin
-  assume P R S h;
-  have eq : π (((`∃ x, P x) ⇒ R) = (`∀ x, P x ⇒ R))
-    { refine propExt _ _ _ _
-      { assume h1 x hpx; refine h1 (∃ᵢ x hpx) }
-      { assume h1 hex; refine ∃ₑ hex h1 } };
-  rewrite eq; refine h
-end;

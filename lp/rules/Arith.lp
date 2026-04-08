@@ -86,14 +86,6 @@ begin
   refine hf h2
 end;
 
-opaque symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop] [S : Prop]
-  : π (E = F)
-  → π (((F ≤ 𝟎) ⇒ R) = S)
-  → π (((E ≤ 𝟎) ⇒ R) = S) ≔
-begin
-  assume E F R S heq h;
-  rewrite heq; refine h
-end;
 
 // AR10: solver(P) = Q; H ⊢ Q ⇒ R → H ⊢ P ⇒ R
 opaque symbol AR10 [P Q R : Prop]
