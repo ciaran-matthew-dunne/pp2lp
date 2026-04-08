@@ -1132,6 +1132,235 @@ let rw_lemma_of_rule = function
   | "XST7" -> Some "xst7_eq"
   | _ -> None
 
+(* ---- Res term emission ----
+   Emits a Res constructor term for the primed chain.
+   The term is used inside: refine ALL7r (λ x, <res_term>) _ *)
+
+(* Compute the result Prop from a primed proof tree node (OCaml-side).
+   Mirrors the LP-side `result` rewrite rules. *)
+let rec compute_result (node : proof_node) : prd =
+  match node with
+  | Apply { rule; goal; children; _ } ->
+    let base = strip_suffix rule in
+    match base, children with
+    | "STOP", [] -> goal  (* result = P *)
+    | _, [child] when is_hoas_identity base -> compute_result child
+    (* Schema 1 passthrough *)
+    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
+      | "IMP1" | "XST7" | "EVR3" | "OPR1" | "OPR2" | "AR9"), [child] ->
+      compute_result child
+    (* Schema 2 branching *)
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [child1; child2] ->
+      Binary (And, compute_result child1, compute_result child2)
+    (* IMP4: P ⇒ child_result *)
+    | "IMP4", [child] ->
+      let p = match goal with Binary (Imp, p, _) -> p | _ -> goal in
+      Binary (Imp, p, compute_result child)
+    (* ALL8: ∀x. child_result *)
+    | "ALL8", [child] ->
+      let vars = match goal with Bind (_, xs, _) -> xs | _ -> [] in
+      Bind (Forall0, vars, compute_result child)
+    (* ALL9: H ⇒ child_result *)
+    | "ALL9", [child] ->
+      let h = match goal with Binary (Imp, h, _) -> h | _ -> goal in
+      Binary (Imp, h, compute_result child)
+    | _ -> goal  (* fallback *)
+
+let rec emit_res_term buf (node : proof_node) =
+  match node with
+  | Apply { rule; goal; children; _ } ->
+    let base = strip_suffix rule in
+    begin match base, children with
+    (* STOP: stop_r P *)
+    | "STOP", [] ->
+      Buffer.add_string buf "(stop_r (";
+      pp_prd buf goal;
+      Buffer.add_string buf "))"
+
+    (* HOAS identity: skip *)
+    | _, [child] when is_hoas_identity base ->
+      emit_res_term buf child
+
+    (* Schema 1 passthrough *)
+    | "AND2", [child] ->
+      let (p, q) = match goal with
+        | Unary (Not, Binary (And, p, q)) -> (p, q) | _ -> (goal, goal) in
+      Buffer.add_string buf "(and2_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "AND3", [child] ->
+      let (p, q, r) = match goal with
+        | Binary (Imp, Binary (And, p, q), r) -> (p, q, r)
+        | _ -> (goal, goal, goal) in
+      Buffer.add_string buf "(and3_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") ("; pp_prd buf r;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "VR3", [child] ->
+      let p = match goal with
+        | Binary (Imp, _, p) -> p | _ -> goal in
+      Buffer.add_string buf "(vr3_r ("; pp_prd buf p;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "EVR2", [child] ->
+      let e = match goal with
+        | Unary (Not, Eq (e, _)) -> e | _ -> Var "?" in
+      Buffer.add_string buf "(evr2_r ("; pp_exp buf e;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "OR4", [child] ->
+      let (p, q) = match goal with
+        | Binary (Or, p, q) -> (p, q) | _ -> (goal, goal) in
+      Buffer.add_string buf "(or4_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "NOT1", [child] ->
+      let (p, r) = match goal with
+        | Binary (Imp, Unary (Not, Unary (Not, p)), r) -> (p, r)
+        | _ -> (goal, goal) in
+      Buffer.add_string buf "(not1_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf r;
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "XST7", [child] ->
+      Buffer.add_string buf "(xst7_r _ _ "; emit_res_term buf child;
+      Buffer.add_char buf ')'
+
+    (* IMP4: structural — wraps result under implication *)
+    | "IMP4", [child] ->
+      let p = match goal with
+        | Binary (Imp, p, _) -> p | _ -> goal in
+      let child_base = match child with
+        | Apply { rule; _ } -> strip_suffix rule in
+      let child_handles_imp = match child_base with
+        | "AND1" | "AND3" | "OR1" | "OR3" | "IMP1" | "IMP3"
+        | "EQV1" | "EQV3" | "NOT1" | "EVR3" | "EQC1" | "EQC2"
+        | "EQS1" | "EQS2" | "EIMP51" | "EIMP52"
+        | "AR9" | "XST7" -> true
+        | _ -> false
+      in
+      if child_handles_imp then
+        emit_res_term buf child
+      else begin
+        let q = match goal with
+          | Binary (Imp, _, q) -> q | _ -> goal in
+        let child_result = compute_result child in
+        Buffer.add_string buf "(imp4_r ("; pp_prd buf p;
+        Buffer.add_string buf ") ("; pp_prd buf q;
+        Buffer.add_string buf ") ("; pp_prd buf child_result;
+        Buffer.add_string buf ") (\xce\xbb _, "; (* λ _ *)
+        emit_res_term buf child;
+        Buffer.add_string buf "))"
+      end
+
+    (* ALL8: structural — wraps result under ∀ *)
+    | "ALL8", [child] ->
+      let vars = match goal with
+        | Bind (_, xs, _) -> xs | _ -> [] in
+      Buffer.add_string buf "(all8_r (\xce\xbb"; (* λ *)
+      List.iter (fun x ->
+        Buffer.add_char buf ' ';
+        pp_ident buf x) vars;
+      Buffer.add_string buf ", ";
+      emit_res_term buf child;
+      Buffer.add_string buf "))"
+
+    (* ALL9: structural — wraps result under hypothesis *)
+    | "ALL9", [child] ->
+      let h = match goal with
+        | Binary (Imp, h, _) -> h | _ -> goal in
+      let q = match goal with
+        | Binary (Imp, _, q) -> q | _ -> goal in
+      let child_result = compute_result child in
+      Buffer.add_string buf "(all9_r ("; pp_prd buf h;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") ("; pp_prd buf child_result;
+      Buffer.add_string buf ") (\xce\xbb _, "; (* λ _ *)
+      emit_res_term buf child;
+      Buffer.add_string buf "))"
+
+    (* OPR1: substitution *)
+    | "OPR1", [child] ->
+      let (x, e) = match goal with
+        | Binary (Imp, Eq (Var x, e), _) -> (x, e) | _ -> ("?", Var "?") in
+      Buffer.add_string buf "(opr1_r ("; pp_exp buf e;
+      Buffer.add_string buf ") "; pp_ident buf x;
+      Buffer.add_string buf " _ ";
+      emit_res_term buf child;
+      Buffer.add_char buf ')'
+
+    (* AR9: solver equality *)
+    | "AR9", [child] ->
+      let (e_opt, f_opt) = match goal, node with
+        | Binary (Imp, Leq (e, _), _),
+          Apply { arg = Some (Pred (Lift f)); _ } -> (Some e, Some f)
+        | Binary (Imp, Leq (e, _), _),
+          Apply { arg = Some (Pred (Leq (f, _))); _ } -> (Some e, Some f)
+        | _ -> (None, None)
+      in
+      begin match e_opt, f_opt with
+      | Some e, Some f ->
+        Buffer.add_string buf "(ar9_r ("; pp_exp buf e;
+        Buffer.add_string buf ") ("; pp_exp buf f;
+        Buffer.add_string buf ") _ trust ";
+        emit_res_term buf child;
+        Buffer.add_char buf ')'
+      | _ ->
+        Printf.eprintf "warning: AR9 res term: could not extract E/F\n";
+        Buffer.add_string buf "(stop_r _) (* AR9 fallback *)"
+      end
+
+    (* Schema 2: branching *)
+    | "AND1", [child1; child2] ->
+      let (p, q, r) = match goal with
+        | Binary (Imp, Unary (Not, Binary (And, p, q)), r) -> (p, q, r)
+        | _ -> (goal, goal, goal) in
+      Buffer.add_string buf "(and1_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") ("; pp_prd buf r;
+      Buffer.add_string buf ") "; emit_res_term buf child1;
+      Buffer.add_char buf ' '; emit_res_term buf child2;
+      Buffer.add_char buf ')'
+    | "OR3", [child1; child2] ->
+      let (p, q, r) = match goal with
+        | Binary (Imp, Binary (Or, p, q), r) -> (p, q, r)
+        | _ -> (goal, goal, goal) in
+      Buffer.add_string buf "(or3_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") ("; pp_prd buf r;
+      Buffer.add_string buf ") "; emit_res_term buf child1;
+      Buffer.add_char buf ' '; emit_res_term buf child2;
+      Buffer.add_char buf ')'
+    | "AND4", [child1; child2] ->
+      let (p, q) = match goal with
+        | Binary (And, p, q) -> (p, q) | _ -> (goal, goal) in
+      Buffer.add_string buf "(and4_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") "; emit_res_term buf child1;
+      Buffer.add_char buf ' '; emit_res_term buf child2;
+      Buffer.add_char buf ')'
+    | "IMP3", [child1; child2] ->
+      let (p, q, r) = match goal with
+        | Binary (Imp, Binary (Imp, p, q), r) -> (p, q, r)
+        | _ -> (goal, goal, goal) in
+      Buffer.add_string buf "(imp3_r ("; pp_prd buf p;
+      Buffer.add_string buf ") ("; pp_prd buf q;
+      Buffer.add_string buf ") ("; pp_prd buf r;
+      Buffer.add_string buf ") "; emit_res_term buf child1;
+      Buffer.add_char buf ' '; emit_res_term buf child2;
+      Buffer.add_char buf ')'
+
+    (* Fallback *)
+    | _ ->
+      Printf.eprintf "warning: no Res constructor for %s\n" base;
+      Buffer.add_string buf "(stop_r _) (* fallback for ";
+      Buffer.add_string buf base;
+      Buffer.add_string buf " *)"
+    end
+
 (* Emit a primed chain node. buf is the output buffer, pad is indentation.
    ctx tracks hypotheses. The node is from the primed subtree. *)
 let rec emit_primed_chain buf ctx pad (node : proof_node) =
@@ -1379,42 +1608,33 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 (* ---- Branching quantifier emission (ALL7/XST8) ---- *)
 
 and emit_branching_quant buf thm_hyps ctx indent first_pad pad
-    eff_rule node goal child1 child2 =
-  Buffer.add_string buf first_pad;
-  Buffer.add_string buf "refine ";
-  Buffer.add_string buf eff_rule;
-  emit_rule_args buf ctx eff_rule node;
-  Buffer.add_string buf " _ _\n";
-  Buffer.add_string buf pad;
-  Buffer.add_string buf "{ ";
-  (* Introduce bound vars in first child *)
+    eff_rule _node goal child1 child2 =
+  (* Use Res-based approach: have chain ≔ λ vars, <res_term>; refine ALL7r chain _ *)
   let bvars = binding_vars goal in
   let bvars =
-    (* 1-var variants only assume first var from compound binding *)
     if (eff_rule = "ALL7" || eff_rule = "XST8")
        && List.length bvars > 1
     then (match bvars with x :: _ -> [x] | [] -> [])
     else bvars
   in
-  if bvars <> [] then begin
-    Buffer.add_string buf "assume";
-    List.iter (fun x ->
-      Buffer.add_char buf ' ';
-      pp_ident buf x) bvars;
-    Buffer.add_string buf ";\n";
-    Buffer.add_string buf (String.make (indent + 2) ' ')
-  end;
-  emit_primed_chain buf ctx (String.make (indent + 2) ' ') child1;
-  Buffer.add_string buf " }\n";
-  Buffer.add_string buf pad;
-  Buffer.add_string buf "{ ";
+  let all7_sym = if List.length bvars >= 2 then "ALL7_2r" else "ALL7r" in
+  (* Emit: refine ALL7r (λ vars, <res_term>) _ *)
+  Buffer.add_string buf first_pad;
+  Buffer.add_string buf "refine ";
+  Buffer.add_string buf all7_sym;
+  Buffer.add_string buf " (\xce\xbb"; (* (λ *)
+  List.iter (fun x ->
+    Buffer.add_char buf ' ';
+    pp_ident buf x) bvars;
+  Buffer.add_string buf ", ";
+  emit_res_term buf child1;
+  Buffer.add_string buf ") _;\n";
   if eff_rule = "ALL7_2" || eff_rule = "XST8_2"
-     || eff_rule = "ALL7_1_2" then
-    (* Multi-var base proof: NRM rules can't handle nested ♢ *)
+     || eff_rule = "ALL7_1_2" then begin
+    Buffer.add_string buf pad;
     Buffer.add_string buf "admit"
-  else
-    emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
-  Buffer.add_string buf " }"
+  end else
+    emit_node buf thm_hyps ctx indent child2
 
 (* ---- Generic two-child emission ---- *)
 
