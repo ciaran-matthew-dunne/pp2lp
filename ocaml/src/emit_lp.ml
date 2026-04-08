@@ -1168,185 +1168,99 @@ let rec compute_result (node : proof_node) : prd =
 
 let rec emit_res_term buf (node : proof_node) =
   match node with
-  | Apply { rule; goal; children; _ } ->
+  | Apply { rule; children; _ } ->
     let base = strip_suffix rule in
+    let wrap1 name child =
+      Buffer.add_string buf "("; Buffer.add_string buf name;
+      Buffer.add_char buf ' '; emit_res_term buf child;
+      Buffer.add_char buf ')' in
+    let wrap2 name c1 c2 =
+      Buffer.add_string buf "("; Buffer.add_string buf name;
+      Buffer.add_char buf ' '; emit_res_term buf c1;
+      Buffer.add_char buf ' '; emit_res_term buf c2;
+      Buffer.add_char buf ')' in
     begin match base, children with
-    (* STOP: stop_r P *)
-    | "STOP", [] ->
-      Buffer.add_string buf "(stop_r (";
-      pp_prd buf goal;
-      Buffer.add_string buf "))"
+    | "STOP", [] -> Buffer.add_string buf "stop_r"
+    | _, [child] when is_hoas_identity base -> emit_res_term buf child
 
-    (* HOAS identity: skip *)
-    | _, [child] when is_hoas_identity base ->
-      emit_res_term buf child
+    (* Schema 1 passthrough — all implicit, just constructor + child *)
+    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
+      | "IMP1" | "XST7" | "EVR3"), [child] ->
+      wrap1 (String.lowercase_ascii base ^ "_r") child
 
-    (* Schema 1 passthrough *)
-    | "AND2", [child] ->
-      let (p, q) = match goal with
-        | Unary (Not, Binary (And, p, q)) -> (p, q) | _ -> (goal, goal) in
-      Buffer.add_string buf "(and2_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "AND3", [child] ->
-      let (p, q, r) = match goal with
-        | Binary (Imp, Binary (And, p, q), r) -> (p, q, r)
-        | _ -> (goal, goal, goal) in
-      Buffer.add_string buf "(and3_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") ("; pp_prd buf r;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "VR3", [child] ->
-      let p = match goal with
-        | Binary (Imp, _, p) -> p | _ -> goal in
-      Buffer.add_string buf "(vr3_r ("; pp_prd buf p;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "EVR2", [child] ->
-      let e = match goal with
-        | Unary (Not, Eq (e, _)) -> e | _ -> Var "?" in
-      Buffer.add_string buf "(evr2_r ("; pp_exp buf e;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "OR4", [child] ->
-      let (p, q) = match goal with
-        | Binary (Or, p, q) -> (p, q) | _ -> (goal, goal) in
-      Buffer.add_string buf "(or4_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "NOT1", [child] ->
-      let (p, r) = match goal with
-        | Binary (Imp, Unary (Not, Unary (Not, p)), r) -> (p, r)
-        | _ -> (goal, goal) in
-      Buffer.add_string buf "(not1_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf r;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "XST7", [child] ->
-      Buffer.add_string buf "(xst7_r _ _ "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-
-    (* IMP4: structural — wraps result under implication *)
-    | "IMP4", [child] ->
-      let p = match goal with
-        | Binary (Imp, p, _) -> p | _ -> goal in
-      let child_base = match child with
-        | Apply { rule; _ } -> strip_suffix rule in
-      let child_handles_imp = match child_base with
-        | "AND1" | "AND3" | "OR1" | "OR3" | "IMP1" | "IMP3"
-        | "EQV1" | "EQV3" | "NOT1" | "EVR3" | "EQC1" | "EQC2"
-        | "EQS1" | "EQS2" | "EIMP51" | "EIMP52"
-        | "AR9" | "XST7" -> true
-        | _ -> false
-      in
-      if child_handles_imp then
-        emit_res_term buf child
-      else begin
-        Buffer.add_string buf "(imp4_r ("; pp_prd buf p;
-        Buffer.add_string buf ") "; emit_res_term buf child;
-        Buffer.add_char buf ')'
-      end
-
-    (* ALL8: structural — wraps result under ∀ *)
-    | "ALL8", [child] ->
-      let vars = match goal with
-        | Bind (_, xs, _) -> xs | _ -> [] in
-      Buffer.add_string buf "(all8_r (\xce\xbb"; (* λ *)
-      List.iter (fun x ->
-        Buffer.add_char buf ' ';
-        pp_ident buf x) vars;
-      Buffer.add_string buf ", ";
-      emit_res_term buf child;
-      Buffer.add_string buf "))"
-
-    (* ALL9: structural — wraps result under hypothesis *)
-    | "ALL9", [child] ->
-      let h = match goal with
-        | Binary (Imp, h, _) -> h | _ -> goal in
-      Buffer.add_string buf "(all9_r ("; pp_prd buf h;
-      Buffer.add_string buf ") "; emit_res_term buf child;
-      Buffer.add_char buf ')'
-
-    (* OPR1: substitution *)
+    (* OPR1/OPR2: P is explicit (HO implicit) — construct the lambda *)
     | "OPR1", [child] ->
-      let (x, e) = match goal with
-        | Binary (Imp, Eq (Var x, e), _) -> (x, e) | _ -> ("?", Var "?") in
-      Buffer.add_string buf "(opr1_r ("; pp_exp buf e;
-      Buffer.add_string buf ") "; pp_ident buf x;
-      Buffer.add_string buf " _ ";
+      let (x, body) = match node with
+        | Apply { goal = Binary (Imp, Eq (Var x, _), body); _ } -> (x, body)
+        | _ -> ("__z", Lift (Var "?")) in
+      let z = "__z" in
+      let body' = subst_prd x z body in
+      Buffer.add_string buf "(opr1_r (\xce\xbb "; (* (opr1_r (λ  *)
+      Buffer.add_string buf z;
+      Buffer.add_string buf ", ";
+      pp_prd buf body';
+      Buffer.add_string buf ") ";
+      emit_res_term buf child;
+      Buffer.add_char buf ')'
+    | "OPR2", [child] ->
+      let (x, body) = match node with
+        | Apply { goal = Binary (Imp, Eq (_, Var x), body); _ } -> (x, body)
+        | _ -> ("__z", Lift (Var "?")) in
+      let z = "__z" in
+      let body' = subst_prd x z body in
+      Buffer.add_string buf "(opr2_r (\xce\xbb ";
+      Buffer.add_string buf z;
+      Buffer.add_string buf ", ";
+      pp_prd buf body';
+      Buffer.add_string buf ") ";
       emit_res_term buf child;
       Buffer.add_char buf ')'
 
-    (* AR9: solver equality *)
+    (* IMP4: always wrap — each Res constructor handles one layer *)
+    | "IMP4", [child] -> wrap1 "imp4_r" child
+
+    (* ALL8: lambda wrapper *)
+    | "ALL8", [child] ->
+      let vars = match node with
+        | Apply { goal; _ } -> (match goal with
+          | Bind (_, xs, _) -> xs | _ -> [])  in
+      Buffer.add_string buf "(all8_r (\xce\xbb"; (* λ *)
+      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
+      Buffer.add_string buf ", "; emit_res_term buf child;
+      Buffer.add_string buf "))"
+
+    | "ALL9", [child] -> wrap1 "all9_r" child
+
+    (* AR9: E=F from solver — E/F need to be explicit for trust *)
     | "AR9", [child] ->
-      let (e_opt, f_opt) = match goal, node with
-        | Binary (Imp, Leq (e, _), _),
-          Apply { arg = Some (Pred (Lift f)); _ } -> (Some e, Some f)
-        | Binary (Imp, Leq (e, _), _),
-          Apply { arg = Some (Pred (Leq (f, _))); _ } -> (Some e, Some f)
+      let (e_opt, f_opt) = match node with
+        | Apply { goal = Binary (Imp, Leq (e, _), _);
+                  arg = Some (Pred (Lift f)); _ } -> (Some e, Some f)
+        | Apply { goal = Binary (Imp, Leq (e, _), _);
+                  arg = Some (Pred (Leq (f, _))); _ } -> (Some e, Some f)
         | _ -> (None, None)
       in
       begin match e_opt, f_opt with
-      | Some e, Some f ->
-        Buffer.add_string buf "(ar9_r ("; pp_exp buf e;
-        Buffer.add_string buf ") ("; pp_exp buf f;
-        Buffer.add_string buf ") _ trust ";
+      | Some e, Some f when e = f ->
+        (* Identity: E = F, skip AR9 entirely *)
+        emit_res_term buf child
+      | Some _e, Some _f ->
+        (* Non-identity: emit trust with type annotation *)
+        Buffer.add_string buf "(ar9_r trust ";
         emit_res_term buf child;
         Buffer.add_char buf ')'
       | _ ->
         Printf.eprintf "warning: AR9 res term: could not extract E/F\n";
-        Buffer.add_string buf "(stop_r _) (* AR9 fallback *)"
+        emit_res_term buf child
       end
 
-    (* Schema 2: branching *)
-    | "AND1", [child1; child2] ->
-      let (p, q, r) = match goal with
-        | Binary (Imp, Unary (Not, Binary (And, p, q)), r) -> (p, q, r)
-        | _ -> (goal, goal, goal) in
-      Buffer.add_string buf "(and1_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") ("; pp_prd buf r;
-      Buffer.add_string buf ") "; emit_res_term buf child1;
-      Buffer.add_char buf ' '; emit_res_term buf child2;
-      Buffer.add_char buf ')'
-    | "OR3", [child1; child2] ->
-      let (p, q, r) = match goal with
-        | Binary (Imp, Binary (Or, p, q), r) -> (p, q, r)
-        | _ -> (goal, goal, goal) in
-      Buffer.add_string buf "(or3_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") ("; pp_prd buf r;
-      Buffer.add_string buf ") "; emit_res_term buf child1;
-      Buffer.add_char buf ' '; emit_res_term buf child2;
-      Buffer.add_char buf ')'
-    | "AND4", [child1; child2] ->
-      let (p, q) = match goal with
-        | Binary (And, p, q) -> (p, q) | _ -> (goal, goal) in
-      Buffer.add_string buf "(and4_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") "; emit_res_term buf child1;
-      Buffer.add_char buf ' '; emit_res_term buf child2;
-      Buffer.add_char buf ')'
-    | "IMP3", [child1; child2] ->
-      let (p, q, r) = match goal with
-        | Binary (Imp, Binary (Imp, p, q), r) -> (p, q, r)
-        | _ -> (goal, goal, goal) in
-      Buffer.add_string buf "(imp3_r ("; pp_prd buf p;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") ("; pp_prd buf r;
-      Buffer.add_string buf ") "; emit_res_term buf child1;
-      Buffer.add_char buf ' '; emit_res_term buf child2;
-      Buffer.add_char buf ')'
+    (* Schema 2 branching *)
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [c1; c2] ->
+      wrap2 (String.lowercase_ascii base ^ "_r") c1 c2
 
-    (* Fallback *)
     | _ ->
       Printf.eprintf "warning: no Res constructor for %s\n" base;
-      Buffer.add_string buf "(stop_r _) (* fallback for ";
-      Buffer.add_string buf base;
-      Buffer.add_string buf " *)"
+      Buffer.add_string buf "stop_r"
     end
 
 (* Emit a primed chain node. buf is the output buffer, pad is indentation.
