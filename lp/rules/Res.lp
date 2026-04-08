@@ -89,10 +89,10 @@ rule result (imp2_r _ _ $h1 $h2) ↪ result $h1 ∧ result $h2;
 // ---- Structural ----
 
 // IMP4: result wraps under implication.
-// R (child's result) is explicit to avoid dummy-application issues.
-constant symbol imp4_r (P Q R : Prop)
-  : (π P → Res Q) → Res (P ⇒ Q);
-rule result (imp4_r $P _ $R _) ↪ $P ⇒ $R;
+// The child's Res structure doesn't depend on the P hypothesis,
+// so we take Res Q directly (not under π P →).
+constant symbol imp4_r (P : Prop) [Q : Prop] : Res Q → Res (P ⇒ Q);
+rule result (imp4_r $P $h) ↪ $P ⇒ result $h;
 
 // ALL8: result wraps under ∀
 constant symbol all8_r [P : τ ι → Prop]
@@ -100,10 +100,8 @@ constant symbol all8_r [P : τ ι → Prop]
 rule result (all8_r $f) ↪ `∀ x, result ($f x);
 
 // ALL9: result wraps under hypothesis implication.
-// R (child's result) is explicit.
-constant symbol all9_r (H Q R : Prop)
-  : (π H → Res Q) → Res (H ⇒ Q);
-rule result (all9_r $H _ $R _) ↪ $H ⇒ $R;
+constant symbol all9_r (H : Prop) [Q : Prop] : Res Q → Res (H ⇒ Q);
+rule result (all9_r $H $h) ↪ $H ⇒ result $h;
 
 // AND5: antecedent equivalence
 constant symbol and5_r (C C' R : Prop)

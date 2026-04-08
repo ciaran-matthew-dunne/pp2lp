@@ -1245,15 +1245,9 @@ let rec emit_res_term buf (node : proof_node) =
       if child_handles_imp then
         emit_res_term buf child
       else begin
-        let q = match goal with
-          | Binary (Imp, _, q) -> q | _ -> goal in
-        let child_result = compute_result child in
         Buffer.add_string buf "(imp4_r ("; pp_prd buf p;
-        Buffer.add_string buf ") ("; pp_prd buf q;
-        Buffer.add_string buf ") ("; pp_prd buf child_result;
-        Buffer.add_string buf ") (\xce\xbb _, "; (* λ _ *)
-        emit_res_term buf child;
-        Buffer.add_string buf "))"
+        Buffer.add_string buf ") "; emit_res_term buf child;
+        Buffer.add_char buf ')'
       end
 
     (* ALL8: structural — wraps result under ∀ *)
@@ -1272,15 +1266,9 @@ let rec emit_res_term buf (node : proof_node) =
     | "ALL9", [child] ->
       let h = match goal with
         | Binary (Imp, h, _) -> h | _ -> goal in
-      let q = match goal with
-        | Binary (Imp, _, q) -> q | _ -> goal in
-      let child_result = compute_result child in
       Buffer.add_string buf "(all9_r ("; pp_prd buf h;
-      Buffer.add_string buf ") ("; pp_prd buf q;
-      Buffer.add_string buf ") ("; pp_prd buf child_result;
-      Buffer.add_string buf ") (\xce\xbb _, "; (* λ _ *)
-      emit_res_term buf child;
-      Buffer.add_string buf "))"
+      Buffer.add_string buf ") "; emit_res_term buf child;
+      Buffer.add_char buf ')'
 
     (* OPR1: substitution *)
     | "OPR1", [child] ->
