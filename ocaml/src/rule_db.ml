@@ -65,6 +65,8 @@ let parse_flat_suffix json =
     flat_name = to_string (member "flat_name" json);
   }
 
+let to_list_or_empty = function `List l -> l | _ -> []
+
 let load path =
   let json = Yojson.Basic.from_file path in
   let rules = List.map parse_rule (to_list (member "rules" json)) in
@@ -72,17 +74,19 @@ let load path =
   List.iter (fun r -> Hashtbl.replace by_name r.name r) rules;
   (* Also register flat suffixes and emit variants as lookupable *)
   let flat_suffixes =
-    List.map parse_flat_suffix (to_list (member "flat_suffixes" json))
+    List.map parse_flat_suffix (to_list_or_empty (member "flat_suffixes" json))
   in
   List.iter (fun fs ->
     match Hashtbl.find_opt by_name fs.fs_base with
     | Some base_rule ->
       Hashtbl.replace by_name fs.flat_name
         { base_rule with name = fs.flat_name }
-    | None -> ()
+    | None ->
+      Printf.eprintf "warning: flat_suffix %S references unknown base rule %S\n"
+        fs.flat_name fs.fs_base
   ) flat_suffixes;
   let emit_variants =
-    List.map parse_emit_variant (to_list (member "emit_variants" json))
+    List.map parse_emit_variant (to_list_or_empty (member "emit_variants" json))
   in
   (* Register emit variants as lookupable (inherit base rule's metadata) *)
   List.iter (fun ev ->
@@ -91,7 +95,9 @@ let load path =
       if not (Hashtbl.mem by_name ev.variant) then
         Hashtbl.replace by_name ev.variant
           { base_rule with name = ev.variant }
-    | None -> ()
+    | None ->
+      Printf.eprintf "warning: emit_variant %S references unknown base rule %S\n"
+        ev.variant ev.base
   ) emit_variants;
   { rules; by_name; emit_variants; flat_suffixes }
 
@@ -102,12 +108,16 @@ let find db name = Hashtbl.find_opt db.by_name name
 let rule_arity db name =
   match find db name with
   | Some r -> r.arity
-  | None -> 1  (* default: 1 child *)
+  | None ->
+    Printf.eprintf "warning: unknown rule %S, assuming arity 1\n" name;
+    1
 
 let has_primed db name =
   match find db name with
   | Some r -> r.primed
-  | None -> false
+  | None ->
+    Printf.eprintf "warning: unknown rule %S, assuming no primed variant\n" name;
+    false
 
 let emit_args db name =
   match find db name with
@@ -117,7 +127,9 @@ let emit_args db name =
 let lp_status db name =
   match find db name with
   | Some r -> r.lp_status
-  | None -> "unknown"
+  | None ->
+    Printf.eprintf "warning: unknown rule %S, status unknown\n" name;
+    "unknown"
 
 (* --- Global instance --- *)
 

@@ -87,11 +87,12 @@ begin
 end;
 
 opaque symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop] [S : Prop]
-  : π ⊤
+  : π (E = F)
   → π (((F ≤ 𝟎) ⇒ R) = S)
   → π (((E ≤ 𝟎) ⇒ R) = S) ≔
 begin
-  admit
+  assume E F R S heq h;
+  rewrite heq; refine h
 end;
 
 // AR10: solver(P) = Q; H ⊢ Q ⇒ R → H ⊢ P ⇒ R
