@@ -1166,6 +1166,124 @@ let rec compute_result (node : proof_node) : prd =
       Binary (Imp, h, compute_result child)
     | _ -> goal  (* fallback *)
 
+(* Emit a Res chain as a proof script (sequence of refine steps).
+   Each step changes the goal from Res (outer) to Res (inner). *)
+let rec emit_res_proof buf pad (node : proof_node) =
+  match node with
+  | Apply { rule; children; _ } ->
+    let base = strip_suffix rule in
+    begin match base, children with
+    | "STOP", [] ->
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine stop_r"
+    | _, [child] when is_hoas_identity base ->
+      emit_res_proof buf pad child
+
+    (* Schema 1 passthrough — just refine constructor _ *)
+    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
+      | "IMP1" | "XST7" | "EVR3"), [child] ->
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf (String.lowercase_ascii base ^ "_r _;\n");
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "IMP4", [child] ->
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine imp4_r _;\n";
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "ALL8", [child] ->
+      let vars = match node with
+        | Apply { goal; _ } -> (match goal with
+          | Bind (_, xs, _) -> xs | _ -> []) in
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine all8_r _; assume";
+      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
+      Buffer.add_string buf ";\n";
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "ALL9", [child] ->
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine all9_r _;\n";
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "OPR1", [child] ->
+      let (x, body) = match node with
+        | Apply { goal = Binary (Imp, Eq (Var x, _), body); _ } -> (x, body)
+        | _ -> ("__z", Lift (Var "?")) in
+      let z = "__z" in
+      let body' = subst_prd x z body in
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine opr1_r (\xce\xbb "; (* λ *)
+      Buffer.add_string buf z;
+      Buffer.add_string buf ", ";
+      pp_prd buf body';
+      Buffer.add_string buf ") _;\n";
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "OPR2", [child] ->
+      let (x, body) = match node with
+        | Apply { goal = Binary (Imp, Eq (_, Var x), body); _ } -> (x, body)
+        | _ -> ("__z", Lift (Var "?")) in
+      let z = "__z" in
+      let body' = subst_prd x z body in
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine opr2_r (\xce\xbb ";
+      Buffer.add_string buf z;
+      Buffer.add_string buf ", ";
+      pp_prd buf body';
+      Buffer.add_string buf ") _;\n";
+      Buffer.add_string buf pad;
+      emit_res_proof buf pad child
+
+    | "AR9", [child] ->
+      let is_identity = match node with
+        | Apply { goal = Binary (Imp, Leq (e, _), _);
+                  arg = Some (Pred (Lift f)); _ } -> e = f
+        | _ -> false in
+      if is_identity then
+        emit_res_proof buf pad child
+      else begin
+        Buffer.add_string buf "// "; Buffer.add_string buf rule;
+        Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+        Buffer.add_string buf "refine ar9_r trust _;\n";
+        Buffer.add_string buf pad;
+        emit_res_proof buf pad child
+      end
+
+    (* Schema 2 branching — refine constructor _ _ { child1 } { child2 } *)
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [c1; c2] ->
+      Buffer.add_string buf "// "; Buffer.add_string buf rule;
+      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf (String.lowercase_ascii base ^ "_r _ _\n");
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "{ ";
+      emit_res_proof buf (pad ^ "  ") c1;
+      Buffer.add_string buf " }\n";
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "{ ";
+      emit_res_proof buf (pad ^ "  ") c2;
+      Buffer.add_string buf " }"
+
+    | _ ->
+      Printf.eprintf "warning: no Res proof step for %s\n" base;
+      Buffer.add_string buf "refine stop_r"
+    end
+
+(* Emit a Res constructor term (for inline lambda body — kept as fallback) *)
 let rec emit_res_term buf (node : proof_node) =
   match node with
   | Apply { rule; children; _ } ->
@@ -1520,23 +1638,29 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
     else bvars
   in
   let all7_sym = if List.length bvars >= 2 then "ALL7_2r" else "ALL7r" in
-  (* Emit: refine ALL7r (λ vars, <res_term>) _ *)
+  let inner_pad = String.make (indent + 2) ' ' in
+  (* Emit: refine ALL7r _ _ { assume vars; refine steps } { base child } *)
   Buffer.add_string buf first_pad;
   Buffer.add_string buf "refine ";
   Buffer.add_string buf all7_sym;
-  Buffer.add_string buf " (\xce\xbb"; (* (λ *)
+  Buffer.add_string buf " _ _\n";
+  Buffer.add_string buf pad;
+  Buffer.add_string buf "{ assume";
   List.iter (fun x ->
     Buffer.add_char buf ' ';
     pp_ident buf x) bvars;
-  Buffer.add_string buf ", ";
-  emit_res_term buf child1;
-  Buffer.add_string buf ") _;\n";
+  Buffer.add_string buf ";\n";
+  Buffer.add_string buf inner_pad;
+  emit_res_proof buf inner_pad child1;
+  Buffer.add_string buf " }\n";
+  Buffer.add_string buf pad;
+  Buffer.add_string buf "{ ";
   if eff_rule = "ALL7_2" || eff_rule = "XST8_2"
-     || eff_rule = "ALL7_1_2" then begin
-    Buffer.add_string buf pad;
+     || eff_rule = "ALL7_1_2" then
     Buffer.add_string buf "admit"
-  end else
-    emit_node buf thm_hyps ctx indent child2
+  else
+    emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
+  Buffer.add_string buf " }"
 
 (* ---- Generic two-child emission ---- *)
 
