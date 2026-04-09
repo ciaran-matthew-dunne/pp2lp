@@ -3,7 +3,7 @@
 export PP2LP_ROOT := $(CURDIR)
 
 PP2LP        := ocaml/_build/default/bin/main.exe
-LP_CHECK      = lambdapi check --map-dir pp2lp:$(CURDIR)/lp --json
+LP_CHECK      = lambdapi check --json
 FORMAT_ERROR  = python3 bench/format_error.py
 
 # -- Expected failures (known issues, tolerated by check) ---------------------

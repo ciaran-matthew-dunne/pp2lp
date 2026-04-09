@@ -41,7 +41,6 @@ begin
   }
 end;
 
-// NRM4: x not free in Q; H ⊢ (Q ⇒ ♢x · (P ⇒ R)) ⇒ S → H ⊢ ♢x · (P ⇒ (Q ⇒ R)) ⇒ S
 opaque symbol NRM4 [P R : τ ι → Prop] [Q S : Prop]
   : π ((Q ⇒ (`♢ x, P x ⇒ R x)) ⇒ S)
   → π ((`♢ x, P x ⇒ Q ⇒ R x) ⇒ S) ≔
@@ -50,7 +49,6 @@ begin
   refine h1 (λ hq x hpx, h2 x hpx hq)
 end;
 
-// NRM5: H ⊢ ♢x · (P ∧ Q ⇒ R) ⇒ S → H ⊢ ♢x · (P ⇒ (Q ⇒ R)) ⇒ S
 opaque symbol NRM5 [P Q R : τ ι → Prop] [S : Prop]
   : π ((`♢ x, P x ∧ Q x ⇒ R x) ⇒ S)
   → π ((`♢ x, P x ⇒ Q x ⇒ R x) ⇒ S) ≔
@@ -109,9 +107,6 @@ begin
   assume P Q S h1 h2;
   refine h1 (λ x y hp, h2 x hp y)
 end;
-
-
-// ---- NRM10-15: Normal form transformations ----
 
 opaque symbol NRM10 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
@@ -227,8 +222,6 @@ begin
   refine ⊥ₑ (hf E F (∧ᵢ ⊤ᵢ hr))
 end;
 
-// ---- NRM20-23: Equality elimination under ♡ ----
-
 opaque symbol NRM20 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
   : π ((`♡ y, ¬ (P E y)) ⇒ Q)
   → π ((`♡ x, `♡ y, ¬ (P x y ∧ (x = E))) ⇒ Q) ≔
@@ -261,11 +254,6 @@ begin
   refine h1 (λ hpe, h2 E (∧ᵢ hpe (eq_sym (eq_refl E))))
 end;
 
-// ---- NRM24-26: Simple transformations ----
-
-// NRM24: P is not of the form A ∧ B;
-// H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ Q → H ⊢ ♡x · ¬P ⇒ Q
-// Identical to NRM14 in HOAS (♢=♡=∀).
 opaque symbol NRM24 [P : τ ι → Prop] [Q : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ Q)
   → π ((`♡ x, ¬ (P x)) ⇒ Q) ≔
