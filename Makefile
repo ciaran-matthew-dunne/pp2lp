@@ -7,7 +7,7 @@ LP_CHECK      = lambdapi check --json
 FORMAT_ERROR  = python3 bench/format_error.py
 
 # -- Expected failures (known issues, tolerated by check) ---------------------
-XFAIL = xst7_witness xst8_elim xst_flatten xst_mem
+XFAIL = xst_flatten
 
 # -- Replay discovery ---------------------------------------------------------
 # Replays live in their source directories (no merged replay/ dir).

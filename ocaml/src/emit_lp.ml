@@ -1585,7 +1585,12 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
     then (match bvars with x :: _ -> [x] | [] -> [])
     else bvars
   in
-  let all7_sym = if List.length bvars >= 2 then "ALL7_2r" else "ALL7r" in
+  let is_xst8 = eff_rule = "XST8" || eff_rule = "XST8_2" in
+  let all7_sym =
+    if is_xst8 then
+      (if List.length bvars >= 2 then "XST8_2r" else "XST8r")
+    else
+      (if List.length bvars >= 2 then "ALL7_2r" else "ALL7r") in
   let inner_pad = String.make (indent + 2) ' ' in
   (* Emit: refine ALL7r _ _ { assume vars; refine steps } { base child } *)
   Buffer.add_string buf first_pad;

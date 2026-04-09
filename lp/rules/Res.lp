@@ -116,3 +116,20 @@ symbol ALL7_2r [P : τ ι → τ ι → Prop] [Q : Prop]
   (h2 : π ((`♢ x, `♢ y, result (h1 x y)) ⇒ Q))
   : π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
   λ hP, h2 (λ x y, =⇒ (to_eq (h1 x y)) (hP x y));
+
+// ---- XST8 with Res: existential via ¬¬ elimination ----
+// XST8: (H ⊢ ¬P) ⇝ R; H ⊢ (∀x·R) ⇒ ⊥ → H ⊢ ∃x·P
+// The result chain computes R from ¬P. We need ¬(P x) = result(h1 x),
+// then the continuation proves (∀x, result(h1 x)) ⇒ ⊥.
+
+symbol XST8r [P : τ ι → Prop]
+  (h1 : Π x : τ ι, Res (¬ (P x)))
+  (h2 : π ((`∀ x, result (h1 x)) ⇒ ⊥))
+  : π (`∃ x, P x) ≔
+  ¬¬ₑ _ (λ hne, h2 (λ x, =⇒ (to_eq (h1 x)) (λ hpx, hne (∃ᵢ x hpx))));
+
+symbol XST8_2r [P : τ ι → τ ι → Prop]
+  (h1 : Π x : τ ι, Π y : τ ι, Res (¬ (P x y)))
+  (h2 : π ((`∀ x, `∀ y, result (h1 x y)) ⇒ ⊥))
+  : π (`∃ x, `∃ y, P x y) ≔
+  ¬¬ₑ _ (λ hne, h2 (λ x y, =⇒ (to_eq (h1 x y)) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy)))));
