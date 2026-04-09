@@ -84,6 +84,8 @@ begin
 end;
 
 // ALL8: x not free in H; H ⊢ P → H ⊢ ∀x·P
+// Identity in HOAS: π(∀x, P x) is already Πx, π(P x).
+// The emitter handles ∀-introduction via assume.
 opaque symbol ALL8 [P : τ ι → Prop]
   : π (`∀ x, P x)
   → π (`∀ x, P x) ≔
@@ -93,7 +95,7 @@ end;
 
 // ALL9: H, (∀x·T) ⊢ Q → H ⊢ (♡x·T) ⇒ Q
 opaque symbol ALL9 [T : τ ι → Prop] [Q : Prop]
-  : (π (`♡ x, T x) → π Q)
+  : (π (`∀ x, T x) → π Q)
   → π ((`♡ x, T x) ⇒ Q) ≔
 begin
   assume T Q h; refine h

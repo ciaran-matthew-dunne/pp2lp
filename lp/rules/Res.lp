@@ -46,6 +46,35 @@ constant symbol imp1_r [P Q R : Prop]
   : Res (P ⇒ ¬ Q ⇒ R) → Res (¬ (P ⇒ Q) ⇒ R);
 rule result (imp1_r $h) ↪ result $h;
 
+constant symbol imp5_r [P Q : Prop] : Res Q → Res (P ⇒ Q);
+rule result (imp5_r $h) ↪ result $h;
+
+constant symbol not2_r [P : Prop] : Res P → Res (¬ ¬ P);
+rule result (not2_r $h) ↪ result $h;
+
+constant symbol vr2_r : Res ⊥ → Res (¬ ⊤);
+rule result (vr2_r $h) ↪ result $h;
+
+constant symbol fx1_r [P : Prop] : Res P → Res (¬ ⊥ ⇒ P);
+rule result (fx1_r $h) ↪ result $h;
+
+// EQV: schema 2 (branching)
+constant symbol eqv1_r [P Q R : Prop]
+  : Res (P ⇒ ¬ Q ⇒ R) → Res (¬ P ⇒ Q ⇒ R) → Res (¬ (P ⇔ Q) ⇒ R);
+rule result (eqv1_r $h1 $h2) ↪ result $h1 ∧ result $h2;
+
+constant symbol eqv2_r [P Q : Prop]
+  : Res (¬ Q) → Res P → Res (¬ (P ⇔ Q));
+rule result (eqv2_r $h1 $h2) ↪ result $h1 ∧ result $h2;
+
+constant symbol eqv3_r [P Q R : Prop]
+  : Res (Q ⇒ R) → Res (P ⇒ R) → Res ((P ⇔ Q) ⇒ R);
+rule result (eqv3_r $h1 $h2) ↪ result $h1 ∧ result $h2;
+
+constant symbol eqv4_r [P Q : Prop]
+  : Res (Q ⇒ P) → Res (P ⇒ Q) → Res (P ⇔ Q);
+rule result (eqv4_r $h1 $h2) ↪ result $h1 ∧ result $h2;
+
 // OPR1/OPR2: substitution under equality
 // PE (child consequent) is explicit; Px (goal consequent) inferred from context.
 constant symbol opr1_r [x E : τ ι] (PE : Prop) [Px : Prop]

@@ -1130,11 +1130,13 @@ let rec compute_result (node : proof_node) : prd =
     | "STOP", [] -> goal  (* result = P *)
     | _, [child] when is_hoas_identity base -> compute_result child
     (* Schema 1 passthrough *)
-    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
-      | "IMP1" | "XST7" | "EVR3" | "OPR1" | "OPR2" | "AR9"), [child] ->
+    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
+      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
+      | "XST7" | "EVR3" | "OPR1" | "OPR2" | "AR9"), [child] ->
       compute_result child
     (* Schema 2 branching *)
-    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [child1; child2] ->
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"
+      | "EQV1" | "EQV2" | "EQV3" | "EQV4"), [child1; child2] ->
       Binary (And, compute_result child1, compute_result child2)
     (* IMP4: P ⇒ child_result *)
     | "IMP4", [child] ->
@@ -1165,8 +1167,9 @@ let rec emit_res_proof buf pad (node : proof_node) =
       emit_res_proof buf pad child
 
     (* Schema 1 passthrough — just refine constructor _ *)
-    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
-      | "IMP1" | "XST7" | "EVR3"), [child] ->
+    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
+      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
+      | "XST7" | "EVR3"), [child] ->
       Buffer.add_string buf "// "; Buffer.add_string buf rule;
       Buffer.add_string buf "\n"; Buffer.add_string buf pad;
       Buffer.add_string buf "refine ";
@@ -1229,7 +1232,8 @@ let rec emit_res_proof buf pad (node : proof_node) =
       end
 
     (* Schema 2 branching — refine constructor _ _ { child1 } { child2 } *)
-    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [c1; c2] ->
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"
+      | "EQV1" | "EQV2" | "EQV3" | "EQV4"), [c1; c2] ->
       Buffer.add_string buf "// "; Buffer.add_string buf rule;
       Buffer.add_string buf "\n"; Buffer.add_string buf pad;
       Buffer.add_string buf "refine ";
@@ -1267,8 +1271,9 @@ let rec emit_res_term buf (node : proof_node) =
     | _, [child] when is_hoas_identity base -> emit_res_term buf child
 
     (* Schema 1 passthrough — all implicit, just constructor + child *)
-    | ("AND2" | "AND3" | "OR4" | "VR3" | "EVR2" | "NOT1" | "OR1"
-      | "IMP1" | "XST7" | "EVR3"), [child] ->
+    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
+      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
+      | "XST7" | "EVR3"), [child] ->
       wrap1 (String.lowercase_ascii base ^ "_r") child
 
     (* OPR1/OPR2: supply child consequent as PE *)
