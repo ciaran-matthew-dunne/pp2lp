@@ -10,7 +10,7 @@ USAGE
 =====
 Run from the directory containing .but files, or specify the directory:
 
-    cd /path/to/test/smt
+    cd /path/to/bench/prv
     python3 ../gen_traces.py .
 
 Or from any location:

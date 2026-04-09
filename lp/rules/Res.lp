@@ -47,13 +47,13 @@ constant symbol imp1_r [P Q R : Prop]
 rule result (imp1_r $h) ↪ result $h;
 
 // OPR1/OPR2: substitution under equality
-// OPR1/OPR2: P is explicit (HO implicit can't be inferred by lambdapi)
-constant symbol opr1_r [E x : τ ι] (P : τ ι → Prop)
-  : Res ((x = E) ⇒ P E) → Res ((x = E) ⇒ P x);
+// PE (child consequent) is explicit; Px (goal consequent) inferred from context.
+constant symbol opr1_r [x E : τ ι] (PE : Prop) [Px : Prop]
+  : Res ((x = E) ⇒ PE) → Res ((x = E) ⇒ Px);
 rule result (opr1_r _ $h) ↪ result $h;
 
-constant symbol opr2_r [E x : τ ι] (P : τ ι → Prop)
-  : Res ((E = x) ⇒ P E) → Res ((E = x) ⇒ P x);
+constant symbol opr2_r [E x : τ ι] (PE : Prop) [Px : Prop]
+  : Res ((E = x) ⇒ PE) → Res ((E = x) ⇒ Px);
 rule result (opr2_r _ $h) ↪ result $h;
 
 // AR9: solver equality E=F

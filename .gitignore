@@ -1,15 +1,14 @@
 ocaml/_build
 
-test/gen/
-test/prv/gen/
-test/prv/*.res
-test/prv/*.trace
-test/traces/*.trace
-test/traces/*.replay
+bench/gen/
+bench/prv/gen/
+bench/synth/but/
+bench/prv/*.res
+bench/prv/*.trace
+bench/traces/*.trace
+bench/traces/*.replay
 
-lp-old
-lp/gen/
-replay/
+bench/lp/*.lp
 *.lpo
 
 # Private / large binary files
@@ -18,7 +17,7 @@ doc/*.pdf
 doc/*.tar.gz
 tex/**/*.pdf
 
-# LaTeX/TeX build artifacts
+# LaTeX build artifacts
 *.aux
 *.bbl
 *.bcf
@@ -35,14 +34,8 @@ tex/**/*.pdf
 *.lof
 *.lot
 *.makefile
-*.fls
 *.out
 *.toc
-*.fmt
-*.fot
-*.cb
-*.cb2
-*.out
 *.pdfsync
 *.synctex
 *.synctex(busy)
@@ -55,7 +48,7 @@ tex/**/*.pdf
 *.xdv
 *.run.xml
 
-# Atelier B build artifacts and temporary files
+# Atelier B build artifacts
 *.bxml
 *.chk
 *.dep
@@ -82,35 +75,10 @@ btraces
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
-# Backup files
+# Misc
 *.bak
-*.backup
 *.orig
-
-# Temporary files
 *.tmp
-*.temp
-.tmp/
-.temp/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Build directories
-build/
-dist/
-out/
-target/
-
-# Logs
-*.log
-logs/
+.pp2lp-cache
+lp/Experiment.lp

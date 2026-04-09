@@ -74,6 +74,7 @@ constant symbol ≤ : τ ι → τ ι → Prop;
 notation ≤ infix 5;
 
 symbol > ≔ λ x y, ¬ (x ≤ y);
+notation > infix 5;
 
 constant symbol ≪ : τ ι → τ ι → Prop; // strict <
 notation ≪ infix 5;

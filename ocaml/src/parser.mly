@@ -19,9 +19,9 @@
 
 %nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
 %nonassoc COMMA
-%left IMP           (* !x.P => Q = (∀x.P) => Q *)
-%left IFF           (* !x.P <=> Q = (∀x.P) <=> Q *)
-%left OR AND          (* PP spec: ∧ and ∨ have same priority (2), both left-assoc *)
+%left IMP           (* PP spec priority 3: => *)
+%left OR AND        (* PP spec priority 2: and, or (same level, left-assoc) *)
+%left IFF           (* PP spec priority 1: <=> (tighter than and/or) *)
 %right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
 %left UNION
 %left INTER

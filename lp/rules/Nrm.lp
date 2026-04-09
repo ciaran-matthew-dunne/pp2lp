@@ -95,8 +95,6 @@ begin
   refine h1 (λ x y, ∧ₑ₁ (h2 x y)) (λ x y, ∧ₑ₂ (h2 x y))
 end;
 
-// ---- NRM8-9: Quantifier flattening ----
-
 opaque symbol NRM8 [Q : τ ι → τ ι → Prop] [S : Prop]
   : π ((`♢ x, `♢ y, Q x y) ⇒ S)
   → π ((`♢ x, `∀ y, Q x y) ⇒ S) ≔
@@ -104,52 +102,31 @@ begin
   assume Q S h; refine h
 end;
 
-// NRM8_13: Combined NRM8 + NRM13 for two-variable compound.
-// Converts ♢x.∀y.(P x y ⇒ Q x y) to ♡x.♡y.¬(P x y ∧ ¬(Q x y)).
-// In HOAS (♢=♡=∀): (∀x y, P x y ⇒ Q x y) ⇒ R → (∀x y, ¬(P x y ∧ ¬(Q x y))) ⇒ R.
-opaque symbol NRM8_13 [P Q : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, ¬ (P x y ∧ ¬ (Q x y))) ⇒ R)
-  → π ((`♢ x, `∀ y, P x y ⇒ Q x y) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y hpnq, (∧ₑ₂ hpnq) (h2 x y (∧ₑ₁ hpnq)))
-end;
-// NRM8_13_3: Three-variable version.
-opaque symbol NRM8_13_3 [P Q : τ ι → τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, `♡ z, ¬ (P x y z ∧ ¬ (Q x y z))) ⇒ R)
-  → π ((`♢ x, `∀ y, `∀ z, P x y z ⇒ Q x y z) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y z hpnq, (∧ₑ₂ hpnq) (h2 x y z (∧ₑ₁ hpnq)))
-end;
-
-// NRM9: x and y distinct; y not free in P; H ⊢ ♢(x, y) · (P ⇒ Q) ⇒ S → H ⊢ ♢x · (P ⇒ ∀y · Q) ⇒ S
 opaque symbol NRM9 [P : τ ι → Prop] [Q : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `∀ y, P x ⇒ Q x y) ⇒ S)
+  : π ((`♢ x, `♢ y, P x ⇒ Q x y) ⇒ S)
   → π ((`♢ x, P x ⇒ `∀ y, Q x y) ⇒ S) ≔
 begin
   assume P Q S h1 h2;
   refine h1 (λ x y hp, h2 x hp y)
 end;
-// NRM9f: x and y not distinct or y free in P; z fresh; K = [y := z] Q;
-//   H ⊢ ♢(x, z) · (P ⇒ K) ⇒ S → H ⊢ ♢x · (P ⇒ ∀y · Q) ⇒ S
-// Identity in HOAS.
+
 
 // ---- NRM10-15: Normal form transformations ----
 
-// NRM10: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ∧ Q ⇒ FALSE) ⇒ R
-// Identity since ♢=♡=∀ and (P∧Q ⇒ ⊥) = ¬(P∧Q). OCaml emitter should skip.
+opaque symbol NRM10 [P Q : τ ι → Prop] [R : Prop]
+  : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
+  → π ((`♢ x, (P x ∧ Q x) ⇒ ⊥) ⇒ R) ≔
+begin
+  admit;
+end;
 
-// NRM11: H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ R → H ⊢ ♢x · (P ⇒ FALSE) ⇒ R
 opaque symbol NRM11 [P : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ R)
   → π ((`♢ x, P x ⇒ ⊥) ⇒ R) ≔
 begin
-  assume P R h1 h2;
-  refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
+  admit;
 end;
 
-// NRM12: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ⇒ ¬Q) ⇒ R
 opaque symbol NRM12 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
   → π ((`♢ x, P x ⇒ ¬ (Q x)) ⇒ R) ≔
@@ -158,32 +135,12 @@ begin
   refine h1 (λ x hpq, h2 x (∧ₑ₁ hpq) (∧ₑ₂ hpq))
 end;
 
-// NRM13: ♢x.(P⇒Q)⇒R → ♡x.¬(P∧¬Q)⇒R  (2-premise)
 opaque symbol NRM13 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ ¬ (Q x))) ⇒ R)
   → π ((`♢ x, P x ⇒ Q x) ⇒ R) ≔
 begin
   assume P Q R h1 h2;
   refine h1 (λ x hc, (∧ₑ₂ hc) (h2 x (∧ₑ₁ hc)))
-end;
-
-// NRM53: ♢x.(P₁⇒P₂⇒Q)⇒R → ♡x.¬((P₁∧P₂)∧¬Q)⇒R  (3-premise = NRM5+NRM13)
-opaque symbol NRM53 [P1 P2 Q : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ ((P1 x ∧ P2 x) ∧ ¬ (Q x))) ⇒ R)
-  → π ((`♢ x, P1 x ⇒ P2 x ⇒ Q x) ⇒ R) ≔
-begin
-  assume P1 P2 Q R h1 h2;
-  refine h1 (λ x hc, (∧ₑ₂ hc) (h2 x (∧ₑ₁ (∧ₑ₁ hc)) (∧ₑ₂ (∧ₑ₁ hc))))
-end;
-
-// NRM54: ♢x.(P₁⇒P₂⇒P₃⇒Q)⇒R → ♡x.¬(((P₁∧P₂)∧P₃)∧¬Q)⇒R  (4-premise = NRM5²+NRM13)
-opaque symbol NRM54 [P1 P2 P3 Q : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (((P1 x ∧ P2 x) ∧ P3 x) ∧ ¬ (Q x))) ⇒ R)
-  → π ((`♢ x, P1 x ⇒ P2 x ⇒ P3 x ⇒ Q x) ⇒ R) ≔
-begin
-  assume P1 P2 P3 Q R h1 h2;
-  refine h1 (λ x hc,
-    (∧ₑ₂ hc) (h2 x (∧ₑ₁ (∧ₑ₁ (∧ₑ₁ hc))) (∧ₑ₂ (∧ₑ₁ (∧ₑ₁ hc))) (∧ₑ₂ (∧ₑ₁ hc))))
 end;
 
 // NRM13_2: Two-variable version.
@@ -195,22 +152,12 @@ begin
   refine h1 (λ x y hpnq, (∧ₑ₂ hpnq) (h2 x y (∧ₑ₁ hpnq)))
 end;
 
-// NRM14: H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ R → H ⊢ (♢x · ¬P) ⇒ R
 opaque symbol NRM14 [P : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ R)
-  → π ((`♢ x, ¬ (P x)) ⇒ R) ≔
+  → π ((`♢ x, ¬ P x) ⇒ R) ≔
 begin
   assume P R h1 h2;
   refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
-end;
-
-// NRM15: H ⊢ ♡x · ¬(TRUE ∧ ¬P) ⇒ R → H ⊢ (♢x · P) ⇒ R
-opaque symbol NRM15 [P : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (⊤ ∧ ¬ (P x))) ⇒ R)
-  → π ((`♢ x, P x) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x htnpx, (∧ₑ₂ htnpx) (h2 x))
 end;
 
 // NRM14_2: Two-variable version.
@@ -222,6 +169,14 @@ begin
   refine h1 (λ x y htpxy, h2 x y (∧ₑ₂ htpxy))
 end;
 
+opaque symbol NRM15 [P : τ ι → Prop] [R : Prop]
+  : π ((`♡ x, ¬ (⊤ ∧ ¬ P x)) ⇒ R)
+  → π ((`♢ x, P x) ⇒ R) ≔
+begin
+  assume P R h1 h2;
+  refine h1 (λ x htnpx, (∧ₑ₂ htnpx) (h2 x))
+end;
+
 // NRM15_2: Two-variable version.
 opaque symbol NRM15_2 [P : τ ι → τ ι → Prop] [R : Prop]
   : π ((`♡ x, `♡ y, ¬ (⊤ ∧ ¬ (P x y))) ⇒ R)
@@ -231,17 +186,28 @@ begin
   refine h1 (λ x y htnpxy, (∧ₑ₂ htnpxy) (h2 x y))
 end;
 
-// ---- NRM16-19: Hypothesis lookup ----
-// These are Schema 0 rules (result = TRUE) used inside
-// ALL7's result sub-tree. They prove goals from hypotheses.
-
-// NRM16: ∀x · P in H → H ⊢ (♡x · P) ⇒ Q
 opaque symbol NRM16 [P : τ ι → Prop] [Q : Prop]
   : π (`∀ x, P x)
   → π Q
   → π ((`♡ x, P x) ⇒ Q) ≔
 begin
   assume P Q hp hq ht; refine hq
+end;
+
+opaque symbol NRM17 [P : τ ι → Prop] [Q : Prop]
+  : π (`∀ x, P x)
+  → π Q
+  → π ((`♡ x, P x) ⇒ Q) ≔
+begin
+  assume P Q hp hq ht; refine hq
+end;
+
+opaque symbol NRM18 [P : τ ι → Prop] [R Q : Prop] (E : τ ι)
+  : π (`∀ x, ¬ (⊤ ∧ ¬ P x))
+  → π (P E = R)
+  → π ((`♡ y, ¬ (⊤ ∧ R)) ⇒ Q) ≔
+begin
+  admit
 end;
 
 opaque symbol NRM19 [Q : Prop] [R : τ ι → Prop] (E : τ ι)
@@ -299,6 +265,7 @@ end;
 
 // NRM24: P is not of the form A ∧ B;
 // H ⊢ ♡x · ¬(TRUE ∧ P) ⇒ Q → H ⊢ ♡x · ¬P ⇒ Q
+// Identical to NRM14 in HOAS (♢=♡=∀).
 opaque symbol NRM24 [P : τ ι → Prop] [Q : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ Q)
   → π ((`♡ x, ¬ (P x)) ⇒ Q) ≔

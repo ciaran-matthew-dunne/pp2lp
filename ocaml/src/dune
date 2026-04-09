@@ -6,10 +6,10 @@
 (library
  (name pp2lp)
  (public_name pp2lp)
- (libraries unix yojson)
+ (libraries unix)
  (modules
    parser lexer parse_pp syntax_pp
-   rule_db proof_tree emit_lp reconstruct
+   rule_db proof_tree emit_lp emit_pp reconstruct gen_but
    check cache batch
  )
  (flags :standard)

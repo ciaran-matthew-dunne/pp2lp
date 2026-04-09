@@ -2,9 +2,10 @@ open Pp2lp.Syntax_pp
 open Pp2lp.Parse_pp
 open Pp2lp.Proof_tree
 open Pp2lp.Emit_lp
+open Pp2lp.Emit_pp
 open Pp2lp.Reconstruct
 
-let () = Pp2lp.Rule_db.auto_init ()
+
 
 let tests_passed = ref 0
 let tests_failed = ref 0
@@ -232,6 +233,19 @@ let () =
   check "parse: complex arith predicate"
     (match rhs with Simple (Binary (Imp, Binary (And, Leq _, Leq _), Mem _)) -> true
                   | _ -> false)
+
+(* PP spec: <=> (priority 1) binds tighter than and/or (priority 2) *)
+let () =
+  let (_, rhs) = parse_exn "[EQV3] <p <=> q and r>" in
+  check "parse: iff/and precedence"
+    (rhs = Simple (Binary (And, Binary (Iff, Lift (Var "p"), Lift (Var "q")),
+                           Lift (Var "r"))))
+
+let () =
+  let (_, rhs) = parse_exn "[EQV3] <p <=> q or r>" in
+  check "parse: iff/or precedence"
+    (rhs = Simple (Binary (Or, Binary (Iff, Lift (Var "p"), Lift (Var "q")),
+                           Lift (Var "r"))))
 
 (* --- Multiple hypotheses --- *)
 
@@ -679,6 +693,79 @@ let () =
   let output = emit_lp "test_branch" goal tree in
   check "emit_lp: branch has braces" (has "{ " output && has "}" output);
   check "emit_lp: branch has AND1" (has "refine AND1" output)
+
+
+(* ===================================================================
+   SECTION 5: Emit_pp round-trip tests (parse → emit_pp → re-parse)
+   =================================================================== *)
+
+(* Round-trip helper: wrap predicate text in a STOP line, parse, emit, re-parse *)
+let roundtrip_prd text =
+  let line = Printf.sprintf "[STOP] <%s>" text in
+  match parse_pp_string line with
+  | None -> failwith (Printf.sprintf "roundtrip: initial parse failed: %s" text)
+  | Some (_, Simple p) ->
+    let emitted = prd_to_pp p in
+    let line2 = Printf.sprintf "[STOP] <%s>" emitted in
+    (match parse_pp_string line2 with
+     | None -> failwith (Printf.sprintf "roundtrip: re-parse failed: %s" emitted)
+     | Some (_, Simple p2) -> (p, emitted, p2)
+     | _ -> failwith "roundtrip: unexpected FIN on re-parse")
+  | _ -> failwith "roundtrip: unexpected FIN"
+
+let check_roundtrip name text =
+  let (p, _emitted, p2) = roundtrip_prd text in
+  check name (p = p2)
+
+(* --- Simple predicates --- *)
+let () = check_roundtrip "rt: var" "p"
+let () = check_roundtrip "rt: btrue" "btrue"
+let () = check_roundtrip "rt: bfalse" "bfalse"
+let () = check_roundtrip "rt: not" "not(p)"
+let () = check_roundtrip "rt: and" "(p and q)"
+let () = check_roundtrip "rt: or" "(p or q)"
+let () = check_roundtrip "rt: imp" "(p => q)"
+let () = check_roundtrip "rt: iff" "(p <=> q)"
+
+(* --- Equality and comparison --- *)
+let () = check_roundtrip "rt: eq" "a=b"
+let () = check_roundtrip "rt: leq" "a<=b"
+
+(* --- Membership --- *)
+let () = check_roundtrip "rt: mem" "x:S"
+let () = check_roundtrip "rt: multi mem" "x,y:S"
+
+(* --- Quantifiers --- *)
+let () = check_roundtrip "rt: forall0" "!x.(p)"
+let () = check_roundtrip "rt: forall1" "forall(x,y).(p)"
+let () = check_roundtrip "rt: exists" "#x.(p)"
+
+(* --- Arithmetic --- *)
+let () = check_roundtrip "rt: add" "a+b=c"
+let () = check_roundtrip "rt: sub" "a-b<=0"
+let () = check_roundtrip "rt: neg" "-a<=0"
+
+(* --- Set operators --- *)
+let () = check_roundtrip "rt: inter" "a/\\b=c"
+let () = check_roundtrip "rt: union" "a\\/b=c"
+let () = check_roundtrip "rt: set image" "a[b]=c"
+
+(* --- Nested --- *)
+let () = check_roundtrip "rt: nested" "(not(p and q) => (not(p) or not(q)))"
+let () = check_roundtrip "rt: forall imp" "!x.((p and q) => r)"
+let () = check_roundtrip "rt: app mem" "a,b:f"
+
+(* --- exp_to_pp direct tests --- *)
+let () =
+  check "emit_pp: var" (exp_to_pp (Var "x") = "x");
+  check "emit_pp: nat" (exp_to_pp (Nat 42) = "42");
+  check "emit_pp: add" (exp_to_pp (AOp (Add, Var "a", Var "b")) = "a+b");
+  check "emit_pp: sub" (exp_to_pp (AOp (Sub, Var "a", Var "b")) = "a-b");
+  check "emit_pp: neg" (exp_to_pp (Neg (Var "x")) = "-x");
+  check "emit_pp: app" (exp_to_pp (App ("f", [Var "a"; Var "b"])) = "f(a,b)");
+  check "emit_pp: inter" (exp_to_pp (Inter (Var "a", Var "b")) = "a/\\b");
+  check "emit_pp: union" (exp_to_pp (Union (Var "a", Var "b")) = "a\\/b");
+  check "emit_pp: image" (exp_to_pp (SetImage (Var "a", Var "b")) = "a[b]")
 
 
 (* --- Summary --- *)

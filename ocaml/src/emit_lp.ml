@@ -484,7 +484,8 @@ let is_opr_vacuous rule goal =
 let is_hoas_identity = function
   | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
   | "XST1" | "XST2" | "XST3" | "XST4"
-  | "AR3_F" -> true
+  | "AR3_F"
+  | "NRM8" -> true (* ♢x.∀y.Q = ∀x.∀y.Q in HOAS *)
   | _ -> false
 
 let binding_vars = function
@@ -504,17 +505,6 @@ let goal_binding_count goal =
 
 let select_variant rule goal children flat =
   match rule, children with
-  (* NRM8 + NRM13 fusion *)
-  | "NRM8", [Apply { rule = "NRM13"; _ }] ->
-    let rec count_vars = function
-      | Binary (Imp, Bind (_, xs, body), _) ->
-        List.length xs + count_inner body
-      | _ -> 0
-    and count_inner = function
-      | Bind (_, xs, body) -> List.length xs + count_inner body
-      | _ -> 0
-    in
-    if count_vars goal >= 3 then "NRM8_13_3" else "NRM8_13"
   (* ALL7/XST8: 2-var compound binding → _2 variant (flat=0 only) *)
   | ("ALL7" | "ALL7_1"), _ when goal_binding_count goal >= 2 && flat = 0 ->
     if rule = "ALL7_1" then "ALL7_1_2" else "ALL7_2"
@@ -756,21 +746,16 @@ let emit_quant_r_args buf rule node =
     | None -> ()
     end
 
-(* OPR1/OPR2: emit substitution predicate lambda *)
-let emit_opr_args buf opr_rule goal =
-  let decompose = match goal with
-    | Binary (Imp, Eq (Var x, _), body) when opr_rule = "OPR1" -> Some (x, body)
-    | Binary (Imp, Eq (_, Var x), body) when opr_rule = "OPR2" -> Some (x, body)
+(* OPR1/OPR2: emit child consequent as PE *)
+let emit_opr_args buf (node : proof_node) =
+  let child_body = match node with
+    | Apply { children = [Apply { goal = Binary (Imp, _, body); _ }]; _ } -> Some body
     | _ -> None
   in
-  match decompose with
-  | Some (x, body) ->
-    let z = "__z" in
-    let body' = subst_prd x z body in
-    Buffer.add_string buf " (\xce\xbb "; (* (λ  *)
-    Buffer.add_string buf z;
-    Buffer.add_string buf ", ";
-    pp_prd buf body';
+  match child_body with
+  | Some body ->
+    Buffer.add_string buf " (";
+    pp_prd buf body;
     Buffer.add_char buf ')'
   | None ->
     Buffer.add_string buf " _"
@@ -898,8 +883,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
   | Apply { goal; arg; _ } ->
     let base = strip_suffix eff_rule in
     let primed = is_primed eff_rule in
-    let db = Rule_db.get () in
-    let ea = Rule_db.emit_args db base in
+    let ea = Rule_db.emit_args base in
     match ea with
     (* Shared primed+base handlers *)
     | Some "dynamic:axm8" -> emit_axm8_args buf goal
@@ -915,8 +899,8 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
         Printf.eprintf "warning: AR9 missing solver arg\n";
         Buffer.add_string buf " _ trust"
       end
-    | Some "dynamic:opr1" -> emit_opr_args buf "OPR1" goal
-    | Some "dynamic:opr2" -> emit_opr_args buf "OPR2" goal
+    | Some "dynamic:opr1" -> emit_opr_args buf node
+    | Some "dynamic:opr2" -> emit_opr_args buf node
     (* Primed: emit static args if present, skip dynamic base-only handlers *)
     | _ when primed ->
       begin match ea with
@@ -1216,34 +1200,15 @@ let rec emit_res_proof buf pad (node : proof_node) =
       Buffer.add_string buf pad;
       emit_res_proof buf pad child
 
-    | "OPR1", [child] ->
-      let (x, body) = match node with
-        | Apply { goal = Binary (Imp, Eq (Var x, _), body); _ } -> (x, body)
-        | _ -> ("__z", Lift (Var "?")) in
-      let z = "__z" in
-      let body' = subst_prd x z body in
+    | ("OPR1" | "OPR2"), [child] ->
+      let child_body = match child with
+        | Apply { goal = Binary (Imp, _, body); _ } -> body
+        | _ -> Lift (Var "?") in
+      let opr = if base = "OPR1" then "opr1_r" else "opr2_r" in
       Buffer.add_string buf "// "; Buffer.add_string buf rule;
       Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine opr1_r (\xce\xbb "; (* λ *)
-      Buffer.add_string buf z;
-      Buffer.add_string buf ", ";
-      pp_prd buf body';
-      Buffer.add_string buf ") _;\n";
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | "OPR2", [child] ->
-      let (x, body) = match node with
-        | Apply { goal = Binary (Imp, Eq (_, Var x), body); _ } -> (x, body)
-        | _ -> ("__z", Lift (Var "?")) in
-      let z = "__z" in
-      let body' = subst_prd x z body in
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine opr2_r (\xce\xbb ";
-      Buffer.add_string buf z;
-      Buffer.add_string buf ", ";
-      pp_prd buf body';
+      Buffer.add_string buf "refine "; Buffer.add_string buf opr;
+      Buffer.add_string buf " ("; pp_prd buf child_body;
       Buffer.add_string buf ") _;\n";
       Buffer.add_string buf pad;
       emit_res_proof buf pad child
@@ -1306,30 +1271,14 @@ let rec emit_res_term buf (node : proof_node) =
       | "IMP1" | "XST7" | "EVR3"), [child] ->
       wrap1 (String.lowercase_ascii base ^ "_r") child
 
-    (* OPR1/OPR2: P is explicit (HO implicit) — construct the lambda *)
-    | "OPR1", [child] ->
-      let (x, body) = match node with
-        | Apply { goal = Binary (Imp, Eq (Var x, _), body); _ } -> (x, body)
-        | _ -> ("__z", Lift (Var "?")) in
-      let z = "__z" in
-      let body' = subst_prd x z body in
-      Buffer.add_string buf "(opr1_r (\xce\xbb "; (* (opr1_r (λ  *)
-      Buffer.add_string buf z;
-      Buffer.add_string buf ", ";
-      pp_prd buf body';
-      Buffer.add_string buf ") ";
-      emit_res_term buf child;
-      Buffer.add_char buf ')'
-    | "OPR2", [child] ->
-      let (x, body) = match node with
-        | Apply { goal = Binary (Imp, Eq (_, Var x), body); _ } -> (x, body)
-        | _ -> ("__z", Lift (Var "?")) in
-      let z = "__z" in
-      let body' = subst_prd x z body in
-      Buffer.add_string buf "(opr2_r (\xce\xbb ";
-      Buffer.add_string buf z;
-      Buffer.add_string buf ", ";
-      pp_prd buf body';
+    (* OPR1/OPR2: supply child consequent as PE *)
+    | ("OPR1" | "OPR2"), [child] ->
+      let child_body = match child with
+        | Apply { goal = Binary (Imp, _, body); _ } -> body
+        | _ -> Lift (Var "?") in
+      let opr = if base = "OPR1" then "opr1_r" else "opr2_r" in
+      Buffer.add_char buf '('; Buffer.add_string buf opr;
+      Buffer.add_string buf " ("; pp_prd buf child_body;
       Buffer.add_string buf ") ";
       emit_res_term buf child;
       Buffer.add_char buf ')'
@@ -1386,10 +1335,9 @@ let rec emit_res_term buf (node : proof_node) =
 let rec emit_primed_chain buf ctx pad (node : proof_node) =
   match node with
   | Apply { rule; goal; children; _ } ->
-    let db = Rule_db.get () in
     let base = strip_suffix rule in
-    let schema = match Rule_db.find db base with
-      | Some r -> r.result_schema | None -> Some 1 in
+    let schema = match Rule_db.result_schema base with
+      | Some _ as s -> s | None -> Some 1 in
     (* Emit comment showing the PP rule *)
     Buffer.add_string buf "// ";
     Buffer.add_string buf rule;
@@ -1713,15 +1661,6 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf eff_rule;
       emit_rule_args buf ctx eff_rule node
 
-    | [Apply { rule = "NRM13"; children = [grandchild]; _ }]
-      when rule = "NRM8" ->
-      emit_comment ();
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf eff_rule;
-      Buffer.add_string buf " _;\n";
-      emit_node buf thm_hyps ctx indent grandchild
-
     | [_child] when Proof_tree.is_branching_quantifier rule ->
       Printf.eprintf "warning: truncated replay at %s (no base child)\n" rule;
       emit_comment ();
@@ -1740,45 +1679,6 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       done;
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx indent child
-
-    | [child] when rule = "NRM5" ->
-      (* Detect NRM5 chain: NRM5^n + NRM13 → collapsed NRM53/NRM54/...
-         The current node is already NRM5, so total = 1 (this) + extra + 2 (NRM13). *)
-      let rec count_nrm5 n node = match node with
-        | Apply { rule = "NRM5"; children = [child]; _ } ->
-          count_nrm5 (n + 1) child
-        | _ -> (n, node)
-      in
-      let (extra, terminal) = count_nrm5 0 child in
-      let total = 3 + extra in (* this NRM5 + extra NRM5s + 2 from NRM13 *)
-      begin match terminal with
-      | Apply { rule = "NRM13"; children = [grandchild]; _ }
-        when total <= 4 ->
-        (* Emit combined rule: NRM53 for arity 3, NRM54 for arity 4 *)
-        let combined = Printf.sprintf "NRM5%d" total in
-        emit_comment ();
-        Buffer.add_string buf pad;
-        Buffer.add_string buf "// (NRM5";
-        for _ = 2 to extra do Buffer.add_string buf "+NRM5" done;
-        Buffer.add_string buf "+NRM13 collapsed)\n";
-        Buffer.add_string buf pad;
-        Buffer.add_string buf "refine ";
-        Buffer.add_string buf combined;
-        Buffer.add_string buf " _;\n";
-        emit_node buf thm_hyps ctx indent grandchild
-      | _ ->
-        (* Fallback: emit individual NRM5 *)
-        emit_comment ();
-        Buffer.add_string buf pad;
-        Buffer.add_string buf "refine ";
-        Buffer.add_string buf eff_rule;
-        emit_rule_args buf ctx eff_rule node;
-        Buffer.add_string buf " _";
-        let ctx' = introduce buf pad ctx rule goal flat in
-        let child_flat = compute_child_flat rule flat in
-        Buffer.add_string buf ";\n";
-        emit_node buf thm_hyps ctx' indent ~flat:child_flat child
-      end
 
     | [_child] when rule = "INS" ->
       emit_comment ();

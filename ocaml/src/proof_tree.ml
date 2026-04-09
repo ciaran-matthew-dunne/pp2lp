@@ -11,13 +11,11 @@ type proof_node =
       children: proof_node list;
     }
 
-(* Rule metadata is loaded from data/rules.json via Rule_db *)
-
 let rule_arity (name : string) : int =
-  Rule_db.rule_arity (Rule_db.get ()) name
+  Rule_db.rule_arity name
 
 let has_primed (name : string) : bool =
-  Rule_db.has_primed (Rule_db.get ()) name
+  Rule_db.has_primed name
 
 (* Resolve rule name based on context *)
 let resolve_rule (name : string) (ctx : ctx) : string =

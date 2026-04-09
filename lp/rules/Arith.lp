@@ -4,7 +4,6 @@ require open pp2lp.B;
 
 // ---- AR1-3: Reflexivity of ≤ ----
 
-// AR1: H ⊢ R → H ⊢ E ≤ E ⇒ R
 opaque symbol AR1 [E : τ ι] [R : Prop]
   : π R
   → π ((E ≤ E) ⇒ R) ≔
@@ -12,18 +11,15 @@ begin
   assume E R h h0; refine h
 end;
 
-// AR2: a numeric, b numeric, a > b → H ⊢ a ≤ b ⇒ R
 opaque symbol AR2 [a b : τ ι] [R : Prop]
-  : π (¬ (a ≤ b))
+  : π (a > b)
   → π ((a ≤ b) ⇒ R) ≔
 begin
-  assume a b R hn h; refine ⊥ₑ (hn h)
+  admit;
 end;
 
-// AR3: ¬(a ≤ 0) ⇒ R → (b ≤ 0) ⇒ R where b = 1-a (solver-simplified)
-opaque symbol AR3 [a : τ ι] (b : τ ι) [R : Prop]
-  : π (b = (𝟏 - a))
-  → π ((b ≤ 𝟎) ⇒ R)
+opaque symbol AR3 [a : τ ι] [R : Prop]
+  : π ((𝟏 - a ≤ 𝟎) ⇒ R)
   → π (¬ (a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
@@ -32,45 +28,41 @@ end;
 // AR4: F ≤ 0 in H; E + F > 0 (solver-confirmed) → H ⊢ E ≤ 0 ⇒ R
 opaque symbol AR4 [E : τ ι] [R : Prop] (F : τ ι)
   : π (F ≤ 𝟎)
-  → π ⊤
+  → π ((E + F) > 𝟎)
   → π ((E ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-// ---- AR5/AR6: Antisymmetry decomposition ----
-
 opaque symbol AR5 [a : τ ι] [R : Prop]
-  : π (a ≤ 𝟎)
-  → π ((— a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
+  : π (a ≪ 𝟎)
+  → π ((a = 𝟎) ⇒ ((— a ≤ 𝟎) ⇒ R))
   → π ((— a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
 opaque symbol AR6 [a : τ ι] [R : Prop]
-  : π ((— a) ≤ 𝟎)
-  → π ((a ≪ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
+  : π ((— a) ≪ 𝟎)
+  → π ((a = 𝟎) ⇒ ((a ≤ 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
-// ---- AR7/AR8: Antisymmetry with offset ----
-
 opaque symbol AR7 [a b : τ ι] (c : τ ι) [R : Prop]
-  : π ((c + b) ≤ 𝟎)
+  : π ((c + b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((b = a) ⇒ (((a - b) ≪ 𝟎) ⇒ R))
+  → π ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R))
   → π (((a - b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit
 end;
 
 opaque symbol AR8 (a : τ ι) [b c : τ ι] [R : Prop]
-  : π ((a - b) ≤ 𝟎)
+  : π ((a - b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((b = a) ⇒ (((c + b) ≪ 𝟎) ⇒ R))
+  → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
   → π (((c + b) ≤ 𝟎) ⇒ R) ≔
 begin
   admit

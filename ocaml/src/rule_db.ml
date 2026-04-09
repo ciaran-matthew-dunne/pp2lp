@@ -1,162 +1,132 @@
-(* Rule database: single source of truth for PP inference rule metadata.
-   Loaded from data/rules.json at startup. *)
+(* Rule database: static metadata for PP inference rules.
+   Previously loaded from data/rules.json; now inlined. *)
 
-type rule_info = {
-  name: string;
-  section: string option;
-  arity: int;
-  primed: bool;
-  result_schema: int option;  (* 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
-  emit_args: string option;   (* static args or "dynamic:tag" *)
-  lp_file: string option;
-  lp_status: string;          (* "proved" | "admitted" | "todo" | "phantom" *)
-}
+(* Rule arity: -1=skip, 0=leaf, 1=single child, 2=two children *)
+let arity_tbl : (string, int) Hashtbl.t =
+  let t = Hashtbl.create 150 in
+  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
+    "AND1", 2; "AND2", 1; "AND3", 1; "AND4", 2; "AND5", 1;
+    "OR1", 1; "OR2", 2; "OR3", 2; "OR4", 1;
+    "IMP1", 1; "IMP2", 2; "IMP3", 2; "IMP4", 1; "IMP5", 1;
+    "EQV1", 2; "EQV2", 2; "EQV3", 2; "EQV4", 2;
+    "NOT1", 1; "NOT2", 1;
+    "AXM1", 0; "AXM2", 0; "AXM3", 0; "AXM4", 0;
+    "AXM5", 0; "AXM6", 0; "AXM7", 0; "AXM8", 0; "AXM9", 0;
+    "ALL1", 1; "ALL2", 1; "ALL3", 1; "ALL4", 1;
+    "ALL5", 1; "ALL6", 1; "ALL7", 2; "ALL8", 1; "ALL9", 1;
+    "XST1", 1; "XST2", 1; "XST3", 1; "XST4", 1;
+    "XST5", 1; "XST51", 1; "XST6", 1; "XST61", 1;
+    "XST7", 1; "XST8", 2;
+    "VR1", 0; "VR2", 1; "VR3", 1; "VR4", 0;
+    "FX1", 1; "FX2", 0; "FX3", 0;
+    "STOP", 1; "INS", 1;
+    "NRM1", 1; "NRM2", 1; "NRM3", 1; "NRM4", 1;
+    "NRM5", 1; "NRM6", 1; "NRM7", 1; "NRM8", 1;
+    "NRM9", 1; "NRM10", 1; "NRM11", 1; "NRM12", 1;
+    "NRM13", 1; "NRM14", 1; "NRM15", 1; "NRM16", 0;
+    "NRM17", 1; "NRM18", 1; "NRM19", 0; "NRM20", 1;
+    "NRM21", 1; "NRM22", 1; "NRM23", 1; "NRM24", 1;
+    "NRM25", 1; "NRM26", 1; "NRM27", 1; "NRM28", 1;
+    "NRM29", 1; "NRM30", 1;
+    "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
+    "EAXM1", 1; "EAXM2", 1; "EAXM31", 1; "EAXM32", 1;
+    "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
+    "OPR1", 1; "OPR2", 1;
+    "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;
+    "ECTR1", 0; "ECTR2", 0; "ECTR3", 0;
+    "ECTR4", 0; "ECTR5", 0; "ECTR6", 0;
+    "AR1", 1; "AR2", 0; "AR3", 1; "AR3_F", 1;
+    "AR4", 0; "AR5", 1; "AR5_2", 1; "AR6", 1; "AR6_2", 1;
+    "AR7", 1; "AR7_2", 1; "AR8", 1; "AR8_2", 1;
+    "AR9", 1; "AR10", -1; "AR11", 0; "AR12", 1; "AR13", 1;
+    "BOOL11", 1; "BOOL12", 1; "BOOL21", 1; "BOOL22", 1;
+    "BOOL31", 1; "BOOL32", 1; "BOOL41", 1; "BOOL42", 1;
+    "BOOL51", 0; "BOOL52", 0;
+    "FIN", -1; "STOP_NORM", -1; "NRM", -1;
+  ]; t
 
-type emit_variant = {
-  base: string;
-  variant: string;
-  condition: string;
-}
+(* Rules without primed variants *)
+let no_primed : (string, unit) Hashtbl.t =
+  let t = Hashtbl.create 10 in
+  List.iter (fun k -> Hashtbl.replace t k ()) [
+    "INS"; "AR3_F"; "FIN"; "STOP_NORM"; "NRM";
+  ]; t
 
-type flat_suffix = {
-  fs_base: string;
-  flat_name: string;
-}
+(* Emit args for rules that need them *)
+let emit_args_tbl : (string, string) Hashtbl.t =
+  let t = Hashtbl.create 40 in
+  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
+    "AND5", "dynamic:and5";
+    "AXM1", "dynamic:hyp"; "AXM2", "dynamic:hyp";
+    "AXM3", "dynamic:hyp"; "AXM4", "dynamic:hyp";
+    "AXM5", "dynamic:hyp"; "AXM6", "dynamic:hyp";
+    "AXM8", "dynamic:axm8"; "AXM9", "dynamic:axm9";
+    "ALL1", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL2", "\xe2\x8a\xa4\xe1\xb5\xa2";
+    "ALL3", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL4", "\xe2\x8a\xa4\xe1\xb5\xa2";
+    "ALL7", "dynamic:all7";
+    "XST1", "\xe2\x8a\xa4\xe1\xb5\xa2"; "XST2", "\xe2\x8a\xa4\xe1\xb5\xa2";
+    "XST3", "\xe2\x8a\xa4\xe1\xb5\xa2"; "XST4", "\xe2\x8a\xa4\xe1\xb5\xa2";
+    "XST8", "dynamic:xst8";
+    "NRM19", "dynamic:nrm19";
+    "OPR1", "dynamic:opr1"; "OPR2", "dynamic:opr2";
+    "AR2", "trust"; "AR3", "dynamic:ar3"; "AR3_F", "\xe2\x8a\xa4\xe1\xb5\xa2";
+    "AR4", "dynamic:ar4";
+    "AR5", "dynamic:ar56"; "AR6", "dynamic:ar56";
+    "AR7", "dynamic:ar78"; "AR8", "dynamic:ar78";
+    "AR9", "dynamic:ar9"; "AR13", "trust trust";
+    "BOOL31", "trust"; "BOOL32", "trust";
+    "BOOL41", "trust"; "BOOL42", "trust";
+  ]; t
 
-type db = {
-  rules: rule_info list;
-  by_name: (string, rule_info) Hashtbl.t;
-  emit_variants: emit_variant list;
-  flat_suffixes: flat_suffix list;
-}
+(* Result schema: 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
+let result_schema_tbl : (string, int) Hashtbl.t =
+  let t = Hashtbl.create 150 in
+  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
+    "AND1", 2; "AND2", 1; "AND3", 1; "AND4", 2; "AND5", 1;
+    "OR1", 1; "OR2", 2; "OR3", 2; "OR4", 1;
+    "IMP1", 1; "IMP2", 2; "IMP3", 2; "IMP4", 1; "IMP5", 1;
+    "EQV1", 2; "EQV2", 2; "EQV3", 2; "EQV4", 2;
+    "NOT1", 1; "NOT2", 1;
+    "AXM1", 0; "AXM2", 0; "AXM3", 0; "AXM4", 0;
+    "AXM5", 0; "AXM6", 0; "AXM7", 0; "AXM8", 0; "AXM9", 0;
+    "ALL1", 1; "ALL2", 1; "ALL3", 1; "ALL4", 1;
+    "ALL5", 1; "ALL6", 1; "ALL7", 1; "ALL8", 1; "ALL9", 1;
+    "XST1", 1; "XST2", 1; "XST3", 1; "XST4", 1;
+    "XST5", 1; "XST51", 1; "XST6", 1; "XST61", 1;
+    "XST7", 1; "XST8", 1;
+    "VR1", 0; "VR2", 1; "VR3", 1; "VR4", 0;
+    "FX1", 1; "FX2", 0; "FX3", 0;
+    "STOP", 1;
+    "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
+    "EAXM1", 1; "EAXM2", 1; "EAXM31", 1; "EAXM32", 1;
+    "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
+    "OPR1", 1; "OPR2", 1;
+    "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;
+    "ECTR1", 0; "ECTR2", 0; "ECTR3", 0;
+    "ECTR4", 0; "ECTR5", 0; "ECTR6", 0;
+    "AR1", 1; "AR2", 0; "AR3", 1; "AR3_F", 1;
+    "AR4", 0; "AR5", 1; "AR5_2", 1; "AR6", 1; "AR6_2", 1;
+    "AR7", 1; "AR7_2", 1; "AR8", 1; "AR8_2", 1;
+    "AR9", 1; "AR10", 1; "AR11", 0; "AR12", 1;
+    "BOOL11", 1; "BOOL12", 1; "BOOL21", 1; "BOOL22", 1;
+    "BOOL31", 1; "BOOL32", 1; "BOOL41", 1; "BOOL42", 1;
+    "BOOL51", 0; "BOOL52", 0;
+  ]; t
 
-(* JSON helpers *)
-let member key json =
-  match json with
-  | `Assoc l -> (try List.assoc key l with Not_found -> `Null)
-  | _ -> `Null
+(* --- Lookup functions --- *)
 
-let to_string_opt = function `String s -> Some s | _ -> None
-let to_string = function `String s -> s | _ -> failwith "expected string"
-let to_int = function `Int n -> n | _ -> failwith "expected int"
-let to_int_opt = function `Int n -> Some n | _ -> None
-let to_bool = function `Bool b -> b | _ -> failwith "expected bool"
-let to_list = function `List l -> l | _ -> failwith "expected list"
-
-let parse_rule json =
-  { name = to_string (member "name" json);
-    section = to_string_opt (member "section" json);
-    arity = to_int (member "arity" json);
-    primed = to_bool (member "primed" json);
-    result_schema = to_int_opt (member "result_schema" json);
-    emit_args = to_string_opt (member "emit_args" json);
-    lp_file = to_string_opt (member "lp_file" json);
-    lp_status = to_string (member "lp_status" json);
-  }
-
-let parse_emit_variant json =
-  { base = to_string (member "base" json);
-    variant = to_string (member "variant" json);
-    condition = to_string (member "condition" json);
-  }
-
-let parse_flat_suffix json =
-  { fs_base = to_string (member "base" json);
-    flat_name = to_string (member "flat_name" json);
-  }
-
-let to_list_or_empty = function `List l -> l | _ -> []
-
-let load path =
-  let json = Yojson.Basic.from_file path in
-  let rules = List.map parse_rule (to_list (member "rules" json)) in
-  let by_name = Hashtbl.create (List.length rules) in
-  List.iter (fun r -> Hashtbl.replace by_name r.name r) rules;
-  (* Also register flat suffixes and emit variants as lookupable *)
-  let flat_suffixes =
-    List.map parse_flat_suffix (to_list_or_empty (member "flat_suffixes" json))
-  in
-  List.iter (fun fs ->
-    match Hashtbl.find_opt by_name fs.fs_base with
-    | Some base_rule ->
-      Hashtbl.replace by_name fs.flat_name
-        { base_rule with name = fs.flat_name }
-    | None ->
-      Printf.eprintf "warning: flat_suffix %S references unknown base rule %S\n"
-        fs.flat_name fs.fs_base
-  ) flat_suffixes;
-  let emit_variants =
-    List.map parse_emit_variant (to_list_or_empty (member "emit_variants" json))
-  in
-  (* Register emit variants as lookupable (inherit base rule's metadata) *)
-  List.iter (fun ev ->
-    match Hashtbl.find_opt by_name ev.base with
-    | Some base_rule ->
-      if not (Hashtbl.mem by_name ev.variant) then
-        Hashtbl.replace by_name ev.variant
-          { base_rule with name = ev.variant }
-    | None ->
-      Printf.eprintf "warning: emit_variant %S references unknown base rule %S\n"
-        ev.variant ev.base
-  ) emit_variants;
-  { rules; by_name; emit_variants; flat_suffixes }
-
-(* --- Lookup functions (replace proof_tree.ml / emit_lp.ml metadata) --- *)
-
-let find db name = Hashtbl.find_opt db.by_name name
-
-let rule_arity db name =
-  match find db name with
-  | Some r -> r.arity
+let rule_arity name =
+  match Hashtbl.find_opt arity_tbl name with
+  | Some a -> a
   | None ->
     Printf.eprintf "warning: unknown rule %S, assuming arity 1\n" name;
     1
 
-let has_primed db name =
-  match find db name with
-  | Some r -> r.primed
-  | None ->
-    Printf.eprintf "warning: unknown rule %S, assuming no primed variant\n" name;
-    false
+let has_primed name =
+  not (Hashtbl.mem no_primed name)
 
-let emit_args db name =
-  match find db name with
-  | Some r -> r.emit_args
-  | None -> None
+let emit_args name =
+  Hashtbl.find_opt emit_args_tbl name
 
-let lp_status db name =
-  match find db name with
-  | Some r -> r.lp_status
-  | None ->
-    Printf.eprintf "warning: unknown rule %S, status unknown\n" name;
-    "unknown"
-
-(* --- Global instance --- *)
-
-let global_db : db option ref = ref None
-
-let init path =
-  global_db := Some (load path)
-
-let get () =
-  match !global_db with
-  | Some db -> db
-  | None -> failwith "Rule_db not initialised: call Rule_db.init first"
-
-(* Convenience: find the rules.json relative to the executable or project root *)
-let find_rules_json () =
-  let candidates = [
-    "data/rules.json";
-    "../data/rules.json";
-    "../../data/rules.json";
-    "../../../data/rules.json";
-  ] in
-  List.find_opt Sys.file_exists candidates
-
-let auto_init () =
-  match !global_db with
-  | Some _ -> ()  (* already loaded *)
-  | None ->
-    match find_rules_json () with
-    | Some path -> init path
-    | None -> failwith "Cannot find data/rules.json"
+let result_schema name =
+  Hashtbl.find_opt result_schema_tbl name

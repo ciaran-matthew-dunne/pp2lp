@@ -8,6 +8,8 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 
 **pp2lp** translates proof traces from the Predicate Prover (PP) — an automated theorem prover used by Atelier B — into Lambdapi, a proof assistant for the lambda-Pi-calculus modulo rewriting. The goal is to independently verify PP's proofs, since PP is an untrusted oracle whose source code is not publicly available.
 
+It also provides a round-trip pipeline: given a FOL formula, send it to PP for proving, then translate the proof back into a type-checked Lambdapi term.
+
 ## Agent Workflow
 
 ### Editing Lambdapi files (lp/)
@@ -19,7 +21,7 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 ### Editing OCaml code (ocaml/src/)
 1. Edit the source file
 2. `make build` to check it compiles
-3. `make unit-test` to run unit tests (118 tests)
+3. `make unit-test` to run unit tests
 4. `make check JOB=og` to verify traces still pass
 
 ### Debugging a failing trace
@@ -36,16 +38,23 @@ Never add Co-Authored-By lines or any Claude/Anthropic attribution to commit mes
 ## Build & Test Commands
 
 ```bash
-make check                          # build + all jobs (og + all prv categories)
+make check                          # build + all replays (og + prv), fast-fail
 make check JOB=og                   # build + 30 original traces only
-make check JOB=prv                  # build + all 86 PRV replays
+make check JOB=prv                  # build + all PRV replays
 make check JOB=prv-equality         # build + one PRV category only
 make build                          # build OCaml parser/emitter
-make unit-test                      # run OCaml unit tests (118 tests)
+make unit-test                      # run OCaml unit tests
 make trace-NN                       # single trace (e.g. make trace-14)
 make prv-NAME                       # single PRV test (e.g. make prv-arith_ineq_001)
-make errors-prv                     # all PRV failures with error messages
-make gen-prv                        # regenerate PRV traces from .but files
+make test-NAME                      # any single replay (e.g. make test-trace_14)
+make errors-prv                     # all PRV failures with error messages (no fast-fail)
+make prove FORMULA='...'            # send formula to PP, emit LP proof
+make prove FORMULA='...' NAME=foo   # same, with custom symbol name
+make gen                            # regenerate all replays from bench/
+make gen-og                         # copy og trace replays to replay/
+make gen-prv                        # regenerate PRV replays from .but files
+make gen-synth                      # generate synthetic .but files + replays
+make status                         # show test suite overview
 make clean                          # remove build artifacts and lp/gen/
 ```
 
@@ -65,13 +74,13 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 ## Token-Saving Notes
 
 - **Never read generated LP files** (`lp/gen/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
-- **PRV replay files** (`test/prv/gen/replay/`) can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/prv/name.lp` and shows the error. Or run `make check JOB=prv` which shows file:line:col + full error on first failure. Then use `lambdapi_goals` to inspect — don't read the generated file.
+- **PRV replay files** (`bench/prv/gen/replay/`) can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
+- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/name.lp` and shows the error. Or run `make check JOB=prv` which shows file:line:col + full error on first failure. Then use `lambdapi_goals` to inspect — don't read the generated file.
 - **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~900 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
 
 ## Current Test Status
 
-**Traces:** 30/30 pass. **PRV benchmarks:** 86/86 pass. **OCaml unit tests:** 118 pass.
+**Traces:** 30/30 pass. **PRV benchmarks:** 86/86 pass. **Synth:** 61/66 pass (5 xfail). **OCaml unit tests:** 153 pass.
 
 Known failures are listed in the Makefile `XFAIL` variable and tolerated by `make check`.
 
@@ -103,27 +112,30 @@ lp/                         Lambdapi encoding
     ├── Arith.lp            §A.14 Arithmetic (AR1–13)
     └── Bool.lp             §A.15 Boolean (BOOL*)
 
-data/
-└── rules.json              PP rule catalog (arity, primed, emit args, LP status)
-
 ocaml/                      OCaml parser and reconstruction
 ├── src/
 │   ├── syntax_pp.ml        AST: prd, exp, line = lhs * rhs
 │   ├── lexer.mll           ocamllex lexer for PP trace syntax
 │   ├── parser.mly          menhir parser (entry: line_eof)
 │   ├── parse_pp.ml         Driver: parse_pp_replay, parse_pp_string
-│   ├── rule_db.ml          Rule metadata loaded from data/rules.json
+│   ├── rule_db.ml          Rule metadata (arity, primed, emit args, result schema)
 │   ├── proof_tree.ml       Proof tree type + builder from line list
-│   ├── emit_lp.ml          Lambdapi pretty-printer
+│   ├── emit_lp.ml          Lambdapi pretty-printer (AST → LP)
+│   ├── emit_pp.ml          PP pretty-printer (AST → PP text)
+│   ├── gen_but.ml          Round-trip pipeline: formula → .but → PP → LP
 │   └── reconstruct.ml      Reconstruction driver: replay → .lp
-├── bin/main.ml             CLI: parse/emit-lp modes
-└── test/test_pp2lp.ml      Unit + integration tests
+├── bin/main.ml             CLI: emit/check/batch/parse/prove modes
+└── test/test_pp2lp.ml      Unit + integration tests (151 tests)
 
-test/
+bench/                      Benchmark data and pipeline
 ├── traces/                 30 hand-written traces + replays (01–30)
-├── prv/                    123 PRV proof goals (.but files)
+├── prv/                    PRV proof goals (.but files)
 │   └── gen/                Generated output (gitignored)
-└── gen_traces.py           Benchmark: .but → trace → replay pipeline
+├── synth/                  Synthetic proof goals
+│   ├── goals.txt           Goal definitions (NAME FORMULA per line)
+│   └── but/                Generated .but files + traces (gitignored)
+├── gen_traces.py           Benchmark: .but → trace → replay pipeline
+└── format_error.py         Lambdapi JSON error formatter
 ```
 
 Dependencies: `Stdlib` → `B.lp` → `{Eq,NonFree,Subst,Proof,Interp}.lp` → `rules/*.lp` → `Traces.lp`
@@ -146,6 +158,8 @@ Dependencies: `Stdlib` → `B.lp` → `{Eq,NonFree,Subst,Proof,Interp}.lp` → `
 - **`lexer.mll`** / **`parser.mly`** — Tokenise and parse PP replay lines.
 - **`proof_tree.ml`** — Builds proof tree from flat replay lines using rule arity for branching.
 - **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi. Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒). Conjunctions are emitted **left-associatively** (`((a ∧ b) ∧ c)`) so AND3 chains peel conjuncts correctly, even though Stdlib's `∧` notation is right-associative. AND5/AXM8 use generated `∧ₑ₁`/`∧ₑ₂`/`∧ᵢ` lambdas instead of `conj` lists.
+- **`emit_pp.ml`** — Reverse of the parser: converts AST back to PP text syntax. Precedence-aware to avoid unnecessary parenthesization.
+- **`gen_but.ml`** — Round-trip pipeline: takes a formula, generates a `.but` file with delta conditions, calls PP (`krt`) to produce a trace, runs REPLAY, parses the replay, and emits LP.
 - **`reconstruct.ml`** — Wires parse → tree → emit.
 
 ## PP Trace Format
@@ -165,15 +179,16 @@ Rules applied backwards (bottom-up from goal). Multi-premise rules cause branchi
 
 All Lambdapi work must be strictly definitional. Never introduce axioms (unproved `symbol` declarations used as lemmas) without explicit permission. The only unproved symbols are:
 - Domain axioms in B.lp (pair injectivity, set extensionality, arithmetic ordering)
-- Admitted PP rules (AR3–AR8, AR9_1, AR13) — tracked in `data/rules.json` with `lp_status: "admitted"`
+- Admitted PP rules (AR3–AR8, AR9_1, AR13)
 
 ## Roadmap
 
 ### Current state
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
-- OCaml parser complete: parses all 86 PRV replays
-- Rule metadata centralised in `data/rules.json`
-- Automated reconstruction: 30/30 traces, 86/86 PRV (all passing)
+- OCaml parser complete: parses all PRV replays
+- Rule metadata inlined in `rule_db.ml`
+- Automated reconstruction: 30/30 traces, 86/86 PRV passing
+- Round-trip pipeline: formula → PP → LP proof (`make prove`)
 - NRM rules fully proved (0 admits in Nrm.lp)
 - Eq rules fully proved (0 admits in Eq.lp)
 - AR2, AR9 proved in Arith.lp
