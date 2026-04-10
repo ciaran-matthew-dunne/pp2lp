@@ -1351,7 +1351,10 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
           | _ -> compute_result primed_child
         in
         let result_prd = find_leaf_result base_child in
-        Buffer.add_string buf "refine ALL7_1 (\xce\xbb"; (* λ *)
+        let all7_1_sym = if List.length bvars >= 2 then "ALL7_1_2" else "ALL7_1" in
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf all7_1_sym;
+        Buffer.add_string buf " (\xce\xbb"; (* λ *)
         List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
         Buffer.add_string buf ", ";
         pp_prd buf result_prd;

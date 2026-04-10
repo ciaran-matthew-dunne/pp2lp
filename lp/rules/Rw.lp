@@ -472,6 +472,20 @@ begin
   refine eq_trans h4 h2
 end;
 
+// ALL7_1_2: Two-variable version.
+opaque symbol ALL7_1_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop) [Q S : Prop]
+  : (Π x : τ ι, Π y : τ ι, π (P x y = R x y))
+  → π (((`♢ x, `♢ y, R x y) ⇒ Q) = S)
+  → π (((`∀ x, `∀ y, P x y) ⇒ Q) = S) ≔
+begin
+  assume P R Q S h1 h2;
+  have h3 : π ((`∀ x, `∀ y, P x y) = (`∀ x, `∀ y, R x y))
+    { refine ALL8_1 (λ x, ALL8_1 (h1 x)) };
+  have h4 : π (((`∀ x, `∀ y, P x y) ⇒ Q) = ((`∀ x, `∀ y, R x y) ⇒ Q))
+    { rewrite h3; reflexivity };
+  refine eq_trans h4 h2
+end;
+
 // XST8_1: equality for existential ¬¬-elimination in _1 chain.
 // ∃x.P(x) = ((∀x, ¬P(x)) ⇒ ⊥ = S) → (∃x.P(x) = S)
 opaque symbol XST8_1 [P : τ ι → Prop] [S : Prop]
