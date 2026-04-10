@@ -1,0 +1,7 @@
+﻿ [AXM7] &
+ [NOT1] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [EQV2] &
+  (not(p <=> not(p)))

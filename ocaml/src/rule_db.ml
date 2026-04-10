@@ -29,7 +29,7 @@ let arity_tbl : (string, int) Hashtbl.t =
     "NRM25", 1; "NRM26", 1; "NRM27", 1; "NRM28", 1;
     "NRM29", 1; "NRM30", 1;
     "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
-    "EAXM1", 1; "EAXM2", 1; "EAXM31", 1; "EAXM32", 1;
+    "EAXM1", 0; "EAXM2", 0; "EAXM31", 1; "EAXM32", 1;
     "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
     "OPR1", 1; "OPR2", 1;
     "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;
@@ -61,6 +61,7 @@ let emit_args_tbl : (string, string) Hashtbl.t =
     "AXM3", "dynamic:hyp"; "AXM4", "dynamic:hyp";
     "AXM5", "dynamic:hyp"; "AXM6", "dynamic:hyp";
     "AXM8", "dynamic:axm8"; "AXM9", "dynamic:axm9";
+    "EAXM1", "dynamic:hyp"; "EAXM2", "dynamic:hyp";
     "ALL1", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL2", "\xe2\x8a\xa4\xe1\xb5\xa2";
     "ALL3", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL4", "\xe2\x8a\xa4\xe1\xb5\xa2";
     "ALL7", "dynamic:all7";
@@ -98,7 +99,7 @@ let result_schema_tbl : (string, int) Hashtbl.t =
     "FX1", 1; "FX2", 0; "FX3", 0;
     "STOP", 1;
     "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
-    "EAXM1", 1; "EAXM2", 1; "EAXM31", 1; "EAXM32", 1;
+    "EAXM1", 0; "EAXM2", 0; "EAXM31", 1; "EAXM32", 1;
     "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
     "OPR1", 1; "OPR2", 1;
     "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;

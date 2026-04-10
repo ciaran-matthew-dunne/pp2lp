@@ -1,0 +1,4 @@
+﻿ [AXM8] &
+ [AND5] &
+ [ALL8(1)] &
+  (!(a,b,d).((a = b => c(d) = TRUE) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE and #(x$2).(d,x$2: c) and (!(x$4,x$3).(x$4,x$3: c => #(x$5).(x$4,x$5: c) and #(x$6).(x$6,x$3: c)) and !(x$9,x$8,x$7).(x$9,x$8: c and x$9,x$7: c => x$8 = x$7)) or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and #(x$10).(d,x$10: c) and (!(x$12,x$11).(x$12,x$11: c => #(x$13).(x$12,x$13: c) and #(x$14).(x$14,x$11: c)) and !(x$17,x$16,x$15).(x$17,x$16: c and x$17,x$15: c => x$16 = x$15)) and c(d) = TRUE)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE and #(x$18).(d,x$18: c) and (!(x$20,x$19).(x$20,x$19: c => #(x$21).(x$20,x$21: c) and #(x$22).(x$22,x$19: c)) and !(x$25,x$24,x$23).(x$25,x$24: c and x$25,x$23: c => x$24 = x$23)) and !(x$28).(#(x$29).(x$28,x$29: c) => x$28,c(x$28): c) => c(d) = TRUE))

@@ -1,0 +1,10 @@
+﻿ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [OR2] &
+  (not(p and not(p) or (q and not(q))))

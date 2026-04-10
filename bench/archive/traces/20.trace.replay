@@ -1,0 +1,6 @@
+[ALL1] <not(!x.!y.(x = y)) => p or not(p)>
+[ALL5(2)] <not(!(x,y).(x = y)) => p or not(p)>
+[ALL8(1)] <!(x,y).(not(x = y) => p or not(p))>
+[IMP4] <not(x = y) => p or not(p)>
+[OR4] <p or not(p)>
+[AXM7] <not(p) => not(p)>

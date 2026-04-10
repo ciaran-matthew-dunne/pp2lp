@@ -1,40 +1,5 @@
 open Syntax_pp
 
-(* ---- Free variable collection ---- *)
-
-module SS = Set.Make(String)
-
-let rec free_exp_vars acc = function
-  | Var s -> SS.add s acc
-  | Nat _ -> acc
-  | App (_, args) -> List.fold_left free_exp_vars acc args
-  | AOp (_, e1, e2) -> free_exp_vars (free_exp_vars acc e1) e2
-  | Neg e -> free_exp_vars acc e
-  | SetImage (e1, e2) -> free_exp_vars (free_exp_vars acc e1) e2
-  | Inter (e1, e2) -> free_exp_vars (free_exp_vars acc e1) e2
-  | Union (e1, e2) -> free_exp_vars (free_exp_vars acc e1) e2
-
-let rec free_prd_vars (evars, pvars) = function
-  | Lift (Var s) -> (evars, SS.add s pvars)
-  | Lift e -> (free_exp_vars evars e, pvars)
-  | Unary (_, p) -> free_prd_vars (evars, pvars) p
-  | Binary (_, p1, p2) ->
-    free_prd_vars (free_prd_vars (evars, pvars) p1) p2
-  | Eq (e1, e2) -> (free_exp_vars (free_exp_vars evars e1) e2, pvars)
-  | Leq (e1, e2) -> (free_exp_vars (free_exp_vars evars e1) e2, pvars)
-  | Mem (es, e) -> (List.fold_left free_exp_vars (free_exp_vars evars e) es, pvars)
-  | Bind (_, xs, body) ->
-    let (ev, pv) = free_prd_vars (evars, pvars) body in
-    (List.fold_left (fun s x -> SS.remove x s) ev xs,
-     List.fold_left (fun s x -> SS.remove x s) pv xs)
-
-(* Returns (expression_vars, predicate_vars) as sorted lists.
-   Lift(Var x) → predicate variable (_delta_p);
-   Var x in Eq/Leq/Mem/App etc. → expression variable (_delta_e). *)
-let free_vars prd =
-  let (evars, pvars) = free_prd_vars (SS.empty, SS.empty) prd in
-  (SS.elements evars, SS.elements pvars)
-
 (* ---- Split implication ---- *)
 
 (* Split a formula at the outermost implication: H1 ∧ H2 ∧ ... ⇒ G
@@ -58,24 +23,16 @@ let gen_but_content ?(name="pp2lp_query") (hyps : prd list) (goal : prd) : strin
      & Flag(FileOn(\"%s.res\")) \
      & Set(Valid.1 | Rule(Implication | " name name;
   (* Hypotheses *)
-  List.iter (fun h ->
-    Emit_pp.prd_to_pp_buf buf h;
-    Buffer.add_string buf " & "
-  ) hyps;
-  (* Delta conditions for all free variables *)
-  let (all_evars, all_pvars) =
-    let fold_prd (ev, pv) p =
-      let (e, p') = free_vars p in
-      (List.fold_left (fun s x -> SS.add x s) ev e,
-       List.fold_left (fun s x -> SS.add x s) pv p')
-    in
-    List.fold_left fold_prd (fold_prd (SS.empty, SS.empty) goal) hyps
-  in
-  SS.iter (fun v -> Printf.bprintf buf "_delta_e(%s) & " v) all_evars;
-  SS.iter (fun v -> Printf.bprintf buf "_delta_p(%s) & " v) all_pvars;
-  (* Remove trailing " & " *)
-  let len = Buffer.length buf in
-  if len >= 3 then Buffer.truncate buf (len - 3);
+  begin match hyps with
+  | [] ->
+    (* PP requires a non-empty hypothesis field; use ⊤ as a no-op *)
+    Buffer.add_string buf "VRAI"
+  | _ ->
+    List.iteri (fun i h ->
+      if i > 0 then Buffer.add_string buf " & ";
+      Emit_pp.prd_to_pp_buf buf h
+    ) hyps
+  end;
   (* Goal and closing *)
   Buffer.add_string buf " | ? | ? | ";
   Emit_pp.prd_to_pp_buf buf goal;

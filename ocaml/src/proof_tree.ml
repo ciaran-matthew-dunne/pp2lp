@@ -71,11 +71,18 @@ let build (lines : line list) : proof_node =
     if pos >= n then
       None
     else
-      let ((name, _), _) = arr.(pos) in
+      let ((name, _), rhs) = arr.(pos) in
       if is_base_branching_quantifier name then
         Some ([], pos)
-      else if rule_arity name = -1 then
-        collect_primed (pos + 1)
+      else if rule_arity name = -1 then begin
+        (* Include FIN lines (for result extraction), skip other phantoms *)
+        match rhs with
+        | Fin _ ->
+          (match collect_primed (pos + 1) with
+           | Some (rest, bp) -> Some (arr.(pos) :: rest, bp)
+           | None -> None)
+        | _ -> collect_primed (pos + 1)
+      end
       else
         match collect_primed (pos + 1) with
         | Some (rest, branch_pos) ->
@@ -88,6 +95,7 @@ let build (lines : line list) : proof_node =
      Uses a stack: leaves push, arity-1 pop 1, arity-2 pop 2. *)
   let build_postorder (lines : line list) : proof_node =
     let stack = ref [] in
+    let last_fin = ref None in
     let push node = stack := node :: !stack in
     let pop () =
       match !stack with
@@ -97,19 +105,33 @@ let build (lines : line list) : proof_node =
     List.iter (fun ((rule_name, arg), rhs) ->
       let goal = goal_of_rhs rhs in
       let arity = replay_arity rule_name in
-      if arity = -1 then
-        () (* skip phantom lines *)
-      else if arity = 0 then
-        push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [] })
-      else if arity = 1 then begin
-        let child = pop () in
-        push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [child] })
-      end else begin
-        (* arity = 2: in post-order, child1 was pushed first, child2 second *)
-        let child2 = pop () in
-        let child1 = pop () in
+      if arity = -1 then begin
+        (* Track FIN results for branching quantifiers *)
+        (match rhs with
+         | Fin (p, _, _, _) -> last_fin := Some (Pred p)
+         | _ -> ())
+      end
+      else begin
+        (* For ALL7_1/XST8_1, attach the preceding FIN result *)
+        let arg =
+          if is_branching_quantifier rule_name then
+            (match !last_fin with
+             | Some _ as f -> last_fin := None; f
+             | None -> arg)
+          else arg
+        in
+        if arity = 0 then
+          push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [] })
+        else if arity = 1 then begin
+          let child = pop () in
+          push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [child] })
+        end else begin
+          (* arity = 2: in post-order, child1 was pushed first, child2 second *)
+          let child2 = pop () in
+          let child1 = pop () in
         push (Apply { rule = rule_name; arg; goal; ctx = Primed;
                       children = [child1; child2] })
+        end
       end
     ) lines;
     pop ()
@@ -141,20 +163,26 @@ let build (lines : line list) : proof_node =
           (* Build primed subtree from post-order lines *)
           let child1 = build_postorder primed_lines in
           (* Build the ALL7/XST8 branching node *)
-          let ((bname, barg), brhs) = arr.(branch_pos) in
+          let ((bname, _barg), brhs) = arr.(branch_pos) in
           let bgoal = goal_of_rhs brhs in
           let resolved = resolve_rule bname ctx in
+          (* Extract result from FIN line (if present) *)
+          let fin_pos = branch_pos + 1 in
+          let fin_arg =
+            if fin_pos < n then
+              let ((_, _), fin_rhs) = arr.(fin_pos) in
+              match fin_rhs with Fin (p, _, _, _) -> Some (Pred p) | _ -> _barg
+            else _barg
+          in
           (* Skip FIN + normalization *)
-          let pos2 = skip_fin (branch_pos + 1) in
+          let pos2 = skip_fin fin_pos in
           (* Second child: base context (if there are lines remaining) *)
           if pos2 >= n then
             (* ALL7/XST8 is terminal — no child2 *)
-            (Apply { rule = resolved; arg = barg; goal = bgoal; ctx;
-                     children = [child1] },
-             pos2)
+            failwith (Printf.sprintf "truncated replay at %s: no child2" bname)
           else
             let (child2, pos3) = go pos2 Base in
-            (Apply { rule = resolved; arg = barg; goal = bgoal; ctx;
+            (Apply { rule = resolved; arg = fin_arg; goal = bgoal; ctx;
                      children = [child1; child2] },
              pos3)
         | None ->

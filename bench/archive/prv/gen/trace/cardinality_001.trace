@@ -1,0 +1,4 @@
+﻿ [AXM8] &
+ [AND5] &
+ [ALL8(1)] &
+  (!(a,b,c).((a = b => c-card(d)<=0) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE and d: FIN(d) or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and d: FIN(d) and c-card(d)<=0)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE and d: FIN(d) => c-card(d)<=0))

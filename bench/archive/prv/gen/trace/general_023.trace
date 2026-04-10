@@ -1,0 +1,22 @@
+﻿ [AXM3] &
+ [AXM3] &
+ [AND4] &
+ [EVR3] &
+ [EVR3] &
+ [EVR3] &
+ [EVR3] &
+ [OPR1(2)] &
+ [IMP4] &
+ [OPR1(2)] &
+ [OPR1(2)] &
+ [IMP4] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [AND3] &
+ [ALL8(1)] &
+  (!(c,b,a).(-c+b<=0 and delta_ec = TRUE and delta_eb = TRUE and -b+a<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_eb = TRUE and delta_ea = TRUE and delta_ec = TRUE => -b+a<=0 and -c+b<=0))

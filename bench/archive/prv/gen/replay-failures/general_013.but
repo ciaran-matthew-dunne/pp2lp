@@ -1,0 +1,1 @@
+﻿name("Proof_Rules_Validator_4.1.UhRFoV1.res") & (-1+a-min(b[c \/ d])+1<=0 & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & not(b[c \/ d] = {}) & b[c \/ d] /\ INTEGER-NATURAL: FIN(INTEGER) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & not(b[c \/ d] = {}) & b[c \/ d] /\ INTEGER-NATURAL: FIN(INTEGER) => a<=min(b[c \/ d]))

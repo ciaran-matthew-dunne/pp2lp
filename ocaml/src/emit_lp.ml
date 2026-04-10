@@ -510,8 +510,9 @@ let select_variant rule goal children flat =
     if rule = "ALL7_1" then "ALL7_1_2" else "ALL7_2"
   | "XST8", _ when goal_binding_count goal >= 2 && flat = 0 ->
     "XST8_2"
-  (* XST5/XST6/NRM: 2-var compound binding → _2 variant *)
-  | ("XST5" | "XST6" | "NRM5" | "NRM7" | "NRM13"
+  (* XST5/XST6/NRM/ALL5: 2-var compound binding → _2 variant *)
+  | ("ALL5" | "XST5" | "XST6" | "XST7"
+    | "NRM1" | "NRM3" | "NRM5" | "NRM7" | "NRM12" | "NRM13"
     | "NRM14" | "NRM15" | "NRM19"), _
     when goal_binding_count goal >= 2 ->
     rule ^ "_2"
@@ -522,7 +523,7 @@ let select_variant rule goal children flat =
 let compute_child_flat rule flat =
   match rule with
   | "ALL5" | "XST5" | "XST7" -> flat + 1
-  | "XST5_2" -> 0
+  | "XST5_2" | "XST7_2" -> 0
   | _ when is_hoas_identity rule -> flat
   | _ -> 0
 
@@ -594,6 +595,10 @@ let find_axm_hyp ctx rule goal =
     find_hyp ctx q
   | "NOT2", Unary (Not, p) -> find_hyp ctx p
   | "NOT2", Binary (Imp, p, _) -> find_hyp ctx p
+  | "EAXM1", Binary (Imp, Eq (e, f), _) ->
+    find_hyp ctx (Unary (Not, Eq (f, e)))
+  | "EAXM2", Binary (Imp, Unary (Not, Eq (e, f)), _) ->
+    find_hyp ctx (Eq (f, e))
   | _ -> None
 
 (* AXM8: extract i-th conjunct via lambda *)
@@ -948,31 +953,39 @@ let ins_simple_resolve ctx =
     end
   | _ -> None
 
-(* Compare structure ignoring quantifier-bound variable names.
-   Bound variables from ♡/∀ always contain '$' in their name. *)
-let skeleton =
-  let is_bound v = String.contains v '$' in
-  let rec exp_skel = function
-    | Var v when is_bound v -> Var "_"
-    | Var v -> Var v
-    | Nat n -> Nat n
-    | App (f, args) -> App (f, List.map exp_skel args)
-    | AOp (op, e1, e2) -> AOp (op, exp_skel e1, exp_skel e2)
-    | Neg e -> Neg (exp_skel e)
-    | SetImage (e1, e2) -> SetImage (exp_skel e1, exp_skel e2)
-    | Inter (e1, e2) -> Inter (exp_skel e1, exp_skel e2)
-    | Union (e1, e2) -> Union (exp_skel e1, exp_skel e2)
-  in
-  let rec prd_skel = function
-    | Lift e -> Lift (exp_skel e)
-    | Unary (op, p) -> Unary (op, prd_skel p)
-    | Binary (op, p1, p2) -> Binary (op, prd_skel p1, prd_skel p2)
-    | Bind (b, _, body) -> Bind (b, ["_"], prd_skel body)
-    | Mem (es, e) -> Mem (List.map exp_skel es, exp_skel e)
-    | Eq (e1, e2) -> Eq (exp_skel e1, exp_skel e2)
-    | Leq (e1, e2) -> Leq (exp_skel e1, exp_skel e2)
-  in
-  prd_skel
+(* Wildcard-aware structural comparison.
+   Bound variables from ♡/∀ (containing '$') become wildcards. *)
+let rec exp_matches pat hyp =
+  match pat, hyp with
+  | Var v, _ when String.contains v '$' -> true
+  | Var a, Var b -> a = b
+  | Nat a, Nat b -> a = b
+  | App (f1, a1), App (f2, a2) ->
+    f1 = f2 && List.length a1 = List.length a2 &&
+    List.for_all2 exp_matches a1 a2
+  | AOp (o1, a1, b1), AOp (o2, a2, b2) ->
+    o1 = o2 && exp_matches a1 a2 && exp_matches b1 b2
+  | Neg e1, Neg e2 -> exp_matches e1 e2
+  | SetImage (a1, b1), SetImage (a2, b2)
+  | Inter (a1, b1), Inter (a2, b2)
+  | Union (a1, b1), Union (a2, b2) ->
+    exp_matches a1 a2 && exp_matches b1 b2
+  | _ -> false
+and prd_matches pat hyp =
+  match pat, hyp with
+  | Lift e1, Lift e2 -> exp_matches e1 e2
+  | Unary (o1, p1), Unary (o2, p2) -> o1 = o2 && prd_matches p1 p2
+  | Binary (o1, a1, b1), Binary (o2, a2, b2) ->
+    o1 = o2 && prd_matches a1 a2 && prd_matches b1 b2
+  | Bind (b1, _, body1), Bind (b2, _, body2) ->
+    b1 = b2 && prd_matches body1 body2
+  | Mem (es1, e1), Mem (es2, e2) ->
+    List.length es1 = List.length es2 &&
+    List.for_all2 exp_matches es1 es2 && exp_matches e1 e2
+  | Eq (a1, b1), Eq (a2, b2)
+  | Leq (a1, b1), Leq (a2, b2) ->
+    exp_matches a1 a2 && exp_matches b1 b2
+  | _ -> false
 
 let ins_heart_resolve ctx =
   let rec count_bind_vars = function
@@ -989,15 +1002,21 @@ let ins_heart_resolve ctx =
     | Binary (And, l, r) -> flatten_conj_leaves l @ flatten_conj_leaves r
     | p -> [p]
   in
-  let rec collect_bind_vars = function
-    | Bind (Forall2, xs, inner) -> xs @ collect_bind_vars inner
-    | _ -> []
-  in
-  let shapes_match _bvars leaves hyp_prds =
-    List.length leaves = List.length hyp_prds &&
-    List.for_all2 (fun leaf hyp ->
-      skeleton leaf = skeleton hyp
-    ) leaves hyp_prds
+  let find_matching_hyps leaves entries =
+    let find_match leaf =
+      List.find_opt (fun (_, p) ->
+        (match leaf with Leq _ -> false | _ -> true) &&
+        prd_matches leaf p
+      ) entries
+    in
+    let rec go acc = function
+      | [] -> Some (List.rev acc)
+      | leaf :: rest ->
+        match find_match leaf with
+        | Some (name, _) -> go (name :: acc) rest
+        | None -> None
+    in
+    go [] leaves
   in
   let build_term heart n_vars conjs =
     let conj_term = match conjs with
@@ -1010,31 +1029,23 @@ let ins_heart_resolve ctx =
     let underscores = String.concat "" (List.init n_vars (fun _ -> " _")) in
     Printf.sprintf "%s%s %s" heart underscores conj_term
   in
-  (* Scan entries: collect non-♡ as conjuncts, try each ♡-hyp.
-     Skip non-matching ♡-hyps without adding them to conjuncts. *)
-  let rec scan conjs conj_prds = function
+  let rec scan entries = function
     | [] -> None
     | (name, (Bind (Forall2, _, _) as p)) :: rest ->
       let n_vars = count_bind_vars p in
-      let matches = match extract_neg_body p with
-        | Some body ->
-          let leaves = flatten_conj_leaves body in
-          (* Reject if any leaf is Leq — arithmetic expressions may
-             differ between the emitter's AST and the LP proof state. *)
-          let bvars = collect_bind_vars p in
-          let no_arith = List.for_all (fun l ->
-            match l with Leq _ -> false | _ -> true
-          ) leaves in
-          no_arith && shapes_match bvars leaves conj_prds
-        | None -> false
-      in
-      if matches && conjs <> [] then
-        Some (build_term name n_vars conjs)
-      else
-        scan conjs conj_prds rest
-    | (name, p) :: rest -> scan (name :: conjs) (p :: conj_prds) rest
+      begin match extract_neg_body p with
+      | Some body ->
+        let leaves = flatten_conj_leaves body in
+        begin match find_matching_hyps leaves entries with
+        | Some conjs when conjs <> [] ->
+          Some (build_term name n_vars conjs)
+        | _ -> scan entries rest
+        end
+      | None -> scan entries rest
+      end
+    | entry :: rest -> scan (entry :: entries) rest
   in
-  scan [] [] ctx.entries
+  scan [] ctx.entries
 
 let emit_ins buf first_pad ctx =
   match ins_simple_resolve ctx with
@@ -1152,294 +1163,114 @@ let rec compute_result (node : proof_node) : prd =
       Binary (Imp, h, compute_result child)
     | _ -> goal  (* fallback *)
 
-(* Emit a Res chain as a proof script (sequence of refine steps).
-   Each step changes the goal from Res (outer) to Res (inner). *)
-let rec emit_res_proof buf pad (node : proof_node) =
+(* Simplify a result predicate using PP's propositional simplifications. *)
+let is_true = function Lift (Var ("VRAI" | "TRUE")) -> true | _ -> false
+let is_false = function Lift (Var ("FAUX" | "FALSE")) -> true | _ -> false
+let prd_false = Lift (Var "FAUX")
+let prd_true = Lift (Var "VRAI")
+
+let rec simplify_result p =
+  match p with
+  | Binary (And, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_false a || is_false b then prd_false
+    else if is_true a then b else if is_true b then a
+    else Binary (And, a, b)
+  | Binary (Or, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_false a then b else if is_false b then a
+    else if is_true a || is_true b then prd_true
+    else Binary (Or, a, b)
+  | Binary (Imp, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_true a then b else if is_false a then prd_true
+    else Binary (Imp, a, b)
+  | Unary (Not, a) ->
+    let a = simplify_result a in
+    if is_true a then prd_false else if is_false a then prd_true
+    else (match a with Unary (Not, x) -> x | _ -> Unary (Not, a))
+  | Eq (e1, e2) when e1 = e2 -> prd_true
+  | _ -> p
+
+(* Extract the FIN result from a node's arg field (set by proof tree builder).
+   Falls back to compute_result. *)
+let extract_fin_result node fallback_child =
   match node with
-  | Apply { rule; children; _ } ->
-    let base = strip_suffix rule in
-    begin match base, children with
-    | "STOP", [] ->
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine stop_r"
-    | _, [child] when is_hoas_identity base ->
-      emit_res_proof buf pad child
+  | Apply { arg = Some (Pred p); _ } -> p
+  | Apply { children; _ } ->
+    (* Check children for FIN results *)
+    let rec check = function
+      | [] -> compute_result fallback_child
+      | (Apply { arg = Some (Pred p); _ }) :: _ -> p
+      | _ :: rest -> check rest
+    in check children
 
-    (* Schema 1 passthrough — just refine constructor _ *)
-    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
-      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
-      | "XST7" | "EVR3"), [child] ->
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf (String.lowercase_ascii base ^ "_r _;\n");
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | "IMP4", [child] ->
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine imp4_r _;\n";
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | "ALL8", [child] ->
-      let vars = match node with
-        | Apply { goal; _ } -> (match goal with
-          | Bind (_, xs, _) -> xs | _ -> []) in
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine all8_r _; assume";
-      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
-      Buffer.add_string buf ";\n";
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | "ALL9", [child] ->
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine all9_r _;\n";
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | ("OPR1" | "OPR2"), [child] ->
-      let child_body = match child with
-        | Apply { goal = Binary (Imp, _, body); _ } -> body
-        | _ -> Lift (Var "?") in
-      let opr = if base = "OPR1" then "opr1_r" else "opr2_r" in
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine "; Buffer.add_string buf opr;
-      Buffer.add_string buf " ("; pp_prd buf child_body;
-      Buffer.add_string buf ") _;\n";
-      Buffer.add_string buf pad;
-      emit_res_proof buf pad child
-
-    | "AR9", [child] ->
-      let is_identity = match node with
-        | Apply { goal = Binary (Imp, Leq (e, _), _);
-                  arg = Some (Pred (Lift f)); _ } -> e = f
-        | _ -> false in
-      if is_identity then
-        emit_res_proof buf pad child
-      else begin
-        Buffer.add_string buf "// "; Buffer.add_string buf rule;
-        Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-        Buffer.add_string buf "refine ar9_r trust _;\n";
-        Buffer.add_string buf pad;
-        emit_res_proof buf pad child
-      end
-
-    (* Schema 2 branching — refine constructor _ _ { child1 } { child2 } *)
-    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"
-      | "EQV1" | "EQV2" | "EQV3" | "EQV4"), [c1; c2] ->
-      Buffer.add_string buf "// "; Buffer.add_string buf rule;
-      Buffer.add_string buf "\n"; Buffer.add_string buf pad;
-      Buffer.add_string buf "refine ";
-      Buffer.add_string buf (String.lowercase_ascii base ^ "_r _ _\n");
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ ";
-      emit_res_proof buf (pad ^ "  ") c1;
-      Buffer.add_string buf " }\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ ";
-      emit_res_proof buf (pad ^ "  ") c2;
-      Buffer.add_string buf " }"
-
-    | _ ->
-      Printf.eprintf "warning: no Res proof step for %s\n" base;
-      Buffer.add_string buf "refine stop_r"
-    end
-
-(* Emit a Res constructor term (for inline lambda body — kept as fallback) *)
-let rec emit_res_term buf (node : proof_node) =
-  match node with
-  | Apply { rule; children; _ } ->
-    let base = strip_suffix rule in
-    let wrap1 name child =
-      Buffer.add_string buf "("; Buffer.add_string buf name;
-      Buffer.add_char buf ' '; emit_res_term buf child;
-      Buffer.add_char buf ')' in
-    let wrap2 name c1 c2 =
-      Buffer.add_string buf "("; Buffer.add_string buf name;
-      Buffer.add_char buf ' '; emit_res_term buf c1;
-      Buffer.add_char buf ' '; emit_res_term buf c2;
-      Buffer.add_char buf ')' in
-    begin match base, children with
-    | "STOP", [] -> Buffer.add_string buf "stop_r"
-    | _, [child] when is_hoas_identity base -> emit_res_term buf child
-
-    (* Schema 1 passthrough — all implicit, just constructor + child *)
-    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
-      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
-      | "XST7" | "EVR3"), [child] ->
-      wrap1 (String.lowercase_ascii base ^ "_r") child
-
-    (* OPR1/OPR2: supply child consequent as PE *)
-    | ("OPR1" | "OPR2"), [child] ->
-      let child_body = match child with
-        | Apply { goal = Binary (Imp, _, body); _ } -> body
-        | _ -> Lift (Var "?") in
-      let opr = if base = "OPR1" then "opr1_r" else "opr2_r" in
-      Buffer.add_char buf '('; Buffer.add_string buf opr;
-      Buffer.add_string buf " ("; pp_prd buf child_body;
-      Buffer.add_string buf ") ";
-      emit_res_term buf child;
-      Buffer.add_char buf ')'
-
-    (* IMP4: always wrap — each Res constructor handles one layer *)
-    | "IMP4", [child] -> wrap1 "imp4_r" child
-
-    (* ALL8: lambda wrapper *)
-    | "ALL8", [child] ->
-      let vars = match node with
-        | Apply { goal; _ } -> (match goal with
-          | Bind (_, xs, _) -> xs | _ -> [])  in
-      Buffer.add_string buf "(all8_r (\xce\xbb"; (* λ *)
-      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
-      Buffer.add_string buf ", "; emit_res_term buf child;
-      Buffer.add_string buf "))"
-
-    | "ALL9", [child] -> wrap1 "all9_r" child
-
-    (* AR9: E=F from solver — E/F need to be explicit for trust *)
-    | "AR9", [child] ->
-      let (e_opt, f_opt) = match node with
-        | Apply { goal = Binary (Imp, Leq (e, _), _);
-                  arg = Some (Pred (Lift f)); _ } -> (Some e, Some f)
-        | Apply { goal = Binary (Imp, Leq (e, _), _);
-                  arg = Some (Pred (Leq (f, _))); _ } -> (Some e, Some f)
-        | _ -> (None, None)
-      in
-      begin match e_opt, f_opt with
-      | Some e, Some f when e = f ->
-        (* Identity: E = F, skip AR9 entirely *)
-        emit_res_term buf child
-      | Some _e, Some _f ->
-        (* Non-identity: emit trust with type annotation *)
-        Buffer.add_string buf "(ar9_r trust ";
-        emit_res_term buf child;
-        Buffer.add_char buf ')'
-      | _ ->
-        Printf.eprintf "warning: AR9 res term: could not extract E/F\n";
-        emit_res_term buf child
-      end
-
-    (* Schema 2 branching *)
-    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"), [c1; c2] ->
-      wrap2 (String.lowercase_ascii base ^ "_r") c1 c2
-
-    | _ ->
-      Printf.eprintf "warning: no Res constructor for %s\n" base;
-      Buffer.add_string buf "stop_r"
-    end
-
-(* Emit a primed chain node. buf is the output buffer, pad is indentation.
-   ctx tracks hypotheses. The node is from the primed subtree. *)
+(* DEAD CODE — kept temporarily for compilation *)
 let rec emit_primed_chain buf ctx pad (node : proof_node) =
   match node with
   | Apply { rule; goal; children; _ } ->
     let base = strip_suffix rule in
     let schema = match Rule_db.result_schema base with
       | Some _ as s -> s | None -> Some 1 in
-    (* Emit comment showing the PP rule *)
     Buffer.add_string buf "// ";
     Buffer.add_string buf rule;
     Buffer.add_string buf "\n";
     Buffer.add_string buf pad;
     begin match rule, children with
-    (* STOP_1: end of chain → reflexivity *)
+    (* STOP_1: leaf *)
     | "STOP_1", [] ->
-      Buffer.add_string buf "reflexivity"
+      Buffer.add_string buf "refine STOP_1"
 
-    (* HOAS identity rules: skip, recurse on child *)
+    (* HOAS identity: skip *)
     | _, [child] when is_hoas_identity base ->
       emit_primed_chain buf ctx pad child
 
-    (* Schema 0 — leaf: prove formula = ⊤ from hypotheses.
-       TODO: emit direct proof + prop_true when needed. *)
+    (* Schema 0 — leaf *)
     | _, [] when schema = Some 0 ->
-      Printf.eprintf "warning: Schema 0 leaf %s in primed chain (needs prop_true)\n" base;
+      Printf.eprintf "warning: Schema 0 leaf %s in primed chain\n" base;
       Buffer.add_string buf "admit"
 
-    (* IMP4 — structural: congruence under implication.
-       If the child's rewrite lemma already handles the ⇒R form
-       (e.g. and3_eq: (P∧Q)⇒R = P⇒Q⇒R), skip imp_cong and let
-       the child rewrite directly. Otherwise use imp_cong to scope
-       the child's rewrite under the implication. *)
+    (* IMP4_1: congruence under ⇒ *)
     | _, [child] when base = "IMP4" ->
-      let child_base = match child with
-        | Apply { rule; _ } -> strip_suffix rule in
-      let child_handles_imp = match child_base with
-        | "AND1" | "AND3" | "OR1" | "OR3" | "IMP1" | "IMP3"
-        | "EQV1" | "EQV3" | "NOT1" | "EVR3" | "EQC1" | "EQC2"
-        | "EQS1" | "EQS2" | "EIMP51" | "EIMP52"
-        | "AR9" | "XST7" -> true
-        | _ -> false
-      in
-      if child_handles_imp then begin
-        (* Child's lemma already handles ⇒R — pass through, adding
-           the antecedent hypothesis to context for inner steps. *)
-        let hyp_prd = match goal with
-          | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
-        let (_hname, ctx') = fresh_hyp ctx hyp_prd in
-        emit_primed_chain buf ctx' pad child
-      end else begin
-        Buffer.add_string buf "refine imp_cong _;\n";
-        Buffer.add_string buf pad;
-        let hyp_prd = match goal with
-          | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
-        let (hname, ctx') = fresh_hyp ctx hyp_prd in
-        Buffer.add_string buf "assume ";
-        Buffer.add_string buf hname;
-        Buffer.add_string buf ";\n";
-        Buffer.add_string buf pad;
-        emit_primed_chain buf ctx' pad child
-      end
-
-    (* IMP5 — structural: trivial congruence (hypothesis in scope) *)
-    | _, [child] when base = "IMP5" ->
-      Buffer.add_string buf "refine imp_cong _;\n";
+      Buffer.add_string buf "refine IMP4_1 _;\n";
       Buffer.add_string buf pad;
-      (* IMP5 has hypothesis P already in scope, no new assume needed *)
+      emit_primed_chain buf ctx pad child
+
+    (* IMP5_1: strip known antecedent *)
+    | _, [child] when base = "IMP5" ->
       let hyp_prd = match goal with
         | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
-      let (_hname, ctx') = fresh_hyp ctx hyp_prd in
-      Buffer.add_string buf "assume ";
-      Buffer.add_string buf _hname;
-      Buffer.add_string buf ";\n";
-      Buffer.add_string buf pad;
-      emit_primed_chain buf ctx' pad child
+      begin match find_hyp ctx hyp_prd with
+      | Some hname ->
+        Buffer.add_string buf "refine IMP5_1 ";
+        Buffer.add_string buf hname;
+        Buffer.add_string buf " _;\n";
+        Buffer.add_string buf pad;
+        emit_primed_chain buf ctx pad child
+      | None ->
+        Buffer.add_string buf "refine IMP4_1 _;\n";
+        Buffer.add_string buf pad;
+        emit_primed_chain buf ctx pad child
+      end
 
-    (* ALL8 — structural: congruence under ∀ *)
+    (* ALL8_1: congruence under ∀ *)
     | _, [child] when base = "ALL8" ->
-      Buffer.add_string buf "refine forall_cong _;\n";
+      Buffer.add_string buf "refine ALL8_1 _;\n";
       Buffer.add_string buf pad;
-      let vars = match goal with
-        | Bind (_, xs, _) -> xs | _ -> [] in
+      let vars = match goal with Bind (_, xs, _) -> xs | _ -> [] in
       Buffer.add_string buf "assume";
-      List.iter (fun x ->
-        Buffer.add_char buf ' ';
-        pp_ident buf x) vars;
+      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx pad child
 
-    (* ALL9 — structural: congruence under hypothesis implication *)
+    (* ALL9_1: congruence under hypothesis implication *)
     | _, [child] when base = "ALL9" ->
-      Buffer.add_string buf "refine imp_cong _;\n";
+      Buffer.add_string buf "refine ALL9_1 _;\n";
       Buffer.add_string buf pad;
-      let hyp_prd = match goal with
-        | Binary (Imp, p, _) -> p | _ -> Lift (Var "?") in
-      let (hname, ctx') = fresh_hyp ctx hyp_prd in
-      Buffer.add_string buf "assume ";
-      Buffer.add_string buf hname;
-      Buffer.add_string buf ";\n";
-      Buffer.add_string buf pad;
-      emit_primed_chain buf ctx' pad child
+      emit_primed_chain buf ctx pad child
 
-    (* AND5 — structural: antecedent congruence *)
+    (* AND5 — structural: antecedent congruence (keep rewrite approach) *)
     | _, [child] when base = "AND5" ->
       Buffer.add_string buf "rewrite (ante_cong";
       emit_rule_args buf ctx rule node;
@@ -1447,26 +1278,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx pad child
 
-    (* OR4 — needs explicit P,Q to avoid HO unification issue *)
-    | _, [child] when base = "OR4" ->
-      Buffer.add_string buf "rewrite (or4_eq";
-      begin match goal with
-      | Binary (Or, p, q) ->
-        Buffer.add_string buf " (";
-        pp_prd buf p;
-        Buffer.add_string buf ") (";
-        pp_prd buf q;
-        Buffer.add_string buf ")"
-      | _ -> ()
-      end;
-      Buffer.add_string buf ");\n";
-      Buffer.add_string buf pad;
-      emit_primed_chain buf ctx pad child
-
-    (* AR9 — rewrite E to F using the solver equality.
-       ar9_eq can't be used as a top-level rewrite because its implicit R
-       must unify across both sides of the equality goal. Instead, extract
-       E and F and rewrite with a typed trust proof of E = F. *)
+    (* AR9 — solver equality (keep rewrite approach) *)
     | _, [child] when base = "AR9" ->
       let (e_opt, f_opt) = match goal, node with
         | Binary (Imp, Leq (e, _), _),
@@ -1496,10 +1308,9 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf "admit"
       end
 
-    (* OPR1/OPR2 in primed context: same as IMP4 — use imp_cong to isolate
-       the consequent, then the equality hypothesis rewrites x→E. *)
+    (* OPR1/OPR2 — keep rewrite approach *)
     | _, [child] when base = "OPR1" || base = "OPR2" ->
-      Buffer.add_string buf "refine imp_cong _;\n";
+      Buffer.add_string buf "refine IMP4_1 _;\n";
       Buffer.add_string buf pad;
       let eq_hyp = match goal with
         | Binary (Imp, eq, _) -> eq | _ -> Lift (Var "?") in
@@ -1508,7 +1319,6 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Buffer.add_string buf hname;
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
-      (* Rewrite using the equality hypothesis *)
       if base = "OPR1" then begin
         Buffer.add_string buf "rewrite ";
         Buffer.add_string buf hname
@@ -1520,29 +1330,82 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx' pad child
 
-    (* AND4 — Schema 2: commutativity + conj_eq *)
-    | _, [child1; child2] when base = "AND4" ->
-      Buffer.add_string buf "rewrite \xe2\x88\xa7_com;\n"; (* ∧_com *)
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "refine conj_eq _ _\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ ";
-      emit_primed_chain buf ctx (pad ^ "  ") child1;
-      Buffer.add_string buf " }\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "{ ";
-      emit_primed_chain buf ctx (pad ^ "  ") child2;
-      Buffer.add_string buf " }"
-
-    (* Schema 2 — branching: rewrite + conj_eq *)
-    | _, [child1; child2] when schema = Some 2 ->
-      begin match rw_lemma_of_rule base with
-      | Some lemma ->
-        Buffer.add_string buf "rewrite ";
-        Buffer.add_string buf lemma;
-        Buffer.add_string buf ";\n";
+    (* ALL7_1/XST8_1: branching quantifiers in _1 chain *)
+    | _, [ca; cb] when base = "ALL7" || base = "XST8" ->
+      let is_primed_child c = match c with
+        | Apply { rule; _ } -> Proof_tree.is_primed_rule rule
+      in
+      let (primed_child, base_child) =
+        if is_primed_child ca then (ca, cb) else (cb, ca)
+      in
+      if base = "ALL7" then begin
+        let bvars = binding_vars goal in
+        let inner_pad = pad ^ "  " in
+        let result_prd = extract_fin_result node primed_child in
+        Buffer.add_string buf "refine ALL7_1 (\xce\xbb"; (* λ *)
+        List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
+        Buffer.add_string buf ", ";
+        pp_prd buf result_prd;
+        Buffer.add_string buf ") _ _\n";
         Buffer.add_string buf pad;
-        Buffer.add_string buf "refine conj_eq _ _\n";
+        Buffer.add_string buf "{ assume";
+        List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
+        Buffer.add_string buf ";\n";
+        Buffer.add_string buf inner_pad;
+        emit_primed_chain buf ctx inner_pad primed_child;
+        Buffer.add_string buf " }\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "{ ";
+        emit_primed_chain buf ctx inner_pad base_child;
+        Buffer.add_string buf " }"
+      end else begin
+        (* XST8_1: continuation proves ((∀x,¬P x)⇒⊥) = S *)
+        Buffer.add_string buf "refine XST8_1 _;\n";
+        Buffer.add_string buf pad;
+        emit_primed_chain buf ctx pad base_child
+      end
+
+    (* Schema 2 — branching _1 rules (with simplification) *)
+    | _, [child1; child2] when schema = Some 2 ->
+      let r1 = compute_result child1 in
+      let r2 = compute_result child2 in
+      let raw = Binary (And, r1, r2) in
+      let simp = simplify_result raw in
+      if raw <> simp then begin
+        let tmp = Printf.sprintf "h_s%d" ctx.counter in
+        Buffer.add_string buf "have ";
+        Buffer.add_string buf tmp;
+        Buffer.add_string buf " : \xcf\x80 ("; (* π ( *)
+        pp_prd buf goal;
+        Buffer.add_string buf " = (";
+        pp_prd buf raw;
+        Buffer.add_string buf "))\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "{ refine ";
+        Buffer.add_string buf (String.uppercase_ascii base);
+        Buffer.add_string buf "_1 _ _\n";
+        Buffer.add_string buf (pad ^ "  ");
+        Buffer.add_string buf "{ ";
+        emit_primed_chain buf ctx (pad ^ "    ") child1;
+        Buffer.add_string buf " }\n";
+        Buffer.add_string buf (pad ^ "  ");
+        Buffer.add_string buf "{ ";
+        emit_primed_chain buf ctx (pad ^ "    ") child2;
+        Buffer.add_string buf " } };\n";
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "refine eq_trans ";
+        Buffer.add_string buf tmp;
+        Buffer.add_string buf " (";
+        if is_false r1 then Buffer.add_string buf "\xe2\x8a\xa5\xe2\x88\xa7 _"
+        else if is_false r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa5 _"
+        else if is_true r1 then Buffer.add_string buf "\xe2\x8a\xa4\xe2\x88\xa7 _"
+        else if is_true r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa4 _"
+        else Buffer.add_string buf "admit";
+        Buffer.add_string buf ")"
+      end else begin
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf (String.uppercase_ascii base);
+        Buffer.add_string buf "_1 _ _\n";
         Buffer.add_string buf pad;
         Buffer.add_string buf "{ ";
         emit_primed_chain buf ctx (pad ^ "  ") child1;
@@ -1551,25 +1414,15 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf "{ ";
         emit_primed_chain buf ctx (pad ^ "  ") child2;
         Buffer.add_string buf " }"
-      | None ->
-        Printf.eprintf "warning: no rewrite lemma for branching rule %s\n" base;
-        Buffer.add_string buf "admit"
       end
 
-    (* Schema 1 — passthrough: rewrite + recurse *)
+    (* Schema 1 — passthrough _1 rules *)
     | _, [child] ->
-      begin match rw_lemma_of_rule base with
-      | Some lemma ->
-        Buffer.add_string buf "rewrite ";
-        Buffer.add_string buf lemma;
-        Buffer.add_string buf ";\n";
-        Buffer.add_string buf pad;
-        emit_primed_chain buf ctx pad child
-      | None ->
-        (* No dedicated lemma — try using the _1 rule directly *)
-        Printf.eprintf "warning: no rewrite lemma for rule %s, falling back\n" base;
-        Buffer.add_string buf "admit"
-      end
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf (String.uppercase_ascii base);
+      Buffer.add_string buf "_1 _;\n";
+      Buffer.add_string buf pad;
+      emit_primed_chain buf ctx pad child
 
     (* Fallback *)
     | _ ->
@@ -1582,7 +1435,10 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 
 and emit_branching_quant buf thm_hyps ctx indent first_pad pad
     eff_rule _node goal child1 child2 =
-  (* Use Res-based approach: have chain ≔ λ vars, <res_term>; refine ALL7r chain _ *)
+  (* Equality-based approach:
+     refine ALL7 (λ vars, R) _ _
+     { assume vars; _1 equality chain }
+     { child2 from replay } *)
   let bvars = binding_vars goal in
   let bvars =
     if (eff_rule = "ALL7" || eff_rule = "XST8")
@@ -1593,15 +1449,23 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
   let is_xst8 = eff_rule = "XST8" || eff_rule = "XST8_2" in
   let all7_sym =
     if is_xst8 then
-      (if List.length bvars >= 2 then "XST8_2r" else "XST8r")
+      (if List.length bvars >= 2 then "XST8_2" else "XST8")
     else
-      (if List.length bvars >= 2 then "ALL7_2r" else "ALL7r") in
+      (if List.length bvars >= 2 then "ALL7_2" else "ALL7") in
   let inner_pad = String.make (indent + 2) ' ' in
-  (* Emit: refine ALL7r _ _ { assume vars; refine steps } { base child } *)
+  (* Get R from FIN result or compute from chain *)
+  let result_prd = extract_fin_result _node child1 in
+  (* Emit: refine ALL7 (λ vars, R) _ _ { eq_proof } { child2 } *)
   Buffer.add_string buf first_pad;
   Buffer.add_string buf "refine ";
   Buffer.add_string buf all7_sym;
-  Buffer.add_string buf " _ _\n";
+  Buffer.add_string buf " (\xce\xbb"; (* λ *)
+  List.iter (fun x ->
+    Buffer.add_char buf ' ';
+    pp_ident buf x) bvars;
+  Buffer.add_string buf ", ";
+  pp_prd buf result_prd;
+  Buffer.add_string buf ") _ _\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ assume";
   List.iter (fun x ->
@@ -1609,15 +1473,11 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
     pp_ident buf x) bvars;
   Buffer.add_string buf ";\n";
   Buffer.add_string buf inner_pad;
-  emit_res_proof buf inner_pad child1;
+  emit_primed_chain buf ctx inner_pad child1;
   Buffer.add_string buf " }\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
-  if eff_rule = "ALL7_2" || eff_rule = "XST8_2"
-     || eff_rule = "ALL7_1_2" then
-    Buffer.add_string buf "admit"
-  else
-    emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
+  emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
   Buffer.add_string buf " }"
 
 (* ---- Generic two-child emission ---- *)
@@ -1672,21 +1532,16 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_rule_args buf ctx eff_rule node
 
     | [_child] when Proof_tree.is_branching_quantifier rule ->
-      Printf.eprintf "warning: truncated replay at %s (no base child)\n" rule;
-      emit_comment ();
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "admit"
+      failwith (Printf.sprintf "truncated replay at %s: branching quantifier has no child2" rule)
 
     | [child] when rule = "NRM1" ->
       emit_comment ();
       let extra = nrm1_extra_count goal in
       Buffer.add_string buf pad;
-      Buffer.add_string buf "refine NRM1 _";
-      for _ = 1 to extra do
-        Buffer.add_string buf ";\n";
-        Buffer.add_string buf pad;
-        Buffer.add_string buf "refine NRM1 _"
-      done;
+      if extra > 0 then
+        Buffer.add_string buf "refine NRM1_2 _"
+      else
+        Buffer.add_string buf "refine NRM1 _";
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx indent child
 
@@ -1725,7 +1580,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_rule_args buf ctx eff_rule node;
       Buffer.add_string buf " _";
       let ctx' = introduce buf pad ctx rule goal flat in
-      let child_flat = compute_child_flat rule flat in
+      let child_flat = compute_child_flat eff_rule flat in
       Buffer.add_string buf ";\n";
       emit_node buf thm_hyps ctx' indent ~flat:child_flat child
 

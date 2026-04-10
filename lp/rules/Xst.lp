@@ -102,6 +102,16 @@ begin
   refine ∃ₑ h2 h1
 end;
 
+// XST7_2: Two-variable version.
+opaque symbol XST7_2 [P : τ ι → τ ι → Prop] [R : Prop]
+  : π (`∀ x, `∀ y, P x y ⇒ R)
+  → π ((`∃ x, `∃ y, P x y) ⇒ R) ≔
+begin
+  assume P R h1 h2;
+  refine ∃ₑ h2 (λ x hex, ∃ₑ hex (h1 x))
+end;
+
+
 // XST8: x not free in H; (H ⊢ ¬P) ⇝ R; H ⊢ (∀x·R) ⇒ FALSE → H ⊢ ∃x·P
 // First premise: ¬P(x) = R(x) for all x (equality-based normalisation result).
 // Second premise: (∀x R(x)) ⇒ ⊥.
@@ -118,6 +128,29 @@ end;
 
 // XST8_2: Two-variable version for compound ∃(x,y).
 opaque symbol XST8_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop)
+  : π (`∀ x, `∀ y, ¬ (P x y) = R x y)
+  → π ((`∀ x, `∀ y, R x y) ⇒ ⊥)
+  → π (`∃ x, `∃ y, P x y) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ (`∃ x, `∃ y, P x y) _;
+  assume hne;
+  refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
+end;
+
+// XST8i/XST8_2i: R implicit — inferred from the equality proof.
+opaque symbol XST8i [P R : τ ι → Prop]
+  : π (`∀ x, ¬ (P x) = R x)
+  → π ((`∀ x, R x) ⇒ ⊥)
+  → π (`∃ x, P x) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ (`∃ x, P x) _;
+  assume hne;
+  refine h2 (λ x, =⇒ (h1 x) (λ hpx, hne (∃ᵢ x hpx)))
+end;
+
+opaque symbol XST8_2i [P R : τ ι → τ ι → Prop]
   : π (`∀ x, `∀ y, ¬ (P x y) = R x y)
   → π ((`∀ x, `∀ y, R x y) ⇒ ⊥)
   → π (`∃ x, `∃ y, P x y) ≔

@@ -1,0 +1,7 @@
+﻿ [AXM7] &
+ [OR4] &
+ [IMP4] &
+ [ALL8(1)] &
+ [ALL5(2)] &
+ [ALL1] &
+  (not(!x.!y.(x = y)) => p or not(p))

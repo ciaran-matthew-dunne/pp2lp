@@ -1,0 +1,4 @@
+﻿ [AXM8] &
+ [AND5] &
+ [ALL8(1)] &
+  (!(a,b,c,d).((a = TRUE => b = c or b = d) and (delta_ea = TRUE and delta_eb = TRUE and delta_ed = TRUE and delta_ec = TRUE or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ed = TRUE and delta_ec = TRUE and (b = c or b = d))) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ed = TRUE and delta_ec = TRUE => b = c or b = d))

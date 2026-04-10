@@ -1,0 +1,5 @@
+[IMP4] <p => (p => p and p)>
+[IMP5(1)] <p => p and p>
+[AND4] <p and p>
+[AXM3] <p>
+[AXM3] <p>

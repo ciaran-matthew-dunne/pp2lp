@@ -1,0 +1,3 @@
+[IMP1] <not(p => q) => not(q)>
+[IMP4] <p => (not(q) => not(q))>
+[AXM7] <not(q) => not(q)>

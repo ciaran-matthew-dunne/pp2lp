@@ -1,0 +1,25 @@
+[ALL8(1)] <!(a,b,c,d).(-a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => -a+b-c<=0 and a-d<=0)>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => -a+b-c<=0 and a-d<=0>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE and delta_ea = TRUE and delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE and delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE and delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 and delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => (a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE and delta_eb = TRUE => (delta_ec = TRUE => (a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))))))>
+[AND3] < -a+b-c<=0 and delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))))))>
+[IMP4] < -a+b-c<=0 => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))))))))>
+[OPR1(2)] <delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (a-d<=0 => (delta_ea = TRUE => (delta_ed = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))))))>
+[OPR1(2)] <delta_eb = TRUE => (delta_ec = TRUE => (a-d<=0 => (TRUE = TRUE => (delta_ed = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))))))>
+[OPR1(2)] <delta_ec = TRUE => (a-d<=0 => (TRUE = TRUE => (delta_ed = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))))>
+[IMP4] <a-d<=0 => (TRUE = TRUE => (delta_ed = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))))>
+[EVR3] <TRUE = TRUE => (delta_ed = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0)))))>
+[OPR1(2)] <delta_ed = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ed = TRUE => -a+b-c<=0 and a-d<=0))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => -a+b-c<=0 and a-d<=0)))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => -a+b-c<=0 and a-d<=0))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => -a+b-c<=0 and a-d<=0)>
+[EVR3] <TRUE = TRUE => -a+b-c<=0 and a-d<=0>
+[AND4] < -a+b-c<=0 and a-d<=0>
+[AXM3] <a-d<=0>
+[AXM3] < -a+b-c<=0>

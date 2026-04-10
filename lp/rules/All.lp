@@ -61,6 +61,17 @@ begin
   refine h2 (λ x, ¬¬ₑ (P x) (λ hnpx, hnr (h1 x hnpx)))
 end;
 
+// ALL5_2: Two-variable version.
+opaque symbol ALL5_2 [P : τ ι → τ ι → Prop] [R : Prop]
+  : π (`∀ x, `∀ y, ¬ (P x y) ⇒ R)
+  → π (¬ (`∀ x, `∀ y, P x y) ⇒ R) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ R _;
+  assume hnr;
+  refine h2 (λ x y, ¬¬ₑ (P x y) (λ hnpxy, hnr (h1 x y hnpxy)))
+end;
+
 // ALL7: x not free in H; (H ⊢ P) ⇝ R; H ⊢ (♢x·R) ⇒ Q → H ⊢ (∀x·P) ⇒ Q
 // First premise: P(x) = R(x) for all x (equality-based normalisation result).
 // Second premise: (♢x R(x)) ⇒ Q.
@@ -75,6 +86,26 @@ end;
 
 // ALL7_2: Two-variable version for compound ∀(x,y).
 opaque symbol ALL7_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop) [Q : Prop]
+  : π (`∀ x, `∀ y, P x y = R x y)
+  → π ((`♢ x, `♢ y, R x y) ⇒ Q)
+  → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
+begin
+  assume P R Q h1 h2 hP;
+  refine h2 (λ x y, =⇒ (h1 x y) (hP x y))
+end;
+
+// ALL7i/ALL7_2i: R implicit — inferred from the equality proof.
+// The emitter provides the equality proof; Lambdapi infers R from its RHS.
+opaque symbol ALL7i [P R : τ ι → Prop] [Q : Prop]
+  : π (`∀ x, P x = R x)
+  → π ((`♢ x, R x) ⇒ Q)
+  → π ((`∀ x, P x) ⇒ Q) ≔
+begin
+  assume P R Q h1 h2 hP;
+  refine h2 (λ x, =⇒ (h1 x) (hP x))
+end;
+
+opaque symbol ALL7_2i [P R : τ ι → τ ι → Prop] [Q : Prop]
   : π (`∀ x, `∀ y, P x y = R x y)
   → π ((`♢ x, `♢ y, R x y) ⇒ Q)
   → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔

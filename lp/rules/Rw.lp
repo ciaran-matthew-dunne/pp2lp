@@ -401,3 +401,178 @@ begin
     { assume h1 x hpx; refine h1 (∃ᵢ x hpx) }
     { assume h1 hex; refine ∃ₑ hex h1 }
 end;
+
+// ---- _1 equality combinators ----
+// Each _1 rule takes child equalities and produces the parent equality.
+// These compose as terms: AND3_1 (IMP4_1 (STOP_1)) : π (P = R).
+
+// Transitivity (needed for passthrough _1 rules)
+opaque symbol eq_trans [P Q R : Prop]
+  : π (P = Q) → π (Q = R) → π (P = R) ≔
+begin assume P Q R h1 h2; rewrite h1; refine h2 end;
+
+// STOP_1: leaf — identity
+opaque symbol STOP_1 [P : Prop] : π (P = P) ≔
+begin assume P; reflexivity end;
+
+// ---- Structural _1 rules ----
+
+// IMP4_1: congruence of ⇒ on the right (unconditional)
+opaque symbol IMP4_1 [P Q R : Prop]
+  : π (Q = R) → π ((P ⇒ Q) = (P ⇒ R)) ≔
+begin assume P Q R h; rewrite h; reflexivity end;
+
+// IMP5_1: strip known antecedent (needs proof of P)
+opaque symbol IMP5_1 [P Q S : Prop]
+  : π P → π (Q = S) → π ((P ⇒ Q) = S) ≔
+begin
+  assume P Q S hp hqs;
+  refine propExt _ _ _ _
+  { assume hpq; refine =⇒ hqs (hpq hp) }
+  { assume hs hp2; refine =⇒ (eq_sym hqs) hs }
+end;
+
+// ALL8_1: congruence under ∀
+opaque symbol ALL8_1 [P R : τ ι → Prop]
+  : (Π x : τ ι, π (P x = R x))
+  → π ((`∀ x, P x) = (`∀ x, R x)) ≔
+begin
+  assume P R h;
+  refine propExt _ _ _ _
+  { assume h1 x; refine =⇒ (h x) (h1 x) }
+  { assume h1 x; refine =⇒ (eq_sym (h x)) (h1 x) }
+end;
+
+// NRM1_1: strip constant ♢ under equality.
+// (♢ _, P) ⇒ Q = S  →  P ⇒ Q = S  (when P doesn't depend on bound var)
+opaque symbol NRM1_1 [P Q S : Prop]
+  : π ((P ⇒ Q) = S)
+  → π (((`♢ _ : τ ι, P) ⇒ Q) = S) ≔
+begin
+  assume P Q S h;
+  have h1 : π ((`♢ _ : τ ι, P) = P)
+    { refine ∀_const ι P };
+  have h2 : π (((`♢ _ : τ ι, P) ⇒ Q) = (P ⇒ Q))
+    { rewrite h1; reflexivity };
+  refine eq_trans h2 h
+end;
+
+// ALL7_1: equality for branching quantifier in _1 chain.
+// Composes inner per-element equality with continuation equality.
+opaque symbol ALL7_1 [P : τ ι → Prop] [Q S : Prop]
+  :  π (((`♢ x, P x) ⇒ Q) = S)
+  → π (((`∀ x, P x) ⇒ Q) = S) ≔
+begin
+admit
+end;
+
+// XST8_1: equality for existential ¬¬-elimination in _1 chain.
+// ∃x.P(x) = ((∀x, ¬P(x)) ⇒ ⊥ = S) → (∃x.P(x) = S)
+opaque symbol XST8_1 [P : τ ι → Prop] [S : Prop]
+  : π (((`∀ x, ¬ (P x)) ⇒ ⊥) = S)
+  → π ((`∃ x, P x) = S) ≔
+begin
+  assume P S h;
+  have h1 : π ((`∃ x, P x) = ((`∀ x, ¬ (P x)) ⇒ ⊥))
+    { refine propExt _ _ _ _
+      { assume hex hall; refine ∃ₑ hex (λ x hpx, hall x hpx) }
+      { assume hc; refine ¬¬ₑ _ (λ hne, hc (λ x hpx, hne (∃ᵢ x hpx))) } };
+  refine eq_trans h1 h
+end;
+
+// ALL9_1: congruence under hypothesis implication (same as IMP4_1)
+opaque symbol ALL9_1 [H Q R : Prop]
+  : π (Q = R) → π ((H ⇒ Q) = (H ⇒ R)) ≔
+begin assume H Q R h; rewrite h; reflexivity end;
+
+// ---- Passthrough _1 rules (eq_trans local_eq child_eq) ----
+
+opaque symbol AND2_1 [P Q S : Prop]
+  : π ((P ⇒ ¬ Q) = S) → π (¬ (P ∧ Q) = S) ≔
+begin assume P Q S h; refine eq_trans (and2_eq) h end;
+
+opaque symbol AND3_1 [P Q R S : Prop]
+  : π ((P ⇒ Q ⇒ R) = S) → π (((P ∧ Q) ⇒ R) = S) ≔
+begin assume P Q R S h; refine eq_trans and3_eq h end;
+
+opaque symbol OR1_1 [P Q R S : Prop]
+  : π ((¬ P ⇒ ¬ Q ⇒ R) = S) → π ((¬ (P ∨ Q) ⇒ R) = S) ≔
+begin assume P Q R S h; refine eq_trans or1_eq h end;
+
+opaque symbol OR4_1 [P Q S : Prop]
+  : π ((¬ P ⇒ Q) = S) → π ((P ∨ Q) = S) ≔
+begin assume P Q S h; refine eq_trans (or4_eq P Q) h end;
+
+opaque symbol NOT1_1 [P R S : Prop]
+  : π ((P ⇒ R) = S) → π ((¬ ¬ P ⇒ R) = S) ≔
+begin assume P R S h; refine eq_trans not1_eq h end;
+
+opaque symbol NOT2_1 [P S : Prop]
+  : π (P = S) → π (¬ ¬ P = S) ≔
+begin assume P S h; refine eq_trans (¬¬ₑ_eq P) h end;
+
+opaque symbol IMP1_1 [P Q R S : Prop]
+  : π ((P ⇒ ¬ Q ⇒ R) = S) → π ((¬ (P ⇒ Q) ⇒ R) = S) ≔
+begin assume P Q R S h; refine eq_trans imp1_eq h end;
+
+opaque symbol VR3_1 [P S : Prop]
+  : π (P = S) → π ((⊤ ⇒ P) = S) ≔
+begin assume P S h; refine eq_trans (⊤⇒ P) h end;
+
+opaque symbol EVR2_1 [E : τ ι] [S : Prop]
+  : π (⊥ = S) → π (¬ (E = E) = S) ≔
+begin assume E S h; refine eq_trans (¬=_idem ι E) h end;
+
+opaque symbol EVR3_1 [E : τ ι] [P S : Prop]
+  : π (P = S) → π (((E = E) ⇒ P) = S) ≔
+begin
+  assume E P S h;
+  have h1 : π ((E = E) = ⊤) { refine =_idem ι E };
+  have h2 : π (((E = E) ⇒ P) = (⊤ ⇒ P))
+    { rewrite h1; reflexivity };
+  refine eq_trans h2 (eq_trans (⊤⇒ P) h)
+end;
+
+// ---- Branching _1 rules (eq_trans local_eq (conj_eq child1 child2)) ----
+
+opaque symbol AND1_1 [P Q R S1 S2 : Prop]
+  : π ((¬ Q ⇒ R) = S1) → π ((¬ P ⇒ R) = S2)
+  → π ((¬ (P ∧ Q) ⇒ R) = (S1 ∧ S2)) ≔
+begin assume P Q R S1 S2 h1 h2; refine eq_trans and1_eq (conj_eq h1 h2) end;
+
+opaque symbol AND4_1 [P Q S1 S2 : Prop]
+  : π (Q = S1) → π (P = S2) → π ((P ∧ Q) = (S1 ∧ S2)) ≔
+begin
+  assume P Q S1 S2 h1 h2;
+  refine eq_trans (∧_com P Q) (conj_eq h1 h2)
+end;
+
+opaque symbol OR2_1 [P Q S1 S2 : Prop]
+  : π ((¬ Q) = S1) → π ((¬ P) = S2)
+  → π (¬ (P ∨ Q) = (S1 ∧ S2)) ≔
+begin assume P Q S1 S2 h1 h2; refine eq_trans or2_eq (conj_eq h1 h2) end;
+
+opaque symbol OR3_1 [P Q R S1 S2 : Prop]
+  : π ((Q ⇒ R) = S1) → π ((P ⇒ R) = S2)
+  → π (((P ∨ Q) ⇒ R) = (S1 ∧ S2)) ≔
+begin assume P Q R S1 S2 h1 h2; refine eq_trans or3_eq (conj_eq h1 h2) end;
+
+opaque symbol IMP3_1 [P Q R S1 S2 : Prop]
+  : π ((Q ⇒ R) = S1) → π ((¬ P ⇒ R) = S2)
+  → π (((P ⇒ Q) ⇒ R) = (S1 ∧ S2)) ≔
+begin assume P Q R S1 S2 h1 h2; refine eq_trans imp3_eq (conj_eq h1 h2) end;
+
+opaque symbol IMP2_1 [P Q S1 S2 : Prop]
+  : π ((¬ Q) = S1) → π (P = S2)
+  → π (¬ (P ⇒ Q) = (S1 ∧ S2)) ≔
+begin assume P Q S1 S2 h1 h2; refine eq_trans imp2_eq (conj_eq h1 h2) end;
+
+opaque symbol EQV1_1 [P Q R S1 S2 : Prop]
+  : π ((P ⇒ ¬ Q ⇒ R) = S1) → π ((¬ P ⇒ Q ⇒ R) = S2)
+  → π ((¬ (P ⇔ Q) ⇒ R) = (S1 ∧ S2)) ≔
+begin assume P Q R S1 S2 h1 h2; refine eq_trans eqv1_eq (conj_eq h1 h2) end;
+
+opaque symbol EQV3_1 [P Q R S1 S2 : Prop]
+  : π ((P ⇒ Q ⇒ R) = S1) → π ((¬ P ⇒ ¬ Q ⇒ R) = S2)
+  → π (((P ⇔ Q) ⇒ R) = (S1 ∧ S2)) ≔
+begin assume P Q R S1 S2 h1 h2; refine eq_trans eqv3_eq (conj_eq h1 h2) end;

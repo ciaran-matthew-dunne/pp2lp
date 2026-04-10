@@ -1,0 +1,1 @@
+Flag(FileOn("equality_001.replay.res")) & ("equality_001.trace")

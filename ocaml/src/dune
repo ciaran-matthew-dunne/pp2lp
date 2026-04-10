@@ -10,7 +10,6 @@
  (modules
    parser lexer parse_pp syntax_pp
    rule_db proof_tree emit_lp emit_pp reconstruct gen_but
-   check cache batch
  )
  (flags :standard)
 )

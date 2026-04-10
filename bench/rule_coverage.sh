@@ -2,7 +2,7 @@
 # Show PP rule coverage across the benchmark suite.
 # Usage: bench/rule_coverage.sh [--by-suite] [--missing]
 #
-#   --by-suite   Break down by og/prv/synth
+#   --by-suite   Break down by archive (og+prv) vs synth
 #   --missing    Show only rules with zero coverage
 
 set -euo pipefail
@@ -26,36 +26,34 @@ extract_rules() {
   sed 's/\].*//' "$@" 2>/dev/null | sed 's/\[//' | sed 's/(.*//; s/_1$//' | grep -E '^[A-Z]' || true
 }
 
-if $BY_SUITE; then
-  # Collect per-suite
-  OG_RULES=$(extract_rules bench/traces/*.replay | sort -u)
-  PRV_RULES=$(extract_rules bench/prv/gen/replay/*.replay | sort -u)
-  SYNTH_RULES=$(extract_rules bench/synth/but/gen/replay/*.replay | sort -u)
+# Current replays
+SYNTH_GLOB="bench/gen/*.replay"
+# Archived replays (og traces + prv)
+ARCHIVE_GLOB="bench/archive/traces/*.replay bench/archive/prv/gen/replay/*.replay"
 
-  printf "%-14s %3s %3s %3s\n" "RULE" "OG" "PRV" "SYN"
-  printf "%-14s %3s %3s %3s\n" "----" "---" "---" "---"
+if $BY_SUITE; then
+  ARCHIVE_RULES=$(extract_rules $ARCHIVE_GLOB | sort -u)
+  SYNTH_RULES=$(extract_rules $SYNTH_GLOB | sort -u)
+
+  printf "%-14s %4s %4s\n" "RULE" "ARC" "SYN"
+  printf "%-14s %4s %4s\n" "----" "----" "----"
   for rule in $ALL_RULES; do
-    og=" "; prv=" "; syn=" "
-    echo "$OG_RULES"   | grep -qx "$rule" && og="*"
-    echo "$PRV_RULES"  | grep -qx "$rule" && prv="*"
-    echo "$SYNTH_RULES" | grep -qx "$rule" && syn="*"
-    if $MISSING && [ "$og$prv$syn" != "   " ]; then continue; fi
-    printf "%-14s %3s %3s %3s\n" "$rule" "$og" "$prv" "$syn"
+    arc=" "; syn=" "
+    echo "$ARCHIVE_RULES" | grep -qx "$rule" && arc="*"
+    echo "$SYNTH_RULES"   | grep -qx "$rule" && syn="*"
+    if $MISSING && [ "$arc$syn" != "  " ]; then continue; fi
+    printf "%-14s %4s %4s\n" "$rule" "$arc" "$syn"
   done
 
-  og_n=$(echo "$OG_RULES" | wc -w)
-  prv_n=$(echo "$PRV_RULES" | wc -w)
+  arc_n=$(echo "$ARCHIVE_RULES" | wc -w)
   syn_n=$(echo "$SYNTH_RULES" | wc -w)
-  all_covered=$(cat <(echo "$OG_RULES") <(echo "$PRV_RULES") <(echo "$SYNTH_RULES") | sort -u | wc -w)
+  all_covered=$(cat <(echo "$ARCHIVE_RULES") <(echo "$SYNTH_RULES") | sort -u | wc -w)
   total=$(echo "$ALL_RULES" | wc -w)
   echo ""
-  echo "Coverage: $all_covered/$total rules (og=$og_n, prv=$prv_n, synth=$syn_n)"
+  echo "Coverage: $all_covered/$total rules (archive=$arc_n, synth=$syn_n)"
 else
   # Simple: count occurrences across all replays
-  ALL_REPLAY_RULES=$(extract_rules \
-    bench/traces/*.replay \
-    bench/prv/gen/replay/*.replay \
-    bench/synth/but/gen/replay/*.replay)
+  ALL_REPLAY_RULES=$(extract_rules $SYNTH_GLOB $ARCHIVE_GLOB)
 
   if $MISSING; then
     covered=$(echo "$ALL_REPLAY_RULES" | sort -u)

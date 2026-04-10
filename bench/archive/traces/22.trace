@@ -1,0 +1,12 @@
+﻿ [AXM7] &
+ [FIN(FAUX => FAUX)] &
+ [STOP_NORM] &
+ [NRM1] &
+ [NRM] &
+ [FIN(FAUX)] &
+ [STOP_1] &
+ [EVR2_1] &
+ [ALL7(1)] &
+ [ALL6] &
+ [ALL2] &
+  (not(!x.!y.not(x = x)))

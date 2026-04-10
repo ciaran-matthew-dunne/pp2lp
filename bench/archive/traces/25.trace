@@ -1,0 +1,20 @@
+﻿ [AXM3] &
+ [NOT2] &
+ [IMP4] &
+ [AND2] &
+ [ALL8(3)] &
+ [XST6] &
+ [XST2] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => not(#x.#y.(p(x,y) and not(p(x,y)))))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(1)] &
+ [XST7_1(2)] &
+ [ALL7(1)] &
+  (!(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => not(#x.#y.(p(x,y) and not(p(x,y)))))

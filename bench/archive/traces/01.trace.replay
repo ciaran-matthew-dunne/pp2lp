@@ -1,0 +1,8 @@
+[AND1] <not(p and q) => not(p) or not(q)>
+[IMP4] <not(q) => not(p) or not(q)>
+[OR4] <not(p) or not(q)>
+[AXM4] <not(not(p)) => not(q)>
+[IMP4] <not(p) => not(p) or not(q)>
+[OR4] <not(p) or not(q)>
+[NOT1] <not(not(p)) => not(q)>
+[AXM1] <p => not(q)>

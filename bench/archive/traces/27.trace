@@ -1,0 +1,28 @@
+﻿ [VR4] &
+ [FIN(VRAI)] &
+ [NRM19] &
+ [NRM14] &
+ [NRM] &
+ [FIN(not(p(x,y)))] &
+ [STOP_1] &
+ [ALL7(3)] &
+ [FIN(not(p(x,y)))] &
+ [STOP_1] &
+ [XST8(3)] &
+ [XST4] &
+ [ALL9] &
+ [FIN(forall2(x$6,x$5,x$7).not(x$6,x$5,x$7: p and not(x$6,x$5,p(x$6,x$5): p)) => #x.#y.p(x,y))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$7).(x$6,x$5,x$7: p => x$6,x$5,p(x$6,x$5): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [IMP4] &
+ [AND3] &
+ [ALL8(1)] &
+  (!(a,b).(p(a,b) and !(x$6,x$5).(#(x$7).(x$6,x$5,x$7: p) => x$6,x$5,p(x$6,x$5): p) => #x.#y.p(x,y)))

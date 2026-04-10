@@ -1,0 +1,76 @@
+[ALL8(1)] <!(a,b).((a = b => !(x$2).(x$2: c => x$2: d)) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d))) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => !(x$4).(x$4: c => x$4: d))>
+[AND5] <(a = b => !(x$2).(x$2: c => x$2: d)) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d))) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => !(x$4).(x$4: c => x$4: d)>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE and !(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b and delta_ea = TRUE and delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b and delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) and a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))>
+[OR3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AND3] <delta_ec = TRUE and delta_ed = TRUE and !(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AND3] <delta_ec = TRUE and delta_ed = TRUE => (!(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[OPR1(1)] <delta_ec = TRUE => (delta_ed = TRUE => (!(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))))>
+[OPR1(1)] <delta_ed = TRUE => (!(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[STOP_1] <x$3: d>
+[IMP4_1] <x$3: c => x$3: d>
+[ALL7(1)] <!(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[FIN(x$3: c => x$3: d)] <FIN(x$3: c => x$3: d | (Hyp |- !(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))) | (Hyp |- forall(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))) | 15)>
+[NRM13] <forall(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[STOP_NORM] <forall2(x$3).not(x$3: c and not(x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[NRM] <forall(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[FIN(forall2(x$3).not(x$3: c and not(x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))] <FIN(forall2(x$3).not(x$3: c and not(x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))) | (Hyp |- forall(x$3).(x$3: c => x$3: d) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))) | (Hyp |- forall2(x$3).not(x$3: c and not(x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))) | 16)>
+[ALL9] <forall2(x$3).not(x$3: c and not(x$3: d)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[OPR1(2)] <a = b => (delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))>
+[OPR1(2)] <delta_ea = TRUE => (delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))>
+[OPR1(2)] <delta_eb = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))>
+[EVR3] <TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))>
+[STOP_1] <x$2: d>
+[IMP4_1] <x$2: c => x$2: d>
+[ALL7(3)] <!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[FIN(x$2: c => x$2: d)] <FIN(x$2: c => x$2: d | (Hyp,!(x$3).not(x$3: c and not(x$3: d)) |- !(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | (Hyp,!(x$3).not(x$3: c and not(x$3: d)) |- forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | 23)>
+[NRM13] <forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[STOP_NORM] <forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)>
+[NRM] <forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[FIN(forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d))] <FIN(forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d) | (Hyp,!(x$3).not(x$3: c and not(x$3: d)) |- forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | (Hyp,!(x$3).not(x$3: c and not(x$3: d)) |- forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)) | 24)>
+[ALL9] <forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)>
+[ALL8(3)] <!(x$4).(x$4: c => x$4: d)>
+[IMP4] <x$4: c => x$4: d>
+[STOP] <x$4: d>
+[IMP4] <not(x$4: d) => FAUX>
+[INS] <FAUX>
+[AXM7] <FAUX => FAUX>
+[OR3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and not(a = b) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE => (not(a = b) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[OPR1(1)] <delta_ea = TRUE => (delta_eb = TRUE => (not(a = b) => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))))>
+[OPR1(1)] <delta_eb = TRUE => (not(a = b) => (a = b => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[IMP4] <not(a = b) => (a = b => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AXM1] <a = b => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => (delta_ed = TRUE => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[AND3] <delta_ea = TRUE and delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))))>
+[OPR1(1)] <delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (a = b => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (a = b => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))))>
+[OPR1(1)] <delta_ec = TRUE => (delta_ed = TRUE => (a = b => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))))>
+[OPR1(1)] <delta_ed = TRUE => (a = b => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ed = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))))>
+[OPR1(1)] <a = b => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)))>
+[EVR3] <TRUE = TRUE => (!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d))>
+[STOP_1] <x$2: d>
+[IMP4_1] <x$2: c => x$2: d>
+[ALL7(1)] <!(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[FIN(x$2: c => x$2: d)] <FIN(x$2: c => x$2: d | (Hyp |- !(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | (Hyp |- forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | 26)>
+[NRM13] <forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[STOP_NORM] <forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)>
+[NRM] <forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)>
+[FIN(forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d))] <FIN(forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d) | (Hyp |- forall(x$2).(x$2: c => x$2: d) => !(x$4).(x$4: c => x$4: d)) | (Hyp |- forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)) | 27)>
+[ALL9] <forall2(x$2).not(x$2: c and not(x$2: d)) => !(x$4).(x$4: c => x$4: d)>
+[ALL8(3)] <!(x$4).(x$4: c => x$4: d)>
+[IMP4] <x$4: c => x$4: d>
+[STOP] <x$4: d>
+[IMP4] <not(x$4: d) => FAUX>
+[INS] <FAUX>
+[AXM7] <FAUX => FAUX>

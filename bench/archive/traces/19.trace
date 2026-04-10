@@ -1,0 +1,26 @@
+﻿ [AXM9] &
+ [ALL9] &
+ [FIN(forall2(x$4,x$5).not(x$4,x$5: p and not(x$4,p(x$4): p)) => (p(a) => q))] &
+ [STOP_NORM] &
+ [NRM13] &
+ [NRM8(2)] &
+ [NRM] &
+ [FIN(!(x$5).(x$4,x$5: p => x$4,p(x$4): p))] &
+ [STOP_1] &
+ [IMP4_1] &
+ [ALL8_1(3)] &
+ [XST7_1(2)] &
+ [ALL7(3)] &
+ [ALL9] &
+ [FIN(forall2(x).not(VRAI and p(x)) => (!(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)))] &
+ [STOP_NORM] &
+ [NRM14] &
+ [NRM] &
+ [FIN(not(p(x)))] &
+ [STOP_1] &
+ [VR3_1] &
+ [AND2_1] &
+ [ALL7(1)] &
+ [AND3] &
+ [ALL8(1)] &
+  (!a.(!x.not(VRAI and p(x)) and !(x$4).(#(x$5).(x$4,x$5: p) => x$4,p(x$4): p) => (p(a) => q)))

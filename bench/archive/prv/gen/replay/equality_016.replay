@@ -1,0 +1,75 @@
+[ALL8(1)] <!(a,b,c,d).((a = TRUE => b = c and d = TRUE) and (delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE)) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => b = c)>
+[AND5] <(a = TRUE => b = c and d = TRUE) and (delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE)) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => b = c>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and (b = c and d = TRUE) => b = c>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE => (b = c and d = TRUE => b = c)>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) and a = TRUE and delta_ea = TRUE and delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) and a = TRUE and delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) and a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))>
+[OR3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) or (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c and d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) and b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[OR3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[AND3] <delta_ed = TRUE and not(d = TRUE) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <delta_ed = TRUE => (not(d = TRUE) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))))>
+[BOOL31] <not(d = TRUE) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <d = FALSE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <b = c => (FALSE = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and FALSE = TRUE => b = c))))))>
+[BOOL52] <FALSE = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (c = c and FALSE = TRUE => c = c)))))>
+[OR3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and not(b = c) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE => (not(b = c) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (not(b = c) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))))>
+[OPR1(1)] <delta_ec = TRUE => (not(b = c) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))))>
+[IMP4] <not(b = c) => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))))))>
+[AXM1] <b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE => (delta_ed = TRUE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))))>
+[OPR1(1)] <delta_ec = TRUE => (delta_ed = TRUE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))))>
+[OPR1(1)] <delta_ed = TRUE => (b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <b = c => (d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))))))>
+[OPR1(1)] <d = TRUE => (a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (c = c and d = TRUE => c = c)))))>
+[OPR1(1)] <a = TRUE => (delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (c = c and TRUE = TRUE => c = c))))>
+[OPR1(1)] <delta_ea = TRUE => (TRUE = TRUE => (TRUE = TRUE => (c = c and TRUE = TRUE => c = c)))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (c = c and TRUE = TRUE => c = c))>
+[EVR3] <TRUE = TRUE => (c = c and TRUE = TRUE => c = c)>
+[AXM8] <c = c and TRUE = TRUE => c = c>
+[OR3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) or (delta_ea = TRUE and not(a = TRUE)) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_ea = TRUE and not(a = TRUE) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <delta_ea = TRUE => (not(a = TRUE) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[BOOL31] <not(a = TRUE) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <a = FALSE => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[BOOL52] <FALSE = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))>
+[AND3] <delta_ea = TRUE and (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE))) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <delta_ea = TRUE => (delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) => (a = TRUE => (delta_ea = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[OR3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) or (delta_ed = TRUE and not(d = TRUE)) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_ed = TRUE and not(d = TRUE) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <delta_ed = TRUE => (not(d = TRUE) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[BOOL31] <not(d = TRUE) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <d = FALSE => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and FALSE = TRUE => b = c))))>
+[EVR3] <TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and FALSE = TRUE => b = c)))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (b = c and FALSE = TRUE => b = c))>
+[OPR1(1)] <delta_ec = TRUE => (b = c and FALSE = TRUE => b = c)>
+[AXM8] <b = c and FALSE = TRUE => b = c>
+[OR3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_eb = TRUE and delta_ec = TRUE and not(b = c)) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and not(b = c) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE => (not(b = c) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (not(b = c) => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <delta_ec = TRUE => (not(b = c) => (a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[IMP4] <not(b = c) => (a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(2)] <a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))>
+[EVR3] <TRUE = TRUE => (b = c and d = TRUE => b = c)>
+[AXM8] <b = c and d = TRUE => b = c>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))>
+[AND3] <delta_eb = TRUE and delta_ec = TRUE => (delta_ed = TRUE => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[OPR1(1)] <delta_eb = TRUE => (delta_ec = TRUE => (delta_ed = TRUE => (a = TRUE => (TRUE = TRUE => (delta_eb = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c)))))))>
+[OPR1(1)] <delta_ec = TRUE => (delta_ed = TRUE => (a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (delta_ec = TRUE => (b = c and d = TRUE => b = c))))))>
+[OPR1(1)] <delta_ed = TRUE => (a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))))>
+[OPR1(1)] <a = TRUE => (TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c)))>
+[EVR3] <TRUE = TRUE => (TRUE = TRUE => (b = c and d = TRUE => b = c))>
+[EVR3] <TRUE = TRUE => (b = c and d = TRUE => b = c)>
+[AXM8] <b = c and d = TRUE => b = c>

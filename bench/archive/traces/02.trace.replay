@@ -1,0 +1,4 @@
+[AND2] <not(p and not(p))>
+[IMP4] <p => not(not(p))>
+[NOT2] <not(not(p))>
+[AXM3] <p>

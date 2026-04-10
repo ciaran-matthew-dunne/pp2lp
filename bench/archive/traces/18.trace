@@ -1,0 +1,13 @@
+﻿ [FX3] &
+ [FIN(FAUX => (a = a => p))] &
+ [STOP_NORM] &
+ [NRM1] &
+ [NRM] &
+ [FIN(FAUX)] &
+ [STOP_1] &
+ [EVR2_1] &
+ [VR3_1] &
+ [AND2_1] &
+ [ALL7(1)] &
+ [ALL8(1)] &
+  (!a.(!x.not(VRAI and x = x) => (a = a => p)))

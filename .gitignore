@@ -1,14 +1,6 @@
 ocaml/_build
 
 bench/gen/
-bench/prv/gen/
-bench/synth/but/
-bench/prv/*.res
-bench/prv/*.trace
-bench/traces/*.trace
-bench/traces/*.replay
-
-bench/lp/*.lp
 *.lpo
 
 # Private / large binary files

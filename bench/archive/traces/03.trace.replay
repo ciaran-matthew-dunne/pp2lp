@@ -1,0 +1,7 @@
+[AND3] <p and q => q and p>
+[IMP4] <p => (q => q and p)>
+[AR10(q)] <q => q and p>
+[IMP4] <q => q and p>
+[AND4] <q and p>
+[AXM3] <p>
+[AXM3] <q>

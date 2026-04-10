@@ -22,40 +22,30 @@ It also provides a round-trip pipeline: given a FOL formula, send it to PP for p
 1. Edit the source file
 2. `make build` to check it compiles
 3. `make unit-test` to run unit tests
-4. `make check JOB=og` to verify traces still pass
+4. `make check` to verify benchmarks still pass
 
-### Debugging a failing trace
+### Debugging a failing test
 1. `make check` output shows file:line:col + full error on failure
 2. `lambdapi_goals FILE LINE` to see proof state at failure
-3. Compare with the hand-written version in `lp/Traces.lp`
-4. Fix in `emit_lp.ml`, rebuild, re-test
+3. Fix in `emit_lp.ml`, rebuild, re-test
 
 ### Verifying nothing is broken
-- `make check` — build + all jobs (og traces + PRV), halts on first **unexpected** failure. Known failures listed in `XFAIL` (Makefile) are tolerated and reported as `xfail`.
+- `make check` — build + all synth benchmarks, halts on first **unexpected** failure. Known failures listed in `XFAIL` (Makefile) are tolerated and reported as `xfail`. Reports `trust`/`admit` counts per test and in summary.
 - `make unit-test` — OCaml unit tests (standalone)
-- **Always use `make check` for the tight feedback loop.** Never use `make errors-prv` during development — it runs all tests without fast-fail and is slow. Reserve it for periodic audits only.
 
 ## Build & Test Commands
 
 ```bash
-make check                          # build + all replays (og + prv), fast-fail
-make check JOB=og                   # build + 30 original traces only
-make check JOB=prv                  # build + all PRV replays
-make check JOB=prv-equality         # build + one PRV category only
+make check                          # build + all benchmarks, fast-fail
+make check JOB=<prefix>             # filter tests by name prefix
 make build                          # build OCaml parser/emitter
 make unit-test                      # run OCaml unit tests
-make trace-NN                       # single trace (e.g. make trace-14)
-make prv-NAME                       # single PRV test (e.g. make prv-arith_ineq_001)
-make test-NAME                      # any single replay (e.g. make test-trace_14)
-make errors-prv                     # all PRV failures with error messages (no fast-fail)
+make test-NAME                      # single test (e.g. make test-and1_basic)
 make prove FORMULA='...'            # send formula to PP, emit LP proof
 make prove FORMULA='...' NAME=foo   # same, with custom symbol name
-make gen                            # regenerate all replays from bench/
-make gen-og                         # copy og trace replays to replay/
-make gen-prv                        # regenerate PRV replays from .but files
-make gen-synth                      # generate synthetic .but files + replays
+make gen                            # regenerate all synth goals + replays
 make status                         # show test suite overview
-make clean                          # remove build artifacts and lp/gen/
+make clean                          # remove build artifacts and generated files
 ```
 
 All commands run from the **project root** (`/home/ciaran/prog/pp2lp`). Do not `cd ocaml` — the Makefile handles build directories.
@@ -73,16 +63,18 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 ## Token-Saving Notes
 
-- **Never read generated LP files** (`lp/gen/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
-- **PRV replay files** (`bench/prv/gen/replay/`) can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single PRV test:** `make prv-name` generates `lp/gen/name.lp` and shows the error. Or run `make check JOB=prv` which shows file:line:col + full error on first failure. Then use `lambdapi_goals` to inspect — don't read the generated file.
-- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~900 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
+- **Never read generated LP files** (`bench/gen/lp/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
+- **Replay files** can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
+- **Debugging a single test:** `make test-name` generates `bench/gen/lp/name.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
+- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~1,650 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
 
 ## Current Test Status
 
-**Traces:** 30/30 pass. **PRV benchmarks:** 86/86 pass. **Synth:** 61/66 pass (5 xfail). **OCaml unit tests:** 153 pass.
+**Synth benchmarks:** 103 goals, 103 with replays. 102/103 passing (1 failing: `all1_flatten`).
 
-Known failures are listed in the Makefile `XFAIL` variable and tolerated by `make check`.
+Known failures are listed in the Makefile `XFAIL` variable and tolerated by `make check`. Currently XFAIL is empty.
+
+**Unit tests:** 153 passing.
 
 ## Directory Structure
 
@@ -95,9 +87,10 @@ lp/                         Lambdapi encoding
 ├── Traces.lp               30 hand-written proof reconstructions
 ├── Rules.lp                Aggregates all rule modules
 ├── Test.lp                 Small test proofs
+├── Experiment.lp           Archived experiment (norm via rewrite rules)
 ├── lambdapi.pkg            Package config (pp2lp)
 ├── gen/                    Auto-generated .lp proofs (gitignored)
-└── rules/                  PP inference rules (base + primed _1 variants)
+└── rules/                  PP inference rules
     ├── Conj.lp             §A.1  Conjunction (AND1–5)
     ├── Disj.lp             §A.2  Disjunction (OR1–4)
     ├── Impl.lp             §A.3  Implication (IMP1–5)
@@ -110,7 +103,8 @@ lp/                         Lambdapi encoding
     ├── Nrm.lp              §A.12 Normalisation (NRM1–30)
     ├── Eq.lp               §A.13 Equality (EVR, OPR, EAXM, EQC, EQS, ECTR)
     ├── Arith.lp            §A.14 Arithmetic (AR1–13)
-    └── Bool.lp             §A.15 Boolean (BOOL*)
+    ├── Bool.lp             §A.15 Boolean (BOOL*)
+    └── Rw.lp               Rewrite lemmas for normalisation chains
 
 ocaml/                      OCaml parser and reconstruction
 ├── src/
@@ -125,15 +119,16 @@ ocaml/                      OCaml parser and reconstruction
 │   ├── gen_but.ml          Round-trip pipeline: formula → .but → PP → LP
 │   └── reconstruct.ml      Reconstruction driver: replay → .lp
 ├── bin/main.ml             CLI: emit/check/batch/parse/prove modes
-└── test/test_pp2lp.ml      Unit + integration tests (151 tests)
+└── test/test_pp2lp.ml      Unit + integration tests (153 tests)
 
 bench/                      Benchmark data and pipeline
-├── traces/                 30 hand-written traces + replays (01–30)
-├── prv/                    PRV proof goals (.but files)
-│   └── gen/                Generated output (gitignored)
-├── synth/                  Synthetic proof goals
-│   ├── goals.txt           Goal definitions (NAME FORMULA per line)
-│   └── but/                Generated .but files + traces (gitignored)
+├── goals.txt               Goal definitions (NAME FORMULA per line, 103 goals)
+├── gen/                    All generated output (flat dir, gitignored)
+│   ├── *.but               .but files from pp2lp synth
+│   ├── *.trace             .trace files from PP
+│   ├── *.replay            .replay files from REPLAY
+│   └── *.lp                .lp proofs from make check
+├── archive/                Archived benchmarks (original traces, PRV goals)
 ├── gen_traces.py           Benchmark: .but → trace → replay pipeline
 └── format_error.py         Lambdapi JSON error formatter
 ```
@@ -185,9 +180,9 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 
 ### Current state
 - Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
-- OCaml parser complete: parses all PRV replays
+- OCaml parser complete: parses all replay formats
 - Rule metadata inlined in `rule_db.ml`
-- Automated reconstruction: 30/30 traces, 86/86 PRV passing
+- Automated reconstruction: 78/78 synth benchmarks passing
 - Round-trip pipeline: formula → PP → LP proof (`make prove`)
 - NRM rules fully proved (0 admits in Nrm.lp)
 - Eq rules fully proved (0 admits in Eq.lp)
