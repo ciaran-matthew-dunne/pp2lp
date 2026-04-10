@@ -1341,7 +1341,16 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       if base = "ALL7" then begin
         let bvars = binding_vars goal in
         let inner_pad = pad ^ "  " in
-        let result_prd = extract_fin_result node primed_child in
+        (* R is the per-element result. Extract from the per-element
+           subtree — the first child of the base_child (NRM continuation)
+           contains the inner STOP chain whose result is R. *)
+        let rec find_leaf_result n = match n with
+          | Apply { rule = "STOP_1"; goal; _ } -> goal
+          | Apply { children = [c]; _ } -> find_leaf_result c
+          | Apply { children = c :: _; _ } -> find_leaf_result c
+          | _ -> compute_result primed_child
+        in
+        let result_prd = find_leaf_result base_child in
         Buffer.add_string buf "refine ALL7_1 (\xce\xbb"; (* λ *)
         List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
         Buffer.add_string buf ", ";

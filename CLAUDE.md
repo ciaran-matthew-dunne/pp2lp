@@ -63,9 +63,9 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 ## Token-Saving Notes
 
-- **Never read generated LP files** (`bench/gen/lp/`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
+- **Never read generated LP files** (`bench/gen/*.lp`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
 - **Replay files** can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single test:** `make test-name` generates `bench/gen/lp/name.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
+- **Debugging a single test:** `make test-name` generates `bench/gen/name.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
 - **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~1,650 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
 
 ## Current Test Status
@@ -133,18 +133,17 @@ bench/                      Benchmark data and pipeline
 └── format_error.py         Lambdapi JSON error formatter
 ```
 
-Dependencies: `Stdlib` → `B.lp` → `{Eq,NonFree,Subst,Proof,Interp}.lp` → `rules/*.lp` → `Traces.lp`
+Dependencies: `Stdlib` → `B.lp` → `{NonFree,Subst,Proof}.lp` → `rules/*.lp` → `Traces.lp`
 
 ## Architecture
 
 ### Lambdapi encoding (`lp/`)
 
 - **`B.lp`** — Foundation. Uses Stdlib (Prop, Set, FOL, Eq, etc.) for the shallow encoding. Domain type `ι`, membership `ϵ`, maplet `↦`, arithmetic on `τ ι` (𝟎, 𝟏, +, -, ×, ≤, ≪, —). String coercion for variables.
-- **`Eq.lp`** — Sequential rewrite rules for syntactic equality (`str_eq`, `var_eq`, `exp_eq`, `prd_eq`).
 - **`NonFree.lp`** — Non-freeness checking (`pnf`, `enf`, `vpnf`, `venf`, `str_mem`).
 - **`Subst.lp`** — Capture-avoiding substitution (`psub`, `esub`) following PP spec SUB rules.
-- **`Interp.lp`** — Semantic interpretation. `sat` maps predicates to propositions, `den` maps expressions to denotations.
-- **Rule files (`rules/`)** — PP inference rules split by spec appendix section. Each rule has a base form and a primed `_1` variant for result-producing trace reconstruction. Multi-premise rules (AND1, OR2, IMP3, EQV1–4, ALL7, XST8) create proof tree branching.
+- **Rule files (`rules/`)** — PP inference rules split by spec appendix section. Multi-premise rules (AND1, OR2, IMP3, EQV1–4, ALL7, XST8) create proof tree branching.
+- **`Rw.lp`** — Rewrite lemmas for normalisation chains. Replaces the old primed (`_1`) rule mechanism: instead of separate equality-chaining symbols, the emitter uses `rewrite lemma; ...` proof scripts.
 - **`Traces.lp`** — 30 hand-reconstructed PP traces as type-checked proofs.
 
 ### OCaml parser and reconstruction (`ocaml/`)
@@ -152,7 +151,7 @@ Dependencies: `Stdlib` → `B.lp` → `{Eq,NonFree,Subst,Proof,Interp}.lp` → `
 - **`syntax_pp.ml`** — AST types. `prd` (predicates), `exp` (expressions), `line = lhs * rhs`.
 - **`lexer.mll`** / **`parser.mly`** — Tokenise and parse PP replay lines.
 - **`proof_tree.ml`** — Builds proof tree from flat replay lines using rule arity for branching.
-- **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi. Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒). Conjunctions are emitted **left-associatively** (`((a ∧ b) ∧ c)`) so AND3 chains peel conjuncts correctly, even though Stdlib's `∧` notation is right-associative. AND5/AXM8 use generated `∧ₑ₁`/`∧ₑ₂`/`∧ᵢ` lambdas instead of `conj` lists.
+- **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi (~1,650 lines, largest file). Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒). Emits Res-typed rewrite chains as proof scripts instead of inline terms. Conjunctions are emitted **left-associatively** (`((a ∧ b) ∧ c)`) so AND3 chains peel conjuncts correctly, even though Stdlib's `∧` notation is right-associative. AND5/AXM8 use generated `∧ₑ₁`/`∧ₑ₂`/`∧ᵢ` lambdas instead of `conj` lists.
 - **`emit_pp.ml`** — Reverse of the parser: converts AST back to PP text syntax. Precedence-aware to avoid unnecessary parenthesization.
 - **`gen_but.ml`** — Round-trip pipeline: takes a formula, generates a `.but` file with delta conditions, calls PP (`krt`) to produce a trace, runs REPLAY, parses the replay, and emits LP.
 - **`reconstruct.ml`** — Wires parse → tree → emit.
@@ -179,14 +178,15 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 ## Roadmap
 
 ### Current state
-- Lambdapi shallow encoding complete: all PP rules formalised with base + primed variants
+- Lambdapi shallow encoding complete: all PP rules formalised (primed `_1` rules removed, replaced by Rw.lp rewrite lemmas + Res type)
 - OCaml parser complete: parses all replay formats
 - Rule metadata inlined in `rule_db.ml`
-- Automated reconstruction: 78/78 synth benchmarks passing
+- Automated reconstruction: 102/103 synth benchmarks passing (1 failing: `all1_flatten`)
 - Round-trip pipeline: formula → PP → LP proof (`make prove`)
 - NRM rules fully proved (0 admits in Nrm.lp)
 - Eq rules fully proved (0 admits in Eq.lp)
 - AR2, AR9 proved in Arith.lp
+- 153 OCaml unit tests passing
 
 ### Admitted LP rules (proved via `admit`)
 - **Arithmetic** (AR3–AR8, AR9_1, AR13): need integer arithmetic axioms in B.lp or encode solver-confirmed facts

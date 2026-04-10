@@ -458,12 +458,18 @@ begin
 end;
 
 // ALL7_1: equality for branching quantifier in _1 chain.
-// Composes inner per-element equality with continuation equality.
-opaque symbol ALL7_1 [P : τ ι → Prop] [Q S : Prop]
-  :  π (((`♢ x, P x) ⇒ Q) = S)
+// R is the per-element result; inner chain proves P x = R x for each x.
+opaque symbol ALL7_1 [P : τ ι → Prop] (R : τ ι → Prop) [Q S : Prop]
+  : (Π x : τ ι, π (P x = R x))
+  → π (((`♢ x, R x) ⇒ Q) = S)
   → π (((`∀ x, P x) ⇒ Q) = S) ≔
 begin
-admit
+  assume P R Q S h1 h2;
+  have h3 : π ((`∀ x, P x) = (`∀ x, R x))
+    { refine ALL8_1 h1 };
+  have h4 : π (((`∀ x, P x) ⇒ Q) = ((`∀ x, R x) ⇒ Q))
+    { rewrite h3; reflexivity };
+  refine eq_trans h4 h2
 end;
 
 // XST8_1: equality for existential ¬¬-elimination in _1 chain.
