@@ -104,11 +104,11 @@ let () =
 
 let () =
   let (_, rhs) = parse_exn "[ALL1] <!x.p>" in
-  check "parse: forall0" (rhs = Simple (Bind (Forall0, ["x"], Lift (Var "p"))))
+  check "parse: forall0" (rhs = Simple (Bind (Bang, ["x"], Lift (Var "p"))))
 
 let () =
   let (_, rhs) = parse_exn "[ALL1] <forall(x,y).p>" in
-  check "parse: forall1 multi" (rhs = Simple (Bind (Forall1, ["x"; "y"], Lift (Var "p"))))
+  check "parse: forall1 multi" (rhs = Simple (Bind (Forall, ["x"; "y"], Lift (Var "p"))))
 
 let () =
   let (_, rhs) = parse_exn "[ALL1] <#x.p>" in
@@ -171,7 +171,7 @@ let () =
   in
   check "parse: FIN with binding hyp"
     (rhs = Fin (Lift (Var "VRAI"),
-                ([Bind (Forall0, ["x"], Unary (Not, Lift (Var "p")))],
+                ([Bind (Bang, ["x"], Unary (Not, Lift (Var "p")))],
                  Lift (Var "q")),
                 ([], Lift (Var "r")),
                 7))
@@ -369,7 +369,7 @@ let () =
 let () =
   check "emit: forall0 HOAS"
     (has "`\xe2\x88\x80"
-      (prd_to_string (Bind (Forall0, ["x"], Eq (Var "x", Var "x")))))
+      (prd_to_string (Bind (Bang, ["x"], Eq (Var "x", Var "x")))))
 
 let () =
   check "emit: nested connectives"
@@ -644,7 +644,7 @@ let () =
   (* No hyps: plain predicate *)
   check "extract_hyps: no hyps" (extract_theorem_hyps p = []);
   (* ∀ x (p ∧ q ⇒ r) → [q; p] *)
-  let thm = Bind (Forall0, ["x"],
+  let thm = Bind (Bang, ["x"],
     Binary (Imp, Binary (And, p, q), r)) in
   let hyps = extract_theorem_hyps thm in
   check "extract_hyps: forall imp" (List.length hyps = 2);
@@ -653,7 +653,7 @@ let () =
   let hyps2 = extract_theorem_hyps thm2 in
   check "extract_hyps: nested conj" (List.length hyps2 = 3);
   (* Nested ∀ stripping *)
-  let thm3 = Bind (Forall0, ["x"], Bind (Forall0, ["y"],
+  let thm3 = Bind (Bang, ["x"], Bind (Bang, ["y"],
     Binary (Imp, p, q))) in
   let hyps3 = extract_theorem_hyps thm3 in
   check "extract_hyps: nested forall" (List.length hyps3 = 1)

@@ -99,8 +99,8 @@ and prd_to_pp_buf ?(parens=true) buf p =
     exp_to_pp_buf ~parent_prec:0 buf e
   | Bind (binder, xs, body) ->
     let qsym = match binder with
-      | Forall0 -> "!"
-      | Forall1 -> "forall"
+      | Bang -> "!"
+      | Forall -> "forall"
       | Forall2 -> "forall2"
       | Exists -> "#"
     in

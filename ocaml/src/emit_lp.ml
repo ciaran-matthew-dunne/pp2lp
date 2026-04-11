@@ -191,8 +191,8 @@ and pp_prd ?(min_bp = bp_max) buf p =
       pp_exp ~min_bp:6 buf e)
   | Bind (binder, xs, body) ->
     let qsym = match binder with
-      | Forall0 -> "`\xe2\x88\x80" (* `∀ *)
-      | Forall1 -> "`\xe2\x99\xa2"  (* `♢ *)
+      | Bang -> "`\xe2\x88\x80" (* `∀ *)
+      | Forall -> "`\xe2\x99\xa2"  (* `♢ *)
       | Forall2 -> "`\xe2\x99\xa1"  (* `♡ *)
       | Exists   -> "`\xe2\x88\x83"  (* `∃ *)
     in
@@ -320,8 +320,8 @@ let rec pp_prd_block ?(min_bp = 0) ind buf p =
       pp_prd_block ~min_bp:6 ind buf p2)
   | Bind (binder, xs, body) ->
     let qsym = match binder with
-      | Forall0 -> "`\xe2\x88\x80" (* `∀ *)
-      | Forall1 -> "`\xe2\x99\xa2"  (* `♢ *)
+      | Bang -> "`\xe2\x88\x80" (* `∀ *)
+      | Forall -> "`\xe2\x99\xa2"  (* `♢ *)
       | Forall2 -> "`\xe2\x99\xa1"  (* `♡ *)
       | Exists   -> "`\xe2\x88\x83"  (* `∃ *)
     in
@@ -418,7 +418,7 @@ let rec collect_conj_hyps acc = function
   | p -> p :: acc
 
 let rec extract_theorem_hyps = function
-  | Bind (Forall0, _, body) -> extract_theorem_hyps body
+  | Bind (Bang, _, body) -> extract_theorem_hyps body
   | Binary (Imp, hyps, _) -> collect_conj_hyps [] hyps
   | _ -> []
 
@@ -716,7 +716,7 @@ let emit_quant_r_args buf rule node =
   | Apply { children; _ } ->
     let extract_r child_goal =
       match child_goal with
-      | Binary (Imp, Bind ((Forall0|Forall1|Forall2), xs, r_body), _) ->
+      | Binary (Imp, Bind ((Bang|Forall|Forall2), xs, r_body), _) ->
         if rule = "ALL7_2" || rule = "XST8_2" then
           Some (xs, [], right_assoc_conj r_body)
         else
@@ -1156,7 +1156,7 @@ let rec compute_result (node : proof_node) : prd =
     (* ALL8: ∀x. child_result *)
     | "ALL8", [child] ->
       let vars = match goal with Bind (_, xs, _) -> xs | _ -> [] in
-      Bind (Forall0, vars, compute_result child)
+      Bind (Bang, vars, compute_result child)
     (* ALL9: H ⇒ child_result *)
     | "ALL9", [child] ->
       let h = match goal with Binary (Imp, h, _) -> h | _ -> goal in

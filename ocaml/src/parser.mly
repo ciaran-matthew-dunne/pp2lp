@@ -64,8 +64,8 @@ exp_seq:
   { e :: es }
 
 binder:
-  | FORALL0 { Forall0 }
-  | FORALL1 { Forall1 }
+  | FORALL0 { Bang }
+  | FORALL1 { Forall }
   | FORALL2 { Forall2 }
   | EXISTS  { Exists }
 binding:

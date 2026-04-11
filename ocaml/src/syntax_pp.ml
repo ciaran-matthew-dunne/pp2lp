@@ -6,7 +6,10 @@ and bop =
 and aop =
   | Add | Sub
 and binder =
-  | Forall0 | Forall1 | Forall2 | Exists
+  | Bang     (* !x. — PP's default universal quantifier *)
+  | Forall   (* forall x. — keyword form *)
+  | Forall2  (* forall2 x. — second-order *)
+  | Exists   (* #x. — existential quantifier *)
 
 type prd =
   | Lift of exp
