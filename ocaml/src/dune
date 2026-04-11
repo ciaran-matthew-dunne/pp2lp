@@ -9,7 +9,8 @@
  (libraries unix)
  (modules
    parser lexer parse_pp syntax_pp
-   rule_db proof_tree pp_lp emit_lp emit_pp reconstruct gen_but
+   rule_db proof_tree pp_lp free_vars subst hyp_ctx
+   emit_lp emit_pp reconstruct gen_but
  )
  (flags :standard)
 )
