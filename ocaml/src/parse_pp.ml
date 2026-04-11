@@ -27,17 +27,19 @@ let parse_pp_line (lx : lexbuf) : line option =
 
 let parse_pp_replay (fp : string) : line list =
   let ch = open_in fp in
-  let lx = Lexing.from_channel ch in
-  let ls = ref [] in
-  try
-    while true do
-      match parse_pp_line lx with
-      | Some l -> ls := l :: !ls;
-      | None -> raise Exit
-    done;
-    assert false (* unreachable *)
-  with
-  | Exit -> close_in ch; List.rev !ls
-  | exn ->
-      Printf.eprintf "Unexpected error parsing %s: %s\n" fp (Printexc.to_string exn);
-      close_in ch; List.rev !ls
+  Fun.protect ~finally:(fun () -> close_in ch) (fun () ->
+    let lx = Lexing.from_channel ch in
+    let ls = ref [] in
+    (try
+       while true do
+         match parse_pp_line lx with
+         | Some l -> ls := l :: !ls
+         | None ->
+             Printf.eprintf "parse_pp_replay: stopping at line %d in %s\n"
+               lx.lex_curr_p.pos_lnum fp;
+             raise Exit
+       done
+     with
+     | Exit -> ()
+     | End_of_file -> ());
+    List.rev !ls)

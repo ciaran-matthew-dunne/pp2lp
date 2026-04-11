@@ -48,4 +48,5 @@ rule token = parse
   (* literals *)
   | symbol as s  { SYMBOL s }
   | natural as i { NATURAL (int_of_string i) }
-  | _ { token lexbuf }
+  | [' ' '\t' '\r'] { token lexbuf }
+  | _ as c { Printf.eprintf "warning: skipping unexpected char '%c'\n" c; token lexbuf }
