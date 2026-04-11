@@ -35,6 +35,12 @@ check: build
 	  replay="bench/gen/$$n.replay"; \
 	  outfile="bench/gen/$$n.lp"; \
 	  emit_warn=$$({ $(PP2LP) emit "$$replay" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	  if ! grep -q 'symbol' "$$outfile"; then \
+	    is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
+	    if [ $$is_xfail -eq 1 ]; then xfail=$$((xfail+1)); \
+	    else fail=$$((fail+1)); echo "FAIL $$n (empty emission)"; \
+	      echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
+	    fi; continue; fi; \
 	  $(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; \
 	  if grep -q '"status":"ok"' "$$lp_tmp"; then pass=$$((pass+1)); \
 	    nt=$$(grep -ow 'trust' "$$outfile" | wc -l); \
@@ -67,6 +73,8 @@ test-%: build
 	[ -f "$$replay" ] || { echo "$$replay missing — run 'make gen' first"; exit 1; }; \
 	outfile="bench/gen/$*.lp"; \
 	emit_warn=$$({ $(PP2LP) emit "$$replay" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	if ! grep -q 'symbol' "$$outfile"; then \
+	  echo "FAIL $* (empty emission)"; echo "$$emit_warn" | head -5; exit 1; fi; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
 	$(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; \
 	if grep -q '"status":"ok"' "$$lp_tmp"; then echo "OK $*"; \

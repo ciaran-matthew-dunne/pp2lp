@@ -142,16 +142,8 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       if base = "ALL7" then begin
         let bvars = binding_vars goal in
         let inner_pad = pad ^ "  " in
-        (* R is the per-element result. Extract from the per-element
-           subtree — the first child of the base_child (NRM continuation)
-           contains the inner STOP chain whose result is R. *)
-        let rec find_leaf_result n = match n with
-          | Apply { rule = "STOP_1"; goal; _ } -> goal
-          | Apply { children = [c]; _ } -> find_leaf_result c
-          | Apply { children = c :: _; _ } -> find_leaf_result c
-          | _ -> compute_result primed_child
-        in
-        let result_prd = find_leaf_result base_child in
+        (* R is the per-element result from the first antecedent (primed_child) *)
+        let result_prd = compute_result primed_child in
         let all7_1_sym = if List.length bvars >= 2 then "ALL7_1_2" else "ALL7_1" in
         Buffer.add_string buf "refine ";
         Buffer.add_string buf all7_1_sym;
@@ -345,7 +337,8 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       emit_rule_args buf ctx eff_rule node
 
     | [_child] when Proof_tree.is_branching_quantifier rule ->
-      failwith (Printf.sprintf "truncated replay at %s: branching quantifier has no child2" rule)
+      failwith (Printf.sprintf
+        "emit: %s has only 1 child (truncated or malformed replay)" rule)
 
     | [child] when rule = "NRM1" ->
       emit_comment ();

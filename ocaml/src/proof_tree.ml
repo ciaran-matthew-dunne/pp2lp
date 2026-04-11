@@ -17,8 +17,6 @@ let has_primed = Rule_db.has_primed
 
 (* --- Rule name predicates --- *)
 
-let is_phantom name = Rule_db.rule_arity name = -1
-
 let is_primed_rule name =
   name = "STOP_1" ||
   (String.length name > 2 &&
@@ -62,6 +60,8 @@ let replay_arity name =
     Rule_db.rule_arity base
   else
     Rule_db.rule_arity name
+
+let is_phantom name = replay_arity name = -1
 
 (* --- Helpers used by build --- *)
 
@@ -191,7 +191,7 @@ let build (lines : line list) : proof_node =
     end
     else
       let ((rule_name, arg), rhs) = arr.(pos) in
-      let arity = Rule_db.rule_arity rule_name in
+      let arity = replay_arity rule_name in
 
       if arity = -1 then
         go (pos + 1) ctx
@@ -214,7 +214,9 @@ let build (lines : line list) : proof_node =
           in
           let pos2 = skip_fin arr n fin_pos in
           if pos2 >= n then
-            failwith (Printf.sprintf "truncated replay at %s: no child2" bname)
+            failwith (Printf.sprintf
+              "proof_tree: %s at end of replay has no child2 \
+               (truncated or malformed replay)" bname)
           else
             let (child2, pos3) = go pos2 Base in
             (Apply { rule = resolved; arg = fin_arg; goal = bgoal; ctx;
