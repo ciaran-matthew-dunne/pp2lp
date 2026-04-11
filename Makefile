@@ -1,4 +1,4 @@
-.PHONY: build check gen unit-test clean prove status coverage
+.PHONY: build check check-all gen unit-test clean prove status coverage
 
 export PP2LP_ROOT := $(CURDIR)
 
@@ -7,7 +7,11 @@ LP_CHECK      = lambdapi check --json -c
 FORMAT_ERROR  = python3 bench/format_error.py
 
 # -- Expected failures (known issues, tolerated by check) ---------------------
-XFAIL =
+# Truncated replays (ALL7/XST8 at end with no child2) + stack underflow:
+# PP/REPLAY generates incomplete traces for these goals.
+XFAIL = fuzz_0006 fuzz_0050 fuzz_0083 fuzz_0156 fuzz_0161 fuzz_0192 \
+        fuzz_0209 fuzz_0289 fuzz_0336 fuzz_0415 fuzz_0427 fuzz_0434 \
+        fuzz_0659 fuzz_0708 fuzz_0857 fuzz_0958 nrm2_factor
 
 # -- Replay discovery ---------------------------------------------------------
 REPLAYS      := $(wildcard bench/gen/*.replay)
@@ -15,7 +19,7 @@ TESTS        := $(patsubst bench/gen/%.replay,%,$(REPLAYS))
 
 # JOB= filter
 ifdef JOB
-  TESTS := $(filter $(JOB)_%,$(TESTS))
+  TESTS := $(filter $(JOB)%,$(TESTS))
 endif
 
 # -- Replay generation --------------------------------------------------------
@@ -24,22 +28,27 @@ gen: build
 	@$(PP2LP) synth bench/goals.txt bench/gen
 	@python3 bench/gen_traces.py -q -o bench/gen bench/gen
 
-# -- check: build + run benchmark tests ---------------------------------------
-check: build
+# -- Shared check logic (used by check and check-all) ------------------------
+# Args: FAST_FAIL (0 or 1)
+define RUN_CHECK
 	@if [ -z "$(TESTS)" ]; then echo "No replay files found — run 'make gen' first"; exit 1; fi
 	@printf 'package_name = pp2lp_bench\nroot_path = pp2lp_bench\n' > bench/gen/lambdapi.pkg
 	@rm -f bench/gen/*.lp
-	@t=$$(date +%s); pass=0; fail=0; xfail=0; tot_trust=0; tot_admit=0; \
+	@t=$$(date +%s); pass=0; fail=0; xfail=0; empty=0; \
+	tot_trust=0; tot_admit=0; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
 	for n in $(TESTS); do \
 	  replay="bench/gen/$$n.replay"; \
 	  outfile="bench/gen/$$n.lp"; \
 	  emit_warn=$$({ $(PP2LP) emit "$$replay" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	  is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
 	  if ! grep -q 'symbol' "$$outfile"; then \
-	    is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
+	    empty=$$((empty+1)); \
 	    if [ $$is_xfail -eq 1 ]; then xfail=$$((xfail+1)); \
 	    else fail=$$((fail+1)); echo "FAIL $$n (empty emission)"; \
-	      echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
+	      if [ $(1) -eq 1 ]; then \
+	        echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
+	      fi; \
 	    fi; continue; fi; \
 	  $(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; \
 	  if grep -q '"status":"ok"' "$$lp_tmp"; then pass=$$((pass+1)); \
@@ -51,21 +60,33 @@ check: build
 	    [ $$na -gt 0 ] && warns="$${warns:+$$warns, }$$na admit"; \
 	    [ -n "$$warns" ] && echo "  warn $$n: $$warns"; \
 	  else \
-	    is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
 	    if [ $$is_xfail -eq 1 ]; then xfail=$$((xfail+1)); \
 	    else fail=$$((fail+1)); echo "FAIL $$n"; \
 	      $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp" || echo "  (no details)"; \
-	      echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
+	      if [ $(1) -eq 1 ]; then \
+	        echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
+	      fi; \
 	    fi; \
 	  fi; \
 	done; \
 	msg="$$pass passed, $$fail failed"; \
 	[ $$xfail -gt 0 ] && msg="$$msg, $$xfail xfail"; \
+	[ $$empty -gt 0 ] && msg="$$msg, $$empty empty"; \
 	warns=""; \
 	[ $$tot_trust -gt 0 ] && warns="$$tot_trust trust"; \
 	[ $$tot_admit -gt 0 ] && warns="$${warns:+$$warns, }$$tot_admit admit"; \
 	[ -n "$$warns" ] && msg="$$msg ($$warns)"; \
-	echo "$$msg ($$(( $$(date +%s) - t ))s)"
+	echo "$$msg ($$(( $$(date +%s) - t ))s)"; \
+	[ $$fail -gt 0 ] && exit 1 || true
+endef
+
+# -- check: build + benchmarks, fast-fail on first unexpected failure ---------
+check: build
+	$(call RUN_CHECK,1)
+
+# -- check-all: build + benchmarks, report ALL failures ----------------------
+check-all: build
+	$(call RUN_CHECK,0)
 
 # -- Individual test: make test-<name> ----------------------------------------
 test-%: build
@@ -93,11 +114,36 @@ prove: build
 coverage:
 	@bash bench/rule_coverage.sh --by-suite
 
-# -- Status -------------------------------------------------------------------
-status:
+# -- Status: full overview of project health ----------------------------------
+status: build
 	@echo "=== pp2lp status ==="
-	@echo "Goals: $$(grep -c '^[a-z]' bench/goals.txt 2>/dev/null || echo 0), $$(ls bench/gen/*.replay 2>/dev/null | wc -l) with replays"
-	@echo "XFAIL: $(XFAIL)"
+	@goals=$$(grep -c '^[a-z]' bench/goals.txt 2>/dev/null || echo 0); \
+	replays=$$(ls bench/gen/*.replay 2>/dev/null | wc -l); \
+	echo "Goals: $$goals, $$replays with replays"; \
+	echo "XFAIL: $(XFAIL)"; \
+	echo "Unit tests:"; cd ocaml && dune exec test/test_pp2lp.exe 2>&1 | tail -1; cd ..; \
+	echo "Benchmarks:"; \
+	pass=0; fail=0; xfail=0; empty=0; \
+	printf 'package_name = pp2lp_bench\nroot_path = pp2lp_bench\n' > bench/gen/lambdapi.pkg; \
+	rm -f bench/gen/*.lp; \
+	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
+	for n in $(TESTS); do \
+	  replay="bench/gen/$$n.replay"; \
+	  outfile="bench/gen/$$n.lp"; \
+	  $(PP2LP) emit "$$replay" > "$$outfile" 2>/dev/null; \
+	  is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
+	  if ! grep -q 'symbol' "$$outfile"; then \
+	    empty=$$((empty+1)); \
+	    [ $$is_xfail -eq 1 ] && xfail=$$((xfail+1)) || fail=$$((fail+1)); \
+	    continue; fi; \
+	  $(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; \
+	  if grep -q '"status":"ok"' "$$lp_tmp"; then pass=$$((pass+1)); \
+	  else [ $$is_xfail -eq 1 ] && xfail=$$((xfail+1)) || fail=$$((fail+1)); fi; \
+	done; \
+	msg="  $$pass passed, $$fail failed"; \
+	[ $$xfail -gt 0 ] && msg="$$msg, $$xfail xfail"; \
+	[ $$empty -gt 0 ] && msg="$$msg, $$empty empty"; \
+	echo "$$msg"
 
 # -- Build --------------------------------------------------------------------
 build:

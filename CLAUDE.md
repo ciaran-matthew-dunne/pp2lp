@@ -22,29 +22,41 @@ It also provides a round-trip pipeline: given a FOL formula, send it to PP for p
 1. Edit the source file
 2. `make build` to check it compiles
 3. `make unit-test` to run unit tests
-4. `make check` to verify benchmarks still pass
+4. `make test-NAME` to test a specific benchmark
+5. `make check` to verify no regressions (fast-fail on first failure)
 
 ### Debugging a failing test
-1. `make check` output shows file:line:col + full error on failure
+1. `make test-NAME` shows the error with file:line:col + proof context
 2. `lambdapi_goals FILE LINE` to see proof state at failure
-3. Fix in `emit_lp.ml`, rebuild, re-test
+3. Fix the issue, rebuild, re-test
+4. The failing file is in `bench/gen/NAME.lp` — prefer `lambdapi_goals` over reading it
 
 ### Verifying nothing is broken
-- `make check` — build + all synth benchmarks, halts on first **unexpected** failure. Known failures listed in `XFAIL` (Makefile) are tolerated and reported as `xfail`. Reports `trust`/`admit` counts per test and in summary.
-- `make unit-test` — OCaml unit tests (standalone)
+- `make check` — build + benchmarks, halts on first **unexpected** failure. Fast.
+- `make check-all` — same but reports ALL failures without stopping. Use after big changes.
+- `make check JOB=fuzz` — filter to a prefix (e.g., only fuzz tests)
+- `make status` — full overview: unit tests + benchmark pass/fail/empty counts
+- `make unit-test` — OCaml unit tests only (153 tests)
+
+### Typical change cycle
+1. Edit OCaml code
+2. `make build && make unit-test` — quick compile + unit check
+3. `make test-NAME` — test specific benchmark you're working on
+4. `make check` — verify no regressions before committing
 
 ## Build & Test Commands
 
 ```bash
-make check                          # build + all benchmarks, fast-fail
-make check JOB=<prefix>             # filter tests by name prefix
 make build                          # build OCaml parser/emitter
-make unit-test                      # run OCaml unit tests
+make unit-test                      # run OCaml unit tests (153 tests)
+make check                          # build + benchmarks, fast-fail on first failure
+make check-all                      # build + ALL benchmarks, report all failures
+make check JOB=fuzz                 # filter tests by name prefix
 make test-NAME                      # single test (e.g. make test-and1_basic)
+make status                         # full overview: unit tests + benchmark counts
 make prove FORMULA='...'            # send formula to PP, emit LP proof
 make prove FORMULA='...' NAME=foo   # same, with custom symbol name
 make gen                            # regenerate all synth goals + replays
-make status                         # show test suite overview
 make clean                          # remove build artifacts and generated files
 ```
 
@@ -65,16 +77,31 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 
 - **Never read generated LP files** (`bench/gen/*.lp`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
 - **Replay files** can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single test:** `make test-name` generates `bench/gen/name.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
-- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files. Most files in this project are small, but `emit_lp.ml` (~1,650 lines) and `Traces.lp` (~240 lines) benefit from targeted access.
+- **Debugging a single test:** `make test-NAME` generates `bench/gen/NAME.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
+- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files.
 
 ## Current Test Status
 
-**Synth benchmarks:** 103 goals, 103 with replays. 102/103 passing (1 failing: `all1_flatten`).
-
-Known failures are listed in the Makefile `XFAIL` variable and tolerated by `make check`. Currently XFAIL is empty.
-
 **Unit tests:** 153 passing.
+
+**Synth benchmarks:** 1103 goals, 666 with replays.
+- 561 passing, ~93 failing LP checks, 17 xfail (truncated replays from PP)
+- Run `make status` for current counts — they change as bugs are fixed
+- Known failures (XFAIL in Makefile): truncated replays where PP/REPLAY generates incomplete traces
+
+**`make check` baseline:** Tests alphabetically until first failure. Currently ~55 pass before the first non-xfail failure.
+
+## Benchmark Pipeline
+
+```
+goals.txt  →  *.but  →  *.trace  →  *.replay  →  *.lp
+ (synth)     (pp2lp)    (PP/krt)   (REPLAY)    (pp2lp emit)
+```
+
+- `make gen` runs the full pipeline (synth + trace generation)
+- `make check` only runs the last step (emit + lambdapi check)
+- Replays are the source of truth — they persist in `bench/gen/` (gitignored)
+- `.lp` files are regenerated fresh each `make check` run
 
 ## Directory Structure
 
@@ -87,7 +114,6 @@ lp/                         Lambdapi encoding
 ├── Traces.lp               30 hand-written proof reconstructions
 ├── Rules.lp                Aggregates all rule modules
 ├── Test.lp                 Small test proofs
-├── Experiment.lp           Archived experiment (norm via rewrite rules)
 ├── lambdapi.pkg            Package config (pp2lp)
 ├── gen/                    Auto-generated .lp proofs (gitignored)
 └── rules/                  PP inference rules
@@ -104,25 +130,30 @@ lp/                         Lambdapi encoding
     ├── Eq.lp               §A.13 Equality (EVR, OPR, EAXM, EQC, EQS, ECTR)
     ├── Arith.lp            §A.14 Arithmetic (AR1–13)
     ├── Bool.lp             §A.15 Boolean (BOOL*)
-    └── Rw.lp               Rewrite lemmas for normalisation chains
+    └── Rw.lp               Rewrite lemmas for normalisation chains (_1 rules)
 
 ocaml/                      OCaml parser and reconstruction
 ├── src/
-│   ├── syntax_pp.ml        AST: prd, exp, line = lhs * rhs
+│   ├── syntax_pp.ml        AST: prd, exp, binder (Bang/Forall/Forall2/Exists)
 │   ├── lexer.mll           ocamllex lexer for PP trace syntax
 │   ├── parser.mly          menhir parser (entry: line_eof)
 │   ├── parse_pp.ml         Driver: parse_pp_replay, parse_pp_string
-│   ├── rule_db.ml          Rule metadata (arity, primed, emit args, result schema)
-│   ├── proof_tree.ml       Proof tree type + builder from line list
-│   ├── emit_lp.ml          Lambdapi pretty-printer (AST → LP)
+│   ├── rule_db.ml          Rule metadata: single rule_info record per rule
+│   ├── proof_tree.ml       Proof tree type + builder from replay lines
+│   ├── pp_lp.ml            LP pretty-printing (precedence-aware, conjunction helpers)
+│   ├── free_vars.ml        Free variable analysis
+│   ├── subst.ml            AST substitution
+│   ├── hyp_ctx.ml          Hypothesis context management
+│   ├── rule_args.ml        Dynamic argument emitters + variant selection + INS resolution
+│   ├── emit_lp.ml          Core emission: primed chains, branching, node dispatch (~470 lines)
 │   ├── emit_pp.ml          PP pretty-printer (AST → PP text)
 │   ├── gen_but.ml          Round-trip pipeline: formula → .but → PP → LP
 │   └── reconstruct.ml      Reconstruction driver: replay → .lp
-├── bin/main.ml             CLI: emit/check/batch/parse/prove modes
+├── bin/main.ml             CLI: emit/parse/prove/synth modes
 └── test/test_pp2lp.ml      Unit + integration tests (153 tests)
 
 bench/                      Benchmark data and pipeline
-├── goals.txt               Goal definitions (NAME FORMULA per line, 103 goals)
+├── goals.txt               Goal definitions (NAME FORMULA per line, 1103 goals)
 ├── gen/                    All generated output (flat dir, gitignored)
 │   ├── *.but               .but files from pp2lp synth
 │   ├── *.trace             .trace files from PP
@@ -140,34 +171,35 @@ Dependencies: `Stdlib` → `B.lp` → `{NonFree,Subst,Proof}.lp` → `rules/*.lp
 ### Lambdapi encoding (`lp/`)
 
 - **`B.lp`** — Foundation. Uses Stdlib (Prop, Set, FOL, Eq, etc.) for the shallow encoding. Domain type `ι`, membership `ϵ`, maplet `↦`, arithmetic on `τ ι` (𝟎, 𝟏, +, -, ×, ≤, ≪, —). String coercion for variables.
-- **`NonFree.lp`** — Non-freeness checking (`pnf`, `enf`, `vpnf`, `venf`, `str_mem`).
-- **`Subst.lp`** — Capture-avoiding substitution (`psub`, `esub`) following PP spec SUB rules.
 - **Rule files (`rules/`)** — PP inference rules split by spec appendix section. Multi-premise rules (AND1, OR2, IMP3, EQV1–4, ALL7, XST8) create proof tree branching.
-- **`Rw.lp`** — Rewrite lemmas for normalisation chains. Replaces the old primed (`_1`) rule mechanism: instead of separate equality-chaining symbols, the emitter uses `rewrite lemma; ...` proof scripts.
+- **`Rw.lp`** — Rewrite lemmas for normalisation chains. Contains `_1` variants of rules (ALL7_1, IMP4_1, etc.) used in primed/result derivation contexts.
 - **`Traces.lp`** — 30 hand-reconstructed PP traces as type-checked proofs.
 
-### OCaml parser and reconstruction (`ocaml/`)
+### OCaml pipeline (`ocaml/`)
 
-- **`syntax_pp.ml`** — AST types. `prd` (predicates), `exp` (expressions), `line = lhs * rhs`.
-- **`lexer.mll`** / **`parser.mly`** — Tokenise and parse PP replay lines.
-- **`proof_tree.ml`** — Builds proof tree from flat replay lines using rule arity for branching.
-- **`emit_lp.ml`** — Pretty-prints proof trees as Lambdapi (~1,650 lines, largest file). Translates PP syntax (VRAI/FAUX, `and`/`or`/`not`/`=>`) to Unicode (TRUE/FALSE, ∧/∨/¬/⇒). Emits Res-typed rewrite chains as proof scripts instead of inline terms. Conjunctions are emitted **left-associatively** (`((a ∧ b) ∧ c)`) so AND3 chains peel conjuncts correctly, even though Stdlib's `∧` notation is right-associative. AND5/AXM8 use generated `∧ₑ₁`/`∧ₑ₂`/`∧ᵢ` lambdas instead of `conj` lists.
-- **`emit_pp.ml`** — Reverse of the parser: converts AST back to PP text syntax. Precedence-aware to avoid unnecessary parenthesization.
-- **`gen_but.ml`** — Round-trip pipeline: takes a formula, generates a `.but` file with delta conditions, calls PP (`krt`) to produce a trace, runs REPLAY, parses the replay, and emits LP.
-- **`reconstruct.ml`** — Wires parse → tree → emit.
+**Parsing:** `syntax_pp.ml` → `lexer.mll` → `parser.mly` → `parse_pp.ml`
 
-## PP Trace Format
+**Tree building:** `proof_tree.ml` builds proof trees from flat replay lines. Key concepts:
+- **Base vs Primed context:** `_1`-suffixed rules form "result derivations" inside ALL7/XST8
+- **`collect_primed`:** Scans ahead to find ALL7/XST8, collects _1 chain
+- **`build_postorder`:** Stack-based post-order tree construction for primed subtrees
+- **`replay_arity`:** Strips `_1` suffix to look up base rule arity (XST8_1 is special: arity 1)
 
-Raw trace: `[AXM1] & [NOT1] & [OR4] & ... & (not(p and q) => not(p) or not(q))`
+**Emission:** `emit_lp.ml` (core, ~470 lines) + helpers in extracted modules:
+- `pp_lp.ml` — LP pretty-printing with binding power tracking
+- `free_vars.ml` — Free variable collection
+- `hyp_ctx.ml` — Hypothesis context threading
+- `rule_args.ml` — Per-rule argument emitters, variant selection, INS resolution, result computation
 
-Replay expands into per-step lines:
-```
-[AND1] <not(p and q) => not(p) or not(q)>
-[IMP4] <not(q) => not(p) or not(q)>
-...
-```
+### PP Replay Format
 
-Rules applied backwards (bottom-up from goal). Multi-premise rules cause branching (left-to-right, depth-first). `[FIN(...)]` = normalisation boundary (not a rule). `[STOP_NORM]` and bare `[NRM]` = phantom entries to skip.
+Replay lines: `[RULE] <goal>` or `[RULE(arg)] <goal>` or `[FIN(result)] <FIN(...)>`
+
+Rules applied backwards (bottom-up from goal). Multi-premise rules cause branching (depth-first). Special entries:
+- `[FIN(...)]` — normalisation boundary, carries result predicate
+- `[STOP_NORM]`, `[NRM]` — phantom entries (arity -1), skipped
+- `[RULE_1]` — primed rule in result derivation (first antecedent of ALL7/XST8)
+- Non-_1 NRM steps between _1 rules and FIN — normalisation bookkeeping, not proof steps
 
 ## Critical: No Axioms
 
@@ -178,33 +210,28 @@ All Lambdapi work must be strictly definitional. Never introduce axioms (unprove
 ## Roadmap
 
 ### Current state
-- Lambdapi shallow encoding complete: all PP rules formalised (primed `_1` rules removed, replaced by Rw.lp rewrite lemmas + Res type)
-- OCaml parser complete: parses all replay formats
-- Rule metadata inlined in `rule_db.ml`
-- Automated reconstruction: 102/103 synth benchmarks passing (1 failing: `all1_flatten`)
+- Lambdapi shallow encoding complete: all PP rules formalised
+- OCaml pipeline refactored into 16 modules (emit_lp.ml down from 1757 to ~470 lines)
+- 561/666 synth benchmarks passing (~84%), 153 unit tests
 - Round-trip pipeline: formula → PP → LP proof (`make prove`)
 - NRM rules fully proved (0 admits in Nrm.lp)
 - Eq rules fully proved (0 admits in Eq.lp)
-- AR2, AR9 proved in Arith.lp
-- 153 OCaml unit tests passing
 
 ### Admitted LP rules (proved via `admit`)
-- **Arithmetic** (AR3–AR8, AR9_1, AR13): need integer arithmetic axioms in B.lp or encode solver-confirmed facts
-- AR5/AR6 child type uses `≪` but proof needs `≤` — structural gap in rule type
-- AR3/AR4/AR9_1 side conditions encoded as `π ⊤` — no recoverable information
+- **Arithmetic** (AR3–AR8, AR9_1, AR13): need integer arithmetic axioms in B.lp
 
-### P1 — Reduce generated proof admits
-1. **BOOL31/42 `trust` elimination** (3,400+ uses) — emitter needs to find `v ∈ BOOL` hypothesis in context
-2. **INS contradiction resolution** — 62 remaining (26 fixed via ♡-hyp matching); blocked cases involve AR3_F arithmetic normalization mismatch between emitter AST and LP proof state
-3. **ALL7_2 base proof admits** (~100) — needs n-ary quantifier flattening
+### P1 — Fix remaining benchmark failures (~93 failing)
+1. **Primed chain emission bugs** — various _1 chain patterns not yet handled correctly
+2. **Schema 0 leaf in primed chains** — AXM rules appearing as leaves need special handling
+3. **BOOL31/42 `trust` elimination** — emitter needs to find `v ∈ BOOL` hypothesis in context
 
 ### P2 — Prove arithmetic rules
-4. **Axiomatise integer arithmetic in B.lp** — ordering properties (antisymmetry, transitivity, strict-to-non-strict) needed to prove AR5–AR8.
-5. **Prove AR5–AR8, AR13** — replace `admit` with proofs using the new axioms.
+4. **Axiomatise integer arithmetic in B.lp** — ordering properties needed for AR5–AR8
+5. **Prove AR5–AR8, AR13** — replace `admit` with proofs
 
 ### P3 — Generalise and harden
-6. **N-ary quantifier flattening** — replace ad-hoc ALL7_2, XST5_2, NRM14_2 etc. with systematic n-variable handling.
-7. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces.
+6. **N-ary quantifier flattening** — systematic n-variable handling for ALL7_2, XST5_2, etc.
+7. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces
 
 ## Key References
 
