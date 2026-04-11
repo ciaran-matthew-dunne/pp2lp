@@ -1,133 +1,200 @@
-(* Rule database: static metadata for PP inference rules.
-   Previously loaded from data/rules.json; now inlined. *)
+(* Rule database: static metadata for PP inference rules. *)
 
-(* Rule arity: -1=skip, 0=leaf, 1=single child, 2=two children *)
-let arity_tbl : (string, int) Hashtbl.t =
+type rule_info = {
+  arity: int;           (* -1=phantom, 0=leaf, 1=single child, 2=two children *)
+  emit_args: string option;
+  result_schema: int;   (* 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
+  has_primed: bool;
+}
+
+let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
-    "AND1", 2; "AND2", 1; "AND3", 1; "AND4", 2; "AND5", 1;
-    "OR1", 1; "OR2", 2; "OR3", 2; "OR4", 1;
-    "IMP1", 1; "IMP2", 2; "IMP3", 2; "IMP4", 1; "IMP5", 1;
-    "EQV1", 2; "EQV2", 2; "EQV3", 2; "EQV4", 2;
-    "NOT1", 1; "NOT2", 1;
-    "AXM1", 0; "AXM2", 0; "AXM3", 0; "AXM4", 0;
-    "AXM5", 0; "AXM6", 0; "AXM7", 0; "AXM8", 0; "AXM9", 0;
-    "ALL1", 1; "ALL2", 1; "ALL3", 1; "ALL4", 1;
-    "ALL5", 1; "ALL6", 1; "ALL7", 2; "ALL8", 1; "ALL9", 1;
-    "XST1", 1; "XST2", 1; "XST3", 1; "XST4", 1;
-    "XST5", 1; "XST51", 1; "XST6", 1; "XST61", 1;
-    "XST7", 1; "XST8", 2;
-    "VR1", 0; "VR2", 1; "VR3", 1; "VR4", 0;
-    "FX1", 1; "FX2", 0; "FX3", 0;
-    "STOP", 1; "INS", 1;
-    "NRM1", 1; "NRM2", 1; "NRM3", 1; "NRM4", 1;
-    "NRM5", 1; "NRM6", 1; "NRM7", 1; "NRM8", 1;
-    "NRM9", 1; "NRM10", 1; "NRM11", 1; "NRM12", 1;
-    "NRM13", 1; "NRM14", 1; "NRM15", 1; "NRM16", 0;
-    "NRM17", 1; "NRM18", 1; "NRM19", 0; "NRM20", 1;
-    "NRM21", 1; "NRM22", 1; "NRM23", 1; "NRM24", 1;
-    "NRM25", 1; "NRM26", 1; "NRM27", 1; "NRM28", 1;
-    "NRM29", 1; "NRM30", 1;
-    "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
-    "EAXM1", 0; "EAXM2", 0; "EAXM31", 1; "EAXM32", 1;
-    "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
-    "OPR1", 1; "OPR2", 1;
-    "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;
-    "ECTR1", 0; "ECTR2", 0; "ECTR3", 0;
-    "ECTR4", 0; "ECTR5", 0; "ECTR6", 0;
-    "AR1", 1; "AR2", 0; "AR3", 1; "AR3_F", 1;
-    "AR4", 0; "AR5", 1; "AR5_2", 1; "AR6", 1; "AR6_2", 1;
-    "AR7", 1; "AR7_2", 1; "AR8", 1; "AR8_2", 1;
-    "AR9", 1; "AR10", -1; "AR11", 0; "AR12", 1; "AR13", 1;
-    "BOOL11", 1; "BOOL12", 1; "BOOL21", 1; "BOOL22", 1;
-    "BOOL31", 1; "BOOL32", 1; "BOOL41", 1; "BOOL42", 1;
-    "BOOL51", 0; "BOOL52", 0;
-    "FIN", -1; "STOP_NORM", -1; "NRM", -1;
-  ]; t
-
-(* Rules without primed variants *)
-let no_primed : (string, unit) Hashtbl.t =
-  let t = Hashtbl.create 10 in
-  List.iter (fun k -> Hashtbl.replace t k ()) [
-    "INS"; "AR3_F"; "FIN"; "STOP_NORM"; "NRM";
-  ]; t
-
-(* Emit args for rules that need them *)
-let emit_args_tbl : (string, string) Hashtbl.t =
-  let t = Hashtbl.create 40 in
-  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
-    "AND5", "dynamic:and5";
-    "AXM1", "dynamic:hyp"; "AXM2", "dynamic:hyp";
-    "AXM3", "dynamic:hyp"; "AXM4", "dynamic:hyp";
-    "AXM5", "dynamic:hyp"; "AXM6", "dynamic:hyp";
-    "AXM8", "dynamic:axm8"; "AXM9", "dynamic:axm9";
-    "EAXM1", "dynamic:hyp"; "EAXM2", "dynamic:hyp";
-    "ALL1", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL2", "\xe2\x8a\xa4\xe1\xb5\xa2";
-    "ALL3", "\xe2\x8a\xa4\xe1\xb5\xa2"; "ALL4", "\xe2\x8a\xa4\xe1\xb5\xa2";
-    "ALL7", "dynamic:all7";
-    "XST1", "\xe2\x8a\xa4\xe1\xb5\xa2"; "XST2", "\xe2\x8a\xa4\xe1\xb5\xa2";
-    "XST3", "\xe2\x8a\xa4\xe1\xb5\xa2"; "XST4", "\xe2\x8a\xa4\xe1\xb5\xa2";
-    "XST8", "dynamic:xst8";
-    "NRM19", "dynamic:nrm19";
-    "OPR1", "dynamic:opr1"; "OPR2", "dynamic:opr2";
-    "AR2", "trust"; "AR3", "dynamic:ar3"; "AR3_F", "\xe2\x8a\xa4\xe1\xb5\xa2";
-    "AR4", "dynamic:ar4";
-    "AR5", "dynamic:ar56"; "AR6", "dynamic:ar56";
-    "AR7", "dynamic:ar78"; "AR8", "dynamic:ar78";
-    "AR9", "dynamic:ar9"; "AR13", "trust trust";
-    "BOOL31", "trust"; "BOOL32", "trust";
-    "BOOL41", "trust"; "BOOL42", "trust";
-  ]; t
-
-(* Result schema: 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
-let result_schema_tbl : (string, int) Hashtbl.t =
-  let t = Hashtbl.create 150 in
-  List.iter (fun (k,v) -> Hashtbl.replace t k v) [
-    "AND1", 2; "AND2", 1; "AND3", 1; "AND4", 2; "AND5", 1;
-    "OR1", 1; "OR2", 2; "OR3", 2; "OR4", 1;
-    "IMP1", 1; "IMP2", 2; "IMP3", 2; "IMP4", 1; "IMP5", 1;
-    "EQV1", 2; "EQV2", 2; "EQV3", 2; "EQV4", 2;
-    "NOT1", 1; "NOT2", 1;
-    "AXM1", 0; "AXM2", 0; "AXM3", 0; "AXM4", 0;
-    "AXM5", 0; "AXM6", 0; "AXM7", 0; "AXM8", 0; "AXM9", 0;
-    "ALL1", 1; "ALL2", 1; "ALL3", 1; "ALL4", 1;
-    "ALL5", 1; "ALL6", 1; "ALL7", 1; "ALL8", 1; "ALL9", 1;
-    "XST1", 1; "XST2", 1; "XST3", 1; "XST4", 1;
-    "XST5", 1; "XST51", 1; "XST6", 1; "XST61", 1;
-    "XST7", 1; "XST8", 1;
-    "VR1", 0; "VR2", 1; "VR3", 1; "VR4", 0;
-    "FX1", 1; "FX2", 0; "FX3", 0;
-    "STOP", 1;
-    "EVR1", 0; "EVR2", 1; "EVR3", 1; "EVR4", 0; "EVR11", 0;
-    "EAXM1", 0; "EAXM2", 0; "EAXM31", 1; "EAXM32", 1;
-    "EIMP51", 1; "EIMP52", 1; "EAXM91", 1; "EAXM92", 1;
-    "OPR1", 1; "OPR2", 1;
-    "EQC1", 1; "EQC2", 1; "EQS1", 1; "EQS2", 1;
-    "ECTR1", 0; "ECTR2", 0; "ECTR3", 0;
-    "ECTR4", 0; "ECTR5", 0; "ECTR6", 0;
-    "AR1", 1; "AR2", 0; "AR3", 1; "AR3_F", 1;
-    "AR4", 0; "AR5", 1; "AR5_2", 1; "AR6", 1; "AR6_2", 1;
-    "AR7", 1; "AR7_2", 1; "AR8", 1; "AR8_2", 1;
-    "AR9", 1; "AR10", 1; "AR11", 0; "AR12", 1;
-    "BOOL11", 1; "BOOL12", 1; "BOOL21", 1; "BOOL22", 1;
-    "BOOL31", 1; "BOOL32", 1; "BOOL41", 1; "BOOL42", 1;
-    "BOOL51", 0; "BOOL52", 0;
-  ]; t
+  let r ?(emit_args=None) ?(result_schema=1) ?(has_primed=true) name arity =
+    Hashtbl.replace t name { arity; emit_args; result_schema; has_primed }
+  in
+  (* §A.1 Conjunction *)
+  r "AND1" 2 ~result_schema:2;
+  r "AND2" 1;
+  r "AND3" 1;
+  r "AND4" 2 ~result_schema:2;
+  r "AND5" 1 ~emit_args:(Some "dynamic:and5");
+  (* §A.2 Disjunction *)
+  r "OR1" 1;
+  r "OR2" 2 ~result_schema:2;
+  r "OR3" 2 ~result_schema:2;
+  r "OR4" 1;
+  (* §A.3 Implication *)
+  r "IMP1" 1;
+  r "IMP2" 2 ~result_schema:2;
+  r "IMP3" 2 ~result_schema:2;
+  r "IMP4" 1;
+  r "IMP5" 1;
+  (* §A.4 Equivalence *)
+  r "EQV1" 2 ~result_schema:2;
+  r "EQV2" 2 ~result_schema:2;
+  r "EQV3" 2 ~result_schema:2;
+  r "EQV4" 2 ~result_schema:2;
+  (* §A.5 Negation *)
+  r "NOT1" 1;
+  r "NOT2" 1;
+  (* §A.6 Axioms *)
+  let hyp = Some "dynamic:hyp" in
+  r "AXM1" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM2" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM3" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM4" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM5" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM6" 0 ~emit_args:hyp ~result_schema:0;
+  r "AXM7" 0 ~result_schema:0;
+  r "AXM8" 0 ~emit_args:(Some "dynamic:axm8") ~result_schema:0;
+  r "AXM9" 0 ~emit_args:(Some "dynamic:axm9") ~result_schema:0;
+  (* §A.7 Universal quantification *)
+  let top_i = Some "\xe2\x8a\xa4\xe1\xb5\xa2" in (* ⊤ᵢ *)
+  r "ALL1" 1 ~emit_args:top_i;
+  r "ALL2" 1 ~emit_args:top_i;
+  r "ALL3" 1 ~emit_args:top_i;
+  r "ALL4" 1 ~emit_args:top_i;
+  r "ALL5" 1;
+  r "ALL6" 1;
+  r "ALL7" 2 ~emit_args:(Some "dynamic:all7");
+  r "ALL8" 1;
+  r "ALL9" 1;
+  (* §A.8 Existential quantification *)
+  r "XST1" 1 ~emit_args:top_i;
+  r "XST2" 1 ~emit_args:top_i;
+  r "XST3" 1 ~emit_args:top_i;
+  r "XST4" 1 ~emit_args:top_i;
+  r "XST5" 1;
+  r "XST51" 1;
+  r "XST6" 1;
+  r "XST61" 1;
+  r "XST7" 1;
+  r "XST8" 2 ~emit_args:(Some "dynamic:xst8");
+  (* §A.9-11 VR/FX/STOP/INS *)
+  r "VR1" 0 ~result_schema:0;
+  r "VR2" 1;
+  r "VR3" 1;
+  r "VR4" 0 ~result_schema:0;
+  r "FX1" 1;
+  r "FX2" 0 ~result_schema:0;
+  r "FX3" 0 ~result_schema:0;
+  r "STOP" 1;
+  r "INS" 1 ~has_primed:false;
+  (* §A.12 Normalisation *)
+  r "NRM1" 1;
+  r "NRM2" 1;
+  r "NRM3" 1;
+  r "NRM4" 1;
+  r "NRM5" 1;
+  r "NRM6" 1;
+  r "NRM7" 1;
+  r "NRM8" 1;
+  r "NRM9" 1;
+  r "NRM10" 1;
+  r "NRM11" 1;
+  r "NRM12" 1;
+  r "NRM13" 1;
+  r "NRM14" 1;
+  r "NRM15" 1;
+  r "NRM16" 0;
+  r "NRM17" 1;
+  r "NRM18" 1;
+  r "NRM19" 0 ~emit_args:(Some "dynamic:nrm19");
+  r "NRM20" 1;
+  r "NRM21" 1;
+  r "NRM22" 1;
+  r "NRM23" 1;
+  r "NRM24" 1;
+  r "NRM25" 1;
+  r "NRM26" 1;
+  r "NRM27" 1;
+  r "NRM28" 1;
+  r "NRM29" 1;
+  r "NRM30" 1;
+  (* §A.13 Equality *)
+  r "EVR1" 0 ~result_schema:0;
+  r "EVR2" 1;
+  r "EVR3" 1;
+  r "EVR4" 0 ~result_schema:0;
+  r "EVR11" 0 ~result_schema:0;
+  r "EAXM1" 0 ~emit_args:hyp ~result_schema:0;
+  r "EAXM2" 0 ~emit_args:hyp ~result_schema:0;
+  r "EAXM31" 1;
+  r "EAXM32" 1;
+  r "EIMP51" 1;
+  r "EIMP52" 1;
+  r "EAXM91" 1;
+  r "EAXM92" 1;
+  r "OPR1" 1 ~emit_args:(Some "dynamic:opr1");
+  r "OPR2" 1 ~emit_args:(Some "dynamic:opr2");
+  r "EQC1" 1;
+  r "EQC2" 1;
+  r "EQS1" 1;
+  r "EQS2" 1;
+  r "ECTR1" 0 ~result_schema:0;
+  r "ECTR2" 0 ~result_schema:0;
+  r "ECTR3" 0 ~result_schema:0;
+  r "ECTR4" 0 ~result_schema:0;
+  r "ECTR5" 0 ~result_schema:0;
+  r "ECTR6" 0 ~result_schema:0;
+  (* §A.14 Arithmetic *)
+  r "AR1" 1;
+  r "AR2" 0 ~emit_args:(Some "trust") ~result_schema:0;
+  r "AR3" 1 ~emit_args:(Some "dynamic:ar3");
+  r "AR3_F" 1 ~emit_args:top_i ~has_primed:false;
+  r "AR4" 0 ~emit_args:(Some "dynamic:ar4") ~result_schema:0;
+  r "AR5" 1 ~emit_args:(Some "dynamic:ar56");
+  r "AR5_2" 1 ~emit_args:(Some "dynamic:ar56");
+  r "AR6" 1 ~emit_args:(Some "dynamic:ar56");
+  r "AR6_2" 1 ~emit_args:(Some "dynamic:ar56");
+  r "AR7" 1 ~emit_args:(Some "dynamic:ar78");
+  r "AR7_2" 1 ~emit_args:(Some "dynamic:ar78");
+  r "AR8" 1 ~emit_args:(Some "dynamic:ar78");
+  r "AR8_2" 1 ~emit_args:(Some "dynamic:ar78");
+  r "AR9" 1 ~emit_args:(Some "dynamic:ar9");
+  r "AR10" (-1) ~has_primed:false;
+  r "AR11" 0 ~result_schema:0;
+  r "AR12" 1;
+  r "AR13" 1 ~emit_args:(Some "trust trust");
+  (* §A.15 Boolean *)
+  r "BOOL11" 1;
+  r "BOOL12" 1;
+  r "BOOL21" 1;
+  r "BOOL22" 1;
+  r "BOOL31" 1 ~emit_args:(Some "trust");
+  r "BOOL32" 1 ~emit_args:(Some "trust");
+  r "BOOL41" 1 ~emit_args:(Some "trust");
+  r "BOOL42" 1 ~emit_args:(Some "trust");
+  r "BOOL51" 0 ~result_schema:0;
+  r "BOOL52" 0 ~result_schema:0;
+  (* Phantom entries *)
+  r "FIN" (-1) ~has_primed:false;
+  r "STOP_NORM" (-1) ~has_primed:false;
+  r "NRM" (-1) ~has_primed:false;
+  t
 
 (* --- Lookup functions --- *)
 
+let find_opt name = Hashtbl.find_opt rules name
+
 let rule_arity name =
-  match Hashtbl.find_opt arity_tbl name with
-  | Some a -> a
+  match Hashtbl.find_opt rules name with
+  | Some r -> r.arity
   | None ->
     Printf.eprintf "warning: unknown rule %S, assuming arity 1\n" name;
     1
 
 let has_primed name =
-  not (Hashtbl.mem no_primed name)
+  match Hashtbl.find_opt rules name with
+  | Some r -> r.has_primed
+  | None -> true
 
 let emit_args name =
-  Hashtbl.find_opt emit_args_tbl name
+  match Hashtbl.find_opt rules name with
+  | Some r -> r.emit_args
+  | None -> None
 
 let result_schema name =
-  Hashtbl.find_opt result_schema_tbl name
+  match Hashtbl.find_opt rules name with
+  | Some r -> Some r.result_schema
+  | None -> None
