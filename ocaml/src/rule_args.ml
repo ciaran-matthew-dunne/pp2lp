@@ -443,3 +443,245 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       Buffer.add_char buf ' ';
       Buffer.add_string buf args
     | None -> ()
+
+(* ---- INS contradiction resolution ----
+   Derives ⊥ from context hypotheses using two strategies:
+   1. Simple: find a ¬P + P pair in the most recent entries.
+   2. Heart: find a ♡-hyp ∀xs.¬(C₁∧...∧Cₙ) whose conjuncts are in context. *)
+
+let ins_simple_resolve ctx =
+  match ctx.entries with
+  | (neg_name, Unary (Not, p)) :: _ ->
+    begin match find_hyp ctx p with
+    | Some pos_name -> Some (neg_name, pos_name)
+    | None -> None
+    end
+  | (neg_name, Binary (Imp, p, _)) :: _ ->
+    begin match find_hyp ctx p with
+    | Some pos_name -> Some (neg_name, pos_name)
+    | None -> None
+    end
+  | _ -> None
+
+(* Wildcard-aware structural comparison.
+   Bound variables from ♡/∀ (containing '$') become wildcards. *)
+let rec exp_matches pat hyp =
+  match pat, hyp with
+  | Var v, _ when String.contains v '$' -> true
+  | Var a, Var b -> a = b
+  | Nat a, Nat b -> a = b
+  | App (f1, a1), App (f2, a2) ->
+    f1 = f2 && List.length a1 = List.length a2 &&
+    List.for_all2 exp_matches a1 a2
+  | AOp (o1, a1, b1), AOp (o2, a2, b2) ->
+    o1 = o2 && exp_matches a1 a2 && exp_matches b1 b2
+  | Neg e1, Neg e2 -> exp_matches e1 e2
+  | SetImage (a1, b1), SetImage (a2, b2)
+  | Inter (a1, b1), Inter (a2, b2)
+  | Union (a1, b1), Union (a2, b2) ->
+    exp_matches a1 a2 && exp_matches b1 b2
+  | _ -> false
+and prd_matches pat hyp =
+  match pat, hyp with
+  | Lift e1, Lift e2 -> exp_matches e1 e2
+  | Unary (o1, p1), Unary (o2, p2) -> o1 = o2 && prd_matches p1 p2
+  | Binary (o1, a1, b1), Binary (o2, a2, b2) ->
+    o1 = o2 && prd_matches a1 a2 && prd_matches b1 b2
+  | Bind (b1, _, body1), Bind (b2, _, body2) ->
+    b1 = b2 && prd_matches body1 body2
+  | Mem (es1, e1), Mem (es2, e2) ->
+    List.length es1 = List.length es2 &&
+    List.for_all2 exp_matches es1 es2 && exp_matches e1 e2
+  | Eq (a1, b1), Eq (a2, b2)
+  | Leq (a1, b1), Leq (a2, b2) ->
+    exp_matches a1 a2 && exp_matches b1 b2
+  | _ -> false
+
+let ins_heart_resolve ctx =
+  let rec count_bind_vars = function
+    | Bind (Forall2, xs, inner) ->
+      List.length xs + count_bind_vars inner
+    | _ -> 0
+  in
+  let rec extract_neg_body = function
+    | Bind (Forall2, _, inner) -> extract_neg_body inner
+    | Unary (Not, body) -> Some body
+    | _ -> None
+  in
+  let rec flatten_conj_leaves = function
+    | Binary (And, l, r) -> flatten_conj_leaves l @ flatten_conj_leaves r
+    | p -> [p]
+  in
+  let find_matching_hyps leaves entries =
+    let find_match leaf =
+      List.find_opt (fun (_, p) ->
+        (match leaf with Leq _ -> false | _ -> true) &&
+        prd_matches leaf p
+      ) entries
+    in
+    let rec go acc = function
+      | [] -> Some (List.rev acc)
+      | leaf :: rest ->
+        match find_match leaf with
+        | Some (name, _) -> go (name :: acc) rest
+        | None -> None
+    in
+    go [] leaves
+  in
+  let build_term heart n_vars conjs =
+    let conj_term = match conjs with
+      | [] -> assert false
+      | first :: rest ->
+        List.fold_left (fun acc c ->
+          Printf.sprintf "(\xe2\x88\xa7\xe1\xb5\xa2 %s %s)" acc c (* ∧ᵢ *)
+        ) first rest
+    in
+    let underscores = String.concat "" (List.init n_vars (fun _ -> " _")) in
+    Printf.sprintf "%s%s %s" heart underscores conj_term
+  in
+  let rec scan entries = function
+    | [] -> None
+    | (name, (Bind (Forall2, _, _) as p)) :: rest ->
+      let n_vars = count_bind_vars p in
+      begin match extract_neg_body p with
+      | Some body ->
+        let leaves = flatten_conj_leaves body in
+        begin match find_matching_hyps leaves entries with
+        | Some conjs when conjs <> [] ->
+          Some (build_term name n_vars conjs)
+        | _ -> scan entries rest
+        end
+      | None -> scan entries rest
+      end
+    | entry :: rest -> scan (entry :: entries) rest
+  in
+  scan [] ctx.entries
+
+let emit_ins buf first_pad ctx =
+  match ins_simple_resolve ctx with
+  | Some (neg_name, pos_name) ->
+    Buffer.add_string buf first_pad;
+    Buffer.add_string buf "refine ";
+    Buffer.add_string buf neg_name;
+    Buffer.add_char buf ' ';
+    Buffer.add_string buf pos_name
+  | None ->
+    match ins_heart_resolve ctx with
+    | Some term ->
+      Buffer.add_string buf first_pad;
+      Buffer.add_string buf "refine ";
+      Buffer.add_string buf term
+    | None ->
+      Printf.eprintf "warning: INS could not resolve contradiction\n";
+      Buffer.add_string buf first_pad;
+      Buffer.add_string buf "admit"
+
+(* ---- NRM1 compound ♢ emission ---- *)
+
+let nrm1_extra_count goal =
+  match goal with
+  | Binary (Imp, Bind (_, xs, body), _) when List.length xs > 1 ->
+    let fv = free_vars_of_prd body in
+    let extra = List.tl xs in
+    if List.exists (fun v ->
+      SS.mem v fv.prop_vars || SS.mem v fv.exp_vars) extra
+    then 0 else List.length extra
+  | _ -> 0
+
+(* ---- Rewrite lemma lookup ---- *)
+
+let rw_lemma_of_rule = function
+  | "AND1" -> Some "and1_eq"
+  | "AND2" -> Some "and2_eq"
+  | "AND3" -> Some "and3_eq"
+  | "OR1" -> Some "or1_eq"
+  | "OR2" -> Some "or2_eq"
+  | "OR3" -> Some "or3_eq"
+  | "OR4" -> Some "or4_eq"
+  | "IMP1" -> Some "imp1_eq"
+  | "IMP2" -> Some "imp2_eq"
+  | "IMP3" -> Some "imp3_eq"
+  | "EQV1" -> Some "eqv1_eq"
+  | "EQV2" -> Some "eqv2_eq"
+  | "EQV3" -> Some "eqv3_eq"
+  | "EQV4" -> Some "eqv4_eq"
+  | "NOT1" -> Some "not1_eq"
+  | "NOT2" -> Some "\xc2\xac\xc2\xac\xe2\x82\x91_eq"
+  | "VR3" -> Some "\xe2\x8a\xa4\xe2\x87\x92"
+  | "VR2" -> Some "\xc2\xac\xe2\x8a\xa4"
+  | "FX1" -> Some "\xc2\xac\xe2\x8a\xa5"
+  | "EVR2" -> Some "\xc2\xac=_idem"
+  | "EVR3" -> Some "evr3_eq"
+  | "OPR1" -> Some "opr1_eq"
+  | "OPR2" -> Some "opr2_eq"
+  | "EQC1" -> Some "eqc1_eq"
+  | "EQC2" -> Some "eqc2_eq"
+  | "EQS1" -> Some "eqs1_eq"
+  | "EQS2" -> Some "eqs2_eq"
+  | "XST7" -> Some "xst7_eq"
+  | _ -> None
+
+(* ---- Result computation ---- *)
+
+let rec compute_result (node : proof_node) : prd =
+  match node with
+  | Apply { rule; goal; children; _ } ->
+    let base = strip_suffix rule in
+    match base, children with
+    | "STOP", [] -> goal
+    | _, [child] when is_hoas_identity base -> compute_result child
+    | ("AND2" | "AND3" | "AND5" | "OR4" | "VR3" | "VR2" | "EVR2"
+      | "NOT1" | "NOT2" | "OR1" | "IMP1" | "IMP5" | "FX1"
+      | "XST7" | "EVR3" | "OPR1" | "OPR2" | "AR9"), [child] ->
+      compute_result child
+    | ("AND1" | "OR3" | "AND4" | "IMP3" | "OR2" | "IMP2"
+      | "EQV1" | "EQV2" | "EQV3" | "EQV4"), [child1; child2] ->
+      Binary (And, compute_result child1, compute_result child2)
+    | "IMP4", [child] ->
+      let p = match goal with Binary (Imp, p, _) -> p | _ -> goal in
+      Binary (Imp, p, compute_result child)
+    | "ALL8", [child] ->
+      let vars = match goal with Bind (_, xs, _) -> xs | _ -> [] in
+      Bind (Bang, vars, compute_result child)
+    | "ALL9", [child] ->
+      let h = match goal with Binary (Imp, h, _) -> h | _ -> goal in
+      Binary (Imp, h, compute_result child)
+    | _ -> goal
+
+let is_true = function Lift (Var ("VRAI" | "TRUE")) -> true | _ -> false
+let is_false = function Lift (Var ("FAUX" | "FALSE")) -> true | _ -> false
+let prd_false = Lift (Var "FAUX")
+let prd_true = Lift (Var "VRAI")
+
+let rec simplify_result p =
+  match p with
+  | Binary (And, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_false a || is_false b then prd_false
+    else if is_true a then b else if is_true b then a
+    else Binary (And, a, b)
+  | Binary (Or, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_false a then b else if is_false b then a
+    else if is_true a || is_true b then prd_true
+    else Binary (Or, a, b)
+  | Binary (Imp, a, b) ->
+    let a = simplify_result a and b = simplify_result b in
+    if is_true a then b else if is_false a then prd_true
+    else Binary (Imp, a, b)
+  | Unary (Not, a) ->
+    let a = simplify_result a in
+    if is_true a then prd_false else if is_false a then prd_true
+    else (match a with Unary (Not, x) -> x | _ -> Unary (Not, a))
+  | Eq (e1, e2) when e1 = e2 -> prd_true
+  | _ -> p
+
+let extract_fin_result node fallback_child =
+  match node with
+  | Apply { arg = Some (Pred p); _ } -> p
+  | Apply { children; _ } ->
+    let rec check = function
+      | [] -> compute_result fallback_child
+      | (Apply { arg = Some (Pred p); _ }) :: _ -> p
+      | _ :: rest -> check rest
+    in check children
