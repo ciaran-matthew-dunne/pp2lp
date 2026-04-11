@@ -1,10 +1,9 @@
 open Syntax_pp
 open Proof_tree
-include Pp_lp
-include Free_vars
-include Subst
-include Hyp_ctx
-include Rule_args
+open Pp_lp
+open Free_vars
+open Hyp_ctx
+open Rule_args
 
 (* ---- Primed chain emission (rewrite-based) ---- *)
 

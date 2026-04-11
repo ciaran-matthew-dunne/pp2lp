@@ -1,6 +1,8 @@
 open Pp2lp.Syntax_pp
 open Pp2lp.Parse_pp
 open Pp2lp.Proof_tree
+open Pp2lp.Pp_lp
+open Pp2lp.Hyp_ctx
 open Pp2lp.Emit_lp
 open Pp2lp.Emit_pp
 open Pp2lp.Reconstruct
