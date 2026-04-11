@@ -52,9 +52,12 @@ let goal_of_rhs = function
   | Fin (p, _, _, _) -> p
 
 (* Arity of a rule as it appears in the replay (with _1 suffix).
-   For primed rules, strip _1 and look up the base arity. *)
+   For primed rules, strip _1 and look up the base arity.
+   XST8_1 is special: base XST8 has arity 2 but XST8_1 has arity 1
+   (the ¬¬-elimination is internalised). *)
 let replay_arity name =
   if name = "STOP_1" then 0
+  else if name = "XST8_1" || name = "XST8f_1" then 1
   else if is_primed_rule name then
     let base = String.sub name 0 (String.length name - 2) in
     Rule_db.rule_arity base
