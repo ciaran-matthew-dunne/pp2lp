@@ -4,7 +4,15 @@ open Proof_tree
 let goal_of_tree = function
   | Apply { goal; _ } -> goal
 
-(* Derive a symbol name from a filename *)
+(* Check if a string is a simple Lambdapi identifier (no quoting needed) *)
+let is_simple_ident s =
+  s <> "" &&
+  (let c = s.[0] in (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c = '_') &&
+  String.to_seq s |> Seq.for_all (fun c ->
+    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+    (c >= '0' && c <= '9') || c = '_' || c = '\'')
+
+(* Derive a symbol name from a filename, quoting only if needed *)
 let name_of_file (fp : string) : string =
   let base = Filename.basename fp in
   let stem =
@@ -14,8 +22,8 @@ let name_of_file (fp : string) : string =
       Filename.chop_suffix base ".trace.replay"
     else base
   in
-  (* Lambdapi symbol names: wrap in {|...|} if contains special chars *)
-  Printf.sprintf "{|%s|}" stem
+  if is_simple_ident stem then stem
+  else Printf.sprintf "{|%s|}" stem
 
 (* Reconstruct a replay file into a full Lambdapi file (header + symbol) *)
 let reconstruct_file (fp : string) : string =

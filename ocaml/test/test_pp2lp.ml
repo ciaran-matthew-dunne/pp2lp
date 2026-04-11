@@ -571,12 +571,12 @@ let () =
 
 (* --- name_of_file --- *)
 let () =
-  check "reconstruct: name_of_file .replay"
+  check "reconstruct: name_of_file .replay (needs quoting)"
     (name_of_file "foo/03.trace.replay" = "{|03.trace|}");
-  check "reconstruct: name_of_file .replay only"
-    (name_of_file "bar/test.replay" = "{|test|}");
-  check "reconstruct: name_of_file plain"
-    (name_of_file "baz/hello" = "{|hello|}")
+  check "reconstruct: name_of_file .replay (simple)"
+    (name_of_file "bar/test.replay" = "test");
+  check "reconstruct: name_of_file plain (simple)"
+    (name_of_file "baz/hello" = "hello")
 
 (* --- reconstruct_lines produces valid output --- *)
 let () =
