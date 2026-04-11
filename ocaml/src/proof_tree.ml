@@ -69,7 +69,9 @@ let is_phantom name = replay_arity name = -1
 (* --- Helpers used by build --- *)
 
 (* Collect primed prefix lines until a BASE ALL7/XST8 is found.
-   Returns Some (collected_lines, branch_pos) or None. *)
+   Returns Some (collected_lines, branch_pos) or None.
+   Non-_1 NRM steps (normalisation bookkeeping) are skipped — they
+   compute the FIN result but are not equality-chain proof steps. *)
 let rec collect_primed arr n pos =
   if pos >= n then None
   else
@@ -85,42 +87,28 @@ let rec collect_primed arr n pos =
          | None -> None)
       | _ -> collect_primed arr n (pos + 1)
     end
+    else if is_nrm_step name && not (is_primed_rule name) then
+      (* Non-_1 NRM step: normalisation bookkeeping, skip *)
+      collect_primed arr n (pos + 1)
     else
       match collect_primed arr n (pos + 1) with
       | Some (rest, branch_pos) -> Some (arr.(pos) :: rest, branch_pos)
       | None -> None
 
-(* Remove NRM normalization bridges from primed lines.
-   An NRM step followed by FIN (possibly after other NRM steps) is a
-   normalization bridge — skip it so per-element leaves stay separate. *)
-let remove_norm_bridges (lines : line list) : line list =
-  let arr = Array.of_list lines in
-  let n = Array.length arr in
-  let skip = Array.make n false in
-  for i = 0 to n - 1 do
-    let ((name, _), _) = arr.(i) in
-    if is_nrm_step name && not skip.(i) then begin
-      let j = ref (i + 1) in
-      while !j < n && (let ((nm, _), _) = arr.(!j) in is_nrm_step nm) do
-        incr j
-      done;
-      if !j < n then
-        let ((_, _), rhs) = arr.(!j) in
-        match rhs with
-        | Fin _ ->
-          for k = i to !j - 1 do
-            let ((kn, _), _) = arr.(k) in
-            if is_nrm_step kn then skip.(k) <- true
-          done
-        | _ -> ()
-    end
-  done;
-  List.filteri (fun i _ -> not skip.(i)) (Array.to_list arr)
+(* Remove non-_1 NRM steps from collected primed lines.
+   Non-suffixed NRM steps (NRM1, NRM3, ...) in the primed chain are
+   normalisation bookkeeping that PP uses to compute the FIN result.
+   Only _1-suffixed NRM steps (NRM1_1, NRM3_1, ...) are actual proof
+   steps in the equality chain. *)
+let remove_norm_steps (lines : line list) : line list =
+  List.filter (fun ((name, _), _) ->
+    not (is_nrm_step name && not (is_primed_rule name))
+  ) lines
 
 (* Build a primed subtree from post-order lines (leaf-first).
    Stack-based: leaves push, arity-1 pop 1, arity-2 pop 2. *)
 let build_postorder (lines : line list) : proof_node =
-  let lines = remove_norm_bridges lines in
+  let lines = remove_norm_steps lines in
   let stack = ref [] in
   let last_fin = ref None in
   let push node = stack := node :: !stack in

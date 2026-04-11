@@ -144,6 +144,10 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         let inner_pad = pad ^ "  " in
         (* R is the per-element result from the first antecedent (primed_child) *)
         let result_prd = compute_result primed_child in
+        (* Check if R depends on the quantifier variables *)
+        let fv = free_vars_of_prd result_prd in
+        let r_is_constant = List.for_all (fun v ->
+          not (SS.mem v fv.prop_vars || SS.mem v fv.exp_vars)) bvars in
         let all7_1_sym = if List.length bvars >= 2 then "ALL7_1_2" else "ALL7_1" in
         Buffer.add_string buf "refine ";
         Buffer.add_string buf all7_1_sym;
@@ -161,6 +165,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf " }\n";
         Buffer.add_string buf pad;
         Buffer.add_string buf "{ ";
+        (* If R doesn't depend on bound vars, ♢ x, R is stuck — need NRM1_1 *)
+        if r_is_constant then begin
+          Buffer.add_string buf "refine NRM1_1 _;\n";
+          Buffer.add_string buf inner_pad
+        end;
         emit_primed_chain buf ctx inner_pad base_child;
         Buffer.add_string buf " }"
       end else begin
