@@ -34,10 +34,7 @@ let parse_pp_replay (fp : string) : line list =
        while true do
          match parse_pp_line lx with
          | Some l -> ls := l :: !ls
-         | None ->
-             Printf.eprintf "parse_pp_replay: stopping at line %d in %s\n"
-               lx.lex_curr_p.pos_lnum fp;
-             raise Exit
+         | None -> raise Exit
        done
      with
      | Exit -> ()

@@ -73,23 +73,16 @@ Use the `/lambdapi` skill for all Lambdapi work — it loads the MCP tools and a
 - `lambdapi_symbols file` — all symbols in scope. Useful when you need a rule name.
 - `lambdapi_axioms files` — audit for unproved assumptions. Run before committing.
 
-## Token-Saving Notes
-
-- **Never read generated LP files** (`bench/gen/*.lp`) in full — they have huge type signatures. Use `lambdapi_check` for errors and `lambdapi_goals` for proof state instead.
-- **Replay files** can be 10K+ tokens. Use `head -20` via Bash to see just the first few lines.
-- **Debugging a single test:** `make test-NAME` generates `bench/gen/NAME.lp` and shows the error. Then use `lambdapi_goals` to inspect — don't read the generated file.
-- **Prefer targeted reads.** Use `Read` with `offset`/`limit` or `Grep` rather than reading whole files.
-
 ## Current Test Status
 
 **Unit tests:** 153 passing.
 
-**Synth benchmarks:** 1103 goals, 666 with replays.
-- 561 passing, ~93 failing LP checks, 17 xfail (truncated replays from PP)
-- Run `make status` for current counts — they change as bugs are fixed
-- Known failures (XFAIL in Makefile): truncated replays where PP/REPLAY generates incomplete traces
-
-**`make check` baseline:** Tests alphabetically until first failure. Currently ~55 pass before the first non-xfail failure.
+**Synth benchmarks:** 133 goals, 133 with replays.
+- 129 passing, 3 failing, 1 skip (ill-formed replay)
+- Failures: 3 are 3-variable quantifier (n-ary not yet implemented)
+- Run `make status` for current counts
+- Ill-formed replays (truncated traces from PP) are detected and skipped automatically
+- Emission never produces `admit` — unhandled cases raise `Emit_admit` and fail cleanly
 
 ## Benchmark Pipeline
 
@@ -111,7 +104,7 @@ lp/                         Lambdapi encoding
 ├── NonFree.lp              Stub (HOAS handles non-freeness implicitly)
 ├── Subst.lp                Stub (HOAS application replaces explicit substitution)
 ├── Proof.lp                Stub (shallow encoding uses plain functions)
-├── Traces.lp               30 hand-written proof reconstructions
+├── Traces.lp               23 hand-written proof reconstructions
 ├── Rules.lp                Aggregates all rule modules
 ├── Test.lp                 Small test proofs
 ├── lambdapi.pkg            Package config (pp2lp)
@@ -153,7 +146,7 @@ ocaml/                      OCaml parser and reconstruction
 └── test/test_pp2lp.ml      Unit + integration tests (153 tests)
 
 bench/                      Benchmark data and pipeline
-├── goals.txt               Goal definitions (NAME FORMULA per line, 1103 goals)
+├── goals.txt               Goal definitions (NAME FORMULA per line, 133 goals)
 ├── gen/                    All generated output (flat dir, gitignored)
 │   ├── *.but               .but files from pp2lp synth
 │   ├── *.trace             .trace files from PP
@@ -173,7 +166,7 @@ Dependencies: `Stdlib` → `B.lp` → `{NonFree,Subst,Proof}.lp` → `rules/*.lp
 - **`B.lp`** — Foundation. Uses Stdlib (Prop, Set, FOL, Eq, etc.) for the shallow encoding. Domain type `ι`, membership `ϵ`, maplet `↦`, arithmetic on `τ ι` (𝟎, 𝟏, +, -, ×, ≤, ≪, —). String coercion for variables.
 - **Rule files (`rules/`)** — PP inference rules split by spec appendix section. Multi-premise rules (AND1, OR2, IMP3, EQV1–4, ALL7, XST8) create proof tree branching.
 - **`Rw.lp`** — Rewrite lemmas for normalisation chains. Contains `_1` variants of rules (ALL7_1, IMP4_1, etc.) used in primed/result derivation contexts.
-- **`Traces.lp`** — 30 hand-reconstructed PP traces as type-checked proofs.
+- **`Traces.lp`** — 23 hand-reconstructed PP traces as type-checked proofs.
 
 ### OCaml pipeline (`ocaml/`)
 
@@ -201,37 +194,29 @@ Rules applied backwards (bottom-up from goal). Multi-premise rules cause branchi
 - `[RULE_1]` — primed rule in result derivation (first antecedent of ALL7/XST8)
 - Non-_1 NRM steps between _1 rules and FIN — normalisation bookkeeping, not proof steps
 
-## Critical: No Axioms
-
-All Lambdapi work must be strictly definitional. Never introduce axioms (unproved `symbol` declarations used as lemmas) without explicit permission. The only unproved symbols are:
-- Domain axioms in B.lp (pair injectivity, set extensionality, arithmetic ordering)
-- Admitted PP rules (AR3–AR8, AR9_1, AR13)
-
 ## Roadmap
 
 ### Current state
 - Lambdapi shallow encoding complete: all PP rules formalised
-- OCaml pipeline refactored into 16 modules (emit_lp.ml down from 1757 to ~470 lines)
-- 561/666 synth benchmarks passing (~84%), 153 unit tests
+- OCaml pipeline: 13 modules in ocaml/src/ (emit_lp.ml ~470 lines)
+- 129/133 synth benchmarks passing (~97%), 153 unit tests
 - Round-trip pipeline: formula → PP → LP proof (`make prove`)
-- NRM rules fully proved (0 admits in Nrm.lp)
+- NRM rules mostly proved (3 admits remain in Nrm.lp: NRM10, NRM11, NRM18)
 - Eq rules fully proved (0 admits in Eq.lp)
+- Ill-formed replays detected and skipped automatically (exit code 2)
 
 ### Admitted LP rules (proved via `admit`)
-- **Arithmetic** (AR3–AR8, AR9_1, AR13): need integer arithmetic axioms in B.lp
+- **Arithmetic** (AR2–AR8, AR13): need integer arithmetic axioms in B.lp
+- **Normalisation** (NRM10, NRM11, NRM18): ♡/♢ binder equivalences
 
-### P1 — Fix remaining benchmark failures (~93 failing)
-1. **Primed chain emission bugs** — various _1 chain patterns not yet handled correctly
-2. **Schema 0 leaf in primed chains** — AXM rules appearing as leaves need special handling
-3. **BOOL31/42 `trust` elimination** — emitter needs to find `v ∈ BOOL` hypothesis in context
+### P1 — Prove arithmetic rules
+1. **Axiomatise integer arithmetic in B.lp** — ordering properties needed for AR5–AR8
+2. **Prove AR5–AR8, AR13** — replace `admit` with proofs
 
-### P2 — Prove arithmetic rules
-4. **Axiomatise integer arithmetic in B.lp** — ordering properties needed for AR5–AR8
-5. **Prove AR5–AR8, AR13** — replace `admit` with proofs
-
-### P3 — Generalise and harden
-6. **N-ary quantifier flattening** — systematic n-variable handling for ALL7_2, XST5_2, etc.
-7. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces
+### P2 — Generalise and harden
+3. **N-ary quantifier flattening** — 3+ variable handling for ALL7_3, XST8_3 (3 failing tests)
+4. **INS unification** — INS resolution fails on some multi-variable membership contexts (1 admit in xst8_2_mem)
+5. **Incremental testing** — Makefile caching to avoid re-checking unchanged traces
 
 ## Key References
 

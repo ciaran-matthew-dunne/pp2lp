@@ -94,7 +94,17 @@ begin
   refine h2 (λ x y, =⇒ (h1 x y) (hP x y))
 end;
 
-// ALL7i/ALL7_2i: R implicit — inferred from the equality proof.
+// ALL7_3: Three-variable version for compound ∀(x,y,z).
+opaque symbol ALL7_3 [P : τ ι → τ ι → τ ι → Prop] (R : τ ι → τ ι → τ ι → Prop) [Q : Prop]
+  : π (`∀ x, `∀ y, `∀ z, P x y z = R x y z)
+  → π ((`♢ x, `♢ y, `♢ z, R x y z) ⇒ Q)
+  → π ((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) ≔
+begin
+  assume P R Q h1 h2 hP;
+  refine h2 (λ x y z, =⇒ (h1 x y z) (hP x y z))
+end;
+
+// ALL7i/ALL7_2i/ALL7_3i: R implicit — inferred from the equality proof.
 // The emitter provides the equality proof; Lambdapi infers R from its RHS.
 opaque symbol ALL7i [P R : τ ι → Prop] [Q : Prop]
   : π (`∀ x, P x = R x)
@@ -112,6 +122,15 @@ opaque symbol ALL7_2i [P R : τ ι → τ ι → Prop] [Q : Prop]
 begin
   assume P R Q h1 h2 hP;
   refine h2 (λ x y, =⇒ (h1 x y) (hP x y))
+end;
+
+opaque symbol ALL7_3i [P R : τ ι → τ ι → τ ι → Prop] [Q : Prop]
+  : π (`∀ x, `∀ y, `∀ z, P x y z = R x y z)
+  → π ((`♢ x, `♢ y, `♢ z, R x y z) ⇒ Q)
+  → π ((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) ≔
+begin
+  assume P R Q h1 h2 hP;
+  refine h2 (λ x y z, =⇒ (h1 x y z) (hP x y z))
 end;
 
 // ALL8: x not free in H; H ⊢ P → H ⊢ ∀x·P

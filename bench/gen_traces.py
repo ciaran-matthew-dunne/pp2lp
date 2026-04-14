@@ -2,8 +2,8 @@
 """Generate PP traces and replays from .but files.
 
 Pipeline: .but → PP → .trace → REPLAY → .replay
-Intermediate .trace, .res, .goal files are cleaned up.
-Output .replay files go directly in the output directory.
+Intermediate .res and .goal files are cleaned up.
+The .trace files are kept for debugging.
 
 Usage:
     python3 gen_traces.py [options] <directory-with-but-files>
@@ -120,10 +120,9 @@ def process_but(but_file: Path, krt, pp_kin, replay_kin, out_dir: Path,
     ok, stdout = run_krt(krt, replay_kin, replay_goal.name, str(src_dir),
                          replay_timeout, capture_stdout=True)
 
-    # Cleanup intermediates
+    # Cleanup intermediates (keep .trace for debugging)
     replay_goal.unlink(missing_ok=True)
     (src_dir / replay_res).unlink(missing_ok=True)
-    trace_path.unlink(missing_ok=True)
     # Clean misc files without extension
     misc = src_dir / stem
     if misc.exists() and misc.is_file() and misc.suffix == "":

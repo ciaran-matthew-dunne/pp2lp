@@ -7,11 +7,7 @@ LP_CHECK      = lambdapi check --json -c
 FORMAT_ERROR  = python3 bench/format_error.py
 
 # -- Expected failures (known issues, tolerated by check) ---------------------
-# Truncated replays (ALL7/XST8 at end with no child2) + stack underflow:
-# PP/REPLAY generates incomplete traces for these goals.
-XFAIL = fuzz_0006 fuzz_0050 fuzz_0083 fuzz_0156 fuzz_0161 fuzz_0192 \
-        fuzz_0209 fuzz_0289 fuzz_0336 fuzz_0415 fuzz_0427 fuzz_0434 \
-        fuzz_0659 fuzz_0708 fuzz_0857 fuzz_0958 nrm2_factor
+XFAIL =
 
 # -- Replay discovery ---------------------------------------------------------
 REPLAYS      := $(wildcard bench/gen/*.replay)
@@ -34,17 +30,20 @@ define RUN_CHECK
 	@if [ -z "$(TESTS)" ]; then echo "No replay files found — run 'make gen' first"; exit 1; fi
 	@printf 'package_name = pp2lp_bench\nroot_path = pp2lp_bench\n' > bench/gen/lambdapi.pkg
 	@rm -f bench/gen/*.lp
-	@t=$$(date +%s); pass=0; fail=0; xfail=0; empty=0; \
+	@t=$$(date +%s); pass=0; fail=0; skip=0; \
 	tot_trust=0; tot_admit=0; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
 	for n in $(TESTS); do \
 	  replay="bench/gen/$$n.replay"; \
 	  outfile="bench/gen/$$n.lp"; \
-	  emit_warn=$$({ $(PP2LP) emit "$$replay" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	  emit_tmp=$$(mktemp); \
+	  $(PP2LP) emit "$$replay" > "$$outfile" 2>"$$emit_tmp"; emit_rc=$$?; \
+	  emit_warn=$$(grep -v '^Entering\|^Leaving' "$$emit_tmp"); rm -f "$$emit_tmp"; \
+	  if [ $$emit_rc -eq 2 ]; then \
+	    skip=$$((skip+1)); echo "SKIP $$n: $$emit_warn"; continue; fi; \
 	  is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
 	  if ! grep -q 'symbol' "$$outfile"; then \
-	    empty=$$((empty+1)); \
-	    if [ $$is_xfail -eq 1 ]; then xfail=$$((xfail+1)); \
+	    if [ $$is_xfail -eq 1 ]; then skip=$$((skip+1)); \
 	    else fail=$$((fail+1)); echo "FAIL $$n (empty emission)"; \
 	      if [ $(1) -eq 1 ]; then \
 	        echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
@@ -60,7 +59,7 @@ define RUN_CHECK
 	    [ $$na -gt 0 ] && warns="$${warns:+$$warns, }$$na admit"; \
 	    [ -n "$$warns" ] && echo "  warn $$n: $$warns"; \
 	  else \
-	    if [ $$is_xfail -eq 1 ]; then xfail=$$((xfail+1)); \
+	    if [ $$is_xfail -eq 1 ]; then skip=$$((skip+1)); \
 	    else fail=$$((fail+1)); echo "FAIL $$n"; \
 	      $(FORMAT_ERROR) "$$emit_warn" < "$$lp_tmp" || echo "  (no details)"; \
 	      if [ $(1) -eq 1 ]; then \
@@ -70,8 +69,7 @@ define RUN_CHECK
 	  fi; \
 	done; \
 	msg="$$pass passed, $$fail failed"; \
-	[ $$xfail -gt 0 ] && msg="$$msg, $$xfail xfail"; \
-	[ $$empty -gt 0 ] && msg="$$msg, $$empty empty"; \
+	[ $$skip -gt 0 ] && msg="$$msg, $$skip skip"; \
 	warns=""; \
 	[ $$tot_trust -gt 0 ] && warns="$$tot_trust trust"; \
 	[ $$tot_admit -gt 0 ] && warns="$${warns:+$$warns, }$$tot_admit admit"; \
@@ -93,7 +91,11 @@ test-%: build
 	@replay="bench/gen/$*.replay"; \
 	[ -f "$$replay" ] || { echo "$$replay missing — run 'make gen' first"; exit 1; }; \
 	outfile="bench/gen/$*.lp"; \
-	emit_warn=$$({ $(PP2LP) emit "$$replay" > "$$outfile"; } 2>&1 | grep -v '^Entering\|^Leaving'); \
+	emit_tmp=$$(mktemp); \
+	$(PP2LP) emit "$$replay" > "$$outfile" 2>"$$emit_tmp"; emit_rc=$$?; \
+	emit_warn=$$(grep -v '^Entering\|^Leaving' "$$emit_tmp"); rm -f "$$emit_tmp"; \
+	if [ $$emit_rc -eq 2 ]; then \
+	  echo "SKIP $*: $$emit_warn"; exit 0; fi; \
 	if ! grep -q 'symbol' "$$outfile"; then \
 	  echo "FAIL $* (empty emission)"; echo "$$emit_warn" | head -5; exit 1; fi; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
@@ -123,7 +125,7 @@ status: build
 	echo "XFAIL: $(XFAIL)"; \
 	echo "Unit tests:"; cd ocaml && dune exec test/test_pp2lp.exe 2>&1 | tail -1; cd ..; \
 	echo "Benchmarks:"; \
-	pass=0; fail=0; xfail=0; empty=0; \
+	pass=0; fail=0; skip=0; \
 	printf 'package_name = pp2lp_bench\nroot_path = pp2lp_bench\n' > bench/gen/lambdapi.pkg; \
 	rm -f bench/gen/*.lp; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
@@ -131,18 +133,18 @@ status: build
 	  replay="bench/gen/$$n.replay"; \
 	  outfile="bench/gen/$$n.lp"; \
 	  $(PP2LP) emit "$$replay" > "$$outfile" 2>/dev/null; \
+	  emit_rc=$$?; \
+	  if [ $$emit_rc -eq 2 ]; then skip=$$((skip+1)); continue; fi; \
 	  is_xfail=0; for xf in $(XFAIL); do [ "$$n" = "$$xf" ] && is_xfail=1 && break; done; \
 	  if ! grep -q 'symbol' "$$outfile"; then \
-	    empty=$$((empty+1)); \
-	    [ $$is_xfail -eq 1 ] && xfail=$$((xfail+1)) || fail=$$((fail+1)); \
+	    [ $$is_xfail -eq 1 ] && skip=$$((skip+1)) || fail=$$((fail+1)); \
 	    continue; fi; \
 	  $(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; \
 	  if grep -q '"status":"ok"' "$$lp_tmp"; then pass=$$((pass+1)); \
-	  else [ $$is_xfail -eq 1 ] && xfail=$$((xfail+1)) || fail=$$((fail+1)); fi; \
+	  else [ $$is_xfail -eq 1 ] && skip=$$((skip+1)) || fail=$$((fail+1)); fi; \
 	done; \
 	msg="  $$pass passed, $$fail failed"; \
-	[ $$xfail -gt 0 ] && msg="$$msg, $$xfail xfail"; \
-	[ $$empty -gt 0 ] && msg="$$msg, $$empty empty"; \
+	[ $$skip -gt 0 ] && msg="$$msg, $$skip skip"; \
 	echo "$$msg"
 
 # -- Build --------------------------------------------------------------------

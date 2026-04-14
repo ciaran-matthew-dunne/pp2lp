@@ -4,13 +4,12 @@ type rule_info = {
   arity: int;           (* -1=phantom, 0=leaf, 1=single child, 2=two children *)
   emit_args: string option;
   result_schema: int;   (* 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
-  has_primed: bool;
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit_args=None) ?(result_schema=1) ?(has_primed=true) name arity =
-    Hashtbl.replace t name { arity; emit_args; result_schema; has_primed }
+  let r ?(emit_args=None) ?(result_schema=1) name arity =
+    Hashtbl.replace t name { arity; emit_args; result_schema }
   in
   (* §A.1 Conjunction *)
   r "AND1" 2 ~result_schema:2;
@@ -79,7 +78,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "FX2" 0 ~result_schema:0;
   r "FX3" 0 ~result_schema:0;
   r "STOP" 1;
-  r "INS" 1 ~has_primed:false;
+  r "INS" 1;
   (* §A.12 Normalisation *)
   r "NRM1" 1;
   r "NRM2" 1;
@@ -107,10 +106,6 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM24" 1;
   r "NRM25" 1;
   r "NRM26" 1;
-  r "NRM27" 1;
-  r "NRM28" 1;
-  r "NRM29" 1;
-  r "NRM30" 1;
   (* §A.13 Equality *)
   r "EVR1" 0 ~result_schema:0;
   r "EVR2" 1;
@@ -141,18 +136,14 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR1" 1;
   r "AR2" 0 ~emit_args:(Some "trust") ~result_schema:0;
   r "AR3" 1 ~emit_args:(Some "dynamic:ar3");
-  r "AR3_F" 1 ~emit_args:top_i ~has_primed:false;
+  r "AR3_F" 1 ~emit_args:top_i;
   r "AR4" 0 ~emit_args:(Some "dynamic:ar4") ~result_schema:0;
   r "AR5" 1 ~emit_args:(Some "dynamic:ar56");
-  r "AR5_2" 1 ~emit_args:(Some "dynamic:ar56");
   r "AR6" 1 ~emit_args:(Some "dynamic:ar56");
-  r "AR6_2" 1 ~emit_args:(Some "dynamic:ar56");
   r "AR7" 1 ~emit_args:(Some "dynamic:ar78");
-  r "AR7_2" 1 ~emit_args:(Some "dynamic:ar78");
   r "AR8" 1 ~emit_args:(Some "dynamic:ar78");
-  r "AR8_2" 1 ~emit_args:(Some "dynamic:ar78");
   r "AR9" 1 ~emit_args:(Some "dynamic:ar9");
-  r "AR10" (-1) ~has_primed:false;
+  r "AR10" (-1);
   r "AR11" 0 ~result_schema:0;
   r "AR12" 1;
   r "AR13" 1 ~emit_args:(Some "trust trust");
@@ -168,26 +159,18 @@ let rules : (string, rule_info) Hashtbl.t =
   r "BOOL51" 0 ~result_schema:0;
   r "BOOL52" 0 ~result_schema:0;
   (* Phantom entries *)
-  r "FIN" (-1) ~has_primed:false;
-  r "STOP_NORM" (-1) ~has_primed:false;
-  r "NRM" (-1) ~has_primed:false;
+  r "FIN" (-1);
+  r "STOP_NORM" (-1);
+  r "NRM" (-1);
   t
 
 (* --- Lookup functions --- *)
-
-let find_opt name = Hashtbl.find_opt rules name
 
 let rule_arity name =
   match Hashtbl.find_opt rules name with
   | Some r -> r.arity
   | None ->
-    Printf.eprintf "warning: unknown rule %S, assuming arity 1\n" name;
-    1
-
-let has_primed name =
-  match Hashtbl.find_opt rules name with
-  | Some r -> r.has_primed
-  | None -> true
+    failwith (Printf.sprintf "rule_db: unknown rule %S" name)
 
 let emit_args name =
   match Hashtbl.find_opt rules name with

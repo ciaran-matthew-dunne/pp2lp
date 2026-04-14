@@ -138,7 +138,19 @@ begin
   refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
 end;
 
-// XST8i/XST8_2i: R implicit — inferred from the equality proof.
+// XST8_3: Three-variable version for compound ∃(x,y,z).
+opaque symbol XST8_3 [P : τ ι → τ ι → τ ι → Prop] (R : τ ι → τ ι → τ ι → Prop)
+  : π (`∀ x, `∀ y, `∀ z, ¬ (P x y z) = R x y z)
+  → π ((`∀ x, `∀ y, `∀ z, R x y z) ⇒ ⊥)
+  → π (`∃ x, `∃ y, `∃ z, P x y z) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ (`∃ x, `∃ y, `∃ z, P x y z) _;
+  assume hne;
+  refine h2 (λ x y z, =⇒ (h1 x y z) (λ hpxyz, hne (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz)))))
+end;
+
+// XST8i/XST8_2i/XST8_3i: R implicit — inferred from the equality proof.
 opaque symbol XST8i [P R : τ ι → Prop]
   : π (`∀ x, ¬ (P x) = R x)
   → π ((`∀ x, R x) ⇒ ⊥)
@@ -159,4 +171,15 @@ begin
   refine ¬¬ₑ (`∃ x, `∃ y, P x y) _;
   assume hne;
   refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
+end;
+
+opaque symbol XST8_3i [P R : τ ι → τ ι → τ ι → Prop]
+  : π (`∀ x, `∀ y, `∀ z, ¬ (P x y z) = R x y z)
+  → π ((`∀ x, `∀ y, `∀ z, R x y z) ⇒ ⊥)
+  → π (`∃ x, `∃ y, `∃ z, P x y z) ≔
+begin
+  assume P R h1 h2;
+  refine ¬¬ₑ (`∃ x, `∃ y, `∃ z, P x y z) _;
+  assume hne;
+  refine h2 (λ x y z, =⇒ (h1 x y z) (λ hpxyz, hne (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz)))))
 end;

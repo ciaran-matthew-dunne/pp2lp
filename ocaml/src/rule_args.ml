@@ -40,25 +40,61 @@ let goal_binding_count goal =
   | Unary (Not, Bind (_, xs, _)) -> List.length xs
   | _ -> 0
 
+let check_compound_limit rule n =
+  if n > 3 then
+    raise (Proof_tree.Emit_admit
+      (Printf.sprintf "%s: compound quantifier binds %d variables (max 3)" rule n))
+
 let select_variant rule goal children flat =
+  let n = goal_binding_count goal in
   match rule, children with
-  | ("ALL7" | "ALL7_1"), _ when goal_binding_count goal >= 2 && flat = 0 ->
-    if rule = "ALL7_1" then "ALL7_1_2" else "ALL7_2"
-  | "XST8", _ when goal_binding_count goal >= 2 && flat = 0 ->
-    "XST8_2"
+  | ("ALL7" | "ALL7_1"), _ when n >= 2 && flat = 0 ->
+    check_compound_limit rule n;
+    if rule = "ALL7_1" then Printf.sprintf "ALL7_1_%d" n
+    else Printf.sprintf "ALL7_%d" n
+  | "XST8", _ when n >= 2 && flat = 0 ->
+    check_compound_limit rule n;
+    Printf.sprintf "XST8_%d" n
   | ("ALL5" | "XST5" | "XST6" | "XST7"
     | "NRM1" | "NRM3" | "NRM5" | "NRM7" | "NRM12" | "NRM13"
     | "NRM14" | "NRM15" | "NRM19"), _
-    when goal_binding_count goal >= 2 ->
-    rule ^ "_2"
+    when n >= 2 ->
+    check_compound_limit rule n;
+    Printf.sprintf "%s_%d" rule n
   | _ -> rule
+
+(* ---- Suffix handling ---- *)
+
+(* Strip trailing _N suffix (where N is a number): ALL7_2 → ALL7, ALL7_1_3 → ALL7_1 *)
+let strip_suffix rule =
+  match String.rindex_opt rule '_' with
+  | Some i when i > 0 && i < String.length rule - 1 ->
+    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
+    let all_digits = String.to_seq suffix |> Seq.for_all (fun c -> c >= '0' && c <= '9') in
+    if all_digits then String.sub rule 0 i
+    else rule
+  | _ -> rule
+
+let is_primed rule =
+  let base = strip_suffix rule in
+  let len = String.length base in
+  len > 2 && String.sub base (len - 2) 2 = "_1"
+
+(* Extract the n-ary count from a rule name: ALL7_3 → 3, ALL7 → 1 *)
+let nary_count rule =
+  match String.rindex_opt rule '_' with
+  | Some i when i > 0 && i < String.length rule - 1 ->
+    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
+    (try int_of_string suffix with _ -> 1)
+  | _ -> 1
 
 (* ---- Child flat propagation ---- *)
 
 let compute_child_flat rule flat =
-  match rule with
-  | "ALL5" | "XST5" | "XST7" -> flat + 1
-  | "XST5_2" | "XST7_2" -> 0
+  let base = strip_suffix rule in
+  match base with
+  | "ALL5" | "XST5" | "XST7" ->
+    if rule = base then flat + 1 else 0  (* _n variants reset flat *)
   | _ when is_hoas_identity rule -> flat
   | _ -> 0
 
@@ -101,18 +137,6 @@ let introduce buf pad ctx rule goal flat =
 
 (* ---- Dynamic argument emitters ---- *)
 
-let strip_suffix rule =
-  let len = String.length rule in
-  if len > 2 then
-    let s = String.sub rule (len - 2) 2 in
-    if s = "_1" || s = "_2" then String.sub rule 0 (len - 2)
-    else rule
-  else rule
-
-let is_primed rule =
-  let len = String.length rule in
-  len > 2 && String.sub rule (len - 2) 2 = "_1"
-
 let find_axm_hyp ctx rule goal =
   match rule, goal with
   | "AXM1", Binary (Imp, p, _) -> find_hyp ctx (Unary (Not, p))
@@ -124,8 +148,6 @@ let find_axm_hyp ctx rule goal =
     find_hyp ctx (Unary (Not, q))
   | "AXM6", Binary (Imp, _, Binary (Imp, Unary (Not, q), _)) ->
     find_hyp ctx q
-  | "NOT2", Unary (Not, p) -> find_hyp ctx p
-  | "NOT2", Binary (Imp, p, _) -> find_hyp ctx p
   | "EAXM1", Binary (Imp, Eq (e, f), _) ->
     find_hyp ctx (Unary (Not, Eq (f, e)))
   | "EAXM2", Binary (Imp, Unary (Not, Eq (e, f)), _) ->
@@ -171,7 +193,9 @@ let emit_axm9_args buf ctx =
   in
   match search ctx.entries with
   | Some (name, nvars) when nvars >= 2 ->
-    Buffer.add_string buf "_2 _ _ ";
+    Buffer.add_string buf (Printf.sprintf "_%d" nvars);
+    for _ = 1 to nvars do Buffer.add_string buf " _" done;
+    Buffer.add_char buf ' ';
     Buffer.add_string buf name
   | Some (name, _) ->
     Buffer.add_string buf " _ ";
@@ -242,7 +266,7 @@ let emit_quant_r_args buf rule node =
     let extract_r child_goal =
       match child_goal with
       | Binary (Imp, Bind ((Bang|Forall|Forall2), xs, r_body), _) ->
-        if rule = "ALL7_2" || rule = "XST8_2" then
+        if nary_count rule >= 2 then
           Some (xs, [], right_assoc_conj r_body)
         else
           let lambda_vars = (match xs with x :: _ -> [x] | [] -> []) in
@@ -296,8 +320,7 @@ let emit_ar3_args buf node =
     pp_exp buf result_expr;
     Buffer.add_string buf ") trust"
   | _ ->
-    Printf.eprintf "warning: AR3 missing pipe arg\n";
-    Buffer.add_string buf " _ trust"
+    raise (Emit_admit "AR3 missing pipe arg")
 
 let emit_ar4_args buf ctx _goal =
   let found = List.find_opt (fun (_name, p) ->
@@ -311,8 +334,7 @@ let emit_ar4_args buf ctx _goal =
     Buffer.add_string buf name;
     Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *)
   | _ ->
-    Printf.eprintf "warning: AR4 could not find F ≤ 0 hypothesis\n";
-    Buffer.add_string buf " _ trust \xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *)
+    raise (Emit_admit "AR4 could not find F ≤ 0 hypothesis")
 
 let emit_ar56_args buf =
   Buffer.add_string buf " trust"
@@ -331,8 +353,7 @@ let emit_ar78_args buf base (node : proof_node) =
       pp_exp buf e;
       Buffer.add_string buf ") trust trust"
     | None ->
-      Printf.eprintf "warning: AR8 could not extract a from child equality\n";
-      Buffer.add_string buf " _ trust trust"
+      raise (Emit_admit "AR8 could not extract a from child equality")
     end
   | _ ->
     Buffer.add_string buf " \xf0\x9d\x9f\x8e trust trust" (* 𝟎 *)
@@ -414,8 +435,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
         pp_prd buf p;
         Buffer.add_string buf ") trust"
       | _ ->
-        Printf.eprintf "warning: AR9 missing solver arg\n";
-        Buffer.add_string buf " _ trust"
+        raise (Emit_admit "AR9 missing solver arg")
       end
     | Some "dynamic:opr1" -> emit_opr_args buf node
     | Some "dynamic:opr2" -> emit_opr_args buf node
@@ -464,37 +484,37 @@ let ins_simple_resolve ctx =
   | _ -> None
 
 (* Wildcard-aware structural comparison.
-   Bound variables from ♡/∀ (containing '$') become wildcards. *)
-let rec exp_matches pat hyp =
+   Variables in the wildcards set, or containing '$', match anything. *)
+let rec exp_matches wildcards pat hyp =
   match pat, hyp with
-  | Var v, _ when String.contains v '$' -> true
+  | Var v, _ when SS.mem v wildcards || String.contains v '$' -> true
   | Var a, Var b -> a = b
   | Nat a, Nat b -> a = b
   | App (f1, a1), App (f2, a2) ->
     f1 = f2 && List.length a1 = List.length a2 &&
-    List.for_all2 exp_matches a1 a2
+    List.for_all2 (exp_matches wildcards) a1 a2
   | AOp (o1, a1, b1), AOp (o2, a2, b2) ->
-    o1 = o2 && exp_matches a1 a2 && exp_matches b1 b2
-  | Neg e1, Neg e2 -> exp_matches e1 e2
+    o1 = o2 && exp_matches wildcards a1 a2 && exp_matches wildcards b1 b2
+  | Neg e1, Neg e2 -> exp_matches wildcards e1 e2
   | SetImage (a1, b1), SetImage (a2, b2)
   | Inter (a1, b1), Inter (a2, b2)
   | Union (a1, b1), Union (a2, b2) ->
-    exp_matches a1 a2 && exp_matches b1 b2
+    exp_matches wildcards a1 a2 && exp_matches wildcards b1 b2
   | _ -> false
-and prd_matches pat hyp =
+and prd_matches wildcards pat hyp =
   match pat, hyp with
-  | Lift e1, Lift e2 -> exp_matches e1 e2
-  | Unary (o1, p1), Unary (o2, p2) -> o1 = o2 && prd_matches p1 p2
+  | Lift e1, Lift e2 -> exp_matches wildcards e1 e2
+  | Unary (o1, p1), Unary (o2, p2) -> o1 = o2 && prd_matches wildcards p1 p2
   | Binary (o1, a1, b1), Binary (o2, a2, b2) ->
-    o1 = o2 && prd_matches a1 a2 && prd_matches b1 b2
+    o1 = o2 && prd_matches wildcards a1 a2 && prd_matches wildcards b1 b2
   | Bind (b1, _, body1), Bind (b2, _, body2) ->
-    b1 = b2 && prd_matches body1 body2
+    b1 = b2 && prd_matches wildcards body1 body2
   | Mem (es1, e1), Mem (es2, e2) ->
     List.length es1 = List.length es2 &&
-    List.for_all2 exp_matches es1 es2 && exp_matches e1 e2
+    List.for_all2 (exp_matches wildcards) es1 es2 && exp_matches wildcards e1 e2
   | Eq (a1, b1), Eq (a2, b2)
   | Leq (a1, b1), Leq (a2, b2) ->
-    exp_matches a1 a2 && exp_matches b1 b2
+    exp_matches wildcards a1 a2 && exp_matches wildcards b1 b2
   | _ -> false
 
 let ins_heart_resolve ctx =
@@ -502,6 +522,11 @@ let ins_heart_resolve ctx =
     | Bind (Forall2, xs, inner) ->
       List.length xs + count_bind_vars inner
     | _ -> 0
+  in
+  let rec collect_bind_vars = function
+    | Bind (Forall2, xs, inner) ->
+      List.fold_right SS.add xs (collect_bind_vars inner)
+    | _ -> SS.empty
   in
   let rec extract_neg_body = function
     | Bind (Forall2, _, inner) -> extract_neg_body inner
@@ -512,11 +537,11 @@ let ins_heart_resolve ctx =
     | Binary (And, l, r) -> flatten_conj_leaves l @ flatten_conj_leaves r
     | p -> [p]
   in
-  let find_matching_hyps leaves entries =
+  let find_matching_hyps wildcards leaves entries =
     let find_match leaf =
       List.find_opt (fun (_, p) ->
         (match leaf with Leq _ -> false | _ -> true) &&
-        prd_matches leaf p
+        prd_matches wildcards leaf p
       ) entries
     in
     let rec go acc = function
@@ -539,23 +564,28 @@ let ins_heart_resolve ctx =
     let underscores = String.concat "" (List.init n_vars (fun _ -> " _")) in
     Printf.sprintf "%s%s %s" heart underscores conj_term
   in
-  let rec scan entries = function
+  (* Collect all non-∀₂ entries as potential conjunct matches *)
+  let other_entries = List.filter (fun (_, p) ->
+    match p with Bind (Forall2, _, _) -> false | _ -> true
+  ) ctx.entries in
+  let rec scan = function
     | [] -> None
     | (name, (Bind (Forall2, _, _) as p)) :: rest ->
       let n_vars = count_bind_vars p in
+      let wildcards = collect_bind_vars p in
       begin match extract_neg_body p with
       | Some body ->
         let leaves = flatten_conj_leaves body in
-        begin match find_matching_hyps leaves entries with
+        begin match find_matching_hyps wildcards leaves other_entries with
         | Some conjs when conjs <> [] ->
           Some (build_term name n_vars conjs)
-        | _ -> scan entries rest
+        | _ -> scan rest
         end
-      | None -> scan entries rest
+      | None -> scan rest
       end
-    | entry :: rest -> scan (entry :: entries) rest
+    | _ :: rest -> scan rest
   in
-  scan [] ctx.entries
+  scan ctx.entries
 
 let emit_ins buf first_pad ctx =
   match ins_simple_resolve ctx with
@@ -572,9 +602,7 @@ let emit_ins buf first_pad ctx =
       Buffer.add_string buf "refine ";
       Buffer.add_string buf term
     | None ->
-      Printf.eprintf "warning: INS could not resolve contradiction\n";
-      Buffer.add_string buf first_pad;
-      Buffer.add_string buf "admit"
+      raise (Emit_admit "INS could not resolve contradiction")
 
 (* ---- NRM1 compound ♢ emission ---- *)
 
@@ -587,39 +615,6 @@ let nrm1_extra_count goal =
       SS.mem v fv.prop_vars || SS.mem v fv.exp_vars) extra
     then 0 else List.length extra
   | _ -> 0
-
-(* ---- Rewrite lemma lookup ---- *)
-
-let rw_lemma_of_rule = function
-  | "AND1" -> Some "and1_eq"
-  | "AND2" -> Some "and2_eq"
-  | "AND3" -> Some "and3_eq"
-  | "OR1" -> Some "or1_eq"
-  | "OR2" -> Some "or2_eq"
-  | "OR3" -> Some "or3_eq"
-  | "OR4" -> Some "or4_eq"
-  | "IMP1" -> Some "imp1_eq"
-  | "IMP2" -> Some "imp2_eq"
-  | "IMP3" -> Some "imp3_eq"
-  | "EQV1" -> Some "eqv1_eq"
-  | "EQV2" -> Some "eqv2_eq"
-  | "EQV3" -> Some "eqv3_eq"
-  | "EQV4" -> Some "eqv4_eq"
-  | "NOT1" -> Some "not1_eq"
-  | "NOT2" -> Some "\xc2\xac\xc2\xac\xe2\x82\x91_eq"
-  | "VR3" -> Some "\xe2\x8a\xa4\xe2\x87\x92"
-  | "VR2" -> Some "\xc2\xac\xe2\x8a\xa4"
-  | "FX1" -> Some "\xc2\xac\xe2\x8a\xa5"
-  | "EVR2" -> Some "\xc2\xac=_idem"
-  | "EVR3" -> Some "evr3_eq"
-  | "OPR1" -> Some "opr1_eq"
-  | "OPR2" -> Some "opr2_eq"
-  | "EQC1" -> Some "eqc1_eq"
-  | "EQC2" -> Some "eqc2_eq"
-  | "EQS1" -> Some "eqs1_eq"
-  | "EQS2" -> Some "eqs2_eq"
-  | "XST7" -> Some "xst7_eq"
-  | _ -> None
 
 (* ---- Result computation ---- *)
 

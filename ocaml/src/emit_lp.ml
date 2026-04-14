@@ -3,6 +3,7 @@ open Proof_tree
 open Pp_lp
 open Free_vars
 open Hyp_ctx
+
 open Rule_args
 
 (* ---- Primed chain emission (rewrite-based) ---- *)
@@ -28,8 +29,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 
     (* Schema 0 — leaf *)
     | _, [] when schema = Some 0 ->
-      Printf.eprintf "warning: Schema 0 leaf %s in primed chain\n" base;
-      Buffer.add_string buf "admit"
+      raise (Emit_admit (Printf.sprintf "schema 0 leaf %s in primed chain" base))
 
     (* IMP4_1: congruence under ⇒ *)
     | _, [child] when base = "IMP4" ->
@@ -105,8 +105,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf pad;
         emit_primed_chain buf ctx pad child
       | _ ->
-        Printf.eprintf "warning: AR9 primed chain: could not extract E/F\n";
-        Buffer.add_string buf "admit"
+        raise (Emit_admit "AR9 primed chain: could not extract E/F")
       end
 
     (* OPR1/OPR2 — keep rewrite approach *)
@@ -148,7 +147,8 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         let fv = free_vars_of_prd result_prd in
         let r_is_constant = List.for_all (fun v ->
           not (SS.mem v fv.prop_vars || SS.mem v fv.exp_vars)) bvars in
-        let all7_1_sym = if List.length bvars >= 2 then "ALL7_1_2" else "ALL7_1" in
+        let n = List.length bvars in
+        let all7_1_sym = if n >= 2 then Printf.sprintf "ALL7_1_%d" n else "ALL7_1" in
         Buffer.add_string buf "refine ";
         Buffer.add_string buf all7_1_sym;
         Buffer.add_string buf " (\xce\xbb"; (* λ *)
@@ -214,7 +214,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         else if is_false r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa5 _"
         else if is_true r1 then Buffer.add_string buf "\xe2\x8a\xa4\xe2\x88\xa7 _"
         else if is_true r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa4 _"
-        else Buffer.add_string buf "admit";
+        else raise (Emit_admit "AND4_1 conjunction: no TRUE/FALSE simplification found");
         Buffer.add_string buf ")"
       end else begin
         Buffer.add_string buf "refine ";
@@ -240,9 +240,8 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 
     (* Fallback *)
     | _ ->
-      Printf.eprintf "warning: unhandled primed node %s with %d children\n"
-        rule (List.length children);
-      Buffer.add_string buf "admit"
+      raise (Emit_admit (Printf.sprintf "unhandled primed node %s with %d children"
+        rule (List.length children)))
     end
 
 (* ---- Branching quantifier emission (ALL7/XST8) ---- *)
@@ -254,18 +253,20 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
      { assume vars; _1 equality chain }
      { child2 from replay } *)
   let bvars = binding_vars goal in
+  let n = List.length bvars in
+  (* Base (non-_n) rules use only the first var; _n variants use all n *)
   let bvars =
-    if (eff_rule = "ALL7" || eff_rule = "XST8")
-       && List.length bvars > 1
+    if (eff_rule = "ALL7" || eff_rule = "XST8") && n > 1
     then (match bvars with x :: _ -> [x] | [] -> [])
     else bvars
   in
-  let is_xst8 = eff_rule = "XST8" || eff_rule = "XST8_2" in
+  let n = List.length bvars in
+  let is_xst8 = String.length eff_rule >= 4 && String.sub eff_rule 0 4 = "XST8" in
   let all7_sym =
     if is_xst8 then
-      (if List.length bvars >= 2 then "XST8_2" else "XST8")
+      (if n >= 2 then Printf.sprintf "XST8_%d" n else "XST8")
     else
-      (if List.length bvars >= 2 then "ALL7_2" else "ALL7") in
+      (if n >= 2 then Printf.sprintf "ALL7_%d" n else "ALL7") in
   let inner_pad = String.make (indent + 2) ' ' in
   (* Get R from FIN result or compute from chain *)
   let result_prd = extract_fin_result _node child1 in
@@ -330,9 +331,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
     in
     begin match children with
     | [] when rule = "SORRY" ->
-      Printf.eprintf "warning: emitting admit for incomplete proof\n";
-      Buffer.add_string buf first_pad;
-      Buffer.add_string buf "admit"
+      raise (Emit_admit "incomplete proof (SORRY node)")
 
     | [child] when is_hoas_identity rule ->
       let child_flat = compute_child_flat rule flat in
@@ -354,7 +353,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       let extra = nrm1_extra_count goal in
       Buffer.add_string buf pad;
       if extra > 0 then
-        Buffer.add_string buf "refine NRM1_2 _"
+        Buffer.add_string buf (Printf.sprintf "refine NRM1_%d _" (extra + 1))
       else
         Buffer.add_string buf "refine NRM1 _";
       Buffer.add_string buf ";\n";
@@ -412,7 +411,8 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
     | _ ->
       emit_comment ();
       Buffer.add_string buf pad;
-      Buffer.add_string buf "admit (* too many children *)"
+      raise (Emit_admit (Printf.sprintf "%s: too many children (%d)"
+        rule (List.length children)))
     end
 
 (* ---- Full .lp file generation ---- *)

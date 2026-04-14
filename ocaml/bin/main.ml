@@ -20,7 +20,14 @@ let cmd_emit () =
       let content = Pp2lp.Reconstruct.reconstruct_symbol fp in
       print_string content;
       print_char '\n'
-    with exn ->
+    with
+    | Pp2lp.Proof_tree.Ill_formed_replay msg ->
+      Printf.eprintf "ill-formed replay: %s\n" msg;
+      exit 2
+    | Pp2lp.Proof_tree.Emit_admit msg ->
+      Printf.eprintf "emit error: %s\n" msg;
+      exit 3
+    | exn ->
       Printf.eprintf "ERROR: %s: %s\n" fp (Printexc.to_string exn)
   ) files
 

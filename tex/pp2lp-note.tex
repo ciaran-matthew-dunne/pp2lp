@@ -1,0 +1,257 @@
+\documentclass[11pt]{article}
+
+% ── Fonts ───────────────────────────────────────────────────────
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{Libertinus Serif}[Ligatures=TeX]
+\setsansfont{Libertinus Sans}[Ligatures=TeX]
+\setmonofont{JetBrains Mono}[Scale=0.85]
+\setmathfont{Libertinus Math}
+
+% ── Packages ────────────────────────────────────────────────────
+\usepackage{amsmath,mathtools}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning, calc}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\tcbuselibrary{listings, skins}
+\usepackage{booktabs}
+\usepackage[a4paper, left=2cm, right=2cm, top=2cm, bottom=1.5cm]{geometry}
+\raggedbottom
+\usepackage[hidelinks]{hyperref}
+\definecolor{link}{HTML}{1A5276}
+\hypersetup{colorlinks=true, urlcolor=link, linkcolor=link}
+
+% ── Colours ───────────────────────────────────────────────────────
+\definecolor{lpKeyword}{HTML}{e14775}
+\definecolor{lpModifier}{HTML}{4a7fb5}
+\definecolor{lpType}{HTML}{7058be}
+\definecolor{lpComment}{HTML}{3b5998}
+\definecolor{lpPunct}{HTML}{918c8e}
+\definecolor{lpFg}{HTML}{3a3338}
+\definecolor{lpBoxBg}{HTML}{fbfaf9}
+\definecolor{lpBoxFr}{HTML}{c5c1bf}
+
+\newcommand{\lmark}[1]{\textcolor{lpPunct}{#1}}
+
+% ── LambdaPi listings language ────────────────────────────────────
+\lstdefinelanguage{lambdapi}{
+  comment=[l]{//},
+  alsoletter={_},
+  keywords={symbol, rule, with, assert, require, open, type,
+            begin, end, assume, refine, have, rewrite,
+            admit, admitted, apply, simplify, reflexivity, symmetry},
+  keywords=[2]{constant, sequential, opaque, injective},
+  keywords=[3]{TYPE, Prop, Set},
+  sensitive=true,
+}
+
+\lstdefinestyle{lp}{
+  language=lambdapi,
+  basicstyle=\footnotesize\ttfamily\color{lpFg},
+  keywordstyle=\color{lpKeyword}\bfseries,
+  keywordstyle=[2]\color{lpModifier},
+  keywordstyle=[3]\color{lpType},
+  commentstyle=\color{lpComment}\itshape,
+  showstringspaces=false,
+  columns=flexible,
+  keepspaces=true,
+  mathescape=true,
+  frame=none,
+  numbers=none,
+  literate=
+    {(}{{\lmark{(}}}1
+    {)}{{\lmark{)}}}1
+    {[}{{\lmark{[}}}1
+    {]}{{\lmark{]}}}1
+    {;}{{\lmark{;}}}1
+    {:}{{\lmark{:}}}1,
+  aboveskip=0pt,
+  belowskip=0pt,
+}
+
+\lstdefinestyle{ppreplay}{
+  basicstyle=\footnotesize\ttfamily\color{lpFg},
+  showstringspaces=false,
+  columns=flexible,
+  keepspaces=true,
+  mathescape=true,
+  frame=none,
+  numbers=none,
+  literate=
+    {[}{{\lmark{[}}}1
+    {]}{{\lmark{]}}}1,
+  aboveskip=0pt,
+  belowskip=0pt,
+}
+
+% ── Document ────────────────────────────────────────────────────
+\begin{document}
+
+\begin{center}
+	{\LARGE\bfseries Verifying Atelier~B's Predicate Prover%
+		\footnote{This work is supported by the
+			ANR project
+			\href{https://anr.fr/Project-ANR-21-CE25-0015}{ICSPA}
+			in collaboration with
+			\href{https://www.clearsy.com/en/}{CLEARSY}.}}\\[12pt]
+	{\large Ciarán Dunne \quad Guillaume Burel}\\[4pt]
+	{\small
+	SAMOVAR, Télécom SudParis, Institut Polytechnique de Paris\\[2pt]
+	\texttt{ciaran-matthew.dunne@telecom-sudparis.eu}
+	\quad
+	\texttt{guillaume.burel@ensiie.fr}
+	}\\[6pt]
+	{\small April 2026}
+\end{center}
+
+\vspace{4pt}
+
+\noindent
+The Predicate Prover (PP) is an automated theorem prover
+used by Atelier~B to discharge first-order proof obligations
+arising from B-method developments.
+Because PP's source code is not publicly available,
+its results must be trusted without independent verification.
+We address this gap with \texttt{pp2lp}, an OCaml tool that
+reconstructs PP proofs in
+\href{https://github.com/Deducteam/lambdapi}{LambdaPi},
+a proof assistant based on the $\lambda\Pi$-calculus modulo rewriting.
+
+We first encode PP's inference rules
+(conjunction, disjunction, implication,
+negation, quantification, equality, normalisation,
+arithmetic, booleans)
+as LambdaPi symbols whose types capture
+each rule's antecedents and consequent, and whose bodies
+are proofs of soundness (\autoref{fig:pp-rule}).
+PP can be instrumented to record a compact
+\emph{trace} listing the inference rules applied
+during a proof;
+a companion Atelier~B utility expands this trace
+into a \emph{replay} recording, for each step,
+the rule applied and the intermediate goal
+(\autoref{fig:pp-trace}, left).
+Given a replay, \texttt{pp2lp} parses it,
+reconstructs a proof tree, and emits a LambdaPi script
+that composes the encoded rules following the tree structure,
+yielding a complete, independently checkable proof
+(\autoref{fig:pp-trace}, right).
+We currently encode 126 of PP's 140~inference rules
+and successfully verify over 100~proof goals.
+% ----- Figure 1: PP rule -> LambdaPi encoding -----
+\begin{figure}[ht]
+	\centering
+	\begin{tikzpicture}[
+			lbl/.style={font=\footnotesize\bfseries, text=lpFg},
+			arr/.style={->, thick, >=stealth, color=lpPunct},
+		]
+		% PP specification (left)
+		\node[anchor=east, inner sep=0pt] (spec) at (-0.5,0) {%
+			\begin{tcolorbox}[
+					colback=lpBoxBg, colframe=lpBoxFr,
+					arc=2pt, boxrule=0.4pt,
+					left=5pt, right=5pt, top=3pt, bottom=3pt,
+					width=6.2cm,
+				]
+				\centering\footnotesize
+				\begin{tabular}{@{}l@{\quad}c@{\quad}c@{}}
+					\toprule
+					                & \textbf{Antécédents}                      & \textbf{Conséquent} \\
+					\midrule
+					$\mathsf{AND2}$ & $\mathsf{H} \vdash P \Rightarrow \lnot Q$
+					                & $\mathsf{H} \vdash \lnot(P \land Q)$                            \\
+					\bottomrule
+				\end{tabular}
+			\end{tcolorbox}};
+		\node[lbl, anchor=south west] at (spec.north west) {\textbf{PP specification}};
+
+		% LambdaPi encoding (right)
+		\node[anchor=west, inner sep=0pt] (lp) at (0.5,0) {%
+			\begin{tcolorbox}[
+					colback=lpBoxBg, colframe=lpBoxFr,
+					arc=2pt, boxrule=0.4pt,
+					left=5pt, right=5pt, top=3pt, bottom=3pt,
+					width=5.6cm,
+				]
+				\begin{lstlisting}[style=lp]
+opaque symbol AND2 [P Q]
+  : $\pi$ (P $\Rightarrow$ $\lnot$ Q)
+  $\to$ $\pi$ ($\lnot$ (P $\land$ Q)) $\coloneqq$
+begin
+  assume P Q h1 h2;
+  refine h1 (${\land}_{e_1}$ h2) (${\land}_{e_2}$ h2)
+end;
+\end{lstlisting}
+			\end{tcolorbox}};
+		\node[lbl, anchor=south west] at (lp.north west) {\textbf{LambdaPi encoding \& proof}};
+
+		% Arrow
+		\draw[arr] (spec.east) -- (lp.west);
+	\end{tikzpicture}
+	\caption{PP rule $\mathsf{AND2}$ and its LambdaPi encoding.
+		The antecedent becomes a function parameter and the consequent
+		the return type; the proof body witnesses soundness
+		using conjunction eliminators ${\land}_{e_1}$, ${\land}_{e_2}$
+		from LambdaPi's standard library.}
+	\label{fig:pp-rule}
+\end{figure}
+
+% ----- Figure 2: PP replay -> LambdaPi proof -----
+\begin{figure}[ht]
+	\centering
+	\begin{tikzpicture}[
+			lbl/.style={font=\footnotesize\bfseries, text=lpFg},
+			arr/.style={->, thick, >=stealth, color=lpPunct},
+		]
+		% PP replay (left)
+		\node[anchor=east, inner sep=0pt] (trace) at (-0.5,0) {%
+			\begin{tcolorbox}[
+					colback=lpBoxBg, colframe=lpBoxFr,
+					arc=2pt, boxrule=0.4pt,
+					left=5pt, right=5pt, top=3pt, bottom=3pt,
+					width=5.0cm,
+				]
+				\begin{lstlisting}[style=ppreplay]
+[$\textbf{AND2}$] <not(p and not(p))>
+[$\textbf{IMP4}$] <p => not(not(p))>
+[$\textbf{NOT2}$] <not(not(p))>
+[$\textbf{AXM3}$] <p>
+\end{lstlisting}
+			\end{tcolorbox}};
+		\node[lbl, anchor=south west] at (trace.north west) {\textbf{PP proof replay}};
+
+		% LambdaPi proof (right)
+		\node[anchor=west, inner sep=0pt] (lp) at (0.5,0) {%
+			\begin{tcolorbox}[
+					colback=lpBoxBg, colframe=lpBoxFr,
+					arc=2pt, boxrule=0.4pt,
+					left=5pt, right=5pt, top=3pt, bottom=3pt,
+					width=5.6cm,
+				]
+				\begin{lstlisting}[style=lp]
+opaque symbol t02 (p : Prop)
+  : $\pi$ ($\lnot$ (p $\land$ $\lnot$ p)) $\coloneqq$
+begin
+  assume p;
+  refine AND2 _;
+  refine IMP4 _;
+  assume hp;
+  refine NOT2 hp
+end;
+\end{lstlisting}
+			\end{tcolorbox}};
+		\node[lbl, anchor=south west] at (lp.north west) {\textbf{LambdaPi reconstruction}};
+
+		% Arrow
+		\draw[arr] (trace.east) -- (lp.west);
+	\end{tikzpicture}
+	\caption{Automated reconstruction of a PP proof of $\lnot(p \land \lnot p)$.
+		Each line in the replay maps to a \texttt{refine} tactic
+		that applies the corresponding rule;
+		LambdaPi type-checks the composed proof against the goal type.}
+	\label{fig:pp-trace}
+\end{figure}
+
+\end{document}

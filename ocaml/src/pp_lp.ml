@@ -285,7 +285,19 @@ let exp_to_string e =
 
 (* ---- Block-formatted predicate printing ---- *)
 
+(* Column width threshold: if inline rendering fits, skip line breaks. *)
+let block_width = 72
+
 let rec pp_prd_block ?(min_bp = 0) ind buf p =
+  (* Try inline first — if it fits, use it *)
+  let inline = Buffer.create 128 in
+  pp_prd ~min_bp inline p;
+  if Buffer.length inline + ind <= block_width then
+    Buffer.add_buffer buf inline
+  else
+    pp_prd_block_break ~min_bp ind buf p
+
+and pp_prd_block_break ?(min_bp = 0) ind buf p =
   let pad = String.make ind ' ' in
   match p with
   | Binary (Imp, p1, p2) ->
@@ -331,6 +343,12 @@ let rec pp_prd_block ?(min_bp = 0) ind buf p =
     pp_prd ~min_bp buf p
 
 and pp_conj_left_block ?(min_bp = 0) ind buf elts =
+  (* Try inline first *)
+  let inline = Buffer.create 128 in
+  pp_conj_left ~min_bp inline elts;
+  if Buffer.length inline + ind <= block_width then
+    Buffer.add_buffer buf inline
+  else
   match elts with
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
   | [p] -> pp_prd_block ~min_bp ind buf p

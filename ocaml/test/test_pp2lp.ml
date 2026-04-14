@@ -1,6 +1,7 @@
 open Pp2lp.Syntax_pp
 open Pp2lp.Parse_pp
 open Pp2lp.Proof_tree
+open Pp2lp.Rule_db
 open Pp2lp.Pp_lp
 open Pp2lp.Hyp_ctx
 open Pp2lp.Emit_lp
@@ -520,9 +521,9 @@ let () =
   let lines = parse_replay_string "[STOP_1] <FAUX>" in
   let tree = build lines in
   match tree with
-  | Apply { rule = "STOP_1"; ctx = Primed; children = []; _ } ->
-    check "tree: STOP_1 primed" true
-  | _ -> check "tree: STOP_1 primed" false
+  | Apply { rule = "STOP_1"; children = []; _ } ->
+    check "tree: STOP_1 leaf" true
+  | _ -> check "tree: STOP_1 leaf" false
 
 (* --- Rule arity table --- *)
 let () =
@@ -541,19 +542,12 @@ let () =
   check "arity: NRM = -1" (rule_arity "NRM" = -1);
   check "arity: AR10 = -1" (rule_arity "AR10" = -1)
 
-(* --- has_primed --- *)
+(* --- is_primed_rule --- *)
 let () =
-  check "primed: AND1 yes" (has_primed "AND1" = true);
-  check "primed: STOP yes" (has_primed "STOP" = true);
-  check "primed: AXM9 yes" (has_primed "AXM9" = true);
-  check "primed: FIN no" (has_primed "FIN" = false)
-
-(* --- resolve_rule --- *)
-let () =
-  check "resolve: AND1 Base" (resolve_rule "AND1" Base = "AND1");
-  check "resolve: AND1 Primed" (resolve_rule "AND1" Primed = "AND1_1");
-  check "resolve: FIN Base" (resolve_rule "FIN" Base = "FIN");
-  check "resolve: FIN Primed" (resolve_rule "FIN" Primed = "FIN")
+  check "primed: STOP_1 yes" (is_primed_rule "STOP_1" = true);
+  check "primed: IMP4_1 yes" (is_primed_rule "IMP4_1" = true);
+  check "primed: AND1 no" (is_primed_rule "AND1" = false);
+  check "primed: FIN no" (is_primed_rule "FIN" = false)
 
 
 (* ===================================================================
@@ -563,13 +557,14 @@ let () =
 (* --- goal_of_tree --- *)
 let () =
   let lines = parse_replay_string
-    "[AND1] <p and q>\n\
-     [AXM3] <p>"
+    "[AND4] <q and p>\n\
+     [AXM3] <p>\n\
+     [AXM3] <q>"
   in
   let tree = build lines in
   let goal = goal_of_tree tree in
   check "reconstruct: goal_of_tree"
-    (goal = Binary (And, Lift (Var "p"), Lift (Var "q")))
+    (goal = Binary (And, Lift (Var "q"), Lift (Var "p")))
 
 (* --- name_of_file --- *)
 let () =

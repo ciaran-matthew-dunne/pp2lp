@@ -1,85 +1,85 @@
 open Syntax_pp
 
-type ctx = Base | Primed
-
 type proof_node =
   | Apply of {
       rule: string;
       arg: arg option;
       goal: prd;
-      ctx: ctx;
       children: proof_node list;
     }
 
-(* Re-export from Rule_db for convenience *)
-let rule_arity = Rule_db.rule_arity
-let has_primed = Rule_db.has_primed
+(* --- Exceptions --- *)
+
+exception Ill_formed_replay of string
+exception Emit_admit of string
 
 (* --- Rule name predicates --- *)
 
+(** A _1-suffixed rule: part of an equality chain (primed derivation).
+    These appear in replays as literal _1 names (STOP_1, IMP4_1, etc.)
+    and only occur as children of branching quantifier nodes. *)
 let is_primed_rule name =
   name = "STOP_1" ||
   (String.length name > 2 &&
    String.sub name (String.length name - 2) 2 = "_1")
 
-let is_base_branching_quantifier name =
-  match name with
-  | "ALL7" | "ALL7f" | "XST8" | "XST8f" -> true
+(** ALL7/XST8: branching quantifiers.
+    First child is an equality chain (_1 rules, built postorder).
+    Second child is a normal subtree (built preorder). *)
+let is_branching_quantifier = function
+  | "ALL7" | "XST8" -> true
   | _ -> false
 
-let is_branching_quantifier name =
-  match name with
-  | "ALL7" | "ALL7f" | "XST8" | "XST8f"
-  | "ALL7_1" | "ALL7f_1" | "XST8_1" | "XST8f_1" -> true
-  | _ -> false
-
+(** NRM with a digit suffix: NRM1, NRM3, etc.
+    NOT the bare "NRM" phantom (arity -1). *)
 let is_nrm_step name =
   let len = String.length name in
   len > 3 &&
   String.sub name 0 3 = "NRM" &&
   let c = name.[3] in c >= '0' && c <= '9'
 
-(* Resolve rule name based on context: append _1 in Primed context *)
-let resolve_rule name ctx =
-  match ctx with
-  | Base -> name
-  | Primed ->
-    if Rule_db.has_primed name then name ^ "_1"
-    else name
+(* --- Replay arity --- *)
 
-let goal_of_rhs = function
-  | Simple p -> p
-  | Fin (p, _, _, _) -> p
-
-(* Arity of a rule as it appears in the replay (with _1 suffix).
-   For primed rules, strip _1 and look up the base arity.
-   XST8_1 is special: base XST8 has arity 2 but XST8_1 has arity 1
-   (the ¬¬-elimination is internalised). *)
+(** Arity of a rule as it appears in the replay.
+    For _1-suffixed rules, strip the suffix and look up the base:
+      STOP_1 → 0, IMP4_1 → IMP4 → 1, AND1_1 → AND1 → 2, etc. *)
 let replay_arity name =
   if name = "STOP_1" then 0
-  else if name = "XST8_1" || name = "XST8f_1" then 1
   else if is_primed_rule name then
     let base = String.sub name 0 (String.length name - 2) in
     Rule_db.rule_arity base
   else
     Rule_db.rule_arity name
 
-let is_phantom name = replay_arity name = -1
+(* --- Helpers --- *)
 
-(* --- Helpers used by build --- *)
+let goal_of_rhs = function
+  | Simple p -> p
+  | Fin (p, _, _, _) -> p
 
-(* Collect primed prefix lines until a BASE ALL7/XST8 is found.
-   Returns Some (collected_lines, branch_pos) or None.
-   Non-_1 NRM steps (normalisation bookkeeping) are skipped — they
-   compute the FIN result but are not equality-chain proof steps. *)
+(** Collect the equality chain (primed prefix) preceding a branching
+    quantifier.  Scans forward from [pos] through _1-suffixed rules
+    until an ALL7/XST8 is found.
+
+    Returns [Some (collected_lines, branch_pos)] where
+    - [collected_lines]: the _1 lines forming the equality derivation
+    - [branch_pos]: index of the ALL7/XST8 that consumes the chain
+
+    Skipped during collection (not proof steps):
+    - Non-_1 NRM steps (NRM1, NRM3 …): normalisation bookkeeping
+      that PP uses to compute the FIN result
+    - Non-FIN phantoms (STOP_NORM, bare NRM)
+
+    FIN lines are kept: they carry the result predicate the emitter
+    needs via [extract_fin_result]. *)
 let rec collect_primed arr n pos =
   if pos >= n then None
   else
     let ((name, _), rhs) = arr.(pos) in
-    if is_base_branching_quantifier name then
+    if is_branching_quantifier name then
       Some ([], pos)
-    else if is_phantom name then begin
-      (* Include FIN lines for result extraction, skip other phantoms *)
+    else if replay_arity name = -1 then begin
+      (* Phantom: keep FIN (carries result), skip others *)
       match rhs with
       | Fin _ ->
         (match collect_primed arr n (pos + 1) with
@@ -95,39 +95,54 @@ let rec collect_primed arr n pos =
       | Some (rest, branch_pos) -> Some (arr.(pos) :: rest, branch_pos)
       | None -> None
 
-(* Remove non-_1 NRM steps from collected primed lines.
-   Non-suffixed NRM steps (NRM1, NRM3, ...) in the primed chain are
-   normalisation bookkeeping that PP uses to compute the FIN result.
-   Only _1-suffixed NRM steps (NRM1_1, NRM3_1, ...) are actual proof
-   steps in the equality chain. *)
+(** Filter out non-_1 NRM steps from collected primed lines.
+    Same criterion as [collect_primed]: only _1-suffixed NRM steps
+    (NRM1_1, NRM3_1 …) are actual equality proof steps. *)
 let remove_norm_steps (lines : line list) : line list =
   List.filter (fun ((name, _), _) ->
     not (is_nrm_step name && not (is_primed_rule name))
   ) lines
 
-(* Build a primed subtree from post-order lines (leaf-first).
-   Stack-based: leaves push, arity-1 pop 1, arity-2 pop 2. *)
+(** Build a proof subtree from the _1 equality chain.
+
+    PP emits equality-chain rules in {b postorder} (leaves first):
+
+    {v
+    [STOP_1]  <p>                 ← leaf (arity 0)
+    [IMP4_1]  <q ⇒ p>            ← pops 1, pushes parent
+    [AND3_1]  <q ∧ r ⇒ p>        ← pops 1, pushes parent
+    v}
+
+    Stack-based evaluation (like a postfix calculator):
+    - Arity 0 (STOP_1): push a leaf
+    - Arity 1 (IMP4_1, AND3_1 …): pop one child, push parent
+    - Arity 2 (AND1_1, OR3_1 …): pop two children, push parent
+    - Phantom (FIN): track the result predicate, don't push
+
+    After processing all lines, the stack should hold exactly one root. *)
 let build_postorder (lines : line list) : proof_node =
   let lines = remove_norm_steps lines in
   let stack = ref [] in
   let last_fin = ref None in
   let push node = stack := node :: !stack in
-  let pop () =
+  let pop rule_name =
     match !stack with
-    | [] -> failwith "proof_tree: build_postorder: empty stack"
+    | [] ->
+      raise (Ill_formed_replay
+        (Printf.sprintf "build_postorder: empty stack at %s" rule_name))
     | x :: rest -> stack := rest; x
   in
   List.iter (fun ((rule_name, arg), rhs) ->
     let goal = goal_of_rhs rhs in
     let arity = replay_arity rule_name in
     if arity = -1 then begin
-      (* Track FIN results for branching quantifiers *)
-      (match rhs with
-       | Fin (p, _, _, _) -> last_fin := Some (Pred p)
-       | _ -> ())
+      (* Track FIN results for the enclosing branching quantifier *)
+      match rhs with
+      | Fin (p, _, _, _) -> last_fin := Some (Pred p)
+      | _ -> ()
     end
     else begin
-      (* For ALL7_1/XST8_1, attach the preceding FIN result *)
+      (* Attach a preceding FIN result to branching quantifier nodes *)
       let arg =
         if is_branching_quantifier rule_name then
           (match !last_fin with
@@ -136,29 +151,37 @@ let build_postorder (lines : line list) : proof_node =
         else arg
       in
       if arity = 0 then
-        push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [] })
+        push (Apply { rule = rule_name; arg; goal; children = [] })
       else if arity = 1 then
-        let child = pop () in
-        push (Apply { rule = rule_name; arg; goal; ctx = Primed; children = [child] })
+        let child = pop rule_name in
+        push (Apply { rule = rule_name; arg; goal; children = [child] })
       else begin
-        let child2 = pop () in
-        let child1 = pop () in
-        push (Apply { rule = rule_name; arg; goal; ctx = Primed;
+        let child2 = pop rule_name in
+        let child1 = pop rule_name in
+        push (Apply { rule = rule_name; arg; goal;
                       children = [child1; child2] })
       end
     end
   ) lines;
-  pop ()
+  match !stack with
+  | [root] -> root
+  | [] -> raise (Ill_formed_replay "build_postorder: no nodes produced")
+  | nodes ->
+    raise (Ill_formed_replay
+      (Printf.sprintf "build_postorder: %d nodes remain on stack"
+         (List.length nodes)))
 
-(* Skip phantom lines (FIN, STOP_NORM, NRM) after a branching point *)
+(** Skip phantom lines (FIN, STOP_NORM, NRM) for position tracking.
+    The caller extracts FIN data before calling this. *)
 let rec skip_phantoms arr n pos =
   if pos >= n then pos
   else
     let ((name, _), _) = arr.(pos) in
-    if is_phantom name then skip_phantoms arr n (pos + 1)
+    if replay_arity name = -1
+    then skip_phantoms arr n (pos + 1)
     else pos
 
-(* Skip FIN + trailing phantoms *)
+(** Skip a FIN line and any trailing phantoms. *)
 let skip_fin arr n pos =
   if pos >= n then pos
   else
@@ -168,98 +191,106 @@ let skip_fin arr n pos =
 
 (* --- Main tree builder --- *)
 
+(** Build a proof tree from replay lines.
+
+    The main replay is {b preorder} (parent first, children after):
+
+    {v
+    [IMP4]    <p ⇒ q>            ← parent (arity 1)
+    [AXM3]    <q>                 ← child
+    v}
+
+    The one exception is the equality chain (_1 rules) preceding a
+    branching quantifier (ALL7/XST8).  These appear in postorder and
+    are handled by [collect_primed] + [build_postorder].
+
+    Raises [Ill_formed_replay] on truncated or malformed replays. *)
 let build (lines : line list) : proof_node =
   let arr = Array.of_list lines in
   let n = Array.length arr in
 
-  let rec go pos ctx =
-    if pos >= n then begin
-      Printf.eprintf "warning: incomplete proof, inserting SORRY\n";
-      (Apply { rule = "SORRY"; arg = None;
-               goal = Lift (Var "incomplete"); ctx;
-               children = [] },
-       pos)
-    end
+  let rec go pos =
+    if pos >= n then
+      raise (Ill_formed_replay "replay ends before proof is complete")
     else
       let ((rule_name, arg), rhs) = arr.(pos) in
+      let goal = goal_of_rhs rhs in
       let arity = replay_arity rule_name in
 
+      (* Skip phantom entries (FIN, STOP_NORM, NRM) *)
       if arity = -1 then
-        go (pos + 1) ctx
+        go (pos + 1)
 
-      (* Primed prefix: _1-suffixed rule in Base context signals a primed
-         subtree preceding an ALL7/XST8 branching quantifier. *)
-      else if ctx = Base && is_primed_rule rule_name then begin
+      (* _1 rule: start of an equality chain preceding ALL7/XST8.
+         Collect the chain (postorder), build it, then build the
+         branching quantifier with child1=chain, child2=continuation. *)
+      else if is_primed_rule rule_name then begin
         match collect_primed arr n pos with
         | Some (primed_lines, branch_pos) ->
           let child1 = build_postorder primed_lines in
           let ((bname, _barg), brhs) = arr.(branch_pos) in
           let bgoal = goal_of_rhs brhs in
-          let resolved = resolve_rule bname ctx in
+          (* Extract FIN result from the line after the branching quant *)
           let fin_pos = branch_pos + 1 in
           let fin_arg =
             if fin_pos < n then
-              let ((_, _), fin_rhs) = arr.(fin_pos) in
-              match fin_rhs with Fin (p, _, _, _) -> Some (Pred p) | _ -> _barg
+              match snd arr.(fin_pos) with
+              | Fin (p, _, _, _) -> Some (Pred p)
+              | _ -> _barg
             else _barg
           in
           let pos2 = skip_fin arr n fin_pos in
           if pos2 >= n then
-            failwith (Printf.sprintf
-              "proof_tree: %s at end of replay has no child2 \
-               (truncated or malformed replay)" bname)
+            raise (Ill_formed_replay
+              (Printf.sprintf "%s at end of replay — missing second child"
+                 bname))
           else
-            let (child2, pos3) = go pos2 Base in
-            (Apply { rule = resolved; arg = fin_arg; goal = bgoal; ctx;
+            let (child2, pos3) = go pos2 in
+            (Apply { rule = bname; arg = fin_arg; goal = bgoal;
                      children = [child1; child2] },
              pos3)
         | None ->
-          let goal = goal_of_rhs rhs in
-          (Apply { rule = rule_name; arg; goal; ctx = Primed;
-                   children = [] },
+          (* Lone _1 rule with no branching quantifier ahead — treat
+             as a leaf.  This shouldn't happen in well-formed replays. *)
+          (Apply { rule = rule_name; arg; goal; children = [] },
            pos + 1)
       end
 
-      else if rule_name = "STOP_1" then
-        let goal = goal_of_rhs rhs in
-        (Apply { rule = "STOP_1"; arg; goal; ctx = Primed; children = [] },
-         pos + 1)
-
+      (* Leaf rule (arity 0) *)
       else if arity = 0 then
-        let resolved = resolve_rule rule_name ctx in
-        let goal = goal_of_rhs rhs in
-        (Apply { rule = resolved; arg; goal; ctx; children = [] },
+        (Apply { rule = rule_name; arg; goal; children = [] },
          pos + 1)
 
+      (* Single-child rule (arity 1) *)
       else if arity = 1 then
-        let resolved = resolve_rule rule_name ctx in
-        let goal = goal_of_rhs rhs in
-        let (child, next_pos) = go (pos + 1) ctx in
-        (Apply { rule = resolved; arg; goal; ctx; children = [child] },
+        let (child, next_pos) = go (pos + 1) in
+        (Apply { rule = rule_name; arg; goal; children = [child] },
          next_pos)
 
+      (* Two-child rule (arity 2) *)
       else begin
-        let goal = goal_of_rhs rhs in
         if is_branching_quantifier rule_name then begin
-          let resolved = resolve_rule rule_name ctx in
-          let (child1, pos1) = go (pos + 1) Primed in
+          (* ALL7/XST8 appearing directly (no preceding _1 chain).
+             child1 should be an equality chain but we build it
+             normally — the emitter handles both cases. *)
+          let (child1, pos1) = go (pos + 1) in
           let pos2 = skip_fin arr n pos1 in
-          let (child2, pos3) = go pos2 Base in
-          (Apply { rule = resolved; arg; goal; ctx;
+          let (child2, pos3) = go pos2 in
+          (Apply { rule = rule_name; arg; goal;
                    children = [child1; child2] },
            pos3)
         end else begin
-          let resolved = resolve_rule rule_name ctx in
-          let (child1, pos1) = go (pos + 1) ctx in
-          let (child2, pos2) = go pos1 ctx in
-          (Apply { rule = resolved; arg; goal; ctx;
+          let (child1, pos1) = go (pos + 1) in
+          let (child2, pos2) = go pos1 in
+          (Apply { rule = rule_name; arg; goal;
                    children = [child1; child2] },
            pos2)
         end
       end
   in
 
-  let (tree, final_pos) = go 0 Base in
+  let (tree, final_pos) = go 0 in
   if final_pos < n then
-    Printf.eprintf "warning: %d unconsumed lines in proof tree\n" (n - final_pos);
+    Printf.eprintf "warning: %d unconsumed lines in proof tree\n"
+      (n - final_pos);
   tree

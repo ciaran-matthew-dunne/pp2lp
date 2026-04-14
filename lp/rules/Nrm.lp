@@ -26,6 +26,15 @@ begin
   refine h1 (h2 inh inh)
 end;
 
+// NRM1_3: Three-variable version.
+opaque symbol NRM1_3 [P S : Prop]
+  : π (P ⇒ S)
+  → π ((`♢ _ : τ ι, `♢ _ : τ ι, `♢ _ : τ ι, P) ⇒ S) ≔
+begin
+  assume P S h1 h2;
+  refine h1 (h2 inh inh inh)
+end;
+
 // NRM2: x not free in P; H ⊢ (P ⇒ ♢x · Q) ⇒ S → H ⊢ ♢x · (P ⇒ Q) ⇒ S
 opaque symbol NRM2 [P : Prop] [Q : τ ι → Prop] [S : Prop]
   : π ((P ⇒ (`♢ x, Q x)) ⇒ S)

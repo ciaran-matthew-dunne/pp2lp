@@ -13,26 +13,6 @@ begin
   rewrite h1; rewrite h2; reflexivity
 end;
 
-// IMP4'/ALL9': lift equality under implication (conditional on hypothesis).
-opaque symbol imp_cong [P Q R : Prop]
-  : (π P → π (Q = R)) → π ((P ⇒ Q) = (P ⇒ R)) ≔
-begin
-  assume P Q R h;
-  refine propExt _ _ _ _
-    { assume h1 hp; refine =⇒ (h hp) (h1 hp) }
-    { assume h1 hp; refine =⇒ (eq_sym (h hp)) (h1 hp) }
-end;
-
-// ALL8': lift equality under ∀.
-opaque symbol forall_cong [P R : τ ι → Prop]
-  : (Π x : τ ι, π (P x = R x)) → π ((`∀ x : τ ι, P x) = (`∀ x : τ ι, R x)) ≔
-begin
-  assume P R h;
-  refine propExt _ _ _ _
-    { assume h1 x; refine =⇒ (h x) (h1 x) }
-    { assume h1 x; refine =⇒ (eq_sym (h x)) (h1 x) }
-end;
-
 // AND5': lift antecedent equivalence into implication equality.
 opaque symbol ante_cong [C C' R : Prop]
   : (π C → π C') → (π C' → π C) → π ((C ⇒ R) = (C' ⇒ R)) ≔
@@ -202,30 +182,6 @@ begin
           refine ⊥ₑ (hneqv heqv) } } }
 end;
 
-// EQV2: ¬(P⇔Q) = (P⇒¬Q) ∧ (¬Q⇒P)
-opaque symbol eqv2_eq [P Q : Prop]
-  : π (¬ (P ⇔ Q) = ((P ⇒ ¬ Q) ∧ (¬ Q ⇒ P))) ≔
-begin
-  assume P Q;
-  refine propExt _ _ _ _
-    { assume hneqv; refine ∧ᵢ
-      (λ hp hq, hneqv (∧ᵢ (λ h0, hq) (λ h0, hp)))
-      (λ hnq, ¬¬ₑ P (λ hnp, hneqv (∧ᵢ
-        (λ hp, ⊥ₑ (hnp hp))
-        (λ hq, ⊥ₑ (hnq hq))))) }
-    { assume h heqv;
-      have hpnq : π (P ⇒ ¬ Q) { refine ∧ₑ₁ h };
-      have hnqp : π (¬ Q ⇒ P) { refine ∧ₑ₂ h };
-      refine ∨ₑ (em Q) _ _
-      { assume hq;
-        have hp : π P { refine ∧ₑ₂ heqv hq };
-        refine hpnq hp hq }
-      { assume hnq;
-        have hp : π P { refine hnqp hnq };
-        have hq : π Q { refine ∧ₑ₁ heqv hp };
-        refine hnq hq } }
-end;
-
 // EQV3: (P⇔Q)⇒R = (P⇒Q⇒R) ∧ (¬P⇒¬Q⇒R)
 opaque symbol eqv3_eq [P Q R : Prop]
   : π (((P ⇔ Q) ⇒ R) = ((P ⇒ (Q ⇒ R)) ∧ (¬ P ⇒ (¬ Q ⇒ R)))) ≔
@@ -250,16 +206,6 @@ begin
         { assume hnq; refine ∧ₑ₂ h hnp hnq } } }
 end;
 
-// EQV4: (P⇔Q) = (P⇒Q) ∧ (Q⇒P)
-opaque symbol eqv4_eq [P Q : Prop]
-  : π ((P ⇔ Q) = ((P ⇒ Q) ∧ (Q ⇒ P))) ≔
-begin
-  assume P Q;
-  refine propExt _ _ _ _
-    { assume h; refine h }
-    { assume h; refine h }
-end;
-
 // ---- Negation (§A.5) ----
 
 // NOT1: ¬¬P⇒R = (P⇒R)
@@ -282,124 +228,6 @@ begin
   refine propExt _ _ _ _
     { assume h1; refine h1 (eq_refl E) }
     { assume h1 h2; refine h1 }
-end;
-
-// OPR1: (x=E)⇒P(x) = (x=E)⇒P(E)
-opaque symbol opr1_eq [E x : τ ι] [P : τ ι → Prop]
-  : π (((x = E) ⇒ P x) = ((x = E) ⇒ P E)) ≔
-begin
-  assume E x P;
-  refine propExt _ _ _ _
-    { assume h1 heq; rewrite left heq; refine h1 heq }
-    { assume h1 heq; rewrite heq; refine h1 heq }
-end;
-
-// OPR2: (E=x)⇒P(x) = (E=x)⇒P(E)
-opaque symbol opr2_eq [E x : τ ι] [P : τ ι → Prop]
-  : π (((E = x) ⇒ P x) = ((E = x) ⇒ P E)) ≔
-begin
-  assume E x P;
-  refine propExt _ _ _ _
-    { assume h1 heq;
-      have heqs : π (x = E) { symmetry; refine heq };
-      rewrite left heqs; refine h1 heq }
-    { assume h1 heq;
-      have heqs : π (x = E) { symmetry; refine heq };
-      rewrite heqs; refine h1 heq }
-end;
-
-// EQC1: ¬(a↦b = c↦d)⇒P = (¬(a=c) ∨ ¬(b=d))⇒P
-opaque symbol eqc1_eq [a b c d : τ ι] [P : Prop]
-  : π ((¬ ((a ↦ b) = (c ↦ d)) ⇒ P) = ((¬ (a = c) ∨ ¬ (b = d)) ⇒ P)) ≔
-begin
-  assume a b c d P;
-  refine propExt _ _ _ _
-    { assume h1 h2;
-      refine h1 _;
-      refine ∨ₑ h2 _ _
-      { assume hnac h3;
-        refine hnac (∧ₑ₁ (pair_inj a b c d h3)) }
-      { assume hnbd h3;
-        refine hnbd (∧ₑ₂ (pair_inj a b c d h3)) } }
-    { assume h1 h2;
-      refine h1 _;
-      refine ∨ₑ (em (a = c)) _ _
-      { assume hac; refine ∨ₑ (em (b = d)) _ _
-        { assume hbd;
-          refine ⊥ₑ (h2 (pair_cong a b c d hac hbd)) }
-        { assume hnbd; refine ∨ᵢ₂ hnbd } }
-      { assume hnac; refine ∨ᵢ₁ hnac } }
-end;
-
-// EQC2: (a↦b = c↦d)⇒P = (a=c ∧ b=d)⇒P
-opaque symbol eqc2_eq [a b c d : τ ι] [P : Prop]
-  : π ((((a ↦ b) = (c ↦ d)) ⇒ P) = (((a = c) ∧ (b = d)) ⇒ P)) ≔
-begin
-  assume a b c d P;
-  refine propExt _ _ _ _
-    { assume h1 h2; refine h1 (pair_cong a b c d (∧ₑ₁ h2) (∧ₑ₂ h2)) }
-    { assume h1 h2; refine h1 (pair_inj a b c d h2) }
-end;
-
-// EQS1: (∀x. x∈E ⇔ x∈F)⇒R = (E=F)⇒R
-opaque symbol eqs1_eq [E F : τ ι] [R : Prop]
-  : π (((`∀ x : τ ι, (x ϵ E) ⇔ (x ϵ F)) ⇒ R) = ((E = F) ⇒ R)) ≔
-begin
-  assume E F R;
-  refine propExt _ _ _ _
-    { assume h1 h2; refine h1 (∧ₑ₁ (set_ext E F) h2) }
-    { assume h1 h2; refine h1 (∧ₑ₂ (set_ext E F) h2) }
-end;
-
-// EQS2: ¬(∀x. x∈E ⇔ x∈F)⇒R = ¬(E=F)⇒R
-opaque symbol eqs2_eq [E F : τ ι] [R : Prop]
-  : π ((¬ (`∀ x : τ ι, (x ϵ E) ⇔ (x ϵ F)) ⇒ R) = (¬ (E = F) ⇒ R)) ≔
-begin
-  assume E F R;
-  refine propExt _ _ _ _
-    { assume h1 h2; refine h1 (λ heqs, ⊥ₑ (h2 (∧ₑ₂ (set_ext E F) heqs))) }
-    { assume h1 h2; refine h1 (λ heq, ⊥ₑ (h2 (∧ₑ₁ (set_ext E F) heq))) }
-end;
-
-// EIMP51: ¬(E=F)⇒P = P (when ¬(F=E) is known)
-opaque symbol eimp51_eq [E F : τ ι] [P : Prop]
-  : π (¬ (F = E)) → π ((¬ (E = F) ⇒ P) = P) ≔
-begin
-  assume E F P hneq;
-  refine propExt _ _ _ _
-    { assume h1; refine h1 (λ h2, hneq (eq_sym h2)) }
-    { assume h1 h2; refine h1 }
-end;
-
-// EIMP52: (E=F)⇒P = P (when F=E is known)
-opaque symbol eimp52_eq [E F : τ ι] [P : Prop]
-  : π (F = E) → π (((E = F) ⇒ P) = P) ≔
-begin
-  assume E F P heq;
-  refine propExt _ _ _ _
-    { assume h1; refine h1 (eq_sym heq) }
-    { assume h1 h2; refine h1 }
-end;
-
-// AR9: (E ≤ 0) ⇒ R = (F ≤ 0) ⇒ R (from E = F)
-opaque symbol ar9_eq [E : τ ι] (F : τ ι) [R : Prop]
-  : π (E = F)
-  → π (((E ≤ 𝟎) ⇒ R) = ((F ≤ 𝟎) ⇒ R)) ≔
-begin
-  assume E F R heq;
-  rewrite heq; reflexivity
-end;
-
-// ---- Existential (§A.8) ----
-
-// XST7: (∃x.P x)⇒R = ∀x.(P x⇒R)
-opaque symbol xst7_eq [P : τ ι → Prop] [R : Prop]
-  : π (((`∃ x, P x) ⇒ R) = (`∀ x, P x ⇒ R)) ≔
-begin
-  assume P R;
-  refine propExt _ _ _ _
-    { assume h1 x hpx; refine h1 (∃ᵢ x hpx) }
-    { assume h1 hex; refine ∃ₑ hex h1 }
 end;
 
 // ---- _1 equality combinators ----
@@ -482,6 +310,20 @@ begin
   have h3 : π ((`∀ x, `∀ y, P x y) = (`∀ x, `∀ y, R x y))
     { refine ALL8_1 (λ x, ALL8_1 (h1 x)) };
   have h4 : π (((`∀ x, `∀ y, P x y) ⇒ Q) = ((`∀ x, `∀ y, R x y) ⇒ Q))
+    { rewrite h3; reflexivity };
+  refine eq_trans h4 h2
+end;
+
+// ALL7_1_3: Three-variable version.
+opaque symbol ALL7_1_3 [P : τ ι → τ ι → τ ι → Prop] (R : τ ι → τ ι → τ ι → Prop) [Q S : Prop]
+  : (Π x : τ ι, Π y : τ ι, Π z : τ ι, π (P x y z = R x y z))
+  → π (((`♢ x, `♢ y, `♢ z, R x y z) ⇒ Q) = S)
+  → π (((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) = S) ≔
+begin
+  assume P R Q S h1 h2;
+  have h3 : π ((`∀ x, `∀ y, `∀ z, P x y z) = (`∀ x, `∀ y, `∀ z, R x y z))
+    { refine ALL8_1 (λ x, ALL8_1 (λ y, ALL8_1 (h1 x y))) };
+  have h4 : π (((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) = ((`∀ x, `∀ y, `∀ z, R x y z) ⇒ Q))
     { rewrite h3; reflexivity };
   refine eq_trans h4 h2
 end;
