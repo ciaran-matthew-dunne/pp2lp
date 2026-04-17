@@ -27,18 +27,16 @@ let is_hoas_identity = function
   | "NRM8" -> true
   | _ -> false
 
+(* Extract the binder variables from a goal of shape
+   [ Bind | ¬Bind | Bind ⇒ _ | ¬Bind ⇒ _ ]. *)
 let binding_vars = function
-  | Binary (Imp, Bind (_, xs, _), _) -> xs
-  | Bind (_, xs, _) -> xs
+  | Binary (Imp, Bind (_, xs, _), _)
+  | Binary (Imp, Unary (Not, Bind (_, xs, _)), _)
+  | Bind (_, xs, _)
+  | Unary (Not, Bind (_, xs, _)) -> xs
   | _ -> []
 
-let goal_binding_count goal =
-  match goal with
-  | Binary (Imp, Bind (_, xs, _), _) -> List.length xs
-  | Bind (_, xs, _) -> List.length xs
-  | Binary (Imp, Unary (Not, Bind (_, xs, _)), _) -> List.length xs
-  | Unary (Not, Bind (_, xs, _)) -> List.length xs
-  | _ -> 0
+let goal_binding_count goal = List.length (binding_vars goal)
 
 let check_compound_limit rule n =
   if n > 3 then
