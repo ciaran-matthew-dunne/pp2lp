@@ -108,24 +108,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         raise (Emit_admit "AR9 primed chain: could not extract E/F")
       end
 
-    (* OPR1/OPR2 — keep rewrite approach *)
+    (* OPR1/OPR2 — primed: refine IMP4_1 first, then assume+rewrite *)
     | _, [child] when base = "OPR1" || base = "OPR2" ->
       Buffer.add_string buf "refine IMP4_1 _;\n";
       Buffer.add_string buf pad;
-      let eq_hyp = match goal with
-        | Binary (Imp, eq, _) -> eq | _ -> Lift (Var "?") in
-      let (hname, ctx') = fresh_hyp ctx eq_hyp in
-      Buffer.add_string buf "assume ";
-      Buffer.add_string buf hname;
-      Buffer.add_string buf ";\n";
-      Buffer.add_string buf pad;
-      if base = "OPR1" then begin
-        Buffer.add_string buf "rewrite ";
-        Buffer.add_string buf hname
-      end else begin
-        Buffer.add_string buf "rewrite left ";
-        Buffer.add_string buf hname
-      end;
+      let ctx' = emit_opr_step buf pad ctx ~base ~skip_rewrite:false goal in
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx' pad child
@@ -386,24 +373,9 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
 
     | [child] when rule = "OPR1" || rule = "OPR2" ->
       emit_comment ();
-      let eq_hyp = match goal with
-        | Binary (Imp, eq, _) -> eq
-        | _ -> Lift (Var "eq") in
-      let (hname, ctx') = fresh_hyp ctx eq_hyp in
       Buffer.add_string buf pad;
-      Buffer.add_string buf "assume ";
-      Buffer.add_string buf hname;
-      if not (is_opr_vacuous rule goal) then begin
-        Buffer.add_string buf ";\n";
-        Buffer.add_string buf pad;
-        if rule = "OPR1" then begin
-          Buffer.add_string buf "rewrite ";
-          Buffer.add_string buf hname
-        end else begin
-          Buffer.add_string buf "rewrite left ";
-          Buffer.add_string buf hname
-        end
-      end;
+      let ctx' = emit_opr_step buf pad ctx ~base:rule
+        ~skip_rewrite:(is_opr_vacuous rule goal) goal in
       Buffer.add_string buf ";\n";
       emit_node buf ctx' indent child
 

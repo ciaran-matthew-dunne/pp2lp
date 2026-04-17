@@ -294,6 +294,28 @@ let emit_opr_args buf (node : proof_node) =
   | None ->
     Buffer.add_string buf " _"
 
+(* Shared [assume h; rewrite [left] h] fragment for OPR1/OPR2.
+   - [base] is "OPR1" (rewrite) or "OPR2" (rewrite left).
+   - [skip_rewrite] is set by the caller when the rewrite is vacuous
+     (base case only; primed chain always rewrites).
+   Emits into [buf] at the current position, assuming the caller has
+   already written any leading padding. Returns the extended context. *)
+let emit_opr_step buf pad ctx ~base ~skip_rewrite goal =
+  let eq_hyp = match goal with
+    | Binary (Imp, eq, _) -> eq
+    | _ -> Lift (Var "eq") in
+  let (hname, ctx') = fresh_hyp ctx eq_hyp in
+  Buffer.add_string buf "assume ";
+  Buffer.add_string buf hname;
+  if not skip_rewrite then begin
+    Buffer.add_string buf ";\n";
+    Buffer.add_string buf pad;
+    Buffer.add_string buf
+      (if base = "OPR1" then "rewrite " else "rewrite left ");
+    Buffer.add_string buf hname
+  end;
+  ctx'
+
 let emit_ar3_args buf node =
   match node with
   | Apply { arg = Some (PipeArg (_a_expr, result_expr)); _ } ->
