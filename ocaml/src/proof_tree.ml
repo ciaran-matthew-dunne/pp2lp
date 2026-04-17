@@ -18,9 +18,7 @@ exception Emit_admit of string
 (** A _1-suffixed rule: part of an equality chain (primed derivation).
     These appear in replays as literal _1 names (STOP_1, IMP4_1, etc.)
     and only occur as children of branching quantifier nodes. *)
-let is_primed_rule name =
-  String.length name > 2 &&
-  String.sub name (String.length name - 2) 2 = "_1"
+let is_primed_rule = Rule_db.is_primed_name
 
 (** ALL7/XST8: branching quantifiers.
     First child is an equality chain (_1 rules, built postorder).
@@ -31,11 +29,7 @@ let is_branching_quantifier = function
 
 (** NRM with a digit suffix: NRM1, NRM3, etc.
     NOT the bare "NRM" phantom (arity -1). *)
-let is_nrm_step name =
-  let len = String.length name in
-  len > 3 &&
-  String.sub name 0 3 = "NRM" &&
-  let c = name.[3] in c >= '0' && c <= '9'
+let is_nrm_step = Rule_db.is_nrm_step
 
 (* --- Replay arity --- *)
 

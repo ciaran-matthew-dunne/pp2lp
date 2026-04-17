@@ -63,28 +63,11 @@ let select_variant rule goal children flat =
 
 (* ---- Suffix handling ---- *)
 
-(* Strip trailing _N suffix (where N is a number): ALL7_2 → ALL7, ALL7_1_3 → ALL7_1 *)
-let strip_suffix rule =
-  match String.rindex_opt rule '_' with
-  | Some i when i > 0 && i < String.length rule - 1 ->
-    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
-    let all_digits = String.to_seq suffix |> Seq.for_all (fun c -> c >= '0' && c <= '9') in
-    if all_digits then String.sub rule 0 i
-    else rule
-  | _ -> rule
-
-let is_primed rule =
-  let base = strip_suffix rule in
-  let len = String.length base in
-  len > 2 && String.sub base (len - 2) 2 = "_1"
-
-(* Extract the n-ary count from a rule name: ALL7_3 → 3, ALL7 → 1 *)
-let nary_count rule =
-  match String.rindex_opt rule '_' with
-  | Some i when i > 0 && i < String.length rule - 1 ->
-    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
-    (try int_of_string suffix with _ -> 1)
-  | _ -> 1
+(* Re-exported from Rule_db so callers in this file (and emit_lp.ml via
+   Rule_args.strip_suffix) don't need to know where they live. *)
+let strip_suffix = Rule_db.strip_suffix
+let is_primed = Rule_db.is_primed
+let nary_count = Rule_db.nary_count
 
 (* ---- Child flat propagation ---- *)
 

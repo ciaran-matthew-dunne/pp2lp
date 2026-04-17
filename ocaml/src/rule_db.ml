@@ -181,3 +181,62 @@ let result_schema name =
   match Hashtbl.find_opt rules name with
   | Some r -> Some r.result_schema
   | None -> None
+
+(* --- Rule-name string predicates ---
+   PP replay rule names carry structural information in their suffix:
+
+     FOO          — base rule (e.g. AND1, IMP4)
+     FOO_1        — primed variant (appears inside a _1 equality chain
+                    that precedes ALL7/XST8)
+     FOO_N        — n-ary variant (e.g. ALL7_2, NRM1_3), N ≥ 2
+     FOO_1_N      — primed + n-ary
+     NRM<digit>…  — normalisation step
+
+   The helpers here are the one authoritative parser of those suffixes.
+   Downstream modules should call these instead of re-implementing
+   substring checks. *)
+
+(* Strip trailing _N where N is a non-empty digit string:
+     ALL7_2      → ALL7
+     ALL7_1_3    → ALL7_1
+     ALL7_1      → ALL7_1   (not stripped, because "1" vs "_N" shape
+                              is resolved by callers via is_primed)
+   Note: we do strip _1 here unless it is the only suffix, because
+   callers (is_primed) want to see the _1 after stripping an outer _N.
+   The rule is: strip *one* trailing numeric suffix. *)
+let strip_suffix rule =
+  match String.rindex_opt rule '_' with
+  | Some i when i > 0 && i < String.length rule - 1 ->
+    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
+    if String.to_seq suffix |> Seq.for_all (fun c -> c >= '0' && c <= '9')
+    then String.sub rule 0 i
+    else rule
+  | _ -> rule
+
+(* Raw suffix check: name ends in "_1".
+   Used when classifying a replay line. *)
+let is_primed_name name =
+  String.length name > 2 &&
+  String.sub name (String.length name - 2) 2 = "_1"
+
+(* Suffix check that sees through an outer n-ary wrapping:
+     ALL7_1   → true
+     ALL7_1_3 → true   (strip _3, then _1)
+     ALL7_3   → false
+   Used after select_variant has attached a _N tag. *)
+let is_primed rule = is_primed_name (strip_suffix rule)
+
+(* Extract the trailing n-ary count: ALL7_3 → 3, ALL7 → 1. *)
+let nary_count rule =
+  match String.rindex_opt rule '_' with
+  | Some i when i > 0 && i < String.length rule - 1 ->
+    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
+    (try int_of_string suffix with _ -> 1)
+  | _ -> 1
+
+(* NRM<digit>... (NRM1, NRM12, NRM1_1, …). Excludes the bare "NRM"
+   phantom (arity -1). *)
+let is_nrm_step name =
+  String.length name > 3 &&
+  String.sub name 0 3 = "NRM" &&
+  (let c = name.[3] in c >= '0' && c <= '9')
