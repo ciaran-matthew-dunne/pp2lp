@@ -39,10 +39,3 @@ let reconstruct_symbol (fp : string) : string =
   let name = name_of_file fp in
   Emit_lp.emit_symbol name goal tree
 
-(* Reconstruct from a line list directly *)
-let reconstruct_lines (name : string) (lines : Syntax_pp.line list) : string =
-  if lines = [] then
-    failwith "reconstruct: empty line list";
-  let tree = Proof_tree.build lines in
-  let goal = goal_of_tree tree in
-  Emit_lp.emit_lp name goal tree

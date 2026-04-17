@@ -179,13 +179,16 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         emit_primed_chain buf ctx pad base_child
       end
 
-    (* Schema 2 — branching _1 rules (with simplification) *)
+    (* Schema 2 — branching _1 rules producing conjunctions.
+       The raw right-associated result propagates up; ALL7_2/XST8_2 accept it
+       and child2's body bridges to left-assoc via `rewrite ∧_assoc`. *)
     | _, [child1; child2] when schema = Some 2 ->
       let r1 = compute_result child1 in
       let r2 = compute_result child2 in
       let raw = Binary (And, r1, r2) in
       let simp = simplify_result raw in
       if raw <> simp then begin
+        (* One side collapses to ⊤/⊥: derive raw first, then simplify. *)
         let tmp = Printf.sprintf "h_s%d" ctx.counter in
         Buffer.add_string buf "have ";
         Buffer.add_string buf tmp;
@@ -214,7 +217,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         else if is_false r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa5 _"
         else if is_true r1 then Buffer.add_string buf "\xe2\x8a\xa4\xe2\x88\xa7 _"
         else if is_true r2 then Buffer.add_string buf "\xe2\x88\xa7\xe2\x8a\xa4 _"
-        else raise (Emit_admit "AND4_1 conjunction: no TRUE/FALSE simplification found");
+        else raise (Emit_admit "Schema 2 conjunction: no TRUE/FALSE simplification found");
         Buffer.add_string buf ")"
       end else begin
         Buffer.add_string buf "refine ";
@@ -246,7 +249,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 
 (* ---- Branching quantifier emission (ALL7/XST8) ---- *)
 
-and emit_branching_quant buf thm_hyps ctx indent first_pad pad
+and emit_branching_quant buf ctx indent pad
     eff_rule _node goal child1 child2 =
   (* Equality-based approach:
      refine ALL7 (λ vars, R) _ _
@@ -268,10 +271,25 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
     else
       (if n >= 2 then Printf.sprintf "ALL7_%d" n else "ALL7") in
   let inner_pad = String.make (indent + 2) ' ' in
-  (* Get R from FIN result or compute from chain *)
-  let result_prd = extract_fin_result _node child1 in
+  (* R is the right-associated conjunction the _1 chain naturally produces.
+     AND4_1 has signature (Q=S1)(P=S2)⇒((P∧Q)=(S1∧S2)), so a nested chain
+     concludes at a right-associated result. We pass that shape to ALL7_2;
+     child2's PP-recorded tactics expect left-assoc, so we prepend
+     `rewrite ∧_assoc` N-2 times at the head of child2's body. *)
+  let result_prd = compute_result child1 in
+  (* Count right-nested ∧ pairs anywhere in the predicate. Each such pair
+     needs exactly one `rewrite ∧_assoc` to become left-assoc. *)
+  let rec count_rassoc = function
+    | Binary (And, a, (Binary (And, _, _) as b)) ->
+      1 + count_rassoc a + count_rassoc b
+    | Binary (_, a, b) -> count_rassoc a + count_rassoc b
+    | Unary (_, a) -> count_rassoc a
+    | Bind (_, _, a) -> count_rassoc a
+    | _ -> 0
+  in
+  let n_assoc_rewrites = count_rassoc result_prd in
   (* Emit: refine ALL7 (λ vars, R) _ _ { eq_proof } { child2 } *)
-  Buffer.add_string buf first_pad;
+  Buffer.add_string buf pad;
   Buffer.add_string buf "refine ";
   Buffer.add_string buf all7_sym;
   Buffer.add_string buf " (\xce\xbb"; (* λ *)
@@ -292,30 +310,33 @@ and emit_branching_quant buf thm_hyps ctx indent first_pad pad
   Buffer.add_string buf " }\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
-  emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
+  for _ = 1 to n_assoc_rewrites do
+    Buffer.add_string buf "rewrite \xe2\x88\xa7_assoc; " (* ∧_assoc *)
+  done;
+  emit_node buf ctx (indent + 2) ~inline:true child2;
   Buffer.add_string buf " }"
 
 (* ---- Generic two-child emission ---- *)
 
-and emit_two_children buf thm_hyps ctx indent first_pad pad
+and emit_two_children buf ctx indent pad
     eff_rule node child1 child2 =
-  Buffer.add_string buf first_pad;
+  Buffer.add_string buf pad;
   Buffer.add_string buf "refine ";
   Buffer.add_string buf eff_rule;
   emit_rule_args buf ctx eff_rule node;
   Buffer.add_string buf " _ _\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
-  emit_node buf thm_hyps ctx (indent + 2) ~inline:true child1;
+  emit_node buf ctx (indent + 2) ~inline:true child1;
   Buffer.add_string buf " }\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
-  emit_node buf thm_hyps ctx (indent + 2) ~inline:true child2;
+  emit_node buf ctx (indent + 2) ~inline:true child2;
   Buffer.add_string buf " }"
 
 (* ---- Proof node emission ---- *)
 
-and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
+and emit_node buf ctx indent ?(inline=false) ?(flat=0)
     (node : proof_node) =
   match node with
   | Apply { rule; goal; children; _ } ->
@@ -335,7 +356,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
 
     | [child] when is_hoas_identity rule ->
       let child_flat = compute_child_flat rule flat in
-      emit_node buf thm_hyps ctx indent ~inline ~flat:child_flat child
+      emit_node buf ctx indent ~inline ~flat:child_flat child
 
     | [] ->
       emit_comment ();
@@ -357,7 +378,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       else
         Buffer.add_string buf "refine NRM1 _";
       Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx indent child
+      emit_node buf ctx indent child
 
     | [_child] when rule = "INS" ->
       emit_comment ();
@@ -384,7 +405,7 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
         end
       end;
       Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx' indent child
+      emit_node buf ctx' indent child
 
     | [child] ->
       emit_comment ();
@@ -396,16 +417,16 @@ and emit_node buf thm_hyps ctx indent ?(inline=false) ?(flat=0)
       let ctx' = introduce buf pad ctx rule goal flat in
       let child_flat = compute_child_flat eff_rule flat in
       Buffer.add_string buf ";\n";
-      emit_node buf thm_hyps ctx' indent ~flat:child_flat child
+      emit_node buf ctx' indent ~flat:child_flat child
 
     | [child1; child2] when Proof_tree.is_branching_quantifier rule ->
       emit_comment ();
-      emit_branching_quant buf thm_hyps ctx indent pad pad
+      emit_branching_quant buf ctx indent pad
         eff_rule node goal child1 child2
 
     | [child1; child2] ->
       emit_comment ();
-      emit_two_children buf thm_hyps ctx indent pad pad
+      emit_two_children buf ctx indent pad
         eff_rule node child1 child2
 
     | _ ->
@@ -421,7 +442,6 @@ let lp_header = "require open pp2lp.B pp2lp.Rules;\n"
 
 let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
   let buf = Buffer.create 4096 in
-  let thm_hyps = extract_theorem_hyps goal in
   let fv = free_vars_of_prd goal in
 
   Buffer.add_string buf "opaque symbol ";
@@ -462,7 +482,7 @@ let emit_symbol (name : string) (goal : prd) (tree : proof_node) : string =
   end;
 
   let ctx = empty_ctx in
-  emit_node buf thm_hyps ctx 2 tree;
+  emit_node buf ctx 2 tree;
   Buffer.add_char buf '\n';
   Buffer.add_string buf "end;\n";
   Buffer.contents buf

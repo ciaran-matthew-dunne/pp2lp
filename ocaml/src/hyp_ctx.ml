@@ -1,15 +1,5 @@
 open Syntax_pp
 
-let rec collect_conj_hyps acc = function
-  | Binary (And, l, r) ->
-    collect_conj_hyps (collect_conj_hyps acc l) r
-  | p -> p :: acc
-
-let rec extract_theorem_hyps = function
-  | Bind (Bang, _, body) -> extract_theorem_hyps body
-  | Binary (Imp, hyps, _) -> collect_conj_hyps [] hyps
-  | _ -> []
-
 type hyp_ctx = {
   entries: (string * prd) list;
   counter: int;

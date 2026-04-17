@@ -19,9 +19,8 @@ exception Emit_admit of string
     These appear in replays as literal _1 names (STOP_1, IMP4_1, etc.)
     and only occur as children of branching quantifier nodes. *)
 let is_primed_rule name =
-  name = "STOP_1" ||
-  (String.length name > 2 &&
-   String.sub name (String.length name - 2) 2 = "_1")
+  String.length name > 2 &&
+  String.sub name (String.length name - 2) 2 = "_1"
 
 (** ALL7/XST8: branching quantifiers.
     First child is an equality chain (_1 rules, built postorder).
@@ -120,6 +119,76 @@ let remove_norm_steps (lines : line list) : line list =
     - Phantom (FIN): track the result predicate, don't push
 
     After processing all lines, the stack should hold exactly one root. *)
+
+(* --- Debug output (defined early so build_result_derivation can use it) --- *)
+
+let debug = ref false
+
+let rec pp_prd_short buf = function
+  | Lift (Var s) -> Buffer.add_string buf s
+  | Lift e -> Emit_pp.exp_to_pp_buf buf e
+  | Unary (Not, p) ->
+    Buffer.add_string buf "not(";
+    pp_prd_short buf p;
+    Buffer.add_char buf ')'
+  | Binary (And, p1, p2) ->
+    pp_prd_short buf p1;
+    Buffer.add_string buf " and ";
+    pp_prd_short buf p2
+  | Binary (Or, p1, p2) ->
+    pp_prd_short buf p1;
+    Buffer.add_string buf " or ";
+    pp_prd_short buf p2
+  | Binary (Imp, p1, p2) ->
+    Buffer.add_char buf '(';
+    pp_prd_short buf p1;
+    Buffer.add_string buf " => ";
+    pp_prd_short buf p2;
+    Buffer.add_char buf ')'
+  | Binary (Iff, p1, p2) ->
+    Buffer.add_char buf '(';
+    pp_prd_short buf p1;
+    Buffer.add_string buf " <=> ";
+    pp_prd_short buf p2;
+    Buffer.add_char buf ')'
+  | Eq (e1, e2) ->
+    Emit_pp.exp_to_pp_buf buf e1;
+    Buffer.add_char buf '=';
+    Emit_pp.exp_to_pp_buf buf e2
+  | Mem (args, s) ->
+    List.iter (fun e -> Emit_pp.exp_to_pp_buf buf e; Buffer.add_char buf ',') args;
+    Buffer.add_string buf ": ";
+    Emit_pp.exp_to_pp_buf buf s
+  | Leq (e1, e2) ->
+    Emit_pp.exp_to_pp_buf buf e1;
+    Buffer.add_string buf "<=";
+    Emit_pp.exp_to_pp_buf buf e2
+  | Bind (b, vars, body) ->
+    Buffer.add_char buf (match b with Bang -> '!' | Forall | Forall2 -> '!' | Exists -> '#');
+    List.iter (fun v -> Buffer.add_string buf v; Buffer.add_char buf '.') vars;
+    Buffer.add_char buf '(';
+    pp_prd_short buf body;
+    Buffer.add_char buf ')'
+
+let rec pp_tree ?(indent="") ?(last=true) ch node =
+  let prefix = if last then "└── " else "├── " in
+  let child_indent = indent ^ (if last then "    " else "│   ") in
+  match node with
+  | Apply { rule; goal; children; _ } ->
+    let buf = Buffer.create 64 in
+    pp_prd_short buf goal;
+    Printf.fprintf ch "%s%s%s  <%s>\n" indent prefix rule (Buffer.contents buf);
+    let n = List.length children in
+    List.iteri (fun i c ->
+      pp_tree ~indent:child_indent ~last:(i = n - 1) ch c
+    ) children
+
+let debug_tree label node =
+  if !debug then begin
+    Printf.eprintf "=== %s ===\n" label;
+    pp_tree ~indent:"" ~last:true stderr node
+  end
+
 let build_postorder (lines : line list) : proof_node =
   let lines = remove_norm_steps lines in
   let stack = ref [] in
@@ -142,7 +211,6 @@ let build_postorder (lines : line list) : proof_node =
       | _ -> ()
     end
     else begin
-      (* Attach a preceding FIN result to branching quantifier nodes *)
       let arg =
         if is_branching_quantifier rule_name then
           (match !last_fin with
@@ -164,7 +232,9 @@ let build_postorder (lines : line list) : proof_node =
     end
   ) lines;
   match !stack with
-  | [root] -> root
+  | [root] ->
+    debug_tree "result derivation (postorder)" root;
+    root
   | [] -> raise (Ill_formed_replay "build_postorder: no nodes produced")
   | nodes ->
     raise (Ill_formed_replay
@@ -202,7 +272,7 @@ let skip_fin arr n pos =
 
     The one exception is the equality chain (_1 rules) preceding a
     branching quantifier (ALL7/XST8).  These appear in postorder and
-    are handled by [collect_primed] + [build_postorder].
+    are handled by [collect_primed] + [build_result_derivation].
 
     Raises [Ill_formed_replay] on truncated or malformed replays. *)
 let build (lines : line list) : proof_node =

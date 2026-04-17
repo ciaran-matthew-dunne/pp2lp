@@ -671,12 +671,3 @@ let rec simplify_result p =
   | Eq (e1, e2) when e1 = e2 -> prd_true
   | _ -> p
 
-let extract_fin_result node fallback_child =
-  match node with
-  | Apply { arg = Some (Pred p); _ } -> p
-  | Apply { children; _ } ->
-    let rec check = function
-      | [] -> compute_result fallback_child
-      | (Apply { arg = Some (Pred p); _ }) :: _ -> p
-      | _ :: rest -> check rest
-    in check children
