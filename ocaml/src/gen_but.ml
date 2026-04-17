@@ -9,15 +9,18 @@ let split_imp prd =
   | Binary (Imp, lhs, goal) -> (Pp_lp.conj_leaves lhs, goal)
   | _ -> ([], prd)
 
-(* ---- .but file generation ---- *)
+(* ---- .but / .goal file generation ----
+   A PP input file has the shape
+     Flag(F1) & Flag(F2) & … & Set(Valid.1 | Rule(Implication | HYPS | ? | ? | GOAL | nn))
+   We build the prelude (Flags) and the Set(...) body independently so
+   that [gen_but] (used for tracked .but files on disk) and [prove] (used
+   for transient .goal inputs) can share the body and attach different
+   flags without string-splicing. *)
 
-let gen_but_content ?(name="pp2lp_query") (hyps : prd list) (goal : prd) : string =
+(* The Set(Valid.1 | Rule(...)) body — the formula-dependent part. *)
+let gen_set_body (hyps : prd list) (goal : prd) : string =
   let buf = Buffer.create 512 in
-  Printf.bprintf buf
-    "Flag(TypeOn(\"%s\")) \
-     & Flag(FileOn(\"%s.res\")) \
-     & Set(Valid.1 | Rule(Implication | " name name;
-  (* Hypotheses *)
+  Buffer.add_string buf "Set(Valid.1 | Rule(Implication | ";
   begin match hyps with
   | [] ->
     (* PP requires a non-empty hypothesis field; use ⊤ as a no-op *)
@@ -28,11 +31,21 @@ let gen_but_content ?(name="pp2lp_query") (hyps : prd list) (goal : prd) : strin
       Emit_pp.prd_to_pp_buf buf h
     ) hyps
   end;
-  (* Goal and closing *)
   Buffer.add_string buf " | ? | ? | ";
   Emit_pp.prd_to_pp_buf buf goal;
   Buffer.add_string buf " | nn))";
   Buffer.contents buf
+
+(* Join a flag list with the Set(…) body into a full PP input file. *)
+let with_flags (flags : string list) (body : string) : string =
+  String.concat " & "
+    (List.map (Printf.sprintf "Flag(%s)") flags @ [body])
+
+let gen_but_content ?(name="pp2lp_query") (hyps : prd list) (goal : prd) : string =
+  with_flags
+    [Printf.sprintf "TypeOn(\"%s\")" name;
+     Printf.sprintf "FileOn(\"%s.res\")" name]
+    (gen_set_body hyps goal)
 
 (* Generate a .but file from a single formula (hyps ⇒ goal) *)
 let gen_but ?(name="pp2lp_query") (formula : prd) : string =
@@ -83,7 +96,8 @@ let run_cmd args cwd =
 
 (* prove: formula → LP proof string *)
 let prove ?(name="pp2lp_query") (formula : prd) : string =
-  let but_content = gen_but ~name formula in
+  let (hyps, goal) = split_imp formula in
+  let but_content = gen_but_content ~name hyps goal in
   let krt = find_krt () in
   let pp_kin = find_kin "PP.kin" in
   let replay_kin = find_kin "REPLAY.kin" in
@@ -100,15 +114,12 @@ let prove ?(name="pp2lp_query") (formula : prd) : string =
   let oc = open_out but_file in
   output_string oc but_content;
   close_out oc;
-  (* Convert .but → .goal (add TraceOn flag) *)
+  (* .goal: same formula body, different flags (TraceOn + FileOn only). *)
   let goal_content =
-    Printf.sprintf "Flag(TraceOn(\"%s\")) & Flag(FileOn(\"%s\")) & %s"
-      trace_file res_file
-      (let s = but_content in
-       (* Remove the TypeOn and FileOn flags, keep Set(...) *)
-       match String.split_on_char '&' s with
-       | _ :: _ :: rest -> String.concat "&" rest |> String.trim
-       | _ -> s)
+    with_flags
+      [Printf.sprintf "TraceOn(\"%s\")" trace_file;
+       Printf.sprintf "FileOn(\"%s\")" res_file]
+      (gen_set_body hyps goal)
   in
   let oc = open_out goal_file in
   output_string oc goal_content;
