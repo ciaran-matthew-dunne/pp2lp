@@ -119,14 +119,10 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx' pad child
 
-    (* ALL7_1/XST8_1: branching quantifiers in _1 chain *)
-    | _, [ca; cb] when base = "ALL7" || base = "XST8" ->
-      let is_primed_child c = match c with
-        | Apply { rule; _ } -> Proof_tree.is_primed_rule rule
-      in
-      let (primed_child, base_child) =
-        if is_primed_child ca then (ca, cb) else (cb, ca)
-      in
+    (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
+       Proof_tree.build guarantees child1 is the _1-chain subtree and
+       child2 is the continuation — the order never needs swapping. *)
+    | _, [primed_child; base_child] when base = "ALL7" || base = "XST8" ->
       if base = "ALL7" then begin
         let bvars = binding_vars goal in
         let inner_pad = pad ^ "  " in

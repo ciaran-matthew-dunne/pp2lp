@@ -70,7 +70,11 @@ let rec collect_primed arr n pos =
     if is_branching_quantifier name then
       Some ([], pos)
     else if replay_arity name = -1 then begin
-      (* Phantom: keep FIN (carries result), skip others *)
+      (* Phantom. FIN lines inside a primed chain signal a completed
+         inner branching quantifier (nested ALL7/XST8 inside an outer
+         one); we keep them in the collected list so build_postorder
+         can thread last_fin to the inner branching node. Non-FIN
+         phantoms (STOP_NORM, bare NRM) carry nothing and are dropped. *)
       match rhs with
       | Fin _ ->
         (match collect_primed arr n (pos + 1) with
@@ -265,10 +269,8 @@ let build (lines : line list) : proof_node =
                      children = [child1; child2] },
              pos3)
         | None ->
-          (* Lone _1 rule with no branching quantifier ahead — treat
-             as a leaf.  This shouldn't happen in well-formed replays. *)
-          (Apply { rule = rule_name; arg; goal; children = [] },
-           pos + 1)
+          raise (Ill_formed_replay
+            (Printf.sprintf "%s without a following ALL7/XST8" rule_name))
       end
 
       (* Leaf rule (arity 0) *)
@@ -282,25 +284,19 @@ let build (lines : line list) : proof_node =
         (Apply { rule = rule_name; arg; goal; children = [child] },
          next_pos)
 
-      (* Two-child rule (arity 2) *)
+      (* Two-child rule (arity 2). ALL7/XST8 are branching quantifiers
+         and always arrive here via the primed-chain path above — they
+         never appear as a bare entry without a preceding _1 chain. *)
       else begin
-        if is_branching_quantifier rule_name then begin
-          (* ALL7/XST8 appearing directly (no preceding _1 chain).
-             child1 should be an equality chain but we build it
-             normally — the emitter handles both cases. *)
-          let (child1, pos1) = go (pos + 1) in
-          let pos2 = skip_fin arr n pos1 in
-          let (child2, pos3) = go pos2 in
-          (Apply { rule = rule_name; arg; goal;
-                   children = [child1; child2] },
-           pos3)
-        end else begin
-          let (child1, pos1) = go (pos + 1) in
-          let (child2, pos2) = go pos1 in
-          (Apply { rule = rule_name; arg; goal;
-                   children = [child1; child2] },
-           pos2)
-        end
+        if is_branching_quantifier rule_name then
+          raise (Ill_formed_replay
+            (Printf.sprintf "%s without a preceding _1 equality chain"
+               rule_name));
+        let (child1, pos1) = go (pos + 1) in
+        let (child2, pos2) = go pos1 in
+        (Apply { rule = rule_name; arg; goal;
+                 children = [child1; child2] },
+         pos2)
       end
   in
 
