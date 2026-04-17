@@ -23,9 +23,7 @@ let is_primed_rule = Rule_db.is_primed_name
 (** ALL7/XST8: branching quantifiers.
     First child is an equality chain (_1 rules, built postorder).
     Second child is a normal subtree (built preorder). *)
-let is_branching_quantifier = function
-  | "ALL7" | "XST8" -> true
-  | _ -> false
+let is_branching_quantifier = Rule_db.is_branching
 
 (** NRM with a digit suffix: NRM1, NRM3, etc.
     NOT the bare "NRM" phantom (arity -1). *)

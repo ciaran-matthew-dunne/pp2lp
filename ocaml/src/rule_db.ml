@@ -4,12 +4,18 @@ type rule_info = {
   arity: int;           (* -1=phantom, 0=leaf, 1=single child, 2=two children *)
   emit_args: string option;
   result_schema: int;   (* 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
+  hoas_identity: bool;  (* rule is absorbed by LP's HOAS — skip in emit *)
+  intro_antecedent: bool; (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
+  branching: bool;      (* ALL7/XST8: first child is a _1 equality chain *)
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit_args=None) ?(result_schema=1) name arity =
-    Hashtbl.replace t name { arity; emit_args; result_schema }
+  let r ?(emit_args=None) ?(result_schema=1) ?(hoas_identity=false)
+        ?(intro_antecedent=false) ?(branching=false) name arity =
+    Hashtbl.replace t name
+      { arity; emit_args; result_schema;
+        hoas_identity; intro_antecedent; branching }
   in
   (* §A.1 Conjunction *)
   r "AND1" 2 ~result_schema:2;
@@ -26,7 +32,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "IMP1" 1;
   r "IMP2" 2 ~result_schema:2;
   r "IMP3" 2 ~result_schema:2;
-  r "IMP4" 1;
+  r "IMP4" 1 ~intro_antecedent:true;
   r "IMP5" 1;
   (* §A.4 Equivalence *)
   r "EQV1" 2 ~result_schema:2;
@@ -49,26 +55,26 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AXM9" 0 ~emit_args:(Some "dynamic:axm9") ~result_schema:0;
   (* §A.7 Universal quantification *)
   let top_i = Some "\xe2\x8a\xa4\xe1\xb5\xa2" in (* ⊤ᵢ *)
-  r "ALL1" 1 ~emit_args:top_i;
-  r "ALL2" 1 ~emit_args:top_i;
-  r "ALL3" 1 ~emit_args:top_i;
-  r "ALL4" 1 ~emit_args:top_i;
+  r "ALL1" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "ALL2" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "ALL3" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "ALL4" 1 ~emit_args:top_i ~hoas_identity:true;
   r "ALL5" 1;
-  r "ALL6" 1;
-  r "ALL7" 2 ~emit_args:(Some "dynamic:all7");
+  r "ALL6" 1 ~hoas_identity:true;
+  r "ALL7" 2 ~emit_args:(Some "dynamic:all7") ~branching:true;
   r "ALL8" 1;
-  r "ALL9" 1;
+  r "ALL9" 1 ~intro_antecedent:true;
   (* §A.8 Existential quantification *)
-  r "XST1" 1 ~emit_args:top_i;
-  r "XST2" 1 ~emit_args:top_i;
-  r "XST3" 1 ~emit_args:top_i;
-  r "XST4" 1 ~emit_args:top_i;
+  r "XST1" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "XST2" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "XST3" 1 ~emit_args:top_i ~hoas_identity:true;
+  r "XST4" 1 ~emit_args:top_i ~hoas_identity:true;
   r "XST5" 1;
   r "XST51" 1;
   r "XST6" 1;
   r "XST61" 1;
   r "XST7" 1;
-  r "XST8" 2 ~emit_args:(Some "dynamic:xst8");
+  r "XST8" 2 ~emit_args:(Some "dynamic:xst8") ~branching:true;
   (* §A.9-11 VR/FX/STOP/INS *)
   r "VR1" 0 ~result_schema:0;
   r "VR2" 1;
@@ -87,7 +93,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM5" 1;
   r "NRM6" 1;
   r "NRM7" 1;
-  r "NRM8" 1;
+  r "NRM8" 1 ~hoas_identity:true;
   r "NRM9" 1;
   r "NRM10" 1;
   r "NRM11" 1;
@@ -136,7 +142,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR1" 1;
   r "AR2" 0 ~emit_args:(Some "trust") ~result_schema:0;
   r "AR3" 1 ~emit_args:(Some "dynamic:ar3");
-  r "AR3_F" 1 ~emit_args:top_i;
+  r "AR3_F" 1 ~emit_args:top_i ~hoas_identity:true;
   r "AR4" 0 ~emit_args:(Some "dynamic:ar4") ~result_schema:0;
   r "AR5" 1 ~emit_args:(Some "dynamic:ar56");
   r "AR6" 1 ~emit_args:(Some "dynamic:ar56");
@@ -145,7 +151,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR9" 1 ~emit_args:(Some "dynamic:ar9");
   r "AR10" (-1);
   r "AR11" 0 ~result_schema:0;
-  r "AR12" 1;
+  r "AR12" 1 ~intro_antecedent:true;
   r "AR13" 1 ~emit_args:(Some "trust trust");
   (* §A.15 Boolean *)
   r "BOOL11" 1;
@@ -181,6 +187,19 @@ let result_schema name =
   match Hashtbl.find_opt rules name with
   | Some r -> Some r.result_schema
   | None -> None
+
+let lookup_flag f name =
+  match Hashtbl.find_opt rules name with
+  | Some r -> f r
+  | None -> false
+
+(* --- Rule-class predicates (queried by emit_lp / proof_tree). ---
+   Predicates take the *base* name (after _1 / _N stripping): they only
+   need to be set on the base rule in the db above. *)
+
+let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
+let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
+let is_branching    = lookup_flag (fun r -> r.branching)
 
 (* --- Rule-name string predicates ---
    PP replay rule names carry structural information in their suffix:

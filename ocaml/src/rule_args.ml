@@ -20,12 +20,7 @@ let is_opr_vacuous rule goal =
     not (SS.mem x fv.exp_vars || SS.mem x fv.prop_vars)
   | _ -> false
 
-let is_hoas_identity = function
-  | "ALL1" | "ALL2" | "ALL3" | "ALL4" | "ALL6"
-  | "XST1" | "XST2" | "XST3" | "XST4"
-  | "AR3_F"
-  | "NRM8" -> true
-  | _ -> false
+let is_hoas_identity = Rule_db.is_hoas_identity
 
 (* Extract the binder variables from a goal of shape
    [ Bind | ¬Bind | Bind ⇒ _ | ¬Bind ⇒ _ ]. *)
@@ -81,9 +76,9 @@ let compute_child_flat rule flat =
 
 (* ---- Hypothesis/variable introduction ---- *)
 
-let introduces_antecedent = function
-  | "IMP4" | "IMP4_1" | "AR12" | "AR12_1" | "ALL9" -> true
-  | _ -> false
+(* introduce is only reached from emit_node (preorder, no _1 rules), so
+   we only look up the base rule name. *)
+let introduces_antecedent = Rule_db.intro_antecedent
 
 let introduce buf pad ctx rule goal flat =
   let ctx =
