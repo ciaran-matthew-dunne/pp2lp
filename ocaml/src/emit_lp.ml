@@ -5,6 +5,8 @@ open Free_vars
 open Hyp_ctx
 
 open Rule_args
+open Result
+open Ins
 
 (* ---- Primed chain emission (rewrite-based) ---- *)
 
