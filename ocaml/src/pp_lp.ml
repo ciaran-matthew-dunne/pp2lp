@@ -105,10 +105,25 @@ and pp_exp_args buf = function
     Buffer.add_char buf ')'
   | [] -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 as fallback *)
 
-(* ---- Conjunction helpers ---- *)
+(* ---- Conjunction helpers ----
+   [flatten_conj] peels right-most conjuncts off a left-assoc tree:
+     ((a ∧ b) ∧ c)  →  [a; b; c]
+     (a ∧ (b ∧ c))  →  [a; b ∧ c]       (right-nested inner kept as a unit)
+   Used by the pretty-printer to emit left-assoc chains.
+
+   [conj_leaves] walks both children, collecting every non-∧ leaf:
+     ((a ∧ b) ∧ c)  →  [a; b; c]
+     (a ∧ (b ∧ c))  →  [a; b; c]
+   Used when the caller wants the logical conjuncts regardless of
+   associativity (AXM8/AND5 structural matching, INS heart matching,
+   `.but` antecedent splitting). *)
 
 let rec flatten_conj = function
   | Binary (And, p1, p2) -> flatten_conj p1 @ [p2]
+  | p -> [p]
+
+let rec conj_leaves = function
+  | Binary (And, l, r) -> conj_leaves l @ conj_leaves r
   | p -> [p]
 
 let rec pp_conj_left ?(min_bp = bp_max) buf elts =

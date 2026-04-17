@@ -4,14 +4,9 @@ open Syntax_pp
 
 (* Split a formula at the outermost implication: H1 ∧ H2 ∧ ... ⇒ G
    Returns (hypotheses, goal). If no implication, returns ([], formula). *)
-let rec collect_conj acc = function
-  | Binary (And, p1, p2) -> collect_conj (collect_conj acc p1) p2
-  | p -> p :: acc
-
 let split_imp prd =
   match prd with
-  | Binary (Imp, lhs, goal) ->
-    (List.rev (collect_conj [] lhs), goal)
+  | Binary (Imp, lhs, goal) -> (Pp_lp.conj_leaves lhs, goal)
   | _ -> ([], prd)
 
 (* ---- .but file generation ---- *)

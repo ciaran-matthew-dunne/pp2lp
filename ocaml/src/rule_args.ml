@@ -533,10 +533,6 @@ let ins_heart_resolve ctx =
     | Unary (Not, body) -> Some body
     | _ -> None
   in
-  let rec flatten_conj_leaves = function
-    | Binary (And, l, r) -> flatten_conj_leaves l @ flatten_conj_leaves r
-    | p -> [p]
-  in
   let find_matching_hyps wildcards leaves entries =
     let find_match leaf =
       List.find_opt (fun (_, p) ->
@@ -575,7 +571,7 @@ let ins_heart_resolve ctx =
       let wildcards = collect_bind_vars p in
       begin match extract_neg_body p with
       | Some body ->
-        let leaves = flatten_conj_leaves body in
+        let leaves = conj_leaves body in
         begin match find_matching_hyps wildcards leaves other_entries with
         | Some conjs when conjs <> [] ->
           Some (build_term name n_vars conjs)
