@@ -33,14 +33,20 @@ let is_nrm_step = Rule_db.is_nrm_step
 
 (** Arity of a rule as it appears in the replay.
     For _1-suffixed rules, strip the suffix and look up the base:
-      STOP_1 → 0, IMP4_1 → IMP4 → 1, AND1_1 → AND1 → 2, etc. *)
+      STOP_1 → 0, IMP4_1 → IMP4 → 1, AND1_1 → AND1 → 2, etc.
+    Any lookup miss is surfaced as Ill_formed_replay, not a raw Failure. *)
 let replay_arity name =
   if name = "STOP_1" then 0
-  else if is_primed_rule name then
-    let base = String.sub name 0 (String.length name - 2) in
-    Rule_db.rule_arity base
   else
-    Rule_db.rule_arity name
+    let base =
+      if is_primed_rule name
+      then String.sub name 0 (String.length name - 2)
+      else name
+    in
+    try Rule_db.rule_arity base
+    with Failure _ ->
+      raise (Ill_formed_replay
+        (Printf.sprintf "unknown rule %S in replay" name))
 
 (* --- Helpers --- *)
 

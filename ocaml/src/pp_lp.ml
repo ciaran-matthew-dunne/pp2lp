@@ -379,7 +379,7 @@ and pp_conj_left_block ?(min_bp = 0) ind buf elts =
       Buffer.add_char buf '\n';
       Buffer.add_string buf pad;
       Buffer.add_string buf "\xe2\x88\xa7 "; (* ∧ *)
-      pp_prd ~min_bp:8 buf p;
+      pp_prd_block ~min_bp:8 (ind + 2) buf p;
       if !closes_left > 0 then begin
         Buffer.add_char buf ')';
         decr closes_left

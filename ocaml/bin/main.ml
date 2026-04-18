@@ -9,8 +9,11 @@ let usage () =
 let cmd_emit () =
   let files = ref [] in
   let argv = Array.sub Sys.argv 1 (Array.length Sys.argv - 1) in
-  Arg.parse_argv argv [] (fun f -> files := f :: !files)
-    "Usage: pp2lp emit file1.replay ...";
+  Arg.parse_argv argv
+    ["-debug", Arg.Set Pp2lp.Proof_tree.debug, "Show proof tree debug output";
+     "-debug-ins", Arg.Set Pp2lp.Ins.debug_ctx, "Dump hyp context on INS failure"]
+    (fun f -> files := f :: !files)
+    "Usage: pp2lp emit [-debug] [-debug-ins] file1.replay ...";
   let files = List.rev !files in
   (* Emit header once, then all symbols *)
   print_string Pp2lp.Emit_lp.lp_header;
@@ -130,9 +133,18 @@ let cmd_synth () =
         | Some formula ->
           let but_content = Pp2lp.Gen_but.gen_but ~name formula in
           let but_file = Filename.concat !out_dir (name ^ ".but") in
-          let oc = open_out but_file in
-          output_string oc but_content;
-          close_out oc;
+          (* Only write if content changed — preserves mtime for incremental gen *)
+          let changed = try
+            let ic2 = open_in but_file in
+            let old = In_channel.input_all ic2 in
+            close_in ic2;
+            old <> but_content
+          with Sys_error _ -> true in
+          if changed then begin
+            let oc = open_out but_file in
+            output_string oc but_content;
+            close_out oc
+          end;
           incr ok
     end
   done with End_of_file -> ());

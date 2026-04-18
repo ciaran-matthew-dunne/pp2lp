@@ -112,6 +112,9 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM24" 1;
   r "NRM25" 1;
   r "NRM26" 1;
+  (* NRM27–30: arithmetic solver dispatch; not yet formalised in LP.
+     Deliberately unregistered — replay_arity raises Ill_formed_replay
+     (→ SKIP) if PP emits them, rather than silently dropping a step. *)
   (* §A.13 Equality *)
   r "EVR1" 0 ~result_schema:0;
   r "EVR2" 1;
@@ -149,6 +152,8 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR7" 1 ~emit_args:(Some "dynamic:ar78");
   r "AR8" 1 ~emit_args:(Some "dynamic:ar78");
   r "AR9" 1 ~emit_args:(Some "dynamic:ar9");
+  (* AR10 is a solver no-op: P = Q (trivially); the LP symbol in Arith.lp
+     is never applied because PP emits AR10 only when Q = P. Phantom. *)
   r "AR10" (-1);
   r "AR11" 0 ~result_schema:0;
   r "AR12" 1 ~intro_antecedent:true;

@@ -6,7 +6,7 @@ require open pp2lp.B
   pp2lp.rules.TrueFalse
   pp2lp.rules.All pp2lp.rules.Xst
   pp2lp.rules.Nrm pp2lp.rules.Eq
-  pp2lp.rules.Arith;
+  pp2lp.rules.Arith pp2lp.rules.Rw;
 
 // ---- Trace 01: ¬(p ∧ q) ⇒ (¬p ∨ ¬q) ----
 opaque symbol {|01|} (p q : Prop) :

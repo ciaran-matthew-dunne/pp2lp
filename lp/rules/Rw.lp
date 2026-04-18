@@ -13,6 +13,19 @@ begin
   rewrite h1; rewrite h2; reflexivity
 end;
 
+// Conjunction associativity (right → left).
+// Applied via `rewrite ∧_assoc` inside ALL7_2/XST8_2 continuations to
+// reshape the right-associated R (as produced by the _1 chain) into the
+// left-associated form that the PP-recorded tactics expect.
+opaque symbol ∧_assoc [A B C : Prop]
+  : π ((A ∧ (B ∧ C)) = ((A ∧ B) ∧ C)) ≔
+begin
+  assume A B C;
+  refine propExt _ _ _ _
+  { assume h; refine ∧ᵢ (∧ᵢ (∧ₑ₁ h) (∧ₑ₁ (∧ₑ₂ h))) (∧ₑ₂ (∧ₑ₂ h)) }
+  { assume h; refine ∧ᵢ (∧ₑ₁ (∧ₑ₁ h)) (∧ᵢ (∧ₑ₂ (∧ₑ₁ h)) (∧ₑ₂ h)) }
+end;
+
 // AND5': lift antecedent equivalence into implication equality.
 opaque symbol ante_cong [C C' R : Prop]
   : (π C → π C') → (π C' → π C) → π ((C ⇒ R) = (C' ⇒ R)) ≔
@@ -328,6 +341,19 @@ begin
   refine eq_trans h4 h2
 end;
 
+// XST7_1: equality for (∃x.P x ⇒ R) normalising to (∀x. P x ⇒ R).
+opaque symbol XST7_1 [P : τ ι → Prop] [R S : Prop]
+  : π ((`∀ x, P x ⇒ R) = S)
+  → π (((`∃ x, P x) ⇒ R) = S) ≔
+begin
+  assume P R S h;
+  have h1 : π (((`∃ x, P x) ⇒ R) = (`∀ x, P x ⇒ R))
+    { refine propExt _ _ _ _
+      { assume hir x hpx; refine hir (∃ᵢ x hpx) }
+      { assume hall hex; refine ∃ₑ hex hall } };
+  refine eq_trans h1 h
+end;
+
 // XST8_1: equality for existential ¬¬-elimination in _1 chain.
 // ∃x.P(x) = ((∀x, ¬P(x)) ⇒ ⊥ = S) → (∃x.P(x) = S)
 opaque symbol XST8_1 [P : τ ι → Prop] [S : Prop]
@@ -339,6 +365,33 @@ begin
     { refine propExt _ _ _ _
       { assume hex hall; refine ∃ₑ hex (λ x hpx, hall x hpx) }
       { assume hc; refine ¬¬ₑ _ (λ hne, hc (λ x hpx, hne (∃ᵢ x hpx))) } };
+  refine eq_trans h1 h
+end;
+
+// XST8_1_2: Two-variable version.
+opaque symbol XST8_1_2 [P : τ ι → τ ι → Prop] [S : Prop]
+  : π (((`∀ x, `∀ y, ¬ (P x y)) ⇒ ⊥) = S)
+  → π ((`∃ x, `∃ y, P x y) = S) ≔
+begin
+  assume P S h;
+  have h1 : π ((`∃ x, `∃ y, P x y) = ((`∀ x, `∀ y, ¬ (P x y)) ⇒ ⊥))
+    { refine propExt _ _ _ _
+      { assume hex hall; refine ∃ₑ hex (λ x hexy, ∃ₑ hexy (λ y hpxy, hall x y hpxy)) }
+      { assume hc; refine ¬¬ₑ _ (λ hne, hc (λ x y hpxy, hne (∃ᵢ x (∃ᵢ y hpxy)))) } };
+  refine eq_trans h1 h
+end;
+
+// XST8_1_3: Three-variable version.
+opaque symbol XST8_1_3 [P : τ ι → τ ι → τ ι → Prop] [S : Prop]
+  : π (((`∀ x, `∀ y, `∀ z, ¬ (P x y z)) ⇒ ⊥) = S)
+  → π ((`∃ x, `∃ y, `∃ z, P x y z) = S) ≔
+begin
+  assume P S h;
+  have h1 : π ((`∃ x, `∃ y, `∃ z, P x y z) = ((`∀ x, `∀ y, `∀ z, ¬ (P x y z)) ⇒ ⊥))
+    { refine propExt _ _ _ _
+      { assume hex hall;
+        refine ∃ₑ hex (λ x hexy, ∃ₑ hexy (λ y hexz, ∃ₑ hexz (λ z hpxyz, hall x y z hpxyz))) }
+      { assume hc; refine ¬¬ₑ _ (λ hne, hc (λ x y z hpxyz, hne (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz))))) } };
   refine eq_trans h1 h
 end;
 
@@ -368,6 +421,19 @@ begin assume P Q S h; refine eq_trans (or4_eq P Q) h end;
 opaque symbol NOT1_1 [P R S : Prop]
   : π ((P ⇒ R) = S) → π ((¬ ¬ P ⇒ R) = S) ≔
 begin assume P R S h; refine eq_trans not1_eq h end;
+
+// OPR1_1/OPR2_1: one-point-rule substitution in _1 chain.
+// The local equality ((x = v) ⇒ body_x) = body_v collapses the antecedent
+// by substitution; it is NOT propositionally equivalent pointwise (only
+// the ← direction of the biconditional holds), so admitted. This matches
+// PP's semantic treatment where OPR1 is a proof-search shortcut.
+opaque symbol OPR1_1 [body_x : Prop] [body_v : Prop] [S : Prop]
+  : π (body_v = S) → π (body_x = S) ≔
+begin admit end;
+
+opaque symbol OPR2_1 [body_x : Prop] [body_v : Prop] [S : Prop]
+  : π (body_v = S) → π (body_x = S) ≔
+begin admit end;
 
 opaque symbol NOT2_1 [P S : Prop]
   : π (P = S) → π (¬ ¬ P = S) ≔

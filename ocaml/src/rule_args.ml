@@ -49,8 +49,8 @@ let select_variant rule goal children flat =
     check_compound_limit rule n;
     Printf.sprintf "XST8_%d" n
   | ("ALL5" | "XST5" | "XST6" | "XST7"
-    | "NRM1" | "NRM3" | "NRM5" | "NRM7" | "NRM12" | "NRM13"
-    | "NRM14" | "NRM15" | "NRM19"), _
+    | "NRM1" | "NRM3" | "NRM5" | "NRM6" | "NRM7" | "NRM9"
+    | "NRM12" | "NRM13" | "NRM14" | "NRM15" | "NRM19"), _
     when n >= 2 ->
     check_compound_limit rule n;
     Printf.sprintf "%s_%d" rule n
@@ -312,11 +312,14 @@ let emit_opr_step buf pad ctx ~base ~skip_rewrite goal =
   ctx'
 
 let emit_ar3_args buf node =
+  (* AR3 (a : τ ι) : π ((𝟏 - a ≤ 𝟎) ⇒ R) → π (¬ (a ≤ 𝟎) ⇒ R).
+     PP replay format [AR3(a | 1-a)] supplies `a` (first) and solver
+     result 1-a (second, not needed by LP: baked into the signature). *)
   match node with
-  | Apply { arg = Some (PipeArg (_a_expr, result_expr)); _ } ->
+  | Apply { arg = Some (PipeArg (a_expr, _result_expr)); _ } ->
     Buffer.add_string buf " (";
-    pp_exp buf result_expr;
-    Buffer.add_string buf ") trust"
+    pp_exp buf a_expr;
+    Buffer.add_string buf ")"
   | _ ->
     raise (Emit_admit "AR3 missing pipe arg")
 
@@ -330,7 +333,9 @@ let emit_ar4_args buf ctx _goal =
     pp_exp buf f_expr;
     Buffer.add_string buf ") ";
     Buffer.add_string buf name;
-    Buffer.add_string buf " \xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *)
+    (* Third arg is π ((E + F) > 𝟎) — a solver side-condition that can
+       only be discharged by trust (AR4's body is admit anyway). *)
+    Buffer.add_string buf " trust"
   | _ ->
     raise (Emit_admit "AR4 could not find F ≤ 0 hypothesis")
 
@@ -437,13 +442,6 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       end
     | Some "dynamic:opr1" -> emit_opr_args buf node
     | Some "dynamic:opr2" -> emit_opr_args buf node
-    | _ when primed ->
-      begin match ea with
-      | Some args when not (String.length args > 8 && String.sub args 0 8 = "dynamic:") ->
-        Buffer.add_char buf ' ';
-        Buffer.add_string buf args
-      | _ -> ()
-      end
     | Some "dynamic:hyp" ->
       begin match find_axm_hyp ctx base goal with
       | Some name -> Buffer.add_char buf ' '; Buffer.add_string buf name
@@ -457,6 +455,13 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     | Some "dynamic:ar56" -> emit_ar56_args buf
     | Some "dynamic:ar78" -> emit_ar78_args buf base node
     | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
+    | _ when primed ->
+      begin match ea with
+      | Some args when not (String.length args > 8 && String.sub args 0 8 = "dynamic:") ->
+        Buffer.add_char buf ' ';
+        Buffer.add_string buf args
+      | _ -> ()
+      end
     | Some args ->
       Buffer.add_char buf ' ';
       Buffer.add_string buf args

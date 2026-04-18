@@ -15,10 +15,16 @@ from collections import Counter
 warnings_text = sys.argv[1] if len(sys.argv) > 1 else ""
 project_root = os.environ.get("PP2LP_ROOT", "")
 
+raw = sys.stdin.read()
 try:
-    d = json.loads(sys.stdin.read())
+    d = json.loads(raw)
 except (json.JSONDecodeError, ValueError):
-    print("  (could not parse lambdapi JSON)")
+    # Non-JSON output (lambdapi without --json): strip ANSI, show error lines.
+    text = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", raw)
+    err_lines = [ln for ln in text.splitlines()
+                 if re.search(r"\b(error|Error|Cannot|Unknown)\b", ln)]
+    for ln in (err_lines or text.splitlines())[-5:]:
+        print(f"  {ln}")
     sys.exit(0)
 
 f = d.get("file") or "?"

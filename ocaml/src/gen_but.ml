@@ -103,6 +103,15 @@ let prove ?(name="pp2lp_query") (formula : prd) : string =
   let replay_kin = find_kin "REPLAY.kin" in
   (* Create temp directory *)
   let tmpdir = Filename.temp_dir "pp2lp" "" in
+  Fun.protect
+    ~finally:(fun () ->
+      try
+        Array.iter (fun f ->
+          Sys.remove (Filename.concat tmpdir f)
+        ) (Sys.readdir tmpdir);
+        Unix.rmdir tmpdir
+      with _ -> ())
+    (fun () ->
   let but_file = Filename.concat tmpdir (name ^ ".but") in
   let goal_file = Filename.concat tmpdir (name ^ ".goal") in
   let trace_file = name ^ ".trace" in
@@ -152,12 +161,4 @@ let prove ?(name="pp2lp_query") (formula : prd) : string =
   output_string oc replay_out;
   close_out oc;
   (* Parse replay and emit LP *)
-  let result = Reconstruct.reconstruct_file replay_file in
-  (* Cleanup *)
-  (try
-    Array.iter (fun f ->
-      Sys.remove (Filename.concat tmpdir f)
-    ) (Sys.readdir tmpdir);
-    Unix.rmdir tmpdir
-  with _ -> ());
-  result
+  Reconstruct.reconstruct_file replay_file)

@@ -18,7 +18,7 @@ begin
   admit;
 end;
 
-opaque symbol AR3 [a : τ ι] [R : Prop]
+opaque symbol AR3 (a : τ ι) [R : Prop]
   : π ((𝟏 - a ≤ 𝟎) ⇒ R)
   → π (¬ (a ≤ 𝟎) ⇒ R) ≔
 begin

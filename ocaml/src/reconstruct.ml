@@ -10,10 +10,10 @@ let is_simple_ident = Pp_lp.is_simple_ident
 let name_of_file (fp : string) : string =
   let base = Filename.basename fp in
   let stem =
-    if Filename.check_suffix base ".replay" then
-      Filename.chop_suffix base ".replay"
-    else if Filename.check_suffix base ".trace.replay" then
+    if Filename.check_suffix base ".trace.replay" then
       Filename.chop_suffix base ".trace.replay"
+    else if Filename.check_suffix base ".replay" then
+      Filename.chop_suffix base ".replay"
     else base
   in
   if is_simple_ident stem then stem

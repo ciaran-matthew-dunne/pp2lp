@@ -1,6 +1,20 @@
 ocaml/_build
 
-bench/gen/
+# Per-suite generated artifacts (canonical inputs are tracked:
+# bench/claude/goals.txt, bench/prv/*.but, bench/og/*.replay + *.trace)
+bench/*/lambdapi.pkg
+bench/*/*.lp
+bench/*/*.lpo
+bench/*/.cache/
+bench/*/.gen_status.tsv
+bench/claude/*.but
+bench/claude/*.trace
+bench/claude/*.replay
+bench/prv/*.trace
+bench/prv/*.replay
+bench/fuzz/*.but
+bench/fuzz/*.trace
+bench/fuzz/*.replay
 *.lpo
 
 # Private / large binary files

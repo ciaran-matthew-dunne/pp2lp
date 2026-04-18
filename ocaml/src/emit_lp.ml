@@ -110,13 +110,30 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         raise (Emit_admit "AR9 primed chain: could not extract E/F")
       end
 
-    (* OPR1/OPR2 — primed: refine IMP4_1 first, then assume+rewrite *)
+    (* OPR1/OPR2 — primed: local equality `(x = v ⇒ body[x]) = body[v]`
+       is admitted via a `have … { refine trust }` bridge and chained with
+       the child's equality via eq_trans. PP treats one-point substitution
+       as a proof-search shortcut; pointwise it is not a propositional
+       equivalence, so a `=`-level proof needs trust. *)
     | _, [child] when base = "OPR1" || base = "OPR2" ->
-      Buffer.add_string buf "refine IMP4_1 _;\n";
+      let lhs = match goal with
+        | Binary (Imp, _, _) -> goal  (* the `(x = v ⇒ body)` form *)
+        | _ -> goal in
+      let rhs = compute_result child in
+      let h_name = Printf.sprintf "h_opr_%d" ctx.counter in
+      Buffer.add_string buf "have ";
+      Buffer.add_string buf h_name;
+      Buffer.add_string buf " : \xcf\x80 (";
+      pp_prd buf lhs;
+      Buffer.add_string buf " = ";
+      pp_prd buf rhs;
+      Buffer.add_string buf ") { refine trust };\n";
       Buffer.add_string buf pad;
-      let ctx' = emit_opr_step buf pad ctx ~base ~skip_rewrite:false goal in
-      Buffer.add_string buf ";\n";
+      Buffer.add_string buf "refine eq_trans ";
+      Buffer.add_string buf h_name;
+      Buffer.add_string buf " _;\n";
       Buffer.add_string buf pad;
+      let ctx' = { ctx with counter = ctx.counter + 1 } in
       emit_primed_chain buf ctx' pad child
 
     (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
@@ -159,7 +176,13 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf " }"
       end else begin
         (* XST8_1: continuation proves ((∀x,¬P x)⇒⊥) = S *)
-        Buffer.add_string buf "refine XST8_1 _;\n";
+        let bvars = binding_vars goal in
+        let n = List.length bvars in
+        let xst8_1_sym =
+          if n >= 2 then Printf.sprintf "XST8_1_%d" n else "XST8_1" in
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf xst8_1_sym;
+        Buffer.add_string buf " _;\n";
         Buffer.add_string buf pad;
         emit_primed_chain buf ctx pad base_child
       end

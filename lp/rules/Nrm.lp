@@ -74,6 +74,21 @@ begin
   }
 end;
 
+// NRM3_3: Three-variable version.
+opaque symbol NRM3_3 [P : τ ι → τ ι → τ ι → Prop] [Q S : Prop]
+  : π ((Q ⇒ S) ∧ ((`∀ x, `∀ y, `∀ z, ¬ (P x y z)) ⇒ S))
+  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ Q) ⇒ S) ≔
+begin
+  assume P Q S h1 h2;
+  refine ∨ₑ (em (`∃ x, `∃ y, `∃ z, P x y z)) _ _ {
+    assume hex;
+    refine ∃ₑ hex (λ x hex2, ∃ₑ hex2 (λ y hex3, ∃ₑ hex3 (λ z hpxyz, (∧ₑ₁ h1) (h2 x y z hpxyz))))
+  } {
+    assume hnex;
+    refine (∧ₑ₂ h1) (λ x y z hpxyz, hnex (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz))))
+  }
+end;
+
 opaque symbol NRM4 [P R : τ ι → Prop] [Q S : Prop]
   : π ((Q ⇒ (`♢ x, P x ⇒ R x)) ⇒ S)
   → π ((`♢ x, P x ⇒ Q ⇒ R x) ⇒ S) ≔
@@ -99,6 +114,15 @@ begin
   refine h1 (λ x y hpq, h2 x y (∧ₑ₁ hpq) (∧ₑ₂ hpq))
 end;
 
+// NRM5_3: Three-variable version.
+opaque symbol NRM5_3 [P Q R : τ ι → τ ι → τ ι → Prop] [S : Prop]
+  : π ((`♢ x, `♢ y, `♢ z, (P x y z ∧ Q x y z) ⇒ R x y z) ⇒ S)
+  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ (Q x y z ⇒ R x y z)) ⇒ S) ≔
+begin
+  assume P Q R S h1 h2;
+  refine h1 (λ x y z hpq, h2 x y z (∧ₑ₁ hpq) (∧ₑ₂ hpq))
+end;
+
 // NRM6: H ⊢ ♢x · (R ⇒ P) ⇒ (♢x · (R ⇒ Q) ⇒ S) → H ⊢ ♢x · (R ⇒ P ∧ Q) ⇒ S
 opaque symbol NRM6 [P Q R : τ ι → Prop] [S : Prop]
   : π ((`♢ x, R x ⇒ P x) ⇒ ((`♢ x, R x ⇒ Q x) ⇒ S))
@@ -106,6 +130,15 @@ opaque symbol NRM6 [P Q R : τ ι → Prop] [S : Prop]
 begin
   assume P Q R S h1 h2;
   refine h1 (λ x hr, ∧ₑ₁ (h2 x hr)) (λ x hr, ∧ₑ₂ (h2 x hr))
+end;
+
+// NRM6_2: Two-variable version.
+opaque symbol NRM6_2 [P Q R : τ ι → τ ι → Prop] [S : Prop]
+  : π ((`♢ x, `♢ y, R x y ⇒ P x y) ⇒ ((`♢ x, `♢ y, R x y ⇒ Q x y) ⇒ S))
+  → π ((`♢ x, `♢ y, R x y ⇒ P x y ∧ Q x y) ⇒ S) ≔
+begin
+  assume P Q R S h1 h2;
+  refine h1 (λ x y hr, ∧ₑ₁ (h2 x y hr)) (λ x y hr, ∧ₑ₂ (h2 x y hr))
 end;
 
 // NRM7: H ⊢ (♢x · P) ⇒ ((♢x · Q) ⇒ S) → H ⊢ ♢x · (P ∧ Q) ⇒ S
@@ -141,18 +174,29 @@ begin
   refine h1 (λ x y hp, h2 x hp y)
 end;
 
+// NRM9_2: Two-variable version (binds an extra z).
+opaque symbol NRM9_2 [P : τ ι → τ ι → Prop] [Q : τ ι → τ ι → τ ι → Prop] [S : Prop]
+  : π ((`♢ x, `♢ y, `♢ z, P x y ⇒ Q x y z) ⇒ S)
+  → π ((`♢ x, `♢ y, P x y ⇒ `∀ z, Q x y z) ⇒ S) ≔
+begin
+  assume P Q S h1 h2;
+  refine h1 (λ x y z hp, h2 x y hp z)
+end;
+
 opaque symbol NRM10 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
   → π ((`♢ x, (P x ∧ Q x) ⇒ ⊥) ⇒ R) ≔
 begin
-  admit;
+  assume P Q R h1 h2;
+  refine h1 (λ x hpq, h2 x hpq)
 end;
 
 opaque symbol NRM11 [P : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ R)
   → π ((`♢ x, P x ⇒ ⊥) ⇒ R) ≔
 begin
-  admit;
+  assume P R h1 h2;
+  refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
 end;
 
 opaque symbol NRM12 [P Q : τ ι → Prop] [R : Prop]
@@ -172,6 +216,15 @@ begin
   refine h1 (λ x y hpq, h2 x y (∧ₑ₁ hpq) (∧ₑ₂ hpq))
 end;
 
+// NRM12_3: Three-variable version.
+opaque symbol NRM12_3 [P Q : τ ι → τ ι → τ ι → Prop] [R : Prop]
+  : π ((`♡ x, `♡ y, `♡ z, ¬ (P x y z ∧ Q x y z)) ⇒ R)
+  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ ¬ (Q x y z)) ⇒ R) ≔
+begin
+  assume P Q R h1 h2;
+  refine h1 (λ x y z hpq, h2 x y z (∧ₑ₁ hpq) (∧ₑ₂ hpq))
+end;
+
 opaque symbol NRM13 [P Q : τ ι → Prop] [R : Prop]
   : π ((`♡ x, ¬ (P x ∧ ¬ (Q x))) ⇒ R)
   → π ((`♢ x, P x ⇒ Q x) ⇒ R) ≔
@@ -187,6 +240,15 @@ opaque symbol NRM13_2 [P Q : τ ι → τ ι → Prop] [R : Prop]
 begin
   assume P Q R h1 h2;
   refine h1 (λ x y hpnq, (∧ₑ₂ hpnq) (h2 x y (∧ₑ₁ hpnq)))
+end;
+
+// NRM13_3: Three-variable version.
+opaque symbol NRM13_3 [P Q : τ ι → τ ι → τ ι → Prop] [R : Prop]
+  : π ((`♡ x, `♡ y, `♡ z, ¬ (P x y z ∧ ¬ (Q x y z))) ⇒ R)
+  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ Q x y z) ⇒ R) ≔
+begin
+  assume P Q R h1 h2;
+  refine h1 (λ x y z hpnq, (∧ₑ₂ hpnq) (h2 x y z (∧ₑ₁ hpnq)))
 end;
 
 opaque symbol NRM14 [P : τ ι → Prop] [R : Prop]
@@ -231,6 +293,9 @@ begin
   assume P Q hp hq ht; refine hq
 end;
 
+// NRM17 has extra spec-level conditions (equality E/R) but the LP proof
+// obligation reduces to the same shape as NRM16 after HOAS/rewrite.
+// Intentionally identical to NRM16 at the LP level.
 opaque symbol NRM17 [P : τ ι → Prop] [Q : Prop]
   : π (`∀ x, P x)
   → π Q
