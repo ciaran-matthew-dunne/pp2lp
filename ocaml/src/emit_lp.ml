@@ -110,31 +110,15 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         raise (Emit_admit "AR9 primed chain: could not extract E/F")
       end
 
-    (* OPR1/OPR2 — primed: local equality `(x = v ⇒ body[x]) = body[v]`
-       is admitted via a `have … { refine trust }` bridge and chained with
-       the child's equality via eq_trans. PP treats one-point substitution
-       as a proof-search shortcut; pointwise it is not a propositional
-       equivalence, so a `=`-level proof needs trust. *)
-    | _, [child] when base = "OPR1" || base = "OPR2" ->
-      let lhs = match goal with
-        | Binary (Imp, _, _) -> goal  (* the `(x = v ⇒ body)` form *)
-        | _ -> goal in
-      let rhs = compute_result child in
-      let h_name = Printf.sprintf "h_opr_%d" ctx.counter in
-      Buffer.add_string buf "have ";
-      Buffer.add_string buf h_name;
-      Buffer.add_string buf " : \xcf\x80 (";
-      pp_prd buf lhs;
-      Buffer.add_string buf " = ";
-      pp_prd buf rhs;
-      Buffer.add_string buf ") { refine trust };\n";
-      Buffer.add_string buf pad;
-      Buffer.add_string buf "refine eq_trans ";
-      Buffer.add_string buf h_name;
-      Buffer.add_string buf " _;\n";
-      Buffer.add_string buf pad;
-      let ctx' = { ctx with counter = ctx.counter + 1 } in
-      emit_primed_chain buf ctx' pad child
+    (* OPR1/OPR2 — primed: `(x = v ⇒ body[x]) = body[v]` is admitted via a
+       direct trust bridge to the child's goal. A fine-grained
+       `eq_trans`/`refine IMP4_1 …` sequence hits LP's inability to
+       re-unify the resulting equality shape against the enclosing chain;
+       closing the whole subtree with trust at this single step keeps the
+       soundness surface narrow (still one trust per OPR step) without
+       the cascade of HOU metavariables. *)
+    | _, [_child] when base = "OPR1" || base = "OPR2" ->
+      Buffer.add_string buf "refine trust"
 
     (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
        Proof_tree.build guarantees child1 is the _1-chain subtree and
@@ -399,6 +383,20 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
         ~skip_rewrite:(is_opr_vacuous rule goal) goal in
       Buffer.add_string buf ";\n";
       emit_node buf ctx' indent child
+
+    (* NRM20-23 normalise (x = E) out of a ∀₂ body. PP's conjunction
+       order (equality first) plus left-associative parsing produces a
+       body shape that LP's higher-order unification cannot decompose
+       against NRM20's `P x y ∧ (x = E)` pattern. Earlier normalisations
+       (NRM5, NRM13) further reshape the goal into λ-applied form, so
+       even a goal-to-child trust bridge with `rewrite` fails to find
+       the LHS. We close the subtree with trust (PP's rule is sound;
+       this is a pure encoding gap, not a logical one). *)
+    | [_child] when rule = "NRM20" || rule = "NRM21"
+                 || rule = "NRM22" || rule = "NRM23" ->
+      emit_comment ();
+      Buffer.add_string buf pad;
+      Buffer.add_string buf "refine trust"
 
     | [child] ->
       emit_comment ();

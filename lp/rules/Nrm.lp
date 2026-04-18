@@ -309,7 +309,16 @@ opaque symbol NRM18 [P : τ ι → Prop] [R Q : Prop] (E : τ ι)
   → π (P E = R)
   → π ((`♡ y, ¬ (⊤ ∧ R)) ⇒ Q) ≔
 begin
-  admit
+  assume P R Q E hp heq h;
+  // Derive P E classically from hp E : ¬(⊤ ∧ ¬ P E)
+  have hpe : π (P E)
+    { refine ¬¬ₑ (P E) _;
+      assume hnpe;
+      refine hp E (∧ᵢ ⊤ᵢ hnpe) };
+  // Transport P E along heq to R
+  have hr : π R { rewrite left heq; refine hpe };
+  // h E : ¬ (⊤ ∧ R); apply to (⊤ᵢ, hr) → ⊥, then ⊥ₑ to Q
+  refine ⊥ₑ (h E (∧ᵢ ⊤ᵢ hr))
 end;
 
 opaque symbol NRM19 [Q : Prop] [R : τ ι → Prop] (E : τ ι)
