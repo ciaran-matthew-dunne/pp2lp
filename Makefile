@@ -137,7 +137,7 @@ define RUN_CHECK
 	        echo "$$pass passed, $$fail failed ($$(( $$(date +%s) - t ))s)"; exit 1; \
 	      fi; \
 	    fi; continue; fi; \
-	  $(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; lp_rc=$$?; \
+	  $(LP_CHECK) "$$outfile" >"$$lp_tmp" 2>&1; lp_rc=$$?; \
 	  if [ $$lp_rc -eq 0 ]; then pass=$$((pass+1)); \
 	    nt=$$(grep -ow 'trust' "$$outfile" | wc -l); \
 	    na=$$(grep -ow 'admit' "$$outfile" | wc -l); \
@@ -210,7 +210,7 @@ test-%: build
 	  echo "FAIL $* (empty emission)"; echo "$$emit_warn" | head -5; \
 	  echo "empty emission" > bench/claude/.cache/$*.fail; exit 1; fi; \
 	lp_tmp=$$(mktemp); trap "rm -f $$lp_tmp" EXIT; \
-	$(LP_CHECK) "$$outfile" 2>"$$lp_tmp"; lp_rc=$$?; \
+	$(LP_CHECK) "$$outfile" >"$$lp_tmp" 2>&1; lp_rc=$$?; \
 	if [ $$lp_rc -eq 0 ]; then echo "OK $*"; \
 	  nt=$$(grep -ow 'trust' "$$outfile" | wc -l); \
 	  na=$$(grep -ow 'admit' "$$outfile" | wc -l); \
