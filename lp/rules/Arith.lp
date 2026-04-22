@@ -96,13 +96,15 @@ begin
   assume E P h; refine ⊥ₑ (h (leq_refl E))
 end;
 
-// AR12: H, (a ≤ b) ⊢ P → H ⊢ (a ≪ b) ⇒ P
+// AR12: H, (a ≤ b) ⊢ P → H ⊢ (a ≪ b) ⇒ P in the B-book; PP's ≪ is a
+// proof-search marker (prevents loops), semantically identified with ≤
+// via strict_to_leq. pp2lp has no ≪ in its surface AST, so every emitted
+// AR12 goal has ≤ in the antecedent — we type AR12 accordingly.
 opaque symbol AR12 [a b : τ ι] [P : Prop]
   : (π (a ≤ b) → π P)
-  → π ((a ≪ b) ⇒ P) ≔
+  → π ((a ≤ b) ⇒ P) ≔
 begin
-  assume a b P h1 h2;
-  refine h1 (strict_to_leq a b h2)
+  assume a b P h1 h2; refine h1 h2
 end;
 
 // AR13: solver(1−a) = b; b ≤ 0 → ¬(a ≪ 0)
