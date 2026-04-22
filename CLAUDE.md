@@ -73,10 +73,12 @@ Prefer these over shell `lambdapi`:
 
 ## Admitted / trust status (as of last check)
 
-- **B.lp / Arith**: AR2–AR8, AR13 — integer arithmetic not formalised.
-- **Nrm**: NRM18 — ♡/♢ binder equivalence.
-- **Emitted trust in prv**: OPR1/OPR2 primed bridge, NRM20–23 subtree close (HOU blocker), INS arithmetic-match conjuncts.
-- **Everything else**: provable. Run `make check-all SUITE=prv` to see current counts.
+Audit with `lambdapi_axioms ["lp/rules/*.lp"]`:
+
+- **Arith.lp**: AR2–AR8, AR13 — integer arithmetic not formalised.
+- **Rw.lp**: OPR1_1, OPR2_1 — one-point-rule substitution inside the _1 chain; only the ← direction of the biconditional holds, so admitted pointwise.
+- **Emitted trust in prv**: NRM20–23 subtree close (HOU blocker), INS arithmetic-match conjuncts, OPR1/OPR2 primed bridge.
+- **Everything else**: provable. Run `make check-all SUITE=prv` to see current counts (last run: 53 pass, 17 fail, 30 skip [3238 trust]).
 
 ## Replay format (quick reference)
 
