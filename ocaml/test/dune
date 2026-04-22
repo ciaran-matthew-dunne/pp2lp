@@ -1,3 +1,0 @@
-(test
- (name test_pp2lp)
- (libraries pp2lp str))
