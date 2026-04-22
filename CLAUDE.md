@@ -22,7 +22,7 @@ Never include Co-Authored-By, or Claude/Anthropic attribution.
 
 ```
 make build                   # compile OCaml
-make check [SUITE=X] [JOB=P] # run suite X (default claude); filter tests by prefix P
+make check [SUITE=X] [JOB=P] # run suite X (default prv); filter tests by prefix P
 make check-all [SUITE=X]     # report ALL failures instead of fast-fail
 make check-fresh [SUITE=X]   # drop .lpo + .cache, then check-all
 make check-{claude,prv,og,fuzz}

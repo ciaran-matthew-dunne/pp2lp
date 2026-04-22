@@ -22,7 +22,7 @@ FORMAT_ERROR  = python3 bench/format_error.py
 #   prv    — Atelier B "Proof Rules Validator" corpus (.but inputs)
 #   og     — original pre-baked PP trace replays (no .but source)
 #   fuzz   — randomly generated goals
-SUITE       ?= claude
+SUITE       ?= prv
 SUITE_DIR   := bench/$(SUITE)
 
 # -- Expected failures (known issues, tolerated by check) ---------------------
