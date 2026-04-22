@@ -1,6 +1,0 @@
-﻿ [AXM8] &
- [AND5] &
- [AND5] &
- [AND5] &
- [ALL8(1)] &
-  (!(c,f,g,a,b,d,e).((c = TRUE => not(f = g)) and (delta_ec = TRUE and delta_ef = TRUE and delta_eg = TRUE or (delta_ec = TRUE and not(c = TRUE)) or (delta_ef = TRUE and delta_eg = TRUE and not(f = g))) and (a = b => c = TRUE) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and c = TRUE)) and (d = e => a = b) and (delta_ed = TRUE and delta_ee = TRUE and delta_ea = TRUE and delta_eb = TRUE or (delta_ed = TRUE and delta_ee = TRUE and not(d = e)) or (delta_ea = TRUE and delta_eb = TRUE and a = b)) and d = e and delta_ed = TRUE and delta_ee = TRUE and delta_ef = TRUE and delta_eg = TRUE => not(f = g)))

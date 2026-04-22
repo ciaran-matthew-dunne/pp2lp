@@ -1,0 +1,898 @@
+# Synthetic proof goals for PP round-trip testing.
+# Format: NAME FORMULA
+# Lines starting with # are comments. Blank lines are ignored.
+# Formulas use PP syntax (and/or/not/=>/<=>/!/forall/#/=/<=/: etc.)
+
+# ============================================================
+# §7: Proposition Prover — Connectives
+# ============================================================
+
+# -- A.1 Conjunction (AND1-5) --
+and1_demorgan         not(p and q) => (not(p) or not(q))
+and2_neg_conj         (p => not(q)) => not(p and q)
+and3_elim             (p and q) => p
+and3_chain            (p and q and r) => r
+and4_intro            (p and q) => (q and p)
+and5_imp_in_conj      ((p => q) and p) => q
+
+# -- A.2 Disjunction (OR1-4) --
+or1_neg_disj_imp      not(p or q) => (not(p) and not(q))
+or2_neg_disj          (not(p) and not(q)) => not(p or q)
+or3_case_split        ((p => r) and (q => r)) => ((p or q) => r)
+or4_disj_intro        (p or q) => (q or p)
+or4_excl_middle       p or not(p)
+
+# -- A.3 Implication (IMP1-5) --
+imp1_neg_imp          not(p => q) => (p and not(q))
+imp2_neg_imp_intro    (p and not(q)) => not(p => q)
+imp3_case             ((q => r) and (not(p) => r)) => ((p => q) => r)
+imp4_discharge        p => p
+imp5_hyp_reuse        (p and q) => (p => q)
+imp_trans             ((p => q) and (q => r)) => (p => r)
+
+# -- A.4 Equivalence (EQV1-4) --
+eqv1_neg_iff          not(p <=> q) => ((p and not(q)) or (not(p) and q))
+eqv2_neg_iff_intro    (p and not(q)) => not(p <=> q)
+eqv3_iff_elim         (p <=> q) => ((p => q) and (q => p))
+eqv4_iff_intro        ((p => q) and (q => p)) => (p <=> q)
+eqv4_double_neg       p <=> not(not(p))
+eqv4_comm_and         (p and q) <=> (q and p)
+
+# -- A.5 Negation (NOT1-2) --
+not1_double_neg_elim  not(not(p)) => p
+not2_double_neg_intro p => not(not(p))
+
+# -- A.6 Axioms (AXM1-9) --
+axm1_contra           (not(p) and p) => q
+axm3_identity         (p and q) => p
+axm4_weakening        q => (p => q)
+axm5_neg_chain        not(q) => (p => (q => r))
+axm6_pos_chain        q => (p => (not(q) => r))
+axm7_refl             p => p
+axm8_conj_extract     (p and q and r) => q
+axm9_inst             (!x.(not(VRAI and x: S)) and a: S) => q
+
+# -- A.9-11 TRUE/FALSE (VR, FX) --
+vr1_true              VRAI
+vr4_true_concl        p => VRAI
+fx2_not_false         not(FAUX)
+fx3_ex_falso          FAUX => p
+# VR2: ¬TRUE ⊢ FALSE (triggered indirectly)
+vr2_neg_true          not(VRAI) => FAUX
+
+# ============================================================
+# §8: Predicate Prover — Quantifiers
+# ============================================================
+
+# -- A.7 Universal (ALL1-9) --
+all1_flatten          !x.(!y.(p => q)) => !y.(!x.(p => q))
+all5_neg_forall       #x.(not(p)) => not(!x.(p))
+all7_inst_imp         (!x.(x: S => p)) => (a: S => p)
+all9_assume           (!x.(p => q)) => (p => !x.(q))
+# ALL6: ∀x.⊥ → ¬∃x.⊤ (triggered indirectly)
+all6_false_forall     !x.(FAUX) => not(p)
+
+# -- A.8 Existential (XST1-8) --
+xst_flatten           #x.(#y.(p and q)) => #y.(#x.(p and q))
+xst5_neg_exists       not(#x.(p)) => !x.(not(p))
+xst7_witness          p => #x.(p)
+xst8_elim             (#x.(p and q)) => (#x.(p) and #x.(q))
+# XST51: ¬(∃x.¬P) ⇒ ∀x.P
+xst51_double_neg      not(#x.(not(p))) => !x.(p)
+# XST61: ¬(∃x.¬P) from ∀x.P
+xst61_intro           !x.(p) => not(#x.(not(p)))
+
+# ============================================================
+# §8.5: Equality Rules
+# ============================================================
+
+# -- EVR: reflexivity --
+evr4_refl             a=a
+# -- OPR: substitution --
+opr1_subst            (a=b and a: S) => (b: S)
+opr2_subst_sym        (a=b and b: S) => (a: S)
+opr_chain             (a=b and b=c) => (a=c)
+# -- EAXM31: symmetry goal --
+eaxm31_sym            (a=b) => (b=a)
+# -- Equality symmetry --
+eq_sym                (a=b) => (b=a)
+
+# ============================================================
+# §8.8: Normalisation
+# ============================================================
+
+# NRM1-4: quantifier scope manipulation
+nrm_scope_and         !x.((p and q) => r) => !x.(p => (q => r))
+nrm_quant_imp         !x.(p and q => r) => !x.(p => (q => r))
+# NRM2: factor out non-free premise from quantifier
+nrm2_factor           !x.(p => x=x) => (p => !x.(x=x))
+# NRM4: nested imp with non-free middle
+nrm4_nested           !x.(x: S => p => q) => (p => !x.(x: S => q))
+# NRM9: forall scope extension
+nrm9_scope            !x.(x: S => !y.(y: T => p)) => !x.(!y.(x: S => (y: T => p)))
+# NRM12: imp-to-negation under quantifier
+nrm12_neg             !x.(x: S => not(p)) => !x.(not(x: S and p))
+# NRM5: conjunction splitting under forall
+nrm_split_conj        !x.((p => q) and (p => r)) => (!x.(p => q) and !x.(p => r))
+# NRM exercises via deeper quantified structures
+nrm_deep_quant        !x.(!y.(x: S and y: T => p)) => !x.(!y.(x: S => (y: T => p)))
+
+# ============================================================
+# §8.9: Boolean
+# ============================================================
+
+bool_true_eq          (a=btrue and a=btrue) => btrue
+bool_false_eq         (a=bfalse and a=bfalse) => btrue
+
+# ============================================================
+# Additional coverage targets
+# ============================================================
+
+# -- ALL1/ALL2: compound ∀ negation --
+all1_neg_forall2      not(!x.(!y.(p))) => not(!x.(!y.(p)))
+all2_neg_forall2      not(!x.(!y.(p))) => #x.(#y.(not(p)))
+
+# -- ALL5: ¬∀ elimination --
+all5_neg_forall_imp   (not(!x.(x: S)) => q) => (not(!x.(x: S)) => q)
+
+# -- AND5: implication inside conjunction --
+and5_conj_imp         ((p => q) and r) => (q or not(p))
+
+# -- EVR1/EVR2: reflexivity-based rules --
+evr1_refl_imp         not(a=a) => p
+evr2_neg_refl         FAUX => not(a=a)
+
+# -- FX1: ¬⊥ stripping --
+fx1_not_false_imp     (not(FAUX) => p) => p
+
+# -- VR2: ¬⊤ --
+vr2_neg_true_false    not(VRAI) => FAUX
+
+# -- NRM2: factor out non-free from quantifier scope --
+nrm2_scope            !x.(p => x: S) => (p => !x.(x: S))
+
+# -- NRM4: nested implication scope --
+nrm4_imp_scope        !x.(x: S => (q => x: T)) => (q => !x.(x: S => x: T))
+
+# -- NRM6: conjunction splitting under guarded quantifier --
+nrm6_conj_guard       !x.(x: S => (p and q)) => (!x.(x: S => p) and !x.(x: S => q))
+
+# -- NRM8: compound quantifier flattening --
+nrm8_flatten_forall   !x.(!y.(x: S and y: T => p)) => !x.(!y.((x: S and y: T) => p))
+
+# -- NRM9: forall scope extension with guard --
+nrm9_scope2           !x.(x: S => !y.(y: T => p)) => !x.(!y.(x: S => (y: T => p)))
+
+# -- NRM13: implication to negated conjunction under quantifier --
+nrm13_imp_neg         !x.(x: S => p) => !x.(not(x: S and not(p)))
+
+# -- OPR2: reverse substitution --
+opr2_rev_subst        (b=a and a: S) => (b: S)
+
+# -- XST1/XST2: compound ∃ negation --
+xst1_neg_exists2      not(#x.(#y.(p))) => not(#x.(#y.(p)))
+xst2_neg_exists2      not(#x.(#y.(p))) => !x.(!y.(not(p)))
+
+# -- XST6: ∀¬ to ¬∃ --
+xst6_neg_exists       !x.(not(p)) => not(#x.(p))
+
+# -- BOOL rules --
+bool11_true_guard     (a=btrue => q) => (a=btrue => q)
+bool12_false_guard    (a=bfalse => q) => (a=bfalse => q)
+bool21_sym_true       (btrue=a => q) => (btrue=a => q)
+bool22_sym_false      (bfalse=a => q) => (bfalse=a => q)
+
+# -- EAXM: equality axioms --
+eaxm1_neq_sym         (not(b=a)) => ((a=b) => p)
+eaxm2_eq_sym          (b=a) => (not(a=b) => p)
+
+# -- ECTR: equality contradiction --
+ectr1_eq_contra       (a=b and not(a=b)) => p
+
+# ============================================================
+# Combined / stress tests
+# ============================================================
+
+# Deep nesting
+deep_imp              p => (q => (r => (s => (s and r and q and p))))
+# Mixed connectives
+mixed_or_and          ((p or q) and (r or s)) => ((p and r) or (p and s) or (q and r) or (q and s))
+# Quantifier + connective
+quant_demorgan        !x.(not(p or q)) => !x.(not(p) and not(q))
+quant_contra          !x.((p => q) => (not(q) => not(p)))
+quant_iff             !x.((p <=> q) => ((p and q) or (not(p) and not(q))))
+# Complex equality chain
+eq_chain_3            (a=b and b=c and c=d) => (a=d)
+# Membership + equality
+mem_subst             (a=b and a: S) => (b: S)
+# Quantified membership
+quant_mem             !x.(x: S => x: S)
+# Nested quantifier + conjunction
+quant_and_split       !x.(!y.((x: S and y: T) => p)) => !x.(x: S => !y.(y: T => p))
+# Double negation of existential + membership
+xst_mem               (#x.(x: S and p)) => (#x.(x: S) and #x.(p))
+# Implication + equivalence mix
+imp_eqv_mix           ((p <=> q) and (q => r)) => (p => r)
+# Three-way disjunction
+or3_three_way         ((p => s) and (q => s) and (r => s)) => ((p or q or r) => s)
+# Complex: multiple quantifiers + membership
+multi_quant_mem       !x.(!y.((x: S and y: T) => (y: T and x: S)))
+
+# ============================================================
+# Multi-variable quantifier tests (ALL7_2, XST8_2 paths)
+# ============================================================
+
+# -- ALL7_2: ∀ over 2 variables --
+all7_2_id             !x.(!y.(p => p))
+all7_2_swap           !x.(!y.(p and q)) => !x.(!y.(q and p))
+all7_2_imp            !x.(!y.(p => q)) => !x.(!y.(p => q))
+all7_2_or             !x.(!y.(p or q)) => !x.(!y.(q or p))
+all7_2_neg            !x.(!y.(not(not(p)))) => !x.(!y.(p))
+all7_2_chain          !x.(!y.((p => q) and (q => r))) => !x.(!y.(p => r))
+all7_2_mem_swap       !x.(!y.((x: S and y: T) => (y: T and x: S)))
+all7_2_mem_imp        !x.(!y.(x: S => (y: T => (x: S and y: T))))
+
+# -- XST8_2: ∃ over 2 variables --
+xst8_2_intro          (p and q) => #x.(#y.(p and q))
+xst8_2_or             #x.(#y.(p or q)) => #x.(#y.(q or p))
+xst8_2_from_forall    !x.(!y.(p)) => #x.(#y.(p))
+xst8_2_neg_forall     not(!x.(!y.(p))) => #x.(#y.(not(p)))
+xst8_2_mem            (a: S and b: T) => #x.(#y.(x: S and y: T))
+
+# -- Mixed ALL7_2 + XST8_2 --
+mix_all_xst_2         !x.(!y.(p => q)) => (#x.(#y.(p)) => #x.(#y.(q)))
+mix_xst_all_2         #x.(#y.(p and q)) => (#x.(#y.(p)) and #x.(#y.(q)))
+mix_neg_swap_2        not(#x.(#y.(p))) <=> !x.(!y.(not(p)))
+
+# -- 3-variable quantifiers --
+all7_3v_id            !x.(!y.(!z.(p => p)))
+all7_3v_swap          !x.(!y.(!z.(p and q))) => !x.(!y.(!z.(q and p)))
+xst8_3v_intro         p => #x.(#y.(#z.(p)))
+mix_3v                !x.(!y.(!z.(p))) => #x.(#y.(#z.(p)))
+
+# -- ALL7_2 in primed/normalisation context --
+all7_2_nrm_imp        !x.(!y.((x: S and y: T) => p)) => !x.(x: S => !y.(y: T => p))
+all7_2_nrm_neg        !x.(!y.(not(x: S and y: T))) => !x.(x: S => !y.(not(y: T)))
+all7_2_nrm_or         !x.(!y.((p or q) => r)) => !x.(!y.(p => r) and !y.(q => r))
+
+# -- Probing for AXM in primed chains --
+probe_and_forall      (p and !x.(p => q)) => !x.(q)
+probe_forall_or       !x.(p) => !x.(p or q)
+probe_forall_and      (!x.(p) and !x.(q)) => !x.(p and q)
+probe_forall_split    !x.(p and q) => (!x.(p) and !x.(q))
+probe_xst_elim        #x.(p and q) => #x.(p)
+probe_xst_or          #x.(p) => #x.(p or q)
+probe_forall_xst      (!x.(p => q) and #x.(p)) => #x.(q)
+
+# ============================================================
+# Propositional — deeper combinations
+# ============================================================
+
+# Contrapositive
+prop_contrapos        (p => q) => (not(q) => not(p))
+# Modus tollens
+prop_mt               ((p => q) and not(q)) => not(p)
+# Disjunctive syllogism
+prop_disj_syl         ((p or q) and not(p)) => q
+# Absorption
+prop_absorb           (p => q) => (p => (p and q))
+# Distribution (and over or)
+prop_dist_and_or      (p and (q or r)) => ((p and q) or (p and r))
+# Distribution (or over and)
+prop_dist_or_and      (p or (q and r)) => ((p or q) and (p or r))
+# Exportation
+prop_export           ((p and q) => r) => (p => (q => r))
+# Importation
+prop_import           (p => (q => r)) => ((p and q) => r)
+# Constructive dilemma
+prop_constr_dilemma   ((p => q) and (r => s) and (p or r)) => (q or s)
+# Destructive dilemma
+prop_destr_dilemma    ((p => q) and (r => s) and (not(q) or not(s))) => (not(p) or not(r))
+# Pierce's law variant
+prop_pierce           ((p => q) => p) => p
+# Or associativity
+prop_or_assoc         (p or (q or r)) => ((p or q) or r)
+# And associativity
+prop_and_assoc        (p and (q and r)) => ((p and q) and r)
+# Negated conjunction
+prop_neg_conj         not(p and q) => (not(p) or not(q))
+# Negated disjunction
+prop_neg_disj         not(p or q) => (not(p) and not(q))
+# Triple de Morgan
+prop_demorgan3        not(p and q and r) => (not(p) or not(q) or not(r))
+# Triple de Morgan (or)
+prop_demorgan3_or     not(p or q or r) => (not(p) and not(q) and not(r))
+# Iff split + recombine
+prop_iff_split        (p <=> q) => (q <=> p)
+# Iff + and
+prop_iff_and          ((p <=> q) and (q <=> r)) => (p <=> r)
+# Negated iff
+prop_neg_iff          not(p <=> q) => (p <=> not(q))
+# Complex nested
+prop_nested_imp       (p => (q => r)) => ((p => q) => (p => r))
+# Four-way conjunction elim
+prop_conj4_elim       (p and q and r and s) => (s and p)
+# Four-way disjunction case
+prop_disj4_case       ((p => u) and (q => u) and (r => u) and (s => u)) => ((p or q or r or s) => u)
+# Mixed iff + imp
+prop_iff_imp          ((p <=> q) and (q => r)) => (p => r)
+# Mixed iff + neg
+prop_iff_neg          ((p <=> q) and not(p)) => not(q)
+# Triple implication
+prop_triple_imp       ((p => q) and (q => r) and (r => s)) => (p => s)
+# Curried and
+prop_curry            (p => (q => (r => (p and q and r))))
+# Uncurried and
+prop_uncurry          ((p and q and r) and (p => (q => (r => s)))) => s
+
+# ============================================================
+# Quantifier — wider coverage
+# ============================================================
+
+# ALL8: trivial universal introduction
+quant_all8_trivial    !x.(x=x)
+# ALL9: non-free premise pulled out of forall
+quant_all9_pull       (!x.(p => x: S)) => (p => !x.(x: S))
+# ALL1 + connective under forall
+quant_all1_swap_deep  !x.(!y.(p or q)) => !y.(!x.(p or q))
+# Forall + contrapositive
+quant_contra2         !x.((p => q) => (not(q) => not(p)))
+# Forall + de Morgan
+quant_demorgan2       !x.(not(p and q)) => !x.(not(p) or not(q))
+# Forall distributes over and
+quant_forall_and      !x.(p and q) => (!x.(p) and !x.(q))
+# Exists + de Morgan
+quant_xst_demorgan    #x.(not(p and q)) => #x.(not(p) or not(q))
+# XST7: witness introduction + connective
+quant_xst7_or         p => #x.(p or q)
+# XST5 + NOT
+quant_xst5_chain      not(#x.(p)) => !x.(not(p))
+# XST6: dual of XST5
+quant_xst6_chain      !x.(not(p)) => not(#x.(p))
+# Double quantifier flip
+quant_double_neg_xst  not(#x.(not(p))) => !x.(p)
+# Forall + existential witness
+quant_fa_xst_chain    !x.(p => q) => (#x.(p) => #x.(q))
+# Nested forall + imp
+quant_nested_fa_imp   !x.(!y.(p => (q => (p and q))))
+# Nested forall elim
+quant_nested_fa_elim  !x.(!y.(p and q)) => !x.(!y.(p))
+# Forall with true
+quant_forall_true     !x.(VRAI)
+# Exists from conjunction
+quant_exists_true     (p and q) => #x.(p)
+# Forall + negated exists
+quant_neg_xst_mem     not(#x.(p)) => !x.(not(p))
+# Negated forall to exists
+quant_neg_all_mem     not(!x.(p)) => #x.(not(p))
+# Forall + iff elimination
+quant_all_xst_iff     !x.((p <=> q) => (p => q))
+
+# ============================================================
+# Equality — wider coverage
+# ============================================================
+
+# Symmetry via OPR
+eq_sym_opr            (a=b) => (b=a)
+# Transitivity + symmetry
+eq_trans_sym          (a=b and c=b) => (a=c)
+# Transitivity 4-chain
+eq_chain_4            (a=b and b=c and c=d and d=e) => (a=e)
+# Substitution in negation
+eq_subst_neg          (a=b and not(a: S)) => not(b: S)
+# Substitution both directions
+eq_subst_both         (a=b and a: S and b: T) => (b: S and a: T)
+# Double substitution
+eq_double_subst       (a=b and b=c and a: S) => (c: S)
+# Equality + conjunction
+eq_conj               (a=b and c=d) => ((a=b) and (c=d))
+# Reflexivity in context
+eq_refl_ctx           (a: S) => (a=a and a: S)
+# Equality + implication
+eq_imp                (a=b) => (a: S => b: S)
+# Negated equality reflexivity
+eq_neg_refl           not(a=a) => FAUX
+# Equality contradiction (ECTR path)
+eq_ectr_basic         (a=b and a: S and not(b: S)) => q
+# Equality contradiction reverse
+eq_ectr_rev           (b=a and a: S and not(b: S)) => q
+# Equality contradiction in negative
+eq_ectr_neg           (a=b and not(a: S) and b: S) => q
+# Equality + forall
+eq_forall_subst       (a=b and !x.(x: S => p)) => (a: S => p)
+# Equality chain + membership
+eq_chain_mem          (a=b and b=c and a: S) => (c: S)
+
+# ============================================================
+# Normalisation — targeting NRM5-15
+# ============================================================
+
+# NRM5: currying under forall
+nrm5_curry            !x.((x: S and p) => q) => !x.(x: S => (p => q))
+# NRM5: currying with membership
+nrm5_curry_mem        !x.((x: S and x: T) => p) => !x.(x: S => (x: T => p))
+# NRM6: conjunction split under guarded forall
+nrm6_split            !x.(x: S => (p and q)) => (!x.(x: S => p) and !x.(x: S => q))
+# NRM7: conjunction body split
+nrm7_split            !x.(p and q) => (!x.(p) and !x.(q))
+# NRM8: absorb inner forall
+nrm8_absorb           !x.(!y.(p)) => !x.(!y.(p))
+# NRM9: pull out inner forall with guard
+nrm9_pull             !x.(x: S => !y.(y: T => p)) => !x.(!y.(x: S => (y: T => p)))
+# NRM12: negation in conclusion under forall
+nrm12_neg2            !x.(x: S => not(x: T)) => !x.(not(x: S and x: T))
+# NRM13: implication to negated conjunction
+nrm13_conv            !x.(x: S => p) => !x.(not(x: S and not(p)))
+# NRM13 + membership
+nrm13_mem             !x.(x: S => x: T) => !x.(not(x: S and not(x: T)))
+# NRM1: vacuous quantifier
+nrm1_vacuous          !x.(p => q) => (p => !x.(q))
+# NRM2: non-free premise out
+nrm2_pull             !x.(p => x: S) => (p => !x.(x: S))
+# NRM4: non-free middle out
+nrm4_mid              !x.(x: S => (p => x: T)) => (p => !x.(x: S => x: T))
+# Deeper normalisation chain
+nrm_deep_chain        !x.(!y.((x: S and y: T) => (p and q))) => (!x.(x: S => !y.(y: T => p)) and !x.(x: S => !y.(y: T => q)))
+# NRM + double quantifier
+nrm_double_scope      !x.(!y.(x: S and y: T => p)) => !x.(x: S => !y.(y: T => p))
+# NRM1 + NRM2 combo
+nrm12_combo           !x.(p => x=x) => (p => !x.(x=x))
+
+# ============================================================
+# Boolean — BOOL membership & case analysis
+# ============================================================
+
+# BOOL true guard
+bool_true_imp         (a: BOOL and a=btrue) => (a=btrue)
+# BOOL false guard
+bool_false_imp        (a: BOOL and a=bfalse) => (a=bfalse)
+# BOOL reflexivity with btrue
+bool_neg_true         (a=btrue and b=btrue) => (a=b)
+# BOOL reflexivity with bfalse
+bool_neg_false        (a=bfalse and b=bfalse) => (a=b)
+# BOOL symmetric true
+bool_sym_true         (a: BOOL and btrue=a) => (a=btrue)
+# BOOL symmetric false
+bool_sym_false        (a: BOOL and bfalse=a) => (a=bfalse)
+# BOOL: equality substitution into membership
+bool_true_ne_false    (a=btrue and btrue: S) => (a: S)
+# BOOL: reverse substitution
+bool_false_ne_true    (a=bfalse and b=a) => (b=bfalse)
+# BOOL + transitivity
+bool_case_imp         (a=btrue and btrue=b) => (a=b)
+# BOOL + equality chain
+bool_eq_chain         (a: BOOL and b: BOOL and a=btrue and b=a) => (b=btrue)
+
+# ============================================================
+# Membership — more patterns
+# ============================================================
+
+# Simple membership tautology
+mem_id                (a: S) => (a: S)
+# Membership + conjunction
+mem_conj              (a: S and b: T) => (a: S)
+# Membership + double conjunction
+mem_conj2             (a: S and b: T) => (b: T and a: S)
+# Membership + implication
+mem_imp               (a: S) => (p => a: S)
+# Forall + membership + equality
+mem_forall_eq         !x.(x: S => x=x)
+# Exists + membership
+mem_xst_intro         (a: S) => #x.(x: S)
+# Exists + membership intro
+mem_xst_conj          (a: S and a: T) => #x.(x: S)
+# Membership weakening
+mem_weak              (a: S and a: T) => (a: S)
+
+# ============================================================
+# TRUE/FALSE — edge cases
+# ============================================================
+
+# VR1: VRAI
+tf_vrai               VRAI
+# VR4: p => VRAI
+tf_vr4                (p and q) => VRAI
+# FX2: not FAUX
+tf_fx2                not(FAUX)
+# FX3: ex falso
+tf_fx3                FAUX => (p and q and r)
+# FX1: not(FAUX) stripping
+tf_fx1                (not(FAUX) => p) => p
+# VR2: not VRAI => FAUX
+tf_vr2                not(VRAI) => FAUX
+# VR3: VRAI => p from known p
+tf_vr3_chain          (p and VRAI) => p
+# True in quantifier
+tf_forall_true        !x.(VRAI => x: S) => !x.(x: S)
+# False in quantifier
+tf_forall_false       !x.(FAUX => p)
+# Nested true/false
+tf_nested             (VRAI => (FAUX => p))
+
+# ============================================================
+# STOP — classical reasoning (proof by contradiction)
+# ============================================================
+
+# Excluded middle variants
+stop_excl_mid         p or not(p)
+stop_excl_mid2        (p => q) or (q => p)
+# Double negation elimination
+stop_dne              not(not(p)) => p
+# Peirce's law
+stop_peirce           ((p => q) => p) => p
+# Classical disjunction
+stop_disj_class       (not(p) => q) => (p or q)
+# Classical implication
+stop_imp_class        (not(p) or q) => (p => q)
+# Classical contrapositive
+stop_contra_class     (not(q) => not(p)) => (p => q)
+
+# ============================================================
+# Stress tests — complex multi-rule combinations
+# ============================================================
+
+# Deep implication + conjunction
+stress_deep_conj      ((p => q) and (r => s)) => ((p and r) => (q and s))
+# Mixed quantifiers + equality + membership
+stress_eq_mem_quant   !x.(!y.((x=y and x: S) => y: S))
+# Quantifier + double negation
+stress_neg_quant_mem  !x.(not(not(p)) => p)
+# Long conjunction chain
+stress_conj_chain     (p and q and r and s and u) => (u and s and r and q and p)
+# Nested iff
+stress_nested_iff     (p <=> q) => (not(p) <=> not(q))
+# Quantifier + iff
+stress_quant_iff      !x.((p <=> q) => (p => q))
+# Double quantifier + implication chain
+stress_dbl_quant_imp  !x.(!y.((p => q) and (q => r))) => !x.(!y.(p => r))
+# Forall + disjunction introduction
+stress_xst_split      !x.((p and q) => (p or q))
+# Forall + disjunction + membership
+stress_fa_disj_mem    !x.(x: S => (p or not(p)))
+# Forall + equality reflexivity
+stress_fa_xst_eq      !x.(!y.(x=y => y=x))
+# Nested quantifiers + normalisation
+stress_nrm_nested     !x.(!y.((x: S and y: T) => (y: T and x: S)))
+# Quantified absorption
+stress_quant_absorb   !x.((p => q) => (p => (p and q)))
+# Complex disjunction + implication
+stress_disj_imp       ((p or q) => r) => ((p => r) and (q => r))
+# Exists + negation
+stress_xst_neg_mem    not(!x.(p)) => #x.(not(p))
+# Quantifier + true/false
+stress_quant_tf       !x.((p and VRAI) => p)
+
+# ============================================================
+# Scaled-up goals — longer proofs
+# ============================================================
+
+# -- Long implication chains --
+long_imp_chain5       ((p => q) and (q => r) and (r => s) and (s => u) and (u => v)) => (p => v)
+long_imp_chain6       ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w)) => (p => w)
+long_imp_mt_chain     ((p => q) and (q => r) and (r => s) and not(s)) => not(p)
+long_imp_contra       ((p => q) and (q => r) and (r => s)) => (not(s) => not(p))
+
+# -- Deep conjunction rearrangement --
+long_conj_rev6        (p and q and r and s and u and v) => (v and u and s and r and q and p)
+long_conj_rev7        (p and q and r and s and u and v and w) => (w and v and u and s and r and q and p)
+long_conj_extract     (p and q and r and s and u and v) => (r and u)
+long_conj_dup         (p and q and r) => (p and q and r and p and q)
+long_conj_weaken      (p and q and r and s and u and v) => (p and r and u)
+
+# -- Multi-branch case splits --
+long_or_case4         ((p => u) and (q => u) and (r => u) and (s => u)) => ((p or q or r or s) => u)
+long_or_case5         ((p => u) and (q => u) and (r => u) and (s => u) and (v => u)) => ((p or q or r or s or v) => u)
+long_or_distrib       ((p or q) and (r or s) and (u or v)) => ((p and r and u) or (p and r and v) or (p and s and u) or (p and s and v) or (q and r and u) or (q and r and v) or (q and s and u) or (q and s and v))
+long_or_assoc4        (p or (q or (r or s))) => (((p or q) or r) or s)
+long_disj_syl_chain   ((p or q) and not(p) and (q => r)) => r
+long_or_neg_chain     ((p or q or r) and not(p) and not(q)) => r
+
+# -- Equivalence chains (heavy branching) --
+long_iff_chain3       ((p <=> q) and (q <=> r) and (r <=> s)) => (p <=> s)
+long_iff_chain4       ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u)) => (p => u)
+long_iff_conj         ((p <=> q) and (r <=> s)) => ((p and r) <=> (q and s))
+long_iff_neg          ((p <=> q) and (q <=> r)) => (not(p) <=> not(r))
+long_iff_or           ((p <=> q) and (r <=> s)) => ((p or r) <=> (q or s))
+long_iff_imp          ((p <=> q) and (r <=> s)) => ((p => r) <=> (q => s))
+
+# -- Constructive/destructive dilemmas (multi-premise branching) --
+long_constr_dilemma3  ((p => q) and (r => s) and (u => v) and (p or r or u)) => (q or s or v)
+long_destr_dilemma3   ((p => q) and (r => s) and (u => v) and (not(q) or not(s) or not(v))) => (not(p) or not(r) or not(u))
+long_dilemma_chain    ((p => q) and (r => s) and (q => r)) => ((p or r) => (s or q))
+long_dilemma_nested   ((p => (q and r)) and (s => (u and v)) and (p or s)) => ((q or u) and (r or v))
+
+# -- Deep implication nesting --
+long_nested_imp5      p => (q => (r => (s => (u => (p and q and r and s and u)))))
+long_nested_imp6      p => (q => (r => (s => (u => (v => (v and u and s and r and q and p))))))
+long_export_chain     ((p and q and r and s) => u) => (p => (q => (r => (s => u))))
+long_import_chain     (p => (q => (r => (s => u)))) => ((p and q and r and s) => u)
+long_mixed_depth      (p => (q => r)) => ((s => (p and q)) => (s => r))
+
+# -- Equality chains --
+long_eq_chain5        (a=b and b=c and c=d and d=e and e=f) => (a=f)
+long_eq_chain6        (a=b and b=c and c=d and d=e and e=f and f=g) => (a=g)
+long_eq_mem_chain5    (a=b and b=c and c=d and d=e and e=f and a: S) => (f: S)
+long_eq_sym_chain     (a=b and b=c and c=d) => (d=a)
+long_eq_two_chains    (a=b and b=c and d=e and e=f) => (a=c and d=f)
+long_eq_cross_mem     (a=b and b=c and a: S and c: T) => (b: S and b: T)
+long_eq_neg_chain     (a=b and b=c and not(a: S)) => not(c: S)
+long_eq_conj_mem      (a=b and c=d and a: S and c: T) => (b: S and d: T)
+
+# -- Quantifier + normalisation chains --
+long_nrm_curry3       !x.((x: S and x: T and p) => q) => !x.(x: S => (x: T => (p => q)))
+long_nrm_split3       !x.(x: S => (p and q and r)) => (!x.(x: S => p) and !x.(x: S => q) and !x.(x: S => r))
+long_nrm_nested3      !x.(x: S => !y.(y: T => !z.(z: U => p))) => !x.(!y.(!z.(x: S => (y: T => (z: U => p)))))
+long_nrm_deep_split   !x.(!y.((x: S and y: T) => (p and q))) => (!x.(x: S => !y.(y: T => p)) and !x.(x: S => !y.(y: T => q)))
+long_nrm_factor_deep  !x.(!y.((x: S and y: T) => (q => p))) => (q => !x.(x: S => !y.(y: T => p)))
+long_nrm_neg_deep     !x.(!y.((x: S and y: T) => not(p))) => !x.(!y.(not(x: S and y: T and p)))
+long_nrm_scope_chain  !x.(x: S => !y.(y: T => (p and q))) => (!x.(x: S => !y.(y: T => p)) and !x.(x: S => !y.(y: T => q)))
+
+# -- Multi-variable quantifier proofs --
+long_all7_2_chain     !x.(!y.((p => q) and (q => r) and (r => s))) => !x.(!y.(p => s))
+long_all7_2_conj4     !x.(!y.(p and q and r and s)) => !x.(!y.(s and r and q and p))
+long_all7_2_or_case   !x.(!y.((p => r) and (q => r))) => !x.(!y.((p or q) => r))
+long_all7_2_demorgan  !x.(!y.(not(p and q))) => !x.(!y.(not(p) or not(q)))
+long_all7_2_export    !x.(!y.((p and q) => r)) => !x.(!y.(p => (q => r)))
+long_all7_2_iff       !x.(!y.((p <=> q) => ((p => q) and (q => p))))
+
+long_xst8_2_conj      (p and q and r) => #x.(#y.(p and q and r))
+long_xst8_2_chain     (p and q) => #x.(#y.(q and p))
+long_xst8_2_from_fa   !x.(!y.(p and q)) => #x.(#y.(p))
+
+long_3v_chain         !x.(!y.(!z.((p => q) and (q => r)))) => !x.(!y.(!z.(p => r)))
+long_3v_conj_rev      !x.(!y.(!z.(p and q and r))) => !x.(!y.(!z.(r and q and p)))
+long_3v_mem           !x.(!y.(!z.((x: S and y: T and z: U) => (z: U and y: T and x: S))))
+long_3v_nrm           !x.(!y.(!z.((x: S and y: T and z: U) => p))) => !x.(x: S => !y.(y: T => !z.(z: U => p)))
+
+# -- Mixed quantifier + connective combos --
+long_fa_imp_conj      !x.((p => q) and (p => r)) => !x.(p => (q and r))
+long_fa_xst_chain     (!x.(p => q) and #x.(p)) => #x.(q)
+long_fa_xst_mem       (!x.(x: S => p) and #x.(x: S)) => #x.(p)
+long_fa_or_split      !x.((p or q) => r) => (!x.(p => r) and !x.(q => r))
+long_fa_neg_xst       not(#x.(p and q)) => !x.(not(p and q))
+long_xst_and_split    #x.(p and q and r) => (#x.(p) and #x.(q) and #x.(r))
+long_xst_chain_fa     (!x.(p => q) and !x.(q => r) and #x.(p)) => #x.(r)
+long_neg_xst_chain    (not(#x.(p)) and not(#x.(q))) => !x.(not(p) and not(q))
+
+# -- Equality + quantifier combos --
+long_eq_fa_subst      (a=b and !x.(x: S => p)) => (a: S => p)
+long_eq_fa_chain      (a=b and b=c and !x.(x: S => p)) => (a: S => p)
+long_eq_xst_mem       (a=b and a: S) => #x.(x: S)
+long_eq_fa_neg        (a=b and !x.(not(x: S))) => not(a: S)
+
+# -- Complex mixed stress tests --
+long_stress_mix1      ((p => q) and (r <=> s) and (q => r)) => (p => s)
+long_stress_mix2      ((p <=> q) and (q => r) and (r => s) and not(s)) => not(p)
+long_stress_mix3      ((p or q) and (p => r) and (q => s) and (r => u) and (s => u)) => u
+long_stress_mix4      ((p <=> q) and (r <=> s) and (p or r)) => (q or s)
+long_stress_mix5      ((p => q) and (q => r) and (r <=> s)) => (p => s)
+long_stress_mix6      !x.((p => q) and (q => r) and (r => s)) => !x.(p => s)
+long_stress_mix7      !x.(!y.((p or q) and (p => r) and (q => r))) => !x.(!y.(r))
+long_stress_mix8      !x.((p <=> q) => (not(p) <=> not(q)))
+long_stress_mix9      ((p and q) => r) => ((p => r) or (q => r))
+long_stress_mix10     !x.(x: S => (p or not(p)))
+
+# -- Deep nesting + branching --
+long_deep_branch1     ((p or q) and (r or s)) => ((p => (r => u)) => ((p => (s => u)) => ((q => (r => u)) => ((q => (s => u)) => u))))
+long_deep_branch2     ((p => (q and r)) and (s => (u and v))) => ((p and s) => (q and u))
+long_deep_branch3     ((p => q) and (p => r) and (p => s)) => (p => (q and r and s))
+long_deep_branch4     ((p => (q => r)) and (p => q) and p) => r
+long_deep_branch5     (((p and q) => r) and ((p and s) => r) and p and (q or s)) => r
+
+# -- Contradiction patterns --
+long_contra_chain     ((p => q) and (q => r) and (r => not(p)) and p) => s
+long_contra_iff       ((p <=> q) and p and not(q)) => r
+long_contra_or        ((p or q) and not(p) and not(q)) => r
+long_contra_eq        (a=b and not(a=b)) => p
+long_contra_deep      ((p => q) and (q => r) and p and not(r)) => s
+
+# -- Proof by contradiction / classical --
+long_class_cases      (not(p and q) and p) => not(q)
+long_class_excl3      (p or not(p)) and (q or not(q))
+long_class_dne_chain  not(not(p and q)) => (p and q)
+long_class_pierce2    (((p => q) => p) and ((q => r) => q)) => (p and q)
+
+# -- Wide conjunction intro --
+long_intro_conj5      (p and q and r and s and u) => (p and q and r and s and u)
+long_intro_conj6      (p and q and r and s and u and v) => (p and q and r and s and u and v)
+
+# -- Extra scaling: very wide / deep combos --
+long_scale_imp7       ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and p) => w
+long_scale_conj_or    (p and q and r) => ((p or s) and (q or s) and (r or s))
+long_scale_iff_neg2   ((p <=> q) and (q <=> r) and not(r)) => not(p)
+long_scale_dist2      ((p or q) and (r or s)) => ((p and r) or (p and s) or (q and r) or (q and s))
+
+# ============================================================
+# Mega — even bigger proofs for scale testing
+# ============================================================
+
+# -- Wide conjunctions (7-10 atoms) --
+mega_conj7_rev        (p and q and r and s and u and v and w) => (w and v and u and s and r and q and p)
+mega_conj8_rev        (p and q and r and s and u and v and w and z) => (z and w and v and u and s and r and q and p)
+mega_conj9_rev        (p and q and r and s and u and v and w and z and a1) => (a1 and z and w and v and u and s and r and q and p)
+mega_conj10_rev       (p and q and r and s and u and v and w and z and a1 and b1) => (b1 and a1 and z and w and v and u and s and r and q and p)
+mega_conj8_extract    (p and q and r and s and u and v and w and z) => (u and r and p)
+mega_conj8_weaken     (p and q and r and s and u and v and w and z) => (p and s and w)
+mega_conj8_middle     (p and q and r and s and u and v and w and z) => (s and u)
+mega_conj_self9       (p and q and r and s and u and v and w and z and a1) => (p and q and r and s and u and v and w and z and a1)
+
+# -- Long implication transitivity (8-12 steps) --
+mega_imp_chain8       ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1)) => (p => a1)
+mega_imp_chain9       ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and (a1 => b1)) => (p => b1)
+mega_imp_chain10      ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and (a1 => b1) and (b1 => c1)) => (p => c1)
+mega_imp_chain12      ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and (a1 => b1) and (b1 => c1) and (c1 => d1) and (d1 => e1)) => (p => e1)
+mega_imp_chain_mp8    ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and p) => a1
+mega_imp_chain_mt8    ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and not(a1)) => not(p)
+mega_imp_contra8      ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1)) => (not(a1) => not(p))
+
+# -- Deep nested implications --
+mega_nested_imp7      p => (q => (r => (s => (u => (v => (w => (p and q and r and s and u and v and w)))))))
+mega_nested_imp8      p => (q => (r => (s => (u => (v => (w => (z => (z and w and v and u and s and r and q and p))))))))
+mega_export_chain6    ((p and q and r and s and u and v) => w) => (p => (q => (r => (s => (u => (v => w))))))
+mega_export_chain7    ((p and q and r and s and u and v and w) => z) => (p => (q => (r => (s => (u => (v => (w => z)))))))
+mega_import_chain6    (p => (q => (r => (s => (u => (v => w)))))) => ((p and q and r and s and u and v) => w)
+mega_import_chain7    (p => (q => (r => (s => (u => (v => (w => z))))))) => ((p and q and r and s and u and v and w) => z)
+
+# -- Long equality chains (6-10 elements) --
+mega_eq_chain6        (a=b and b=c and c=d and d=e and e=f and f=g) => (a=g)
+mega_eq_chain7        (a=b and b=c and c=d and d=e and e=f and f=g and g=h) => (a=h)
+mega_eq_chain8        (a=b and b=c and c=d and d=e and e=f and f=g and g=h and h=i) => (a=i)
+mega_eq_chain_mem6    (a=b and b=c and c=d and d=e and e=f and f=g and a: S) => (g: S)
+mega_eq_chain_mem8    (a=b and b=c and c=d and d=e and e=f and f=g and g=h and h=i and a: S) => (i: S)
+mega_eq_chain_sym6    (a=b and b=c and c=d and d=e and e=f and f=g) => (g=a)
+mega_eq_chain_neg6    (a=b and b=c and c=d and d=e and e=f and f=g and not(a: S)) => not(g: S)
+mega_eq_cross         (a=b and c=d and e=f and g=h and a: S and c: T and e: U and g: V) => (b: S and d: T and f: U and h: V)
+mega_eq_3chains       (a=b and b=c and d=e and e=f and g=h and h=i) => ((a=c) and (d=f) and (g=i))
+mega_eq_doublemem     (a=b and b=c and c=d and a: S and a: T) => (d: S and d: T)
+
+# -- Wide disjunction case splits --
+mega_or_case7         ((p => z) and (q => z) and (r => z) and (s => z) and (u => z) and (v => z) and (w => z)) => ((p or q or r or s or u or v or w) => z)
+mega_or_case8         ((p => z) and (q => z) and (r => z) and (s => z) and (u => z) and (v => z) and (w => z) and (a1 => z)) => ((p or q or r or s or u or v or w or a1) => z)
+mega_or_elim7         (p or q or r or s or u or v or w) and not(p) and not(q) and not(r) and not(s) and not(u) and not(v) => w
+mega_or_assoc5        (p or (q or (r or (s or u)))) => ((((p or q) or r) or s) or u)
+mega_or_rev6          (p or q or r or s or u or v) => (v or u or s or r or q or p)
+
+# -- Deep de Morgan --
+mega_demorgan_and7    not(p and q and r and s and u and v and w) => (not(p) or not(q) or not(r) or not(s) or not(u) or not(v) or not(w))
+mega_demorgan_or7     not(p or q or r or s or u or v or w) => (not(p) and not(q) and not(r) and not(s) and not(u) and not(v) and not(w))
+mega_demorgan_and8    not(p and q and r and s and u and v and w and z) => (not(p) or not(q) or not(r) or not(s) or not(u) or not(v) or not(w) or not(z))
+mega_demorgan_mixed   not((p and q) or (r and s) or (u and v)) => ((not(p) or not(q)) and (not(r) or not(s)) and (not(u) or not(v)))
+
+# -- Long iff chains --
+mega_iff_chain4       ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u)) => (p <=> u)
+mega_iff_chain5       ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u) and (u <=> v)) => (p <=> v)
+mega_iff_chain6       ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u) and (u <=> v) and (v <=> w)) => (p <=> w)
+mega_iff_chain_neg5   ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u)) => (not(p) <=> not(u))
+mega_iff_chain_conj   ((p <=> q) and (r <=> s) and (u <=> v)) => ((p and r and u) <=> (q and s and v))
+mega_iff_chain_or     ((p <=> q) and (r <=> s) and (u <=> v)) => ((p or r or u) <=> (q or s or v))
+
+# -- Deep quantifier bodies (1-3 var with large body) --
+mega_all_conj7        !x.(p and q and r and s and u and v and w) => (!x.(p) and !x.(q) and !x.(r) and !x.(s) and !x.(u) and !x.(v) and !x.(w))
+mega_all_rev6         !x.(p and q and r and s and u and v) => !x.(v and u and s and r and q and p)
+mega_all_imp_chain5   !x.((p => q) and (q => r) and (r => s) and (s => u) and (u => v)) => !x.(p => v)
+mega_all_imp_mp5      !x.((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and p) => !x.(v)
+mega_all_body_large   !x.((p and q and r) => (p and q and r and p))
+
+# -- 2-variable quantifiers with bigger bodies --
+mega_all2_rev6        !x.(!y.(p and q and r and s and u and v)) => !x.(!y.(v and u and s and r and q and p))
+mega_all2_conj7       !x.(!y.(p and q and r and s and u and v and w)) => !x.(!y.(w and v and u and s and r and q and p))
+mega_all2_imp_chain6  !x.(!y.((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w))) => !x.(!y.(p => w))
+mega_all2_case5       !x.(!y.((p => z) and (q => z) and (r => z) and (s => z) and (u => z))) => !x.(!y.((p or q or r or s or u) => z))
+mega_all2_demorgan5   !x.(!y.(not(p and q and r and s and u))) => !x.(!y.(not(p) or not(q) or not(r) or not(s) or not(u)))
+mega_all2_export5     !x.(!y.((p and q and r and s and u) => v)) => !x.(!y.(p => (q => (r => (s => (u => v))))))
+
+# -- 3-variable quantifiers with bigger bodies --
+mega_all3_rev5        !x.(!y.(!z.(p and q and r and s and u))) => !x.(!y.(!z.(u and s and r and q and p)))
+mega_all3_rev6        !x.(!y.(!z.(p and q and r and s and u and v))) => !x.(!y.(!z.(v and u and s and r and q and p)))
+mega_all3_imp_chain4  !x.(!y.(!z.((p => q) and (q => r) and (r => s) and (s => u)))) => !x.(!y.(!z.(p => u)))
+mega_all3_mem_chain   !x.(!y.(!z.((x: S and y: T and z: U) => (p and q and r)))) => !x.(!y.(!z.((x: S and y: T and z: U) => r)))
+mega_all3_conj_mem    !x.(!y.(!z.((x: S and y: T and z: U) => (z: U and y: T and x: S))))
+mega_all3_weaken      !x.(!y.(!z.(p and q and r and s))) => !x.(!y.(!z.(s and p)))
+
+# -- Existential + deep bodies --
+mega_xst8_2_conj5     (p and q and r and s and u) => #x.(#y.(p and q and r and s and u))
+mega_xst8_2_from_fa5  !x.(!y.(p and q and r and s and u)) => #x.(#y.(p and q and r and s and u))
+mega_xst_3v_conj      (p and q and r) => #x.(#y.(#z.(p and q and r)))
+mega_xst_chain_big    (!x.(p => q) and !x.(q => r) and !x.(r => s) and !x.(s => u) and #x.(p)) => #x.(u)
+
+# -- Distribution patterns --
+mega_dist_and_or3     (p and (q or r or s)) => ((p and q) or (p and r) or (p and s))
+mega_dist_and_or4     (p and (q or r or s or u)) => ((p and q) or (p and r) or (p and s) or (p and u))
+mega_dist_or_and3     (p or (q and r and s)) => ((p or q) and (p or r) and (p or s))
+mega_dist_or_and4     (p or (q and r and s and u)) => ((p or q) and (p or r) and (p or s) and (p or u))
+mega_dist_3x3         ((p or q or r) and (s or u or v)) => ((p and s) or (p and u) or (p and v) or (q and s) or (q and u) or (q and v) or (r and s) or (r and u) or (r and v))
+
+# -- Multi-branch case splits with big conclusions --
+mega_case_conj        ((p => (q1 and q2)) and (r => (q1 and q2))) => ((p or r) => (q1 and q2))
+mega_case_conj3       ((p => (q1 and q2 and q3)) and (r => (q1 and q2 and q3))) => ((p or r) => (q1 and q2 and q3))
+mega_case_disj        ((p => (q1 or q2)) and (r => (q1 or q2))) => ((p or r) => (q1 or q2))
+mega_case_imp         ((p => (q => s)) and (r => (q => s))) => ((p or r) => (q => s))
+
+# -- Classical / contradiction at scale --
+mega_contra_chain6    ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => not(p)) and p) => z
+mega_contra_iff       ((p <=> q) and (q <=> r) and (r <=> s) and p and not(s)) => z
+mega_contra_or_chain  ((p or q) and (p => r) and (q => r) and not(r)) => z
+mega_dne_deep         not(not(not(not(p)))) => p
+mega_dne_chain        not(not(p and q and r and s)) => (p and q and r and s)
+mega_pierce_chain     (((p => q) => p) and ((q => r) => q) and ((r => s) => r)) => (p and q and r)
+
+# -- Constructive/destructive dilemmas at scale --
+mega_constr_4         ((p1 => q1) and (p2 => q2) and (p3 => q3) and (p4 => q4) and (p1 or p2 or p3 or p4)) => (q1 or q2 or q3 or q4)
+mega_constr_5         ((p1 => q1) and (p2 => q2) and (p3 => q3) and (p4 => q4) and (p5 => q5) and (p1 or p2 or p3 or p4 or p5)) => (q1 or q2 or q3 or q4 or q5)
+mega_destr_4          ((p1 => q1) and (p2 => q2) and (p3 => q3) and (p4 => q4) and (not(q1) or not(q2) or not(q3) or not(q4))) => (not(p1) or not(p2) or not(p3) or not(p4))
+
+# -- Normalisation at scale --
+mega_nrm_scope5       !x.(x: S => (p and q and r and s and u)) => (!x.(x: S => p) and !x.(x: S => q) and !x.(x: S => r) and !x.(x: S => s) and !x.(x: S => u))
+mega_nrm_curry4       !x.((x: S and x: T and x: U and p) => q) => !x.(x: S => (x: T => (x: U => (p => q))))
+mega_nrm_factor5      !x.(!y.((x: S and y: T) => (p => (q => (r => s))))) => (p => (q => (r => !x.(!y.((x: S and y: T) => s)))))
+mega_nrm_2v_split5    !x.(!y.((x: S and y: T) => (p and q and r and s and u))) => (!x.(!y.((x: S and y: T) => p)) and !x.(!y.((x: S and y: T) => q)) and !x.(!y.((x: S and y: T) => r)) and !x.(!y.((x: S and y: T) => s)) and !x.(!y.((x: S and y: T) => u)))
+
+# -- Stress: mixed connective/quantifier deep --
+mega_stress_mix1      ((p1 <=> p2) and (p2 <=> p3) and (p3 <=> p4) and (p4 => q) and p1) => q
+mega_stress_mix3      !x.(!y.((p and q and r) <=> (r and q and p)))
+mega_stress_mix4      ((p or q or r) and (p => s) and (q => s) and (r => s) and (s => u) and (u => v) and (v => w)) => w
+mega_stress_mix5      !x.(!y.((x: S and y: T) => ((p and q) <=> (q and p))))
+mega_stress_mix7      ((p => q) and (r => s) and (q and s => u) and p and r) => u
+mega_stress_mix8      ((p and q) or (r and s)) and ((p => z) and (q => z) and (r => z) and (s => z)) => z
+mega_stress_mix9      !x.(!y.(!z.((p => q) and (q => r) and (r => s)))) => !x.(!y.(!z.(p => s)))
+
+# -- Wide branching with premise reuse --
+mega_reuse1           ((p and q) => r) and ((r and s) => u) and ((u and v) => w) and p and q and s and v => w
+mega_reuse2           (p => (q and r)) and (q => (s and u)) and (r => (v and w)) and p => (s and u and v and w)
+mega_reuse3           ((p and q) => r) and ((p and r) => s) and ((q and s) => u) and p and q => u
+
+# -- Compound eq + connective + quantifier --
+mega_eq_mem_big       (a=b and b=c and c=d and d=e and e=f and a: S and a: T and a: U) => (f: S and f: T and f: U)
+mega_eq_neg_chain2    (a=b and b=c and c=d and d=e and not(a: S)) => (not(b: S) and not(c: S) and not(d: S) and not(e: S))
+mega_eq_iff_chain     (a=b and b=c) => ((a: S) <=> (c: S))
+
+# -- Very deep reasoning (composed operators) --
+mega_deep_reason1     ((p1 => (p2 and p3)) and (p2 => p4) and (p3 => p5) and (p4 and p5 => p6) and p1) => p6
+mega_deep_reason2     ((p => (q or r)) and (q => s) and (r => s) and p) => s
+mega_deep_reason3     ((p <=> (q and r)) and p) => (q and r)
+mega_deep_reason4     ((p <=> (q or r)) and q) => p
+mega_deep_reason5     ((p => (q and r and s)) and (s => u) and (u => v) and p) => v
+mega_deep_reason6     !x.(!y.((p => (q and r)) and (q => (r => s)) and p => s))
+mega_deep_reason7     ((p and q) => (r and s)) and ((r and s) => (u and v)) and p and q => (u and v)
+
+# -- Existential splits at scale --
+mega_xst_split5       #x.(p and q and r and s and u) => (#x.(p) and #x.(q) and #x.(r) and #x.(s) and #x.(u))
+mega_xst_or5          (#x.(p) or #x.(q) or #x.(r) or #x.(s) or #x.(u)) => #x.(p or q or r or s or u)
+mega_xst_2v_conj5     #x.(#y.(p and q and r and s and u)) => (#x.(#y.(p)) and #x.(#y.(q)) and #x.(#y.(r)) and #x.(#y.(s)) and #x.(#y.(u)))
+
+# -- Forall + Exists combinations --
+mega_fa_xst_chain3    (!x.(p => q) and !x.(q => r) and !x.(r => s) and #x.(p)) => #x.(s)
+mega_fa_xst_conj      (!x.(p => q) and !x.(r => s) and #x.(p and r)) => #x.(q and s)
+mega_neg_xst_chain    (not(#x.(p)) and not(#x.(q)) and not(#x.(r))) => !x.(not(p) and not(q) and not(r))
+
+# -- Additional rule-coverage attempts --
+rcov_eq_trans_sub3    (a=b and b=c and c=d and a: S and b: T and c: U and d: V) => (d: S and d: T and d: U and d: V)
+rcov_eq_dup           (a=b and a=b) => (b=a)
+rcov_fa_iff_split     !x.((p <=> q) => (p => q))
+rcov_fa_iff_combine   !x.(((p => q) and (q => p)) => (p <=> q))
+rcov_eq_forall_chain  (a=b and !x.(x: S => x: T) and a: S) => (b: T)
+rcov_nrm_triple       !x.(x: S => (p => (q => r))) => !x.((x: S and p and q) => r)
+rcov_class_elim       (not(p) => FAUX) => p
+rcov_class_or_neg     (not(p) or not(q)) <=> not(p and q)
+rcov_eq_refl_chain    (a=a and b=b and c=c) => VRAI
+
+# -- Additional proofs to hit 500+ --
+extra_imp_chain11     ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and (a1 => b1) and (b1 => c1) and (c1 => d1) and p) => d1
+extra_conj11_rev      (p and q and r and s and u and v and w and z and a1 and b1 and c1) => (c1 and b1 and a1 and z and w and v and u and s and r and q and p)
+extra_contra_big      ((p => q1) and (p => q2) and (p => q3) and (q1 and q2 and q3 => FAUX) and p) => z
+extra_case_7_conj     ((p => (r1 and r2 and r3)) and (q => (r1 and r2 and r3))) => ((p or q) => (r1 and r2 and r3))
+extra_iff_mega_neg    ((p <=> q) and (q <=> r) and (r <=> s) and (s <=> u) and (u <=> v) and (v <=> w)) => (not(p) <=> not(w))
+extra_3v_imp6         !x.(!y.(!z.((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and (v => w)))) => !x.(!y.(!z.(p => w)))
+extra_wide_or_intro   p => (p or q1 or q2 or q3 or q4 or q5 or q6 or q7)
+extra_huge_eq_chain   (a=b and b=c and c=d and d=e and e=f and f=g and g=h and h=i and i=j) => (a=j)
+extra_mt_deep         ((p => q) and (q => r) and (r => s) and (s => u) and (u => v) and not(v)) => not(p)
+extra_mix_big         ((p1 or p2) and (p1 => q) and (p2 => q) and (q => r) and (r => s) and (s => u) and (u => v)) => v
+extra_class_chain     ((not(p) => q) and (not(q) => r) and (not(r) => s) and (not(p) or q) and (not(q) or r) and (not(r) or s)) => s
+extra_3v_mem_extract  !x.(!y.(!z.((x: S and y: T and z: U and p and q and r) => (r and q and p and z: U and y: T and x: S))))
+extra_eq_chain11      (a=b and b=c and c=d and d=e and e=f and f=g and g=h and h=i and i=j and j=k) => (a=k)
+extra_xst2_split4     #x.(#y.(p and q and r and s)) => (#x.(#y.(p)) and #x.(#y.(q)) and #x.(#y.(r)) and #x.(#y.(s)))
+extra_mp_chain11      ((p => q) and p and (q => r) and (r => s) and (s => u) and (u => v) and (v => w) and (w => z) and (z => a1) and (a1 => b1) and (b1 => c1)) => c1
+extra_mem_eq_fwd      !x.(!y.((x=y and x: S) => (y: S and x: S and x=y)))
+extra_dist_3x2x2      ((p or q) and (r or s) and (u or v)) => ((p and r and u) or (p and r and v) or (p and s and u) or (p and s and v) or (q and r and u) or (q and r and v) or (q and s and u) or (q and s and v))
+extra_big_case_8      ((p and q and r and s) or (u and v and w and z)) and ((p => r1) and (q => r1) and (r => r1) and (s => r1) and (u => r1) and (v => r1) and (w => r1) and (z => r1)) => r1
+extra_conj12_self     (p and q and r and s and u and v and w and z and a1 and b1 and c1 and d1) => (p and q and r and s and u and v and w and z and a1 and b1 and c1 and d1)

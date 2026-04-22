@@ -1,0 +1,1 @@
+﻿Flag(TypeOn("Proof_Rules_Validator_4.1.khapWn")) & Flag(FileOn("Proof_Rules_Validator_4.1.jwSiGh1.res")) & Set(Valid.1 | Rule(Implication | a = 1+b & _delta_e(a) & _delta_e(b) & _delta_e(b) & _delta_e(a) | ? | ? | b+1 = a | nn))

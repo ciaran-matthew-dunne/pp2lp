@@ -1,5 +1,0 @@
-﻿ [AXM8] &
- [AND5] &
- [AND5] &
- [ALL8(1)] &
-  (!(c,d,e,a,b).((c = d => e = TRUE) and (delta_ec = TRUE and delta_ed = TRUE and delta_ee = TRUE or (delta_ec = TRUE and delta_ed = TRUE and not(c = d)) or (delta_ee = TRUE and e = TRUE)) and (a = b => c = d) and (delta_ea = TRUE and delta_eb = TRUE and delta_ec = TRUE and delta_ed = TRUE or (delta_ea = TRUE and delta_eb = TRUE and not(a = b)) or (delta_ec = TRUE and delta_ed = TRUE and c = d)) and a = b and delta_ea = TRUE and delta_eb = TRUE and delta_ee = TRUE => e = TRUE))
