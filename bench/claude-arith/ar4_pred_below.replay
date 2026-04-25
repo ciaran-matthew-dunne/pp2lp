@@ -1,0 +1,5 @@
+[ALL8(1)] <!a.(1-a<=0 and a<=0 => false)>
+[AND3] <1-a<=0 and a<=0 => false>
+[IMP4] <1-a<=0 => (a<=0 => false)>
+[AR9(a)] <a<=0 => false>
+[AR4] <a<=0 => false>

@@ -1,0 +1,10 @@
+[ALL8(1)] <!(a,b).(a-b<=0 and -a+b<=0 => -a+b<=0 and a-b<=0)>
+[AND3] <a-b<=0 and -a+b<=0 => -a+b<=0 and a-b<=0>
+[IMP4] <a-b<=0 => (-a+b<=0 => -a+b<=0 and a-b<=0)>
+[AR9(-a+b)] < -a+b<=0 => -a+b<=0 and a-b<=0>
+[AR8] < -a+b<=0 => -a+b<=0 and a-b<=0>
+[IMP4] <b = a => (-a+b<=0 => -a+b<=0 and a-b<=0)>
+[AR12] < -a+b<=0 => -a+b<=0 and a-b<=0>
+[AND4] < -a+b<=0 and a-b<=0>
+[AXM3] <a-b<=0>
+[AXM3] < -a+b<=0>

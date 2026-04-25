@@ -1,0 +1,1 @@
+Flag(TypeOn("ar3_em")) & Flag(FileOn("ar3_em.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | (a<=0 or not(a<=0)) | nn))

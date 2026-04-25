@@ -1,0 +1,1 @@
+Flag(TypeOn("ar8_leq_antisym")) & Flag(FileOn("ar8_leq_antisym.res")) & Set(Valid.1 | Rule(Implication | a<=b & b<=a | ? | ? | b=a | nn))

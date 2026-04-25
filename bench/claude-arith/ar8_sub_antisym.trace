@@ -1,0 +1,11 @@
+﻿ [AXM3] &
+ [AXM3] &
+ [AND4] &
+ [AR12] &
+ [IMP4] &
+ [AR8] &
+ [AR9(-a+b)] &
+ [IMP4] &
+ [AND3] &
+ [ALL8(1)] &
+  (!(a,b).(a-b<=0 and -a+b<=0 => -a+b<=0 and a-b<=0))

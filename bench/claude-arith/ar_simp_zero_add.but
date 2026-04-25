@@ -1,0 +1,1 @@
+Flag(TypeOn("ar_simp_zero_add")) & Flag(FileOn("ar_simp_zero_add.res")) & Set(Valid.1 | Rule(Implication | not(0+a<=0) | ? | ? | not(a<=0) | nn))

@@ -1,0 +1,1 @@
+Flag(TypeOn("ar4_succ_above")) & Flag(FileOn("ar4_succ_above.res")) & Set(Valid.1 | Rule(Implication | a<=0 & not(a+1<=1) | ? | ? | false | nn))

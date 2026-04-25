@@ -1,0 +1,1 @@
+Flag(TypeOn("ar2_double_neg_refl")) & Flag(FileOn("ar2_double_neg_refl.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | not(not(a<=a)) | nn))

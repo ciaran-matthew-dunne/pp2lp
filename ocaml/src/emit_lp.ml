@@ -8,6 +8,93 @@ open Rule_args
 open Result
 open Ins
 
+(* Emitter trace flag. When enabled (via `pp2lp emit -trace`), each
+   dispatch decision that diverges from the obvious "emit the rule
+   name verbatim" path logs a single line to stderr. Format:
+
+       [emit] FILE: TAG <details>
+
+   where TAG identifies the special case (`ar3-bridged`, `opr-trust`,
+   `nrm20-trust`, `all7-second-child-trust`, …). Off by default —
+   non-trace output is unchanged. *)
+let trace = ref false
+let trace_file = ref ""
+
+(* Captured trace events (for `pp2lp emit --json` and `pp2lp debug`).
+   When [trace_capture] is non-None, records get appended *and* the
+   stderr line is suppressed — the consumer wants structured data. *)
+type trace_event = { tag : string; details : string }
+let trace_capture : trace_event list ref option ref = ref None
+let with_trace_capture f =
+  let acc = ref [] in
+  let prev = !trace_capture in
+  trace_capture := Some acc;
+  Fun.protect
+    ~finally:(fun () -> trace_capture := prev)
+    (fun () ->
+      let r = f () in
+      (r, List.rev !acc))
+
+let trace_emit (tag : string) (details : string) : unit =
+  match !trace_capture with
+  | Some acc -> acc := { tag; details } :: !acc
+  | None ->
+    if !trace then
+      Printf.eprintf "[emit] %s: %s%s\n"
+        (if !trace_file = "" then "?" else Filename.basename !trace_file)
+        tag
+        (if details = "" then "" else " " ^ details)
+
+(* ---- AR3 dispatch: AR3 (raw) vs AR3' (bridged) ----
+   PP emits `[AR3(SOURCE | RESULT)]` where RESULT is the solver-normalised
+   form of `1 - SOURCE`. When `1 - SOURCE` reduces to RESULT definitionally,
+   the LP rule AR3 fits as-is. When it doesn't, AR3' takes a bridge proof
+   of `(𝟏 - SOURCE) = RESULT` so subsequent rules see a hypothesis typed
+   directly as `RESULT ≤ 𝟎`. The bridge composes the small proven lemmas
+   in B.lp / Arith.lp (`neg_neg`, `sub_sub`, `ar3_bridge_neg`). *)
+
+(* Emit the bridge proof term — composes lemmas from B.lp / Arith.lp.
+   Falls back to `trust` for unknown shapes (rare; keeps surface narrow). *)
+let emit_ar3_bridge buf source result =
+  match source, result with
+  | Neg x, AOp (Add, Nat 1, x') when x = x' ->
+    Buffer.add_string buf "ar3_bridge_neg ";
+    pp_exp buf x
+  | AOp (Sub, Nat 1, x), _ when x = result ->
+    Buffer.add_string buf "sub_sub \xf0\x9d\x9f\x8f "; (* 𝟏 *)
+    pp_exp buf x
+  | _ ->
+    Buffer.add_string buf "trust"
+
+(* Emit `refine AR3 (SOURCE)` or `refine AR3' (SOURCE) (RESULT) (BRIDGE)`
+   depending on whether `1 - SOURCE` matches RESULT structurally. *)
+let emit_ar3_dispatch buf node =
+  match node with
+  | Apply { arg = Some (PipeArg (source, result)); _ } ->
+    let one_minus_source = AOp (Sub, Nat 1, source) in
+    if one_minus_source = result then begin
+      trace_emit "ar3-direct" "";
+      Buffer.add_string buf "refine AR3 (";
+      pp_exp buf source;
+      Buffer.add_string buf ")"
+    end else begin
+      let bridge_kind = match source, result with
+        | Neg _, _ -> "neg"
+        | AOp (Sub, Nat 1, x), _ when x = result -> "sub-sub"
+        | _ -> "trust"
+      in
+      trace_emit "ar3-bridged" ("bridge=" ^ bridge_kind);
+      Buffer.add_string buf "refine AR3' (";
+      pp_exp buf source;
+      Buffer.add_string buf ") (";
+      pp_exp buf result;
+      Buffer.add_string buf ") (";
+      emit_ar3_bridge buf source result;
+      Buffer.add_string buf ")"
+    end
+  | _ ->
+    raise (Emit_admit "AR3 missing pipe arg")
+
 (* ---- Primed chain emission (rewrite-based) ---- *)
 
 let rec emit_primed_chain buf ctx pad (node : proof_node) =
@@ -118,6 +205,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
        soundness surface narrow (still one trust per OPR step) without
        the cascade of HOU metavariables. *)
     | _, [_child] when base = "OPR1" || base = "OPR2" ->
+      trace_emit "opr-trust" base;
       Buffer.add_string buf "refine trust"
 
     (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
@@ -239,6 +327,23 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         rule (List.length children)))
     end
 
+(* True iff [node]'s subtree contains any NRM20-23 rule application.
+   Those rules are admitted (per CLAUDE.md / Nrm.lp) and emit `refine
+   trust` as their leaf. When a subtree leads inevitably to such a
+   trust leaf, the surrounding proved-NRM rules add nothing the kernel
+   can verify on its own — we can collapse the whole subtree to a
+   single `refine trust` and avoid the higher-order unification that
+   trips up Lambdapi on the conjunction-of-implications goals produced
+   by ALL7_2 / ALL7_3. Net trust budget is unchanged. *)
+and subtree_hits_admitted_nrm node =
+  match node with
+  | Apply { rule; children; _ } ->
+    let base = Rule_db.strip_suffix rule in
+    if base = "NRM20" || base = "NRM21"
+       || base = "NRM22" || base = "NRM23"
+    then true
+    else List.exists subtree_hits_admitted_nrm children
+
 (* ---- Branching quantifier emission (ALL7/XST8) ---- *)
 
 and emit_branching_quant buf ctx indent pad
@@ -302,10 +407,23 @@ and emit_branching_quant buf ctx indent pad
   Buffer.add_string buf " }\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
-  for _ = 1 to n_assoc_rewrites do
-    Buffer.add_string buf "rewrite \xe2\x88\xa7_assoc; " (* ∧_assoc *)
-  done;
-  emit_node buf ctx (indent + 2) ~inline:true child2;
+  if subtree_hits_admitted_nrm child2 then begin
+    (* HOU short-circuit: when child2 chains NRM rules down to an
+       admitted NRM20-23 leaf, Lambdapi can't infer the implicit
+       P/Q/S of NRM7_2/5_2/13_2 against the goal `(♢x y, R x y)` —
+       the lambda inside the quantifier defeats higher-order pattern
+       matching. Since the leaf trust already discharges the chain,
+       collapse the whole subtree to one trust. *)
+    trace_emit "all7-2nd-child-trust"
+      (Printf.sprintf "rule=%s nvars=%d" eff_rule (List.length bvars));
+    Buffer.add_string buf "refine trust"
+  end
+  else begin
+    for _ = 1 to n_assoc_rewrites do
+      Buffer.add_string buf "rewrite \xe2\x88\xa7_assoc; " (* ∧_assoc *)
+    done;
+    emit_node buf ctx (indent + 2) ~inline:true child2
+  end;
   Buffer.add_string buf " }"
 
 (* ---- Generic two-child emission ---- *)
@@ -394,9 +512,20 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
        this is a pure encoding gap, not a logical one). *)
     | [_child] when rule = "NRM20" || rule = "NRM21"
                  || rule = "NRM22" || rule = "NRM23" ->
+      trace_emit "nrm20-23-trust" rule;
       emit_comment ();
       Buffer.add_string buf pad;
       Buffer.add_string buf "refine trust"
+
+    | [child] when rule = "AR3" ->
+      emit_comment ();
+      Buffer.add_string buf pad;
+      emit_ar3_dispatch buf node;
+      Buffer.add_string buf " _";
+      let ctx' = introduce buf pad ctx rule goal flat in
+      let child_flat = compute_child_flat eff_rule flat in
+      Buffer.add_string buf ";\n";
+      emit_node buf ctx' indent ~flat:child_flat child
 
     | [child] ->
       emit_comment ();

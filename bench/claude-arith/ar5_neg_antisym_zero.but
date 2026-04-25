@@ -1,0 +1,1 @@
+Flag(TypeOn("ar5_neg_antisym_zero")) & Flag(FileOn("ar5_neg_antisym_zero.res")) & Set(Valid.1 | Rule(Implication | a<=0 & -a<=0 | ? | ? | 0=a | nn))
