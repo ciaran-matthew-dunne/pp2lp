@@ -78,7 +78,7 @@ end;
 
 // AR6: —a ≤ 0 in H, a ≤ 0 antecedent ⇒ a = 0 (dual to AR5).
 opaque symbol AR6 [a : τ ι] [R : Prop]
-  : π ((— a) ≪ 𝟎)
+  : π ((— a) ≤ 𝟎)
   → π ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
 begin
@@ -180,7 +180,7 @@ end;
 opaque symbol AR13 [a b : τ ι]
   : π ((𝟏 - a) = b)
   → π (b ≤ 𝟎)
-  → π (¬ (a ≪ 𝟎)) ≔
+  → π (¬ (a ≤ 𝟎)) ≔
 begin
   assume a b heq hb ha;
   have h1 : π (𝟏 - a ≤ 𝟎) { rewrite heq; refine hb };

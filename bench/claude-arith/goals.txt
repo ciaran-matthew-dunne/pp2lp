@@ -18,6 +18,9 @@ ar_one_eq              1 = 1
 ar_add_zero_r          a + 0 = a
 ar_add_zero_l          0 + a = a
 
+# -- AR1: discharge a trivially-true (E ≤ E) antecedent. --
+ar1_refl_disc          (a <= a) => b = b
+
 # -- AR2: a > b ⇒ ¬(a ≤ b). PP encodes `>` as `not(_ <= _)`. --
 ar2_neg_refl           not(a <= a) => false
 ar2_double_neg_refl    not(not(a <= a))
@@ -34,8 +37,10 @@ ar4_chain              (a <= 0 and -1 <= 0 and not(a - 1 <= 0)) => false
 
 # -- AR5/AR6: a ≤ 0 ∧ −a ≤ 0 ⇒ a = 0. Negation antisymmetry.
 # (Goals concluding `a = 0` cause PP to chain AR12 onto an `=` antecedent —
-# pre-existing emitter limitation. The reordered `0 = a` form sidesteps it.) --
+# pre-existing emitter limitation. The reordered `0 = a` form sidesteps it.)
+# AR5 vs AR6 differ only in which conjunct is hyp vs antecedent. --
 ar5_neg_antisym_zero   (a <= 0 and -a <= 0) => 0 = a
+ar6_neg_antisym_zero   (-a <= 0 and a <= 0) => 0 = a
 
 # -- AR8: a − b ≤ 0; b − a ≤ 0 ⇒ a = b. Subtraction antisymmetry.
 # (AR7's emitter currently fills `c` with the placeholder `𝟎` —
@@ -47,3 +52,8 @@ ar8_leq_antisym        (a <= b and b <= a) => b = a
 ar_simp_zero           not(a <= 0 - 0) => not(a <= 0)
 ar_simp_add_zero       not(a + 0 <= 0) => not(a <= 0)
 ar_simp_zero_add       not(0 + a <= 0) => not(a <= 0)
+
+# -- AR13 (solver-mediated 1-a ≤ 0 → ¬(a ≤ 0)): no goal trigger known.
+# PP closes naive shapes via AXM7 (consequent normalises to antecedent)
+# without invoking AR13. AR13 doesn't appear in any prv replay either —
+# zero coverage may be inherent to PP's strategy, not a missing goal. --
