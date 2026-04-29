@@ -43,16 +43,12 @@ let relativize path =
     with Not_found ->
       try Sys.getcwd () with _ -> ""
   in
-  let n = String.length root in
-  if n > 0 && String.length path > n &&
-     String.sub path 0 n = root
-  then
+  if root <> "" && String.starts_with ~prefix:root path then
+    let n = String.length root in
     let rest = String.sub path n (String.length path - n) in
-    let rest = if String.length rest > 0 && rest.[0] = '/'
-               then String.sub rest 1 (String.length rest - 1)
-               else rest
-    in
-    rest
+    if String.length rest > 0 && rest.[0] = '/'
+    then String.sub rest 1 (String.length rest - 1)
+    else rest
   else path
 
 let bind o f = Option.bind o f
@@ -187,18 +183,16 @@ let format_for_terminal ?(warnings_text="") (text : string) : string =
   end;
   Buffer.contents b
 
-(* Convert diagnostics to JSON for the --json paths. *)
+(* Convert a diagnostic to JSON for the --json paths in main.ml. *)
 let diag_to_json d =
-  Json_out.JObj (List.filter_map (fun x -> x) [
-    Some ("severity", Json_out.JStr d.severity);
-    Some ("message", Json_out.JStr d.message);
-    (match d.loc with
-     | None -> None
-     | Some l -> Some ("loc", Json_out.JObj [
-         "file", Json_out.JStr l.file;
-         "line", Json_out.JInt l.line;
-         "col", Json_out.JInt l.col;
-       ]))
-  ])
-
-let _ = diag_to_json (* exposed for future use *)
+  let base =
+    [ "severity", Json_out.JStr d.severity;
+      "message",  Json_out.JStr d.message ] in
+  let loc = match d.loc with
+    | None -> []
+    | Some l -> ["loc", Json_out.JObj
+                   [ "file", Json_out.JStr l.file;
+                     "line", Json_out.JInt l.line;
+                     "col",  Json_out.JInt l.col ]]
+  in
+  Json_out.JObj (base @ loc)

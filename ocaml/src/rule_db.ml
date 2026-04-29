@@ -1,196 +1,229 @@
 (* Rule database: static metadata for PP inference rules. *)
 
+(** Kind of a derivation slot in a rule's signature.
+    - [Con]: side-condition proof (e.g. a [trust] arg or a solver lemma).
+      Filled inline in the LP application; not a child in the proof tree.
+    - [Seq]: sequent derivation — a regular proof-tree child.
+    - [Res]: result derivation — a [_1]-chain child. Currently the
+      first slot of branching quantifiers (ALL7/XST8). *)
+type kind = Con | Seq | Res
+
+(** [Arity (slots, output)]: argument-kind list plus the output kind. *)
+type arity = Arity of kind list * kind
+
 type rule_info = {
-  arity: int;           (* -1=phantom, 0=leaf, 1=single child, 2=two children *)
+  arity: arity option;       (* None = phantom (skipped during replay). *)
   emit_args: string option;
-  result_schema: int;   (* 0=leaf/TRUE, 1=passthrough, 2=conjunction *)
-  hoas_identity: bool;  (* rule is absorbed by LP's HOAS — skip in emit *)
-  intro_antecedent: bool; (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
-  branching: bool;      (* ALL7/XST8: first child is a _1 equality chain *)
+  hoas_identity: bool;       (* rule is absorbed by LP's HOAS — skip in emit *)
+  intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit_args=None) ?(result_schema=1) ?(hoas_identity=false)
-        ?(intro_antecedent=false) ?(branching=false) name arity =
+  let r ?(emit_args=None) ?(hoas_identity=false)
+        ?(intro_antecedent=false) name arity =
     Hashtbl.replace t name
-      { arity; emit_args; result_schema;
-        hoas_identity; intro_antecedent; branching }
+      { arity = Some arity; emit_args; hoas_identity; intro_antecedent }
   in
+  let phantom name =
+    Hashtbl.replace t name
+      { arity = None; emit_args = None;
+        hoas_identity = false; intro_antecedent = false }
+  in
+  (* Common arity shapes. *)
+  let leaf   = Arity ([], Seq) in              (* axiom-style leaf       *)
+  let pass   = Arity ([Seq], Seq) in           (* one-child passthrough  *)
+  let conj   = Arity ([Seq; Seq], Seq) in      (* two-child conjunction  *)
+  let branch = Arity ([Res; Seq], Seq) in      (* ALL7 / XST8: _1 chain + cont *)
   (* §A.1 Conjunction *)
-  r "AND1" 2 ~result_schema:2;
-  r "AND2" 1;
-  r "AND3" 1;
-  r "AND4" 2 ~result_schema:2;
-  r "AND5" 1 ~emit_args:(Some "dynamic:and5");
+  r "AND1" conj;
+  r "AND2" pass;
+  r "AND3" pass;
+  r "AND4" conj;
+  r "AND5" pass ~emit_args:(Some "dynamic:and5");
   (* §A.2 Disjunction *)
-  r "OR1" 1;
-  r "OR2" 2 ~result_schema:2;
-  r "OR3" 2 ~result_schema:2;
-  r "OR4" 1;
+  r "OR1" pass;
+  r "OR2" conj;
+  r "OR3" conj;
+  r "OR4" pass;
   (* §A.3 Implication *)
-  r "IMP1" 1;
-  r "IMP2" 2 ~result_schema:2;
-  r "IMP3" 2 ~result_schema:2;
-  r "IMP4" 1 ~intro_antecedent:true;
-  r "IMP5" 1;
+  r "IMP1" pass;
+  r "IMP2" conj;
+  r "IMP3" conj;
+  r "IMP4" pass ~intro_antecedent:true;
+  r "IMP5" pass;
   (* §A.4 Equivalence *)
-  r "EQV1" 2 ~result_schema:2;
-  r "EQV2" 2 ~result_schema:2;
-  r "EQV3" 2 ~result_schema:2;
-  r "EQV4" 2 ~result_schema:2;
+  r "EQV1" conj;
+  r "EQV2" conj;
+  r "EQV3" conj;
+  r "EQV4" conj;
   (* §A.5 Negation *)
-  r "NOT1" 1;
-  r "NOT2" 1;
+  r "NOT1" pass;
+  r "NOT2" pass;
   (* §A.6 Axioms *)
   let hyp = Some "dynamic:hyp" in
-  r "AXM1" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM2" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM3" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM4" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM5" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM6" 0 ~emit_args:hyp ~result_schema:0;
-  r "AXM7" 0 ~result_schema:0;
-  r "AXM8" 0 ~emit_args:(Some "dynamic:axm8") ~result_schema:0;
-  r "AXM9" 0 ~emit_args:(Some "dynamic:axm9") ~result_schema:0;
+  r "AXM1" leaf ~emit_args:hyp;
+  r "AXM2" leaf ~emit_args:hyp;
+  r "AXM3" leaf ~emit_args:hyp;
+  r "AXM4" leaf ~emit_args:hyp;
+  r "AXM5" leaf ~emit_args:hyp;
+  r "AXM6" leaf ~emit_args:hyp;
+  r "AXM7" leaf;
+  r "AXM8" leaf ~emit_args:(Some "dynamic:axm8");
+  r "AXM9" leaf ~emit_args:(Some "dynamic:axm9");
   (* §A.7 Universal quantification *)
-  let top_i = Some "\xe2\x8a\xa4\xe1\xb5\xa2" in (* ⊤ᵢ *)
-  r "ALL1" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "ALL2" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "ALL3" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "ALL4" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "ALL5" 1;
-  r "ALL6" 1 ~hoas_identity:true;
-  r "ALL7" 2 ~emit_args:(Some "dynamic:all7") ~branching:true;
-  r "ALL8" 1;
-  r "ALL9" 1 ~intro_antecedent:true;
+  r "ALL1" pass ~hoas_identity:true;
+  r "ALL2" pass ~hoas_identity:true;
+  r "ALL3" pass ~hoas_identity:true;
+  r "ALL4" pass ~hoas_identity:true;
+  r "ALL5" pass;
+  r "ALL6" pass ~hoas_identity:true;
+  r "ALL7" branch ~emit_args:(Some "dynamic:all7");
+  r "ALL8" pass;
+  r "ALL9" pass ~intro_antecedent:true;
   (* §A.8 Existential quantification *)
-  r "XST1" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "XST2" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "XST3" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "XST4" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "XST5" 1;
-  r "XST51" 1;
-  r "XST6" 1;
-  r "XST61" 1;
-  r "XST7" 1;
-  r "XST8" 2 ~emit_args:(Some "dynamic:xst8") ~branching:true;
+  r "XST1" pass ~hoas_identity:true;
+  r "XST2" pass ~hoas_identity:true;
+  r "XST3" pass ~hoas_identity:true;
+  r "XST4" pass ~hoas_identity:true;
+  r "XST5" pass;
+  r "XST51" pass;
+  r "XST6" pass;
+  r "XST61" pass;
+  r "XST7" pass;
+  r "XST8" branch ~emit_args:(Some "dynamic:xst8");
   (* §A.9-11 VR/FX/STOP/INS *)
-  r "VR1" 0 ~result_schema:0;
-  r "VR2" 1;
-  r "VR3" 1;
-  r "VR4" 0 ~result_schema:0;
-  r "FX1" 1;
-  r "FX2" 0 ~result_schema:0;
-  r "FX3" 0 ~result_schema:0;
-  r "STOP" 1;
-  r "INS" 1;
+  r "VR1" leaf;
+  r "VR2" pass;
+  r "VR3" pass;
+  r "VR4" leaf;
+  r "FX1" pass;
+  r "FX2" leaf;
+  r "FX3" leaf;
+  r "STOP" pass;
+  r "INS" pass;
   (* §A.12 Normalisation *)
-  r "NRM1" 1;
-  r "NRM2" 1;
-  r "NRM3" 1;
-  r "NRM4" 1;
-  r "NRM5" 1;
-  r "NRM6" 1;
-  r "NRM7" 1;
-  r "NRM8" 1 ~hoas_identity:true;
-  r "NRM9" 1;
-  r "NRM10" 1;
-  r "NRM11" 1;
-  r "NRM12" 1;
-  r "NRM13" 1;
-  r "NRM14" 1;
-  r "NRM15" 1;
-  r "NRM16" 0;
-  r "NRM17" 1;
-  r "NRM18" 1;
-  r "NRM19" 0 ~emit_args:(Some "dynamic:nrm19");
-  r "NRM20" 1;
-  r "NRM21" 1;
-  r "NRM22" 1;
-  r "NRM23" 1;
-  r "NRM24" 1;
-  r "NRM25" 1;
-  r "NRM26" 1;
+  r "NRM1" pass;
+  r "NRM2" pass;
+  r "NRM3" pass;
+  r "NRM4" pass;
+  r "NRM5" pass;
+  r "NRM6" pass;
+  r "NRM7" pass;
+  r "NRM8" pass ~hoas_identity:true;
+  r "NRM9" pass;
+  r "NRM10" pass;
+  r "NRM11" pass;
+  r "NRM12" pass;
+  r "NRM13" pass;
+  r "NRM14" pass;
+  r "NRM15" pass;
+  r "NRM16" leaf;
+  r "NRM17" pass;
+  r "NRM18" pass;
+  r "NRM19" leaf ~emit_args:(Some "dynamic:nrm19");
+  r "NRM20" pass;
+  r "NRM21" pass;
+  r "NRM22" pass;
+  r "NRM23" pass;
+  r "NRM24" pass;
+  r "NRM25" pass;
+  r "NRM26" pass;
   (* NRM27–30: arithmetic solver dispatch; not yet formalised in LP.
      Deliberately unregistered — replay_arity raises Ill_formed_replay
      (→ SKIP) if PP emits them, rather than silently dropping a step. *)
   (* §A.13 Equality *)
-  r "EVR1" 0 ~result_schema:0;
-  r "EVR2" 1;
-  r "EVR3" 1;
-  r "EVR4" 0 ~result_schema:0;
-  r "EVR11" 0 ~result_schema:0;
-  r "EAXM1" 0 ~emit_args:hyp ~result_schema:0;
-  r "EAXM2" 0 ~emit_args:hyp ~result_schema:0;
-  r "EAXM31" 1;
-  r "EAXM32" 1;
-  r "EIMP51" 1;
-  r "EIMP52" 1;
-  r "EAXM91" 1;
-  r "EAXM92" 1;
-  r "OPR1" 1 ~emit_args:(Some "dynamic:opr1");
-  r "OPR2" 1 ~emit_args:(Some "dynamic:opr2");
-  r "EQC1" 1;
-  r "EQC2" 1;
-  r "EQS1" 1;
-  r "EQS2" 1;
-  r "ECTR1" 0 ~result_schema:0;
-  r "ECTR2" 0 ~result_schema:0;
-  r "ECTR3" 0 ~result_schema:0;
-  r "ECTR4" 0 ~result_schema:0;
-  r "ECTR5" 0 ~result_schema:0;
-  r "ECTR6" 0 ~result_schema:0;
+  r "EVR1" leaf;
+  r "EVR2" pass;
+  r "EVR3" pass;
+  r "EVR4" leaf;
+  r "EVR11" leaf;
+  r "EAXM1" leaf ~emit_args:hyp;
+  r "EAXM2" leaf ~emit_args:hyp;
+  r "EAXM31" pass;
+  r "EAXM32" pass;
+  r "EIMP51" pass;
+  r "EIMP52" pass;
+  r "EAXM91" pass;
+  r "EAXM92" pass;
+  r "OPR1" pass ~emit_args:(Some "dynamic:opr1");
+  r "OPR2" pass ~emit_args:(Some "dynamic:opr2");
+  r "EQC1" pass;
+  r "EQC2" pass;
+  r "EQS1" pass;
+  r "EQS2" pass;
+  r "ECTR1" leaf;
+  r "ECTR2" leaf;
+  r "ECTR3" leaf;
+  r "ECTR4" leaf;
+  r "ECTR5" leaf;
+  r "ECTR6" leaf;
   (* §A.14 Arithmetic *)
-  r "AR1" 1;
-  r "AR2" 0 ~emit_args:(Some "trust") ~result_schema:0;
-  r "AR3" 1 ~emit_args:(Some "dynamic:ar3");
-  r "AR3_F" 1 ~emit_args:top_i ~hoas_identity:true;
-  r "AR4" 0 ~emit_args:(Some "dynamic:ar4") ~result_schema:0;
-  r "AR5" 1 ~emit_args:(Some "dynamic:ar56");
-  r "AR6" 1 ~emit_args:(Some "dynamic:ar56");
-  r "AR7" 1 ~emit_args:(Some "dynamic:ar78");
-  r "AR8" 1 ~emit_args:(Some "dynamic:ar78");
-  r "AR9" 1 ~emit_args:(Some "dynamic:ar9");
+  r "AR1" pass;
+  r "AR2" (Arity ([Con], Seq)) ~emit_args:(Some "trust");
+  r "AR3" pass ~emit_args:(Some "dynamic:ar3");
+  r "AR3_F" pass ~hoas_identity:true;
+  r "AR4" leaf ~emit_args:(Some "dynamic:ar4");
+  r "AR5" pass ~emit_args:(Some "dynamic:ar56");
+  r "AR6" pass ~emit_args:(Some "dynamic:ar56");
+  r "AR7" pass ~emit_args:(Some "dynamic:ar78");
+  r "AR8" pass ~emit_args:(Some "dynamic:ar78");
+  r "AR9" pass ~emit_args:(Some "dynamic:ar9");
   (* AR10 is a solver no-op: P = Q (trivially); the LP symbol in Arith.lp
      is never applied because PP emits AR10 only when Q = P. Phantom. *)
-  r "AR10" (-1);
-  r "AR11" 0 ~result_schema:0;
-  r "AR12" 1 ~intro_antecedent:true;
-  r "AR13" 1 ~emit_args:(Some "trust trust");
+  phantom "AR10";
+  r "AR11" leaf;
+  r "AR12" pass ~intro_antecedent:true;
+  r "AR13" (Arity ([Con; Con; Seq], Seq)) ~emit_args:(Some "trust trust");
   (* §A.15 Boolean *)
-  r "BOOL11" 1;
-  r "BOOL12" 1;
-  r "BOOL21" 1;
-  r "BOOL22" 1;
-  r "BOOL31" 1 ~emit_args:(Some "trust");
-  r "BOOL32" 1 ~emit_args:(Some "trust");
-  r "BOOL41" 1 ~emit_args:(Some "trust");
-  r "BOOL42" 1 ~emit_args:(Some "trust");
-  r "BOOL51" 0 ~result_schema:0;
-  r "BOOL52" 0 ~result_schema:0;
+  r "BOOL11" pass;
+  r "BOOL12" pass;
+  r "BOOL21" pass;
+  r "BOOL22" pass;
+  r "BOOL31" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
+  r "BOOL32" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
+  r "BOOL41" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
+  r "BOOL42" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
+  r "BOOL51" leaf;
+  r "BOOL52" leaf;
   (* Phantom entries *)
-  r "FIN" (-1);
-  r "STOP_NORM" (-1);
-  r "NRM" (-1);
+  phantom "FIN";
+  phantom "STOP_NORM";
+  phantom "NRM";
   t
 
-(* --- Lookup functions --- *)
+(* --- Lookup --- *)
 
+(** [true] iff the rule has no entry or has [arity = None]. *)
+let is_phantom name =
+  match Hashtbl.find_opt rules name with
+  | Some { arity = None; _ } -> true
+  | Some _ -> false
+  | None -> true
+
+(** Number of children the rule has in the proof tree
+    (= number of [Seq] + [Res] slots). [Con] slots are inline LP args
+    rather than tree children. Returns [-1] for phantom rules.
+    Raises [Failure] if [name] is unknown. *)
 let rule_arity name =
   match Hashtbl.find_opt rules name with
-  | Some r -> r.arity
-  | None ->
-    failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+  | Some { arity = Some (Arity (slots, _)); _ } ->
+    List.length
+      (List.filter (function Seq | Res -> true | Con -> false) slots)
+  | Some { arity = None; _ } -> -1
+  | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+
+(** [true] for rules whose first child is a [_1] result derivation
+    (i.e. an ALL7/XST8-style branching quantifier). *)
+let is_branching name =
+  match Hashtbl.find_opt rules name with
+  | Some { arity = Some (Arity (slots, _)); _ } ->
+    List.exists (function Res -> true | _ -> false) slots
+  | _ -> false
 
 let emit_args name =
   match Hashtbl.find_opt rules name with
   | Some r -> r.emit_args
-  | None -> None
-
-let result_schema name =
-  match Hashtbl.find_opt rules name with
-  | Some r -> Some r.result_schema
   | None -> None
 
 let lookup_flag f name =
@@ -198,13 +231,8 @@ let lookup_flag f name =
   | Some r -> f r
   | None -> false
 
-(* --- Rule-class predicates (queried by emit_lp / proof_tree). ---
-   Predicates take the *base* name (after _1 / _N stripping): they only
-   need to be set on the base rule in the db above. *)
-
 let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
 let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
-let is_branching    = lookup_flag (fun r -> r.branching)
 
 (* --- Rule-name string predicates ---
    PP replay rule names carry structural information in their suffix:
@@ -261,6 +289,6 @@ let nary_count rule =
 (* NRM<digit>... (NRM1, NRM12, NRM1_1, …). Excludes the bare "NRM"
    phantom (arity -1). *)
 let is_nrm_step name =
+  String.starts_with ~prefix:"NRM" name &&
   String.length name > 3 &&
-  String.sub name 0 3 = "NRM" &&
   (let c = name.[3] in c >= '0' && c <= '9')

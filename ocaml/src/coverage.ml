@@ -1,16 +1,11 @@
 (* Per-rule coverage matrix across benchmark suites. Replaces
    bench/rule_coverage.sh. *)
 
-(* All rules known to the rule_db, sorted alphabetically. *)
+(* All non-phantom rules known to the rule_db, sorted alphabetically. *)
 let all_rules () =
-  let acc = Hashtbl.fold (fun k _ a -> k :: a) Rule_db.rules [] in
-  (* Filter phantom entries (arity -1): they don't show up in replays. *)
-  let acc = List.filter (fun n ->
-    match Hashtbl.find_opt Rule_db.rules n with
-    | Some r -> r.arity >= 0
-    | None -> true) acc
-  in
-  List.sort compare acc
+  Hashtbl.fold (fun k _ a -> k :: a) Rule_db.rules []
+  |> List.filter (fun n -> not (Rule_db.is_phantom n))
+  |> List.sort compare
 
 (* Extract the rule names that appear in a replay file.
    Rules look like "[NAME]" or "[NAME(ARG)]" at line start. _1 suffix
@@ -123,11 +118,7 @@ let print_by_suite ?(missing=false) () =
     (String.concat " " parts) covered total
 
 let print_simple ?(missing=false) () =
-  let module SS = Set.Make(String) in
-  let all_files =
-    Suite.all
-    |> List.concat_map replays_in
-  in
+  let all_files = List.concat_map replays_in Suite.all in
   let counts = Hashtbl.create 64 in
   List.iter (fun f ->
     List.iter (fun r ->
@@ -148,13 +139,6 @@ let print_simple ?(missing=false) () =
       Printf.printf "%-14s %6d\n" r n
     ) rules
   end;
-  let covered =
-    Hashtbl.fold (fun _ _ acc -> acc + 1)
-      (let h = Hashtbl.create 32 in
-       Hashtbl.iter (fun k _ ->
-         if List.mem k rules then Hashtbl.replace h k ()) counts;
-       h)
-      0
-  in
+  let covered = List.length (List.filter (Hashtbl.mem counts) rules) in
   let total = List.length rules in
   Printf.printf "\nCoverage: %d/%d rules\n" covered total

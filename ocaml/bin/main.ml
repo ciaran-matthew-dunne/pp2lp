@@ -18,6 +18,28 @@ let lp_dir () =
   | Some r -> Filename.concat r "lp"
   | None -> "lp"
 
+(* Drop all *.lpo compilation outputs under lp/. Used by `check --fresh`
+   and `clean --lpo` / `clean --all`. *)
+let drop_lpo_files () =
+  let rec walk dir =
+    try
+      let dh = Unix.opendir dir in
+      (try while true do
+        let n = Unix.readdir dh in
+        if n <> "." && n <> ".." then begin
+          let p = Filename.concat dir n in
+          match (try Some (Unix.stat p).Unix.st_kind with _ -> None) with
+          | Some Unix.S_DIR -> walk p
+          | Some Unix.S_REG when Filename.check_suffix n ".lpo" ->
+            (try Unix.unlink p with _ -> ())
+          | _ -> ()
+        end
+      done with End_of_file -> ());
+      Unix.closedir dh
+    with Unix.Unix_error _ -> ()
+  in
+  walk (lp_dir ())
+
 (* Common cache config builder. *)
 let make_cache_cfg suite ~xfail =
   let sentinel =
@@ -288,25 +310,7 @@ let cmd_check () =
   let suite_dir = Pp2lp.Suite.dir suite in
   if !fresh then begin
     Pp2lp.Cache.clear_all suite_dir;
-    (* Drop .lpo files under lp/ — same as `make clean-lpo`. *)
-    let rec drop_lpo dir =
-      try
-        let dh = Unix.opendir dir in
-        (try while true do
-          let n = Unix.readdir dh in
-          if n <> "." && n <> ".." then begin
-            let p = Filename.concat dir n in
-            (match (Unix.stat p).Unix.st_kind with
-             | Unix.S_DIR -> drop_lpo p
-             | Unix.S_REG when Filename.check_suffix n ".lpo" ->
-               (try Unix.unlink p with _ -> ())
-             | _ -> ())
-          end
-        done with End_of_file -> ());
-        Unix.closedir dh
-      with Unix.Unix_error _ -> ()
-    in
-    drop_lpo (lp_dir ())
+    drop_lpo_files ()
   end;
   let cfg = make_cache_cfg suite ~xfail:[] in
   Pp2lp.Runner.ensure_pkg suite;
@@ -316,11 +320,9 @@ let cmd_check () =
       if not (List.mem !name all_tests) then
         die "No replay for %S in suite %s" !name suite.Pp2lp.Suite.name;
       [!name]
-    end else if !job <> "" then begin
-      List.filter (fun n ->
-        String.length n >= String.length !job &&
-        String.sub n 0 (String.length !job) = !job) all_tests
-    end else all_tests
+    end else if !job <> "" then
+      List.filter (String.starts_with ~prefix:!job) all_tests
+    else all_tests
   in
   if tests = [] then
     die "No replay files in %s — run 'pp2lp gen --suite=%s' first"
@@ -495,8 +497,7 @@ let cmd_status () =
                 let l = input_line ic in
                 match String.split_on_char '\t' l with
                 | _ :: stage :: reason :: _
-                  when String.length stage > 5 &&
-                       String.sub stage 0 5 = "fail-" ->
+                  when String.starts_with ~prefix:"fail-" stage ->
                   acc := (stage, reason) :: !acc
                 | _ -> ()
               done with End_of_file -> ());
@@ -565,27 +566,7 @@ let cmd_clean () =
     "Usage: pp2lp clean [--lpo] [--cache] [--all] [--suite=X]";
   if not (!lpo || !cache || !all) then
     die "clean: pick at least one of --lpo, --cache, --all";
-  let drop_lpo () =
-    let rec walk dir =
-      try
-        let dh = Unix.opendir dir in
-        (try while true do
-          let n = Unix.readdir dh in
-          if n <> "." && n <> ".." then begin
-            let p = Filename.concat dir n in
-            match (try Some (Unix.stat p).Unix.st_kind with _ -> None) with
-            | Some Unix.S_DIR -> walk p
-            | Some Unix.S_REG when Filename.check_suffix n ".lpo" ->
-              (try Unix.unlink p with _ -> ())
-            | _ -> ()
-          end
-        done with End_of_file -> ());
-        Unix.closedir dh
-      with Unix.Unix_error _ -> ()
-    in
-    walk (lp_dir ())
-  in
-  if !lpo then drop_lpo ();
+  if !lpo then drop_lpo_files ();
   if !cache then begin
     let suites =
       if !suite_name = "" then Pp2lp.Suite.all
@@ -594,9 +575,8 @@ let cmd_clean () =
     List.iter (fun s -> Pp2lp.Cache.clear_all (Pp2lp.Suite.dir s)) suites
   end;
   if !all then begin
-    drop_lpo ();
+    drop_lpo_files ();
     List.iter (fun s -> Pp2lp.Cache.clear_all (Pp2lp.Suite.dir s)) Pp2lp.Suite.all;
-    (* Run dune clean too. *)
     let _ = Sys.command "cd ocaml && dune clean" in
     ()
   end
@@ -687,7 +667,7 @@ let cmd_debug () =
     if want_tree then print_endline "";
     print_endline "=== Emitter dispatch trace ===";
     Pp2lp.Emit_lp.trace_file := !replay;
-    let ((kind, _payload), traces) =
+    let ((kind, payload), traces) =
       Pp2lp.Emit_lp.with_trace_capture (fun () ->
         try
           let body = Pp2lp.Reconstruct.reconstruct_symbol !replay in
@@ -706,10 +686,10 @@ let cmd_debug () =
       ) traces;
     (match kind with
      | `Skip ->
-       Printf.printf "\n[ill-formed replay: %s]\n" _payload;
+       Printf.printf "\n[ill-formed replay: %s]\n" payload;
        exit 2
      | `Error ->
-       Printf.printf "\n[emit error: %s]\n" _payload;
+       Printf.printf "\n[emit error: %s]\n" payload;
        exit 3
      | `Ok -> ())
   end
@@ -856,20 +836,8 @@ let cmd_lp_check () =
     let ok = (rc = 0) in
     if not ok then any_fail := true;
     if !json then begin
-      let errs_json = Pp2lp.Json_out.JList (List.map (fun d ->
-        let loc_field = match d.Pp2lp.Lp_diag.loc with
-          | None -> []
-          | Some l -> ["loc", Pp2lp.Json_out.JObj [
-              "file", Pp2lp.Json_out.JStr l.Pp2lp.Lp_diag.file;
-              "line", Pp2lp.Json_out.JInt l.Pp2lp.Lp_diag.line;
-              "col",  Pp2lp.Json_out.JInt l.Pp2lp.Lp_diag.col;
-            ]]
-        in
-        Pp2lp.Json_out.JObj (
-          ("severity", Pp2lp.Json_out.JStr d.severity) ::
-          ("message",  Pp2lp.Json_out.JStr d.message) ::
-          loc_field)
-      ) errors) in
+      let errs_json = Pp2lp.Json_out.JList
+        (List.map Pp2lp.Lp_diag.diag_to_json errors) in
       Pp2lp.Json_out.print_line (Pp2lp.Json_out.JObj [
         "kind",   Pp2lp.Json_out.JStr "lp-check";
         "file",   Pp2lp.Json_out.JStr f;
@@ -1122,9 +1090,9 @@ let cmd_lp_debug () =
     [ "--flags",   Arg.Set_string flags,
         " Lambdapi debug flags (e.g. u, a, t, ut)";
       "--at",      Arg.Set_int at,
-        " Line to enable debug (default 1: whole file)";
+        " First line to trace (inclusive; default 1 = whole file)";
       "--end-at",  Arg.Set_int end_at,
-        " Line to disable debug (default end-of-file)";
+        " Last line to trace (inclusive; default end-of-file)";
       "--save-to", Arg.Set_string save_to,
         " Write FULL raw lambdapi output to this path";
       "--raw",     Arg.Set raw,
@@ -1132,12 +1100,13 @@ let cmd_lp_debug () =
     (fun s -> if !file = "" then file := s
               else die "lp-debug: extra positional arg %S" s)
     "Usage: pp2lp lp-debug FILE --flags=FLAGS [--at=LINE] [--end-at=LINE]\n\
-     Inserts `debug +FLAGS;` at --at and `debug -FLAGS;` at --end-at\n\
-     in a sibling probe file, then runs `lambdapi check` and slices the\n\
-     trace between the toggles.\n\
+     Inserts `debug +FLAGS;` before line --at and `debug -FLAGS;` after\n\
+     line --end-at in a sibling probe file (both bounds inclusive), then\n\
+     runs `lambdapi check` and slices the trace between the toggles.\n\
      Examples:\n\
        pp2lp lp-debug lp/Foo.lp --flags=u                # whole file\n\
-       pp2lp lp-debug lp/Foo.lp --flags=u --at=42        # from line 42 to EOF\n\
+       pp2lp lp-debug lp/Foo.lp --flags=u --at=42        # line 42 to EOF\n\
+       pp2lp lp-debug lp/Foo.lp --flags=u --at=42 --end-at=42  # just L42\n\
        pp2lp lp-debug lp/Foo.lp --flags=u --at=42 --end-at=65";
   if !file = "" then die "lp-debug: FILE required";
   if !flags = "" then die "lp-debug: --flags required";
@@ -1149,10 +1118,13 @@ let cmd_lp_debug () =
     List.length lines
   in
   let at = if !at = 0 then 1 else !at in
-  let end_at = if !end_at = 0 then line_count + 1 else !end_at in
+  (* --end-at is inclusive: insert the off-toggle AFTER the named line,
+     i.e. at probe position end_at + 1, so [at..end_at] is fully traced.
+     Default 0 → past EOF (whole-file trace). *)
+  let end_at = if !end_at = 0 then line_count + 1 else !end_at + 1 in
   let on_cmd = Printf.sprintf "debug +%s;" !flags in
   let off_cmd = Printf.sprintf "debug -%s;" !flags in
-  let probe, mapping =
+  let probe, _mapping =
     Pp2lp.Lp_tools.make_probe ~original:!file
       ~insertions:[ (at, on_cmd); (end_at, off_cmd) ]
   in
@@ -1161,7 +1133,6 @@ let cmd_lp_debug () =
     (fun () ->
       let argv = [| "lambdapi"; "check"; probe |] in
       let rc, out, err = Pp2lp.Runner.run_capture argv in
-      let _ = mapping in
       if !save_to <> "" then begin
         let oc = open_out !save_to in
         output_string oc (out ^ err);

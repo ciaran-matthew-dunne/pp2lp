@@ -286,18 +286,6 @@ let emit_and5_bwd buf var n j =
   done;
   emit_conj_from_elts buf !elts
 
-(* ---- Convenience stringifiers ---- *)
-
-let prd_to_string p =
-  let buf = Buffer.create 256 in
-  pp_prd buf p;
-  Buffer.contents buf
-
-let exp_to_string e =
-  let buf = Buffer.create 64 in
-  pp_exp buf e;
-  Buffer.contents buf
-
 (* ---- Block-formatted predicate printing ---- *)
 
 (* Column width threshold: if inline rendering fits, skip line breaks. *)

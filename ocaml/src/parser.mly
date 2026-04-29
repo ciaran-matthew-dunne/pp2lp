@@ -97,7 +97,7 @@ raw_prd:
   | es = exp_seq; COLON; e = exp
   { Mem (es,e)}
   | t = binding
-  { t } %prec PERIOD
+  { t }
 
 
 lhs_arg:

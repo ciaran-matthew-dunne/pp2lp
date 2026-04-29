@@ -104,9 +104,8 @@ let filter_emit_warn s =
   |> List.filter (fun l ->
     let t = String.trim l in
     t <> "" &&
-    not (let n = String.length t in
-         (n >= 8 && String.sub t 0 8 = "Entering") ||
-         (n >= 7 && String.sub t 0 7 = "Leaving")))
+    not (String.starts_with ~prefix:"Entering" t ||
+         String.starts_with ~prefix:"Leaving" t))
   |> String.concat "\n"
 
 (* Run pp2lp's emit on one replay → returns (lp_text, exit_code, warn).

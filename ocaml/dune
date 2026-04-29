@@ -1,0 +1,5 @@
+; Project-wide compile flags: suppress warnings 8 (partial-match) and
+; 26 (unused-var) so the LSP isn't flooded while iterating. Applies
+; recursively to src/, bin/, test/.
+(env
+ (_ (flags (:standard -w -8-26))))

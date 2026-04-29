@@ -14,9 +14,9 @@ open Ins
 
        [emit] FILE: TAG <details>
 
-   where TAG identifies the special case (`ar3-bridged`, `opr-trust`,
-   `nrm20-trust`, `all7-second-child-trust`, …). Off by default —
-   non-trace output is unchanged. *)
+   where TAG identifies the special case (`ar3-bridged`,
+   `nrm20-shape-trust`, `nrm21-23-trust`, `all7-2nd-child-trust`,
+   …). Off by default — non-trace output is unchanged. *)
 let trace = ref false
 let trace_file = ref ""
 
@@ -101,8 +101,13 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
   match node with
   | Apply { rule; goal; children; _ } ->
     let base = strip_suffix rule in
-    let schema = match Rule_db.result_schema base with
-      | Some _ as s -> s | None -> Some 1 in
+    (* Number of tree children of the base rule. The _1 form has the
+       same Seq/Res slot count: 0 = leaf, 1 = passthrough, 2 = result
+       conjunction (AND1, OR2, IMP2, EQV1-4). Branching quantifiers
+       (ALL7, XST8) also have 2, but their _1 form is dispatched
+       explicitly above the catch-all. *)
+    let base_arity =
+      try Rule_db.rule_arity base with Failure _ -> 1 in
     Buffer.add_string buf "// ";
     Buffer.add_string buf rule;
     Buffer.add_string buf "\n";
@@ -116,9 +121,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
     | _, [child] when is_hoas_identity base ->
       emit_primed_chain buf ctx pad child
 
-    (* Schema 0 — leaf *)
-    | _, [] when schema = Some 0 ->
-      raise (Emit_admit (Printf.sprintf "schema 0 leaf %s in primed chain" base))
+    (* Leaf base rule (arity 0) reaching the chain — shouldn't happen
+       except for STOP_1 (handled above); surface a precise error. *)
+    | _, [] when base_arity = 0 ->
+      raise (Emit_admit
+        (Printf.sprintf "leaf %s with no children in primed chain" base))
 
     (* IMP4_1: congruence under ⇒ *)
     | _, [child] when base = "IMP4" ->
@@ -197,16 +204,35 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         raise (Emit_admit "AR9 primed chain: could not extract E/F")
       end
 
-    (* OPR1/OPR2 — primed: `(x = v ⇒ body[x]) = body[v]` is admitted via a
-       direct trust bridge to the child's goal. A fine-grained
-       `eq_trans`/`refine IMP4_1 …` sequence hits LP's inability to
-       re-unify the resulting equality shape against the enclosing chain;
-       closing the whole subtree with trust at this single step keeps the
-       soundness surface narrow (still one trust per OPR step) without
-       the cascade of HOU metavariables. *)
-    | _, [_child] when base = "OPR1" || base = "OPR2" ->
-      trace_emit "opr-trust" base;
-      Buffer.add_string buf "refine trust"
+    (* OPR1/OPR2 — primed: rewrite `(x = E ⇒ P x)` to `(x = E ⇒ P E)`
+       (OPR1) or `(E = x ⇒ P x)` to `(E = x ⇒ P E)` (OPR2) within the
+       chain. The bridge `(x = E ⇒ P x) = (x = E ⇒ P E)` holds
+       pointwise: when `x = E` both sides are `P E`; when not, both
+       are vacuously `⊤`. Emit `refine OPRn_1 (λ x, body) x _;` and
+       recurse on the child proving the substituted form. *)
+    | _, [child] when base = "OPR1" || base = "OPR2" ->
+      let xy = match goal, base with
+        | Binary (Imp, Eq (Var x, _), body), "OPR1" -> Some (x, body)
+        | Binary (Imp, Eq (_, Var x), body), "OPR2" -> Some (x, body)
+        | _ -> None
+      in
+      begin match xy with
+      | Some (x_var, body) ->
+        Buffer.add_string buf "refine ";
+        Buffer.add_string buf rule;
+        Buffer.add_string buf " (\xce\xbb "; (* λ *)
+        pp_ident buf x_var;
+        Buffer.add_string buf " : \xcf\x84 \xce\xb9, "; (* τ ι *)
+        pp_prd buf body;
+        Buffer.add_string buf ") ";
+        pp_ident buf x_var;
+        Buffer.add_string buf " _;\n";
+        Buffer.add_string buf pad;
+        emit_primed_chain buf ctx pad child
+      | None ->
+        raise (Emit_admit
+          (Printf.sprintf "%s primed chain: unexpected goal shape" base))
+      end
 
     (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
        Proof_tree.build guarantees child1 is the _1-chain subtree and
@@ -259,10 +285,11 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         emit_primed_chain buf ctx pad base_child
       end
 
-    (* Schema 2 — branching _1 rules producing conjunctions.
-       The raw right-associated result propagates up; ALL7_2/XST8_2 accept it
+    (* Two-child base rules (AND1/AND4/OR2/OR3/IMP2/IMP3/EQV1-4):
+       primed form produces a conjunction in the result chain. The raw
+       right-associated result propagates up; ALL7_2/XST8_2 accept it
        and child2's body bridges to left-assoc via `rewrite ∧_assoc`. *)
-    | _, [child1; child2] when schema = Some 2 ->
+    | _, [child1; child2] when base_arity = 2 ->
       let r1 = compute_result child1 in
       let r2 = compute_result child2 in
       let raw = Binary (And, r1, r2) in
@@ -313,7 +340,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         Buffer.add_string buf " }"
       end
 
-    (* Schema 1 — passthrough _1 rules *)
+    (* Single-child base rules — passthrough _1 form. *)
     | _, [child] ->
       Buffer.add_string buf "refine ";
       Buffer.add_string buf (String.uppercase_ascii base);
@@ -327,14 +354,19 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         rule (List.length children)))
     end
 
-(* True iff [node]'s subtree contains any NRM20-23 rule application.
-   Those rules are admitted (per CLAUDE.md / Nrm.lp) and emit `refine
-   trust` as their leaf. When a subtree leads inevitably to such a
-   trust leaf, the surrounding proved-NRM rules add nothing the kernel
-   can verify on its own — we can collapse the whole subtree to a
-   single `refine trust` and avoid the higher-order unification that
-   trips up Lambdapi on the conjunction-of-implications goals produced
-   by ALL7_2 / ALL7_3. Net trust budget is unchanged. *)
+(* True iff [node]'s subtree contains a NRM rule whose ALL7-second-child
+   continuation can't currently be elaborated by Lambdapi.
+
+   NRM20 is itself proved at the leaf (NRM20_3 / NRM20_4 in Nrm.lp) but
+   the surrounding right-assoc → left-assoc bridging that
+   [emit_branching_quant] prepends to child2 over-fires for
+   OR3_1/AND3_1-rich chains — `compute_result child1` builds a wider
+   right-associated tree than the elaborated goal actually has, so the
+   prepended `rewrite ∧_assoc` calls have nothing to match.  Until that
+   bridging is itself fixed, keeping NRM20 in this set preserves the
+   trust-collapse and the suite stays at 0 failures.  The leaf NRM20
+   dispatch above remains sound and is the entry point for any future
+   change that bypasses the collapse. *)
 and subtree_hits_admitted_nrm node =
   match node with
   | Apply { rule; children; _ } ->
@@ -347,7 +379,7 @@ and subtree_hits_admitted_nrm node =
 (* ---- Branching quantifier emission (ALL7/XST8) ---- *)
 
 and emit_branching_quant buf ctx indent pad
-    eff_rule _node goal child1 child2 =
+    eff_rule goal child1 child2 =
   (* Equality-based approach:
      refine ALL7 (λ vars, R) _ _
      { assume vars; _1 equality chain }
@@ -361,7 +393,7 @@ and emit_branching_quant buf ctx indent pad
     else bvars
   in
   let n = List.length bvars in
-  let is_xst8 = String.length eff_rule >= 4 && String.sub eff_rule 0 4 = "XST8" in
+  let is_xst8 = String.starts_with ~prefix:"XST8" eff_rule in
   let all7_sym =
     if is_xst8 then
       (if n >= 2 then Printf.sprintf "XST8_%d" n else "XST8")
@@ -409,11 +441,12 @@ and emit_branching_quant buf ctx indent pad
   Buffer.add_string buf "{ ";
   if subtree_hits_admitted_nrm child2 then begin
     (* HOU short-circuit: when child2 chains NRM rules down to an
-       admitted NRM20-23 leaf, Lambdapi can't infer the implicit
-       P/Q/S of NRM7_2/5_2/13_2 against the goal `(♢x y, R x y)` —
-       the lambda inside the quantifier defeats higher-order pattern
-       matching. Since the leaf trust already discharges the chain,
-       collapse the whole subtree to one trust. *)
+       admitted NRM21-23 leaf (or to a NRM20 reached through the
+       right-assoc bridging that over-fires for OR3_1/AND3_1-rich
+       chains), Lambdapi can't infer the implicit P/Q/S of
+       NRM7_2/5_2/13_2 against the goal `(♢x y, R x y)` — the lambda
+       inside the quantifier defeats higher-order pattern matching.
+       Collapse the whole subtree to one trust. *)
     trace_emit "all7-2nd-child-trust"
       (Printf.sprintf "rule=%s nvars=%d" eff_rule (List.length bvars));
     Buffer.add_string buf "refine trust"
@@ -502,17 +535,40 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
       Buffer.add_string buf ";\n";
       emit_node buf ctx' indent child
 
-    (* NRM20-23 normalise (x = E) out of a ∀₂ body. PP's conjunction
-       order (equality first) plus left-associative parsing produces a
-       body shape that LP's higher-order unification cannot decompose
-       against NRM20's `P x y ∧ (x = E)` pattern. Earlier normalisations
-       (NRM5, NRM13) further reshape the goal into λ-applied form, so
-       even a goal-to-child trust bridge with `rewrite` fails to find
-       the LHS. We close the subtree with trust (PP's rule is sound;
-       this is a pure encoding gap, not a logical one). *)
-    | [_child] when rule = "NRM20" || rule = "NRM21"
-                 || rule = "NRM22" || rule = "NRM23" ->
-      trace_emit "nrm20-23-trust" rule;
+    (* NRM20: PP produces goals of shape `forall2(x, y) · ¬(((x = E) ∧
+       A y) ∧ B y) ⇒ Q` (3-conjunct, left-assoc, equality first) or
+       `forall2(x, y) · ¬((((x = E) ∧ A y) ∧ B y) ∧ C y) ⇒ Q`
+       (4-conjunct). The spec's `P ∧ x = E` is matched up to AC; PP
+       always emits the equality leftmost and the body x-free. We
+       discharge with NRM20_3 / NRM20_4 in Nrm.lp, which match the
+       left-assoc shape exactly and let HOU infer A/B(/C). *)
+    | [child] when rule = "NRM20" ->
+      let nconj = match goal with
+        | Binary (Imp, Bind (Forall2, [x; _y], Unary (Not, body)), _) ->
+          let conjs = flatten_conj body in
+          (match conjs with
+           | Eq (Var x', _) :: rest when x' = x -> Some (List.length rest + 1)
+           | _ -> None)
+        | _ -> None
+      in
+      begin match nconj with
+      | Some n when n = 3 || n = 4 ->
+        emit_comment ();
+        Buffer.add_string buf pad;
+        Buffer.add_string buf (Printf.sprintf "refine NRM20_%d _;\n" n);
+        Buffer.add_string buf pad;
+        emit_node buf ctx indent child
+      | _ ->
+        trace_emit "nrm20-shape-trust" rule;
+        emit_comment ();
+        Buffer.add_string buf pad;
+        Buffer.add_string buf "refine trust"
+      end
+
+    (* NRM21-23 not exercised by the corpus; keep trust path until a
+       concrete shape demands a sound encoding. *)
+    | [_child] when rule = "NRM21" || rule = "NRM22" || rule = "NRM23" ->
+      trace_emit "nrm21-23-trust" rule;
       emit_comment ();
       Buffer.add_string buf pad;
       Buffer.add_string buf "refine trust"
@@ -542,7 +598,7 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
     | [child1; child2] when Proof_tree.is_branching_quantifier rule ->
       emit_comment ();
       emit_branching_quant buf ctx indent pad
-        eff_rule node goal child1 child2
+        eff_rule goal child1 child2
 
     | [child1; child2] ->
       emit_comment ();

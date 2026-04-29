@@ -1,6 +1,6 @@
 .PHONY: build check check-all check-fresh clean-lpo gen clean prove status coverage test \
         check-claude check-claude-arith check-prv check-og check-fuzz \
-        gen-claude gen-claude-arith gen-prv gen-fuzz gen-all test-cache
+        gen-claude gen-claude-arith gen-prv gen-fuzz gen-all test-cache repl
 
 # Symlink-friendly: re-resolve PP2LP_ROOT every Make invocation.
 export PP2LP_ROOT := $(CURDIR)
@@ -12,6 +12,11 @@ SUITE ?= prv
 # -- Build --------------------------------------------------------------------
 build:
 	@cd ocaml && dune build
+
+# -- Interactive REPL (`open Pp2lp.Proof_tree`, etc.) ------------------------
+# Loads .utop-init.ml so `Stdlib` is open and `R = Pp2lp.Repl_data` is bound.
+repl:
+	@cd ocaml && dune utop src -- -init .utop-init.ml
 
 # -- Check (orchestration goes through the OCaml CLI) ------------------------
 check: build

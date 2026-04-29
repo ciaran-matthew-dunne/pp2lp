@@ -457,7 +457,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
     | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
     | _ when primed ->
       begin match ea with
-      | Some args when not (String.length args > 8 && String.sub args 0 8 = "dynamic:") ->
+      | Some args when not (String.starts_with ~prefix:"dynamic:" args) ->
         Buffer.add_char buf ' ';
         Buffer.add_string buf args
       | _ -> ()

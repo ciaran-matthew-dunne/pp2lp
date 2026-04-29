@@ -33,7 +33,10 @@ let is_nrm_step = Rule_db.is_nrm_step
 
 (** Arity of a rule as it appears in the replay.
     For _1-suffixed rules, strip the suffix and look up the base:
-      STOP_1 → 0, IMP4_1 → IMP4 → 1, AND1_1 → AND1 → 2, etc.
+      IMP4_1 → IMP4 → 1, AND1_1 → AND1 → 2, etc.
+    STOP_1 is special: STOP has arity 1 (it carries the leaf goal as a
+    child in the main tree), but inside the _1 equality chain STOP_1 is
+    the seed leaf — arity 0.
     Any lookup miss is surfaced as Ill_formed_replay, not a raw Failure. *)
 let replay_arity name =
   if name = "STOP_1" then 0
@@ -67,8 +70,9 @@ let goal_of_rhs = function
       that PP uses to compute the FIN result
     - Non-FIN phantoms (STOP_NORM, bare NRM)
 
-    FIN lines are kept: they carry the result predicate the emitter
-    needs via [extract_fin_result]. *)
+    FIN lines are kept: they carry the result predicate that
+    [build_postorder] threads to the enclosing branching quant via
+    [last_fin]. *)
 let rec collect_primed arr n pos =
   if pos >= n then None
   else
@@ -96,32 +100,6 @@ let rec collect_primed arr n pos =
       | Some (rest, branch_pos) -> Some (arr.(pos) :: rest, branch_pos)
       | None -> None
 
-(** Filter out non-_1 NRM steps from collected primed lines.
-    Same criterion as [collect_primed]: only _1-suffixed NRM steps
-    (NRM1_1, NRM3_1 …) are actual equality proof steps. *)
-let remove_norm_steps (lines : line list) : line list =
-  List.filter (fun ((name, _), _) ->
-    not (is_nrm_step name && not (is_primed_rule name))
-  ) lines
-
-(** Build a proof subtree from the _1 equality chain.
-
-    PP emits equality-chain rules in {b postorder} (leaves first):
-
-    {v
-    [STOP_1]  <p>                 ← leaf (arity 0)
-    [IMP4_1]  <q ⇒ p>            ← pops 1, pushes parent
-    [AND3_1]  <q ∧ r ⇒ p>        ← pops 1, pushes parent
-    v}
-
-    Stack-based evaluation (like a postfix calculator):
-    - Arity 0 (STOP_1): push a leaf
-    - Arity 1 (IMP4_1, AND3_1 …): pop one child, push parent
-    - Arity 2 (AND1_1, OR3_1 …): pop two children, push parent
-    - Phantom (FIN): track the result predicate, don't push
-
-    After processing all lines, the stack should hold exactly one root. *)
-
 (* --- Debug output --- *)
 
 let debug = ref false
@@ -144,8 +122,26 @@ let debug_tree label node =
     pp_tree ~indent:"" ~last:true stderr node
   end
 
+(** Build a proof subtree from the _1 equality chain.
+
+    PP emits equality-chain rules in {b postorder} (leaves first):
+
+    {v
+    [STOP_1]  <p>                 ← leaf (arity 0)
+    [IMP4_1]  <q ⇒ p>            ← pops 1, pushes parent
+    [AND3_1]  <q ∧ r ⇒ p>        ← pops 1, pushes parent
+    v}
+
+    Stack-based evaluation (like a postfix calculator):
+    - Arity 0 (STOP_1): push a leaf
+    - Arity 1 (IMP4_1, AND3_1 …): pop one child, push parent
+    - Arity 2 (AND1_1, OR3_1 …): pop two children, push parent
+    - Phantom (FIN): track the result predicate, don't push
+
+    After processing all lines, the stack should hold exactly one root.
+    Non-_1 NRM steps must already have been filtered by the caller
+    (this is what [collect_primed] does). *)
 let build_postorder (lines : line list) : proof_node =
-  let lines = remove_norm_steps lines in
   let stack = ref [] in
   let last_fin = ref None in
   let push node = stack := node :: !stack in
@@ -227,7 +223,7 @@ let skip_fin arr n pos =
 
     The one exception is the equality chain (_1 rules) preceding a
     branching quantifier (ALL7/XST8).  These appear in postorder and
-    are handled by [collect_primed] + [build_result_derivation].
+    are handled by [collect_primed] + [build_postorder].
 
     Raises [Ill_formed_replay] on truncated or malformed replays. *)
 let build (lines : line list) : proof_node =
@@ -253,7 +249,7 @@ let build (lines : line list) : proof_node =
         match collect_primed arr n pos with
         | Some (primed_lines, branch_pos) ->
           let child1 = build_postorder primed_lines in
-          let ((bname, _barg), brhs) = arr.(branch_pos) in
+          let ((bname, barg), brhs) = arr.(branch_pos) in
           let bgoal = goal_of_rhs brhs in
           (* Extract FIN result from the line after the branching quant *)
           let fin_pos = branch_pos + 1 in
@@ -261,8 +257,8 @@ let build (lines : line list) : proof_node =
             if fin_pos < n then
               match snd arr.(fin_pos) with
               | Fin (p, _, _, _) -> Some (Pred p)
-              | _ -> _barg
-            else _barg
+              | _ -> barg
+            else barg
           in
           let pos2 = skip_fin arr n fin_pos in
           if pos2 >= n then
@@ -307,6 +303,10 @@ let build (lines : line list) : proof_node =
   in
 
   let (tree, final_pos) = go 0 in
+  (* Trailing phantoms (FIN/STOP_NORM/NRM after the root proof) carry
+     no information; advance past them before deciding whether real
+     content was left unconsumed. *)
+  let final_pos = skip_phantoms arr n final_pos in
   if final_pos < n then
     Printf.eprintf "warning: %d unconsumed lines in proof tree\n"
       (n - final_pos);

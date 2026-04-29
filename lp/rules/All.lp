@@ -17,28 +17,28 @@ require open pp2lp.B;
 
 // ALL1-4: Compound variable flattening (identity in HOAS).
 // ALL1: x,y distinct; H ⊢ ¬(∀(x,y)·P) ⇒ R → H ⊢ ¬(∀x·∀y·P) ⇒ R
-opaque symbol ALL1 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
+opaque symbol ALL1 [P : τ ι → τ ι → Prop] [R : Prop]
   : π (¬ (`∀ x, `∀ y, P x y) ⇒ R)
   → π (¬ (`∀ x, `∀ y, P x y) ⇒ R) ≔
-begin assume P R nf h; refine h end;
+begin assume P R h; refine h end;
 
 // ALL2: same pattern for NOT(∀) flattening
-opaque symbol ALL2 [P : τ ι → τ ι → Prop] (nf : π ⊤)
+opaque symbol ALL2 [P : τ ι → τ ι → Prop]
   : π (¬ (`∀ x, `∀ y, P x y))
   → π (¬ (`∀ x, `∀ y, P x y)) ≔
-begin assume P nf h; refine h end;
+begin assume P h; refine h end;
 
 // ALL3: compound variable flattening for positive ∀ ⇒ R
-opaque symbol ALL3 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
+opaque symbol ALL3 [P : τ ι → τ ι → Prop] [R : Prop]
   : π ((`∀ x, `∀ y, P x y) ⇒ R)
   → π ((`∀ x, `∀ y, P x y) ⇒ R) ≔
-begin assume P R nf h; refine h end;
+begin assume P R h; refine h end;
 
 // ALL4: flattening for ∀ with implication
-opaque symbol ALL4 [P : τ ι → τ ι → Prop] [Q : Prop] (nf : π ⊤)
+opaque symbol ALL4 [P : τ ι → τ ι → Prop] [Q : Prop]
   : π ((`∀ x, `∀ y, P x y) ⇒ Q)
   → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
-begin assume P Q nf h; refine h end;
+begin assume P Q h; refine h end;
 
 // ALL6: H ⊢ (∀x·P) ⇒ FALSE → H ⊢ ¬(∀x·P)
 // Definitional: ¬Q ≡ Q ⇒ ⊥.

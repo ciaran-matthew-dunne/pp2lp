@@ -247,20 +247,6 @@ let test_between_session_markers_no_markers () =
   let body = Lp_tools.between_session_markers raw in
   check "no markers → original returned" (body = "no markers here")
 
-(* --- echo slicing (lp-debug uses this on stderr) --- *)
-
-let test_slice_between_echoes_basic () =
-  let raw = "ignored\ndebug +u\nevent1\nevent2\ndebug -u\nignored\n" in
-  let body = Lp_tools.slice_between_echoes raw
-               ~start_echo:"debug +u" ~end_echo:"debug -u" in
-  check "between echoes" (body = "event1\nevent2")
-
-let test_slice_between_echoes_missing_start () =
-  let raw = "ignored\nevent1\ndebug -u\nignored\n" in
-  let body = Lp_tools.slice_between_echoes raw
-               ~start_echo:"debug +u" ~end_echo:"debug -u" in
-  check "missing start_echo → empty" (body = "")
-
 let () =
   test_strip_line_comment ();
   test_strip_block_comment ();
@@ -294,8 +280,6 @@ let () =
   test_strip_ansi_local_basic ();
   test_between_session_markers ();
   test_between_session_markers_no_markers ();
-  test_slice_between_echoes_basic ();
-  test_slice_between_echoes_missing_start ();
   Printf.printf "%d/%d lp_tools tests passed\n"
     (!total - !failures) !total;
   if !failures > 0 then exit 1

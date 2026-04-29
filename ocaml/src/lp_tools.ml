@@ -599,13 +599,9 @@ let between_session_markers (text : string) : string =
   let lines = String.split_on_char '\n' text in
   let stripped = List.map strip_ansi_local lines in
   let is_start s =
-    let s = String.trim s in
-    String.length s > 14 && String.sub s 0 14 = "Start checking"
-  in
+    String.starts_with ~prefix:"Start checking" (String.trim s) in
   let is_end s =
-    let s = String.trim s in
-    String.length s > 12 && String.sub s 0 12 = "End checking"
-  in
+    String.starts_with ~prefix:"End checking" (String.trim s) in
   let inside = ref false in
   let acc = ref [] in
   List.iter2 (fun raw stripped_l ->
@@ -620,28 +616,6 @@ let between_session_markers (text : string) : string =
    echoes in lambdapi output. The toggles are inserted by [lp-debug] as
    `debug +FLAGS` / `debug -FLAGS`; they print as bare lines (not ANSI-
    wrapped). Returns the trace between the two echoes, trimmed. *)
-let slice_between_echoes (text : string) ~start_echo ~end_echo : string =
-  let lines = String.split_on_char '\n' text in
-  let stripped = List.map strip_ansi_local lines in
-  let trim s = String.trim s in
-  let acc = ref [] in
-  let inside = ref false in
-  let found_start = ref false in
-  let found_end = ref false in
-  List.iter2 (fun raw stripped_l ->
-    let t = trim stripped_l in
-    if (not !inside) && t = start_echo then begin
-      inside := true; found_start := true
-    end else if !inside && t = end_echo then begin
-      inside := false; found_end := true
-    end else if !inside then
-      acc := raw :: !acc
-  ) lines stripped;
-  let body = String.trim (String.concat "\n" (List.rev !acc)) in
-  if not !found_start then ""        (* probe never reached *)
-  else if not !found_end then body   (* end of session before -FLAGS *)
-  else body
-
 (* Best-effort slice for a single probe at a known probe-file line.
    Looks for a location marker `<probe>:LINE:` and slices from there to
    the next location marker. If no marker fires (some commands emit

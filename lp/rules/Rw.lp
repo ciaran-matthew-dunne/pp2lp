@@ -422,18 +422,37 @@ opaque symbol NOT1_1 [P R S : Prop]
   : π ((P ⇒ R) = S) → π ((¬ ¬ P ⇒ R) = S) ≔
 begin assume P R S h; refine eq_trans not1_eq h end;
 
-// OPR1_1/OPR2_1: one-point-rule substitution in _1 chain.
-// The local equality ((x = v) ⇒ body_x) = body_v collapses the antecedent
-// by substitution; it is NOT propositionally equivalent pointwise (only
-// the ← direction of the biconditional holds), so admitted. This matches
-// PP's semantic treatment where OPR1 is a proof-search shortcut.
-opaque symbol OPR1_1 [body_x : Prop] [body_v : Prop] [S : Prop]
-  : π (body_v = S) → π (body_x = S) ≔
-begin admit end;
+// OPR1_1/OPR2_1: PP's primed one-point-rule. Inside a `_1` chain, the
+// step rewrites `(x = E ⇒ P x)` to `(x = E ⇒ P E)` (OPR1) or the
+// symmetric `(E = x ⇒ P x)` to `(E = x ⇒ P E)` (OPR2). The bridge
+// equality `(x = E ⇒ P x) = (x = E ⇒ P E)` holds pointwise: when
+// `x = E` is true, both sides reduce to `P E`; when false, both are
+// vacuously `⊤`. No surrounding binder is required.
+opaque symbol OPR1_1 [E : τ ι] [S : Prop] (P : τ ι → Prop) (x : τ ι)
+  : π ((x = E ⇒ P E) = S) → π ((x = E ⇒ P x) = S) ≔
+begin
+  assume E S P x h;
+  have bridge : π ((x = E ⇒ P x) = (x = E ⇒ P E))
+    { refine propExt _ _ _ _
+        { assume hyp hxe; have px : π (P x) { refine hyp hxe };
+          rewrite left hxe; refine px }
+        { assume hyp hxe; have pe : π (P E) { refine hyp hxe };
+          rewrite hxe; refine pe } };
+  refine eq_trans bridge h
+end;
 
-opaque symbol OPR2_1 [body_x : Prop] [body_v : Prop] [S : Prop]
-  : π (body_v = S) → π (body_x = S) ≔
-begin admit end;
+opaque symbol OPR2_1 [E : τ ι] [S : Prop] (P : τ ι → Prop) (x : τ ι)
+  : π ((E = x ⇒ P E) = S) → π ((E = x ⇒ P x) = S) ≔
+begin
+  assume E S P x h;
+  have bridge : π ((E = x ⇒ P x) = (E = x ⇒ P E))
+    { refine propExt _ _ _ _
+        { assume hyp hex; have px : π (P x) { refine hyp hex };
+          rewrite hex; refine px }
+        { assume hyp hex; have pe : π (P E) { refine hyp hex };
+          rewrite left hex; refine pe } };
+  refine eq_trans bridge h
+end;
 
 opaque symbol NOT2_1 [P S : Prop]
   : π (P = S) → π (¬ ¬ P = S) ≔

@@ -346,6 +346,35 @@ begin
   refine h1 (λ y hpey, h2 E y (∧ᵢ hpey (eq_refl E)))
 end;
 
+// NRM20_3 / NRM20_4: PP's actual goal shape for NRM20 puts the
+// equality `x = E` as the *leftmost* conjunct in a left-associated
+// chain (the spec's `P ∧ x = E` is matched up to AC), and the body
+// after substitution is x-free. The corpus exercises only the
+// 3-conjunct (81 occurrences) and 4-conjunct (181 occurrences)
+// shapes — these match PP exactly so HOU can infer all metavariables
+// (A/B/C and E) from the goal alone, leaving the antecedent as the
+// only hole.
+opaque symbol NRM20_3 [A B : τ ι → Prop] [Q : Prop] [E : τ ι]
+  : π ((`♡ y, ¬ (A y ∧ B y)) ⇒ Q)
+  → π ((`♡ x, `♡ y, ¬ (((x = E) ∧ A y) ∧ B y)) ⇒ Q) ≔
+begin
+  assume A B Q E h1 h2;
+  refine h1 (λ y hab,
+    h2 E y (∧ᵢ (∧ᵢ (eq_refl E) (∧ₑ₁ hab)) (∧ₑ₂ hab)))
+end;
+
+opaque symbol NRM20_4 [A B C : τ ι → Prop] [Q : Prop] [E : τ ι]
+  : π ((`♡ y, ¬ ((A y ∧ B y) ∧ C y)) ⇒ Q)
+  → π ((`♡ x, `♡ y, ¬ ((((x = E) ∧ A y) ∧ B y) ∧ C y)) ⇒ Q) ≔
+begin
+  assume A B C Q E h1 h2;
+  refine h1 (λ y habc,
+    h2 E y (∧ᵢ (∧ᵢ (∧ᵢ (eq_refl E)
+                       (∧ₑ₁ (∧ₑ₁ habc)))
+                   (∧ₑ₂ (∧ₑ₁ habc)))
+              (∧ₑ₂ habc)))
+end;
+
 opaque symbol NRM21 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
   : π ((`♡ y, ¬ (P E y)) ⇒ Q)
   → π ((`♡ x, `♡ y, ¬ (P x y ∧ (E = x))) ⇒ Q) ≔

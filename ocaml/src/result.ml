@@ -38,15 +38,14 @@ let rec compute_result (node : proof_node) : prd =
       Binary (Imp, h, compute_result child)
     | _ -> goal
 
-(* --- TRUE/FALSE simplification, used when a schema-2 rule's raw
-   conjunction collapses because one side is ⊤ or ⊥. --- *)
+(* --- TRUE/FALSE simplification, used when a two-child rule's raw
+   result conjunction collapses because one side is ⊤ or ⊥. --- *)
 
 let is_true = function Lift (Var ("VRAI" | "TRUE")) -> true | _ -> false
 let is_false = function Lift (Var ("FAUX" | "FALSE")) -> true | _ -> false
-let prd_false = Lift (Var "FAUX")
-let prd_true = Lift (Var "VRAI")
 
 let rec simplify_result p =
+  let prd_true = Lift (Var "VRAI") and prd_false = Lift (Var "FAUX") in
   match p with
   | Binary (And, a, b) ->
     let a = simplify_result a and b = simplify_result b in

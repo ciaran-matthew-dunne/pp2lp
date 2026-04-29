@@ -53,12 +53,6 @@ let print_line j =
   print_string (to_string j);
   print_char '\n'
 
-(* Minimal NDJSON line scanner: split on '\n', drop blank, attempt to find
-   leading "{" → returns the string line for downstream parsing. *)
-let lines s =
-  String.split_on_char '\n' s
-  |> List.filter (fun l -> String.length l > 0)
-
 (* --- Tiny JSON value parser ---
    Used only to consume lambdapi --json NDJSON, which is well-formed.
    Not fully spec-compliant; supports objects, arrays, strings,
@@ -206,4 +200,3 @@ let field k = function
 
 let as_string = function JStr s -> Some s | _ -> None
 let as_int = function JInt n -> Some n | _ -> None
-let _as_obj = function JObj _ as v -> Some v | _ -> None
