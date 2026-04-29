@@ -15,7 +15,6 @@ let all : t list = [
   { name = "claude-arith"; synth = true;  alloc = "" };
   { name = "prv";          synth = false; alloc = "g50000" };
   { name = "og";           synth = false; alloc = "" };
-  { name = "fuzz";         synth = false; alloc = "" };
 ]
 
 let find name =

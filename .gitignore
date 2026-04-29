@@ -12,9 +12,6 @@ bench/claude/*.trace
 bench/claude/*.replay
 bench/prv/*.trace
 bench/prv/*.replay
-bench/fuzz/*.but
-bench/fuzz/*.trace
-bench/fuzz/*.replay
 *.lpo
 
 # Private / large binary files

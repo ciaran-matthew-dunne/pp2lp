@@ -475,12 +475,8 @@ let cmd_gen () =
       | _ -> die "gen_traces.py failed for suite %s" suite.name
     end
   in
-  if !all then
-    List.iter run_one
-      (List.filter (fun (s : Pp2lp.Suite.t) -> s.name <> "fuzz")
-         Pp2lp.Suite.all)
-  else
-    run_one (parse_suite_arg !suite_name)
+  if !all then List.iter run_one Pp2lp.Suite.all
+  else run_one (parse_suite_arg !suite_name)
 
 (* ---- entry point ---- *)
 
