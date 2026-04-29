@@ -20,30 +20,12 @@ open Ins
 let trace = ref false
 let trace_file = ref ""
 
-(* Captured trace events (for `pp2lp emit --json` and `pp2lp debug`).
-   When [trace_capture] is non-None, records get appended *and* the
-   stderr line is suppressed — the consumer wants structured data. *)
-type trace_event = { tag : string; details : string }
-let trace_capture : trace_event list ref option ref = ref None
-let with_trace_capture f =
-  let acc = ref [] in
-  let prev = !trace_capture in
-  trace_capture := Some acc;
-  Fun.protect
-    ~finally:(fun () -> trace_capture := prev)
-    (fun () ->
-      let r = f () in
-      (r, List.rev !acc))
-
 let trace_emit (tag : string) (details : string) : unit =
-  match !trace_capture with
-  | Some acc -> acc := { tag; details } :: !acc
-  | None ->
-    if !trace then
-      Printf.eprintf "[emit] %s: %s%s\n"
-        (if !trace_file = "" then "?" else Filename.basename !trace_file)
-        tag
-        (if details = "" then "" else " " ^ details)
+  if !trace then
+    Printf.eprintf "[emit] %s: %s%s\n"
+      (if !trace_file = "" then "?" else Filename.basename !trace_file)
+      tag
+      (if details = "" then "" else " " ^ details)
 
 (* ---- AR3 dispatch: AR3 (raw) vs AR3' (bridged) ----
    PP emits `[AR3(SOURCE | RESULT)]` where RESULT is the solver-normalised

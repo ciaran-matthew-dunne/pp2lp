@@ -12,7 +12,7 @@
    rule_db proof_tree proof_tree_cmd pp_lp free_vars subst hyp_ctx rule_args
    ins result
    emit_lp emit_pp reconstruct gen_but
-   json_out suite lp_diag cache coverage runner lp_tools
+   json_out suite lp_diag cache runner
    repl_data
  )
 )
