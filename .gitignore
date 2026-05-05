@@ -1,18 +1,32 @@
+# Build artefacts
 ocaml/_build
+*.lpo
 
-# Per-suite generated artifacts (canonical inputs are tracked:
-# bench/claude/goals.txt, bench/prv/*.but, bench/og/*.replay + *.trace)
-bench/*/lambdapi.pkg
-bench/*/*.lp
-bench/*/*.lpo
+# Per-suite inputs/outputs.
+# Tracked: bench/claude/goals.txt
+#          bench/og/*.replay + *.trace + *.but
+#          bench/claude-arith/*.but (committed test goals)
+#          bench/prv/*.but
 bench/*/.cache/
 bench/*/.gen_status.tsv
 bench/claude/*.but
 bench/claude/*.trace
 bench/claude/*.replay
+bench/claude-arith/*.trace
+bench/claude-arith/*.replay
 bench/prv/*.trace
 bench/prv/*.replay
-*.lpo
+
+# Emitted Lambdapi files for every suite live under the pp2lp package
+# (see Suite.lp_dir). They're regenerated from .replay; don't commit.
+lp/bench/
+
+# Experimental / scratch
+lp/quant_test.lp
+ocaml-new/
+
+# Local environment
+.envrc
 
 # Private / large binary files
 admin/
@@ -20,7 +34,7 @@ doc/*.pdf
 doc/*.tar.gz
 tex/**/*.pdf
 
-# LaTeX build artifacts
+# LaTeX build artefacts
 *.aux
 *.bbl
 *.bcf
@@ -51,7 +65,7 @@ tex/**/*.pdf
 *.xdv
 *.run.xml
 
-# Atelier B build artifacts
+# Atelier B build artefacts
 *.bxml
 *.chk
 *.dep
@@ -84,4 +98,3 @@ btraces
 *.orig
 *.tmp
 .pp2lp-cache
-lp/Experiment.lp

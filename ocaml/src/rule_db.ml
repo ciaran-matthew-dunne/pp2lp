@@ -113,9 +113,10 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM5" pass;
   r "NRM6" pass;
   r "NRM7" pass;
-  (* NRM8 converts mixed `forall(x) · ∀ y · …` to compound; the
-     parser's universal-style collapse already merges them, so
-     NRM8 becomes a no-op in our AST. *)
+  (* NRM8: see comment further down. Currently a no-op, since the
+     parser-collapse already merges universal-style binders in the
+     symbol's goal type. The chain residual still has nested form,
+     but for the og corpus this doesn't bite. *)
   r "NRM8" pass ~hoas_identity:true;
   r "NRM9" pass;
   r "NRM10" pass;
