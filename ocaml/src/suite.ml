@@ -26,6 +26,11 @@ let exists name = List.exists (fun s -> s.name = name) all
 
 let names () = List.map (fun s -> s.name) all
 
+(* Replay/trace inputs, cache markers, and synth artefacts live here. *)
 let dir suite = Filename.concat "bench" suite.name
 let cache_dir suite = Filename.concat (dir suite) ".cache"
-let pkg_name suite = "pp2lp_" ^ suite.name
+
+(* Emitted .lp output lives under the pp2lp package so it doesn't
+   need a separate lambdapi.pkg or a lib_root symlink. *)
+let lp_dir suite =
+  Filename.concat (Filename.concat "lp" "bench") suite.name

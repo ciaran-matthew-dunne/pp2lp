@@ -9,10 +9,9 @@
  (libraries unix)
  (modules
    parser lexer parse_pp syntax_pp
-   rule_db proof_tree proof_tree_cmd pp_lp free_vars subst hyp_ctx rule_args
+   rule_db proof_tree pp_lp free_vars subst hyp_ctx rule_args
    ins result
    emit_lp emit_pp reconstruct gen_but
    suite lp_diag cache runner
-   repl_data
  )
 )

@@ -215,7 +215,7 @@ let cmd_check () =
     drop_lpo_files ()
   end;
   let cfg = make_cache_cfg suite ~xfail:[] in
-  Pp2lp.Runner.ensure_pkg suite;
+  Pp2lp.Runner.ensure_lp_dir suite;
   let all_tests = Pp2lp.Runner.list_tests suite in
   let tests =
     if !name <> "" then begin

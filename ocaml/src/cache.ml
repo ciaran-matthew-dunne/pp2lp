@@ -43,7 +43,9 @@ let ensure_cache_dir suite_dir =
   (try Unix.mkdir d 0o755
    with Unix.Unix_error _ -> ())
 
-(* Walk lp/ for *.lp files, collecting newest mtime. *)
+(* Walk lp/ for *.lp files, collecting newest mtime. Skips the
+   `bench/` subtree — those .lp files are emitted outputs whose mtime
+   would feed back into their own cache sentinel. *)
 let rec walk_dir_for_lp acc dir =
   let acc = ref acc in
   (try
@@ -51,7 +53,7 @@ let rec walk_dir_for_lp acc dir =
     (try
       while true do
         let name = Unix.readdir dh in
-        if name <> "." && name <> ".." then begin
+        if name <> "." && name <> ".." && name <> "bench" then begin
           let p = Filename.concat dir name in
           let st = try Some (Unix.stat p) with Unix.Unix_error _ -> None in
           match st with

@@ -61,6 +61,17 @@ let rec pp_exp ?(min_bp = bp_max) buf e =
     Buffer.add_char buf ' ';
     pp_exp_args buf args;
     Buffer.add_char buf ')'
+  | Prj (k, v) ->
+    (* prj _k v — use stdlib `+1` literal for k > 0; bare `0` for 0. *)
+    Buffer.add_string buf "(prj ";
+    if k = 0 then Buffer.add_char buf '0'
+    else begin
+      Buffer.add_char buf '_';
+      Buffer.add_string buf (string_of_int k)
+    end;
+    Buffer.add_char buf ' ';
+    pp_ident buf v;
+    Buffer.add_char buf ')'
   | AOp (Add, e1, e2) ->
     wrap buf (6 < min_bp) (fun () ->
       pp_exp ~min_bp:6 buf e1;
@@ -201,24 +212,29 @@ and pp_prd ?(min_bp = bp_max) buf p =
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
       pp_exp ~min_bp:6 buf e)
   | Bind (binder, xs, body) ->
-    let qsym = match binder with
-      | Bang -> "`\xe2\x88\x80"   (* `∀ *)
-      | Forall -> "`\xe2\x99\xa2"  (* `♢ *)
-      | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
-      | Exists   -> "`\xe2\x88\x83" (* `∃ *)
+    (* Compound-binder rendering. Universals (Bang/Forall/Forall2)
+       map to `!!`, existentials to `??`. Each bound var `xs[k]` is
+       substituted with `Prj (k, v_name)` in the body so the tuple-
+       indexed body matches our rule library's expectations.
+       The tuple variable name is derived from the first bound var so
+       printed goals stay readable. *)
+    let qbang = match binder with Exists -> "??" | _ -> "!!" in
+    let n = List.length xs in
+    let v_name = match xs with
+      | x :: _ -> x ^ "_t"
+      | [] -> "v"
     in
-    let rec emit_vars = function
-      | [] -> pp_prd buf body
-      | x :: rest ->
-        Buffer.add_char buf '(';
-        Buffer.add_string buf qsym;
-        Buffer.add_char buf ' ';
-        pp_ident buf x;
-        Buffer.add_string buf " : \xcf\x84 \xce\xb9, "; (* τ ι *)
-        emit_vars rest;
-        Buffer.add_char buf ')'
-    in
-    emit_vars xs
+    let body' = Subst.subst_prd_to_prjs xs v_name body in
+    Buffer.add_char buf '(';
+    Buffer.add_char buf '`';
+    Buffer.add_string buf qbang;
+    Buffer.add_char buf ' ';
+    pp_ident buf v_name;
+    Buffer.add_string buf " : Tuple ";
+    Buffer.add_string buf (string_of_int n);
+    Buffer.add_string buf ", ";
+    pp_prd buf body';
+    Buffer.add_char buf ')'
 
 (* ---- Left-associative conjunction extraction/reconstruction ---- *)
 
@@ -321,27 +337,22 @@ and pp_prd_block_break ?(min_bp = 0) ind buf p =
       Buffer.add_string buf "\xe2\x88\xa8 "; (* ∨ *)
       pp_prd_block ~min_bp:6 ind buf p2)
   | Bind (binder, xs, body) ->
-    let qsym = match binder with
-      | Bang -> "`\xe2\x88\x80"
-      | Forall -> "`\xe2\x99\xa2"
-      | Forall2 -> "`\xe2\x99\xa1"
-      | Exists   -> "`\xe2\x88\x83"
-    in
-    let rec emit_vars = function
-      | [] ->
-        Buffer.add_char buf '\n';
-        Buffer.add_string buf (String.make (ind + 2) ' ');
-        pp_prd_block (ind + 2) buf body
-      | x :: rest ->
-        Buffer.add_char buf '(';
-        Buffer.add_string buf qsym;
-        Buffer.add_char buf ' ';
-        pp_ident buf x;
-        Buffer.add_string buf " : \xcf\x84 \xce\xb9, "; (* τ ι *)
-        emit_vars rest;
-        Buffer.add_char buf ')'
-    in
-    emit_vars xs
+    let qbang = match binder with Exists -> "??" | _ -> "!!" in
+    let n = List.length xs in
+    let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
+    let body' = Subst.subst_prd_to_prjs xs v_name body in
+    Buffer.add_char buf '(';
+    Buffer.add_char buf '`';
+    Buffer.add_string buf qbang;
+    Buffer.add_char buf ' ';
+    pp_ident buf v_name;
+    Buffer.add_string buf " : Tuple ";
+    Buffer.add_string buf (string_of_int n);
+    Buffer.add_char buf ',';
+    Buffer.add_char buf '\n';
+    Buffer.add_string buf (String.make (ind + 2) ' ');
+    pp_prd_block (ind + 2) buf body';
+    Buffer.add_char buf ')'
   | _ ->
     pp_prd ~min_bp buf p
 

@@ -1,185 +1,160 @@
-// Existential quantification (§A.8) — shallow encoding
+// Existential quantification (§A.8) — tuple-based encoding.
 //
-// With HOAS:
-// - Variable renaming (XST7f, XST8f) collapses into XST7, XST8.
-// - Compound variables (XST1-4) don't exist; nested ∃ IS
-//   the only form. The OCaml emitter should skip XST1-4.
-require open pp2lp.B;
-
-// ---- Identity rules (compound variable flattening) ----
+// PP traces emit only singleton existentials in practice (prv: every
+// `#(x)` is arity-1), but we encode the compound↔nested conversions
+// XST1–4 for completeness.
 //
-// XST7f, XST8f: Variable renaming variants of XST7, XST8.
-//   In HOAS, α-equivalence is automatic, so these collapse
-//   into their base forms.
+// As with ALL1–4, we read `(x,y)` in the spec as "n-tuple x + 1-tuple
+// y", so the rule peels one variable at a time. Unlike `!!`, `??` is
+// a defined symbol that reduces to nested ∃, so the compound and
+// nested forms are *definitionally equal* — XST1–4 are identity in
+// HOAS.
 
-// XST1: ¬(∃(x,y)·P) ⇒ R → ¬(∃x·∃y·P) ⇒ R (identity in HOAS)
-opaque symbol XST1 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
-  : π (¬ (`∃ x, `∃ y, P x y) ⇒ R)
-  → π (¬ (`∃ x, `∃ y, P x y) ⇒ R) ≔
-begin assume P R nf h; refine h end;
+require open pp2lp.B pp2lp.Quant;
 
-// XST2: ∃(x,y)·P ⇒ R → ∃x·∃y·P ⇒ R (identity in HOAS)
-opaque symbol XST2 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
-  : π ((`∃ x, `∃ y, P x y) ⇒ R)
-  → π ((`∃ x, `∃ y, P x y) ⇒ R) ≔
-begin assume P R nf h; refine h end;
+// Helper: compound → nested for `??`. Defined by rewrite rule on
+// the tuple constructor; pattern-match exposes (w ⨾ a) shape.
+symbol compound_to_nested_∃ [n] (P : Tuple (+1 n) → Prop)
+  : Π v : Tuple (+1 n), π (P v)
+  → π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y));
+rule compound_to_nested_∃ [$n] $P ($w ⨾ $a) $h ↪
+  pi_to_??_intro (λ w', `?? y : Tuple 1, $P (w' ⨾ prj 0 y))
+                 $w
+                 (pi_to_??_intro (λ y, $P ($w ⨾ prj 0 y))
+                                 (unit ⨾ $a) $h);
 
-// XST3: Compound ∃ flattening (identity in HOAS).
-// Used both with and without ∧ context.
-opaque symbol XST3 [P : τ ι → τ ι → Prop] [R : Prop] (nf : π ⊤)
-  : π ((`∃ x, `∃ y, P x y) ⇒ R)
-  → π ((`∃ x, `∃ y, P x y) ⇒ R) ≔
-begin assume P R nf h; refine h end;
-
-opaque symbol XST4 [P : τ ι → τ ι → Prop](nf : π ⊤)
-  : π (`∃ x, `∃ y, P x y)
-  → π (`∃ x, `∃ y, P x y) ≔
-begin assume P nf h; refine h end;
-
-// ---- Base rules ----
-
-// XST5: H ⊢ (∀x·¬P) ⇒ R → H ⊢ ¬(∃x·P) ⇒ R
-opaque symbol XST5 [P : τ ι → Prop] [R : Prop]
-  : π ((`∀ x, ¬ (P x)) ⇒ R)
-  → π (¬ (`∃ x, P x) ⇒ R) ≔
+// Helper: nested → compound for `??`.
+opaque symbol nested_to_compound_∃ [n] (P : Tuple (+1 n) → Prop)
+  : π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
+  → π (`?? v : Tuple (+1 n), P v) ≔
 begin
-  assume P R h1 h2;
-  refine h1 (λ x hpx, h2 (∃ᵢ x hpx))
+  assume n P h;
+  refine pi_to_??_elim
+    (λ w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
+    _ h;
+  assume w hw;
+  refine pi_to_??_elim (λ y : Tuple 1, P (w ⨾ prj 0 y)) _ hw;
+  assume y hy;
+  refine pi_to_??_intro P (w ⨾ prj 0 y) hy
 end;
 
-// XST5_2: Two-variable version. H ⊢ (∀x y·¬P) ⇒ R → H ⊢ ¬(∃x·∃y·P) ⇒ R
-opaque symbol XST5_2 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`∀ x, `∀ y, ¬ (P x y)) ⇒ R)
-  → π (¬ (`∃ x, `∃ y, P x y) ⇒ R) ≔
+// XST1: H ⊢ ¬(∃(x,y)·P) ⇒ R → H ⊢ ¬(∃x·∃y·P) ⇒ R
+opaque symbol XST1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  : π (¬ (`?? v : Tuple (+1 n), P v) ⇒ R)
+  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
 begin
-  assume P R h1 h2;
-  refine h1 (λ x y hpxy, h2 (∃ᵢ x (∃ᵢ y hpxy)))
+  assume n P R h hnnested;
+  refine h _;
+  assume hcompound;
+  refine hnnested _;
+  refine pi_to_??_elim P _ hcompound;
+  assume v hv;
+  refine compound_to_nested_∃ P v hv
 end;
 
-// XST51: H ⊢ (∀x·P) ⇒ R → H ⊢ ¬(∃x·¬P) ⇒ R
-opaque symbol XST51 [P : τ ι → Prop] [R : Prop]
-  : π ((`∀ x, P x) ⇒ R)
-  → π (¬ (`∃ x, ¬ (P x)) ⇒ R) ≔
+// XST2: H ⊢ ¬(∃(x,y)·P) → H ⊢ ¬(∃x·∃y·P)
+opaque symbol XST2 [n] [P : Tuple (+1 n) → Prop]
+  : π (¬ (`?? v : Tuple (+1 n), P v))
+  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))) ≔
 begin
-  assume P R h1 h2;
-  refine h1 (λ x, ¬¬ₑ (P x) (λ hnpx, h2 (∃ᵢ x hnpx)))
+  assume n P h hnested;
+  refine h (nested_to_compound_∃ P hnested)
 end;
 
-// XST6: H ⊢ ∀x·¬P → H ⊢ ¬(∃x·P)
-opaque symbol XST6 [P : τ ι → Prop]
-  : π (`∀ x, ¬ (P x))
-  → π (¬ (`∃ x, P x)) ≔
+// XST3: H ⊢ (∃(x,y)·P) ⇒ R → H ⊢ (∃x·∃y·P) ⇒ R
+opaque symbol XST3 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  : π ((`?? v : Tuple (+1 n), P v) ⇒ R)
+  → π ((`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
 begin
-  assume P h1 h2;
-  refine ∃ₑ h2 (λ x hpx, h1 x hpx)
+  assume n P R h hnested;
+  refine h (nested_to_compound_∃ P hnested)
 end;
 
-// XST61: H ⊢ ∀x·P → H ⊢ ¬(∃x·¬P)
-// XST6_2: Two-variable version.
-opaque symbol XST6_2 [P : τ ι → τ ι → Prop]
-  : π (`∀ x, `∀ y, ¬ (P x y))
-  → π (¬ (`∃ x, `∃ y, P x y)) ≔
+// XST4: H ⊢ ∃(x,y)·P → H ⊢ ∃x·∃y·P
+opaque symbol XST4 [n] [P : Tuple (+1 n) → Prop]
+  : π (`?? v : Tuple (+1 n), P v)
+  → π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ≔
 begin
-  assume P h1 h2;
-  refine ∃ₑ h2 (λ x hx, ∃ₑ hx (λ y hpxy, h1 x y hpxy))
+  assume n P h;
+  refine pi_to_??_elim P _ h;
+  assume v hv;
+  refine compound_to_nested_∃ P v hv
 end;
 
-opaque symbol XST61 [P : τ ι → Prop]
-  : π (`∀ x, P x)
-  → π (¬ (`∃ x, ¬ (P x))) ≔
+// ---- Negative side: ¬(∃ …) ⇒ R / ¬(∃ …) ----------------------
+
+// XST5: H ⊢ (∀-block, ¬P) ⇒ R → H ⊢ ¬(∃-block, P) ⇒ R
+
+opaque symbol XST5 [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (P v)) ⇒ R)
+  → π (¬ (`?? v, P v) ⇒ R) ≔
 begin
-  assume P h1 h2;
-  refine ∃ₑ h2 (λ x hnpx, hnpx (h1 x))
+  assume n P R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (P v))
+    (λ v hpv, h2 (pi_to_??_intro P v hpv)))
 end;
 
-// XST7: x not free in R; H ⊢ ∀x·(P ⇒ R) → H ⊢ (∃x·P) ⇒ R
-// "x not free in R" means R : Prop (not τ ι → Prop).
-opaque symbol XST7 [P : τ ι → Prop] [R : Prop]
-  : π (`∀ x, P x ⇒ R)
-  → π ((`∃ x, P x) ⇒ R) ≔
+// XST51: H ⊢ (∀-block, P) ⇒ R → H ⊢ ¬(∃-block, ¬P) ⇒ R
+
+opaque symbol XST51 [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, P v) ⇒ R)
+  → π (¬ (`?? v, ¬ (P v)) ⇒ R) ≔
 begin
-  assume P R h1 h2;
-  refine ∃ₑ h2 h1
+  assume n P R h1 h2;
+  refine h1 (pi_to_!! P (λ v,
+    ¬¬ₑ (P v) (λ hnpv, h2 (pi_to_??_intro (λ v, ¬ (P v)) v hnpv))))
 end;
 
-// XST7_2: Two-variable version.
-opaque symbol XST7_2 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π (`∀ x, `∀ y, P x y ⇒ R)
-  → π ((`∃ x, `∃ y, P x y) ⇒ R) ≔
+// XST6: H ⊢ ∀-block, ¬P → H ⊢ ¬(∃-block, P)
+
+opaque symbol XST6 [n] [P : Tuple n → Prop]
+  : π (`!! v, ¬ (P v))
+  → π (¬ (`?? v, P v)) ≔
 begin
-  assume P R h1 h2;
-  refine ∃ₑ h2 (λ x hex, ∃ₑ hex (h1 x))
+  assume n P h1 h2;
+  refine pi_to_??_elim P
+    (λ v hpv, !!_to_pi (λ v, ¬ (P v)) h1 v hpv) h2
 end;
 
+// XST61: H ⊢ ∀-block, P → H ⊢ ¬(∃-block, ¬P)
 
-// XST8: x not free in H; (H ⊢ ¬P) ⇝ R; H ⊢ (∀x·R) ⇒ FALSE → H ⊢ ∃x·P
-// First premise: ¬P(x) = R(x) for all x (equality-based normalisation result).
-// Second premise: (∀x R(x)) ⇒ ⊥.
-opaque symbol XST8 [P : τ ι → Prop] (R : τ ι → Prop)
-  : π (`∀ x, ¬ (P x) = R x)
-  → π ((`∀ x, R x) ⇒ ⊥)
-  → π (`∃ x, P x) ≔
+opaque symbol XST61 [n] [P : Tuple n → Prop]
+  : π (`!! v, P v)
+  → π (¬ (`?? v, ¬ (P v))) ≔
 begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, P x) _;
+  assume n P h1 h2;
+  refine pi_to_??_elim (λ v, ¬ (P v))
+    (λ v hnpv, hnpv (!!_to_pi P h1 v)) h2
+end;
+
+// ---- Positive side: ∃ … ⇒ R / ∃ … ----------------------------
+
+// XST7: H ⊢ ∀-block, P ⇒ R → H ⊢ (∃-block, P) ⇒ R
+// "x not free in R" means R : Prop.
+
+opaque symbol XST7 [n] [P : Tuple n → Prop] [R : Prop]
+  : π (`!! v, P v ⇒ R)
+  → π ((`?? v, P v) ⇒ R) ≔
+begin
+  assume n P R h1 h2;
+  refine pi_to_??_elim P
+    (λ v hPv, !!_to_pi (λ v, P v ⇒ R) h1 v hPv) h2
+end;
+
+// XST8: result-based ∃-introduction.
+//   premise 1: per-tuple Res chain ρ producing res_tm (ρ v) for each v
+//              (where each ρ v normalises ¬(P v) to res_tm (ρ v))
+//   premise 2: ((`!! v, res_tm (ρ v)) ⇒ ⊥)
+//   conclusion: (`?? v, P v)
+
+opaque symbol XST8 [n] [P : Tuple n → Prop]
+  (ρ : Π v : Tuple n, Res (¬ (P v)))
+  : π ((`!! v, res_tm (ρ v)) ⇒ ⊥) → π (`?? v, P v) ≔
+begin
+  assume n P ρ h_after;
+  refine ¬¬ₑ (`?? v, P v) _;
   assume hne;
-  refine h2 (λ x, =⇒ (h1 x) (λ hpx, hne (∃ᵢ x hpx)))
-end;
-
-// XST8_2: Two-variable version for compound ∃(x,y).
-opaque symbol XST8_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop)
-  : π (`∀ x, `∀ y, ¬ (P x y) = R x y)
-  → π ((`∀ x, `∀ y, R x y) ⇒ ⊥)
-  → π (`∃ x, `∃ y, P x y) ≔
-begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, `∃ y, P x y) _;
-  assume hne;
-  refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
-end;
-
-// XST8_3: Three-variable version for compound ∃(x,y,z).
-opaque symbol XST8_3 [P : τ ι → τ ι → τ ι → Prop] (R : τ ι → τ ι → τ ι → Prop)
-  : π (`∀ x, `∀ y, `∀ z, ¬ (P x y z) = R x y z)
-  → π ((`∀ x, `∀ y, `∀ z, R x y z) ⇒ ⊥)
-  → π (`∃ x, `∃ y, `∃ z, P x y z) ≔
-begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, `∃ y, `∃ z, P x y z) _;
-  assume hne;
-  refine h2 (λ x y z, =⇒ (h1 x y z) (λ hpxyz, hne (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz)))))
-end;
-
-// XST8i/XST8_2i/XST8_3i: R implicit — inferred from the equality proof.
-opaque symbol XST8i [P R : τ ι → Prop]
-  : π (`∀ x, ¬ (P x) = R x)
-  → π ((`∀ x, R x) ⇒ ⊥)
-  → π (`∃ x, P x) ≔
-begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, P x) _;
-  assume hne;
-  refine h2 (λ x, =⇒ (h1 x) (λ hpx, hne (∃ᵢ x hpx)))
-end;
-
-opaque symbol XST8_2i [P R : τ ι → τ ι → Prop]
-  : π (`∀ x, `∀ y, ¬ (P x y) = R x y)
-  → π ((`∀ x, `∀ y, R x y) ⇒ ⊥)
-  → π (`∃ x, `∃ y, P x y) ≔
-begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, `∃ y, P x y) _;
-  assume hne;
-  refine h2 (λ x y, =⇒ (h1 x y) (λ hpxy, hne (∃ᵢ x (∃ᵢ y hpxy))))
-end;
-
-opaque symbol XST8_3i [P R : τ ι → τ ι → τ ι → Prop]
-  : π (`∀ x, `∀ y, `∀ z, ¬ (P x y z) = R x y z)
-  → π ((`∀ x, `∀ y, `∀ z, R x y z) ⇒ ⊥)
-  → π (`∃ x, `∃ y, `∃ z, P x y z) ≔
-begin
-  assume P R h1 h2;
-  refine ¬¬ₑ (`∃ x, `∃ y, `∃ z, P x y z) _;
-  assume hne;
-  refine h2 (λ x y z, =⇒ (h1 x y z) (λ hpxyz, hne (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz)))))
+  refine h_after (pi_to_!! (λ v, res_tm (ρ v)) (λ v,
+    =⇒ (res_eq (ρ v))
+       (λ hpv, hne (pi_to_??_intro P v hpv))))
 end;

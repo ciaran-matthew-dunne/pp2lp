@@ -29,15 +29,20 @@ let write_file path s =
   output_string oc s;
   close_out oc
 
-(* Write the per-suite lambdapi.pkg if the contents would change. *)
-let ensure_pkg suite =
-  let pkg_path = Filename.concat (Suite.dir suite) "lambdapi.pkg" in
-  let pkg_name = Suite.pkg_name suite in
-  let want = Printf.sprintf "package_name = %s\nroot_path = %s\n"
-               pkg_name pkg_name
+(* Ensure the [lp/bench/<suite>/] output directory exists. The emitted
+   .lp lives inside the pp2lp package, so no per-suite lambdapi.pkg is
+   needed. *)
+let ensure_lp_dir suite =
+  let rec mkdirs d =
+    if d = "" || d = "." || d = "/" then ()
+    else begin
+      mkdirs (Filename.dirname d);
+      try Unix.mkdir d 0o755
+      with Unix.Unix_error (Unix.EEXIST, _, _) -> ()
+         | Unix.Unix_error _ -> ()
+    end
   in
-  let cur = try read_file pkg_path with _ -> "" in
-  if cur <> want then write_file pkg_path want
+  mkdirs (Suite.lp_dir suite)
 
 (* Count occurrences of whole-word "trust" / "admit" in LP source.
    Mirrors the original `grep -ow`. We approximate by matching the
@@ -144,7 +149,7 @@ type config = {
 let run_one ~cfg ?(force=false) (name : string) : outcome =
   let suite_dir = Suite.dir cfg.suite in
   let replay = Filename.concat suite_dir (name ^ ".replay") in
-  let outfile = Filename.concat suite_dir (name ^ ".lp") in
+  let outfile = Filename.concat (Suite.lp_dir cfg.suite) (name ^ ".lp") in
   let is_xfail = List.mem name cfg.xfail in
   let cache_hit =
     if force then None

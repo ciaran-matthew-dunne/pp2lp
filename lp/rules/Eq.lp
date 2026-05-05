@@ -1,6 +1,6 @@
 // Equality rules (§A.13) — shallow encoding
 // Exp ≃ Exp becomes Leibniz equality (polymorphic)
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant;
 
 // ---- EVR (equality reflexivity) ----
 
@@ -100,30 +100,34 @@ begin
 end;
 
 // ---- EAXM91/EAXM92: AXM9 extensions for equality commutativity ----
+//
+// Tuple-uniform like AXM9. The hypothesis pattern is the same
+// `!! u, ¬(⊤ ∧ …)` shape; EAXM91/92 only differ from AXM9 in
+// applying eq commutativity at the conclusion.
 
-// EAXM91: ∀x·¬(TRUE ∧ p=q) in H; [x:=E](q=p) reduces to (a=b) → H ⊢ (a=b) ⇒ Q
-// ∀x.¬(⊤∧(p(x)=q(x))) instantiated with E gives ¬(⊤∧(p(E)=q(E))),
-// i.e. p(E)≠q(E). With commutativity, (q(E)=p(E))⇒Q is trivially true.
-opaque symbol EAXM91 [p q : τ ι → τ ι] (E : τ ι) [Q]
-  : π (`∀ x, ¬ (⊤ ∧ (p x = q x)))
-  → π ((q E = p E) ⇒ Q) ≔
+// EAXM91: !!-block ¬(⊤ ∧ p=q) in H; v is an instantiation tuple
+//         → H ⊢ (q v = p v) ⇒ Q
+opaque symbol EAXM91 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q]
+  : π (`!! u, ¬ (⊤ ∧ (p u = q u)))
+  → π ((q v = p v) ⇒ Q) ≔
 begin
-  assume p q E Q hall h;
-  refine ⊥ₑ (hall E (∧ᵢ ⊤ᵢ (eq_sym h)))
+  assume n p q v Q hall h;
+  refine ⊥ₑ (!!_to_pi (λ u, ¬ (⊤ ∧ (p u = q u))) hall v
+              (∧ᵢ ⊤ᵢ (eq_sym h)))
 end;
 
-// EAXM92: ∀x·¬(TRUE ∧ ¬(p=q)) in H; [x:=E](q=p) reduces to (a=b) → H ⊢ ¬(a=b) ⇒ Q
-// ∀x.¬(⊤∧¬(p(x)=q(x))) instantiated with E gives ¬(⊤∧¬(p(E)=q(E))),
-// i.e. p(E)=q(E). With commutativity, ¬(q(E)=p(E))⇒Q is trivially true.
-opaque symbol EAXM92 [p q : τ ι → τ ι] (E : τ ι) [Q]
-  : π (`∀ x, ¬ (⊤ ∧ ¬ (p x = q x)))
-  → π (¬ (q E = p E) ⇒ Q) ≔
+// EAXM92: !!-block ¬(⊤ ∧ ¬(p=q)) in H; v is an instantiation tuple
+//         → H ⊢ ¬(q v = p v) ⇒ Q
+opaque symbol EAXM92 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q]
+  : π (`!! u, ¬ (⊤ ∧ ¬ (p u = q u)))
+  → π (¬ (q v = p v) ⇒ Q) ≔
 begin
-  assume p q E Q hall h;
+  assume n p q v Q hall h;
   refine ⊥ₑ (h (eq_sym _));
-  refine ¬¬ₑ (p E = q E) _;
+  refine ¬¬ₑ (p v = q v) _;
   assume hnpq;
-  refine hall E (∧ᵢ ⊤ᵢ hnpq)
+  refine !!_to_pi (λ u, ¬ (⊤ ∧ ¬ (p u = q u))) hall v
+         (∧ᵢ ⊤ᵢ hnpq)
 end;
 
 // ---- OPR (one-point rules / substitution from equality) ----

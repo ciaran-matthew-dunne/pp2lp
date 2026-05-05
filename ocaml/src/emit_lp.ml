@@ -132,13 +132,16 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         emit_primed_chain buf ctx pad child
       end
 
-    (* ALL8_1: congruence under ∀ *)
+    (* ALL8_1: congruence under `!!` (tuple-uniform). Introduce a
+       single Tuple-n variable named after the first bound var. *)
     | _, [child] when base = "ALL8" ->
       Buffer.add_string buf "refine ALL8_1 _;\n";
       Buffer.add_string buf pad;
-      let vars = match goal with Bind (_, xs, _) -> xs | _ -> [] in
-      Buffer.add_string buf "assume";
-      List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) vars;
+      let v_name = match goal with
+        | Bind (_, x :: _, _) -> x ^ "_t"
+        | _ -> "v" in
+      Buffer.add_string buf "assume ";
+      pp_ident buf v_name;
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
       emit_primed_chain buf ctx pad child
@@ -218,36 +221,37 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
 
     (* ALL7_1/XST8_1: branching quantifiers inside an outer _1 chain.
        Proof_tree.build guarantees child1 is the _1-chain subtree and
-       child2 is the continuation — the order never needs swapping. *)
+       child2 is the continuation — the order never needs swapping.
+       Tuple-uniform: single `refine ALL7_1` or `XST8_1` regardless
+       of arity, with the predicate body abstracted over a tuple var. *)
     | _, [primed_child; base_child] when base = "ALL7" || base = "XST8" ->
       if base = "ALL7" then begin
         let bvars = binding_vars goal in
+        let n = List.length bvars in
         let inner_pad = pad ^ "  " in
-        (* R is the per-element result from the first antecedent (primed_child) *)
         let result_prd = compute_result primed_child in
-        (* Check if R depends on the quantifier variables *)
         let fv = free_vars_of_prd result_prd in
         let r_is_constant = List.for_all (fun v ->
           not (SS.mem v fv.prop_vars || SS.mem v fv.exp_vars)) bvars in
-        let n = List.length bvars in
-        let all7_1_sym = if n >= 2 then Printf.sprintf "ALL7_1_%d" n else "ALL7_1" in
-        Buffer.add_string buf "refine ";
-        Buffer.add_string buf all7_1_sym;
-        Buffer.add_string buf " (\xce\xbb"; (* λ *)
-        List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
+        let v_name = match bvars with x :: _ -> x ^ "_t" | [] -> "v" in
+        let result_prd' = Subst.subst_prd_to_prjs bvars v_name result_prd in
+        Buffer.add_string buf "refine ALL7_1 (\xce\xbb "; (* λ *)
+        pp_ident buf v_name;
+        Buffer.add_string buf " : Tuple ";
+        Buffer.add_string buf (string_of_int n);
         Buffer.add_string buf ", ";
-        pp_prd buf result_prd;
+        pp_prd buf result_prd';
         Buffer.add_string buf ") _ _\n";
         Buffer.add_string buf pad;
-        Buffer.add_string buf "{ assume";
-        List.iter (fun x -> Buffer.add_char buf ' '; pp_ident buf x) bvars;
+        Buffer.add_string buf "{ assume ";
+        pp_ident buf v_name;
         Buffer.add_string buf ";\n";
         Buffer.add_string buf inner_pad;
         emit_primed_chain buf ctx inner_pad primed_child;
         Buffer.add_string buf " }\n";
         Buffer.add_string buf pad;
         Buffer.add_string buf "{ ";
-        (* If R doesn't depend on bound vars, ♢ x, R is stuck — need NRM1_1 *)
+        (* If R doesn't depend on bound vars, ♢ v, R is stuck — need NRM1_1 *)
         if r_is_constant then begin
           Buffer.add_string buf "refine NRM1_1 _;\n";
           Buffer.add_string buf inner_pad
@@ -255,14 +259,8 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         emit_primed_chain buf ctx inner_pad base_child;
         Buffer.add_string buf " }"
       end else begin
-        (* XST8_1: continuation proves ((∀x,¬P x)⇒⊥) = S *)
-        let bvars = binding_vars goal in
-        let n = List.length bvars in
-        let xst8_1_sym =
-          if n >= 2 then Printf.sprintf "XST8_1_%d" n else "XST8_1" in
-        Buffer.add_string buf "refine ";
-        Buffer.add_string buf xst8_1_sym;
-        Buffer.add_string buf " _;\n";
+        (* XST8_1: continuation proves ((`!! v, ¬ P v) ⇒ ⊥) = S *)
+        Buffer.add_string buf "refine XST8_1 _;\n";
         Buffer.add_string buf pad;
         emit_primed_chain buf ctx pad base_child
       end
@@ -362,34 +360,20 @@ and subtree_hits_admitted_nrm node =
 
 and emit_branching_quant buf ctx indent pad
     eff_rule goal child1 child2 =
-  (* Equality-based approach:
-     refine ALL7 (λ vars, R) _ _
-     { assume vars; _1 equality chain }
-     { child2 from replay } *)
+  (* Result-based approach (tuple-uniform):
+     refine ALL7 _ _
+     { assume v; <Res chain producing Res (P v)> }
+     { <continuation from child2> }
+     ALL7's signature is `(ρ : Π v, Res (P v)) → π (((`!! v, res_tm (ρ v)) ⇒ Q)) → π ((`!! v, P v) ⇒ Q)`,
+     so the chain itself goes into the first hole. *)
   let bvars = binding_vars goal in
   let n = List.length bvars in
-  (* Base (non-_n) rules use only the first var; _n variants use all n *)
-  let bvars =
-    if (eff_rule = "ALL7" || eff_rule = "XST8") && n > 1
-    then (match bvars with x :: _ -> [x] | [] -> [])
-    else bvars
-  in
-  let n = List.length bvars in
   let is_xst8 = String.starts_with ~prefix:"XST8" eff_rule in
-  let all7_sym =
-    if is_xst8 then
-      (if n >= 2 then Printf.sprintf "XST8_%d" n else "XST8")
-    else
-      (if n >= 2 then Printf.sprintf "ALL7_%d" n else "ALL7") in
+  let sym = if is_xst8 then "XST8" else "ALL7" in
   let inner_pad = String.make (indent + 2) ' ' in
-  (* R is the right-associated conjunction the _1 chain naturally produces.
-     AND4_1 has signature (Q=S1)(P=S2)⇒((P∧Q)=(S1∧S2)), so a nested chain
-     concludes at a right-associated result. We pass that shape to ALL7_2;
-     child2's PP-recorded tactics expect left-assoc, so we prepend
-     `rewrite ∧_assoc` N-2 times at the head of child2's body. *)
   let result_prd = compute_result child1 in
-  (* Count right-nested ∧ pairs anywhere in the predicate. Each such pair
-     needs exactly one `rewrite ∧_assoc` to become left-assoc. *)
+  let v_name = match bvars with x :: _ -> x ^ "_t" | [] -> "v" in
+  (* Count right-nested ∧ pairs to bridge right-assoc → left-assoc. *)
   let rec count_rassoc = function
     | Binary (And, a, (Binary (And, _, _) as b)) ->
       1 + count_rassoc a + count_rassoc b
@@ -399,22 +383,14 @@ and emit_branching_quant buf ctx indent pad
     | _ -> 0
   in
   let n_assoc_rewrites = count_rassoc result_prd in
-  (* Emit: refine ALL7 (λ vars, R) _ _ { eq_proof } { child2 } *)
+  let _ = n in  (* arity available if needed *)
   Buffer.add_string buf pad;
   Buffer.add_string buf "refine ";
-  Buffer.add_string buf all7_sym;
-  Buffer.add_string buf " (\xce\xbb"; (* λ *)
-  List.iter (fun x ->
-    Buffer.add_char buf ' ';
-    pp_ident buf x) bvars;
-  Buffer.add_string buf ", ";
-  pp_prd buf result_prd;
-  Buffer.add_string buf ") _ _\n";
+  Buffer.add_string buf sym;
+  Buffer.add_string buf " _ _\n";
   Buffer.add_string buf pad;
-  Buffer.add_string buf "{ assume";
-  List.iter (fun x ->
-    Buffer.add_char buf ' ';
-    pp_ident buf x) bvars;
+  Buffer.add_string buf "{ assume ";
+  pp_ident buf v_name;
   Buffer.add_string buf ";\n";
   Buffer.add_string buf inner_pad;
   emit_primed_chain buf ctx inner_pad child1;
@@ -422,15 +398,8 @@ and emit_branching_quant buf ctx indent pad
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
   if subtree_hits_admitted_nrm child2 then begin
-    (* HOU short-circuit: when child2 chains NRM rules down to an
-       admitted NRM21-23 leaf (or to a NRM20 reached through the
-       right-assoc bridging that over-fires for OR3_1/AND3_1-rich
-       chains), Lambdapi can't infer the implicit P/Q/S of
-       NRM7_2/5_2/13_2 against the goal `(♢x y, R x y)` — the lambda
-       inside the quantifier defeats higher-order pattern matching.
-       Collapse the whole subtree to one trust. *)
     trace_emit "all7-2nd-child-trust"
-      (Printf.sprintf "rule=%s nvars=%d" eff_rule (List.length bvars));
+      (Printf.sprintf "rule=%s" eff_rule);
     Buffer.add_string buf "refine trust"
   end
   else begin

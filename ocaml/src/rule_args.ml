@@ -33,28 +33,10 @@ let binding_vars = function
 
 let goal_binding_count goal = List.length (binding_vars goal)
 
-let check_compound_limit rule n =
-  if n > 3 then
-    raise (Proof_tree.Emit_admit
-      (Printf.sprintf "%s: compound quantifier binds %d variables (max 3)" rule n))
-
-let select_variant rule goal children flat =
-  let n = goal_binding_count goal in
-  match rule, children with
-  | ("ALL7" | "ALL7_1"), _ when n >= 2 && flat = 0 ->
-    check_compound_limit rule n;
-    if rule = "ALL7_1" then Printf.sprintf "ALL7_1_%d" n
-    else Printf.sprintf "ALL7_%d" n
-  | "XST8", _ when n >= 2 && flat = 0 ->
-    check_compound_limit rule n;
-    Printf.sprintf "XST8_%d" n
-  | ("ALL5" | "XST5" | "XST6" | "XST7"
-    | "NRM1" | "NRM3" | "NRM5" | "NRM6" | "NRM7" | "NRM9"
-    | "NRM12" | "NRM13" | "NRM14" | "NRM15" | "NRM19"), _
-    when n >= 2 ->
-    check_compound_limit rule n;
-    Printf.sprintf "%s_%d" rule n
-  | _ -> rule
+(* Tuple-uniform rule library: every rule is polymorphic in `[n]` over
+   `Tuple n`, so we never need a per-arity variant. `select_variant`
+   collapses to identity. *)
+let select_variant rule _goal _children _flat = rule
 
 (* ---- Suffix handling ---- *)
 
@@ -97,16 +79,16 @@ let introduce buf pad ctx rule goal flat =
   if rule = "ALL8" || rule = "ALL8_1" then begin
     match goal with
     | Bind (_, xs, _) ->
-      let vars = if flat > 0 && List.length xs > flat
-        then List.filteri (fun i _ -> i < List.length xs - flat) xs
-        else xs
-      in
+      (* Tuple-uniform `!!` form: introduce a single variable of
+         type `Tuple n` named after the first bound var. The body's
+         references to original PP variables have already been
+         substituted with `Prj k v` by `pp_lp`'s Bind renderer. *)
+      let _ = flat in  (* arity collapse no longer relevant *)
+      let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
-      Buffer.add_string buf "assume";
-      List.iter (fun x ->
-        Buffer.add_char buf ' ';
-        pp_ident buf x) vars
+      Buffer.add_string buf "assume ";
+      pp_ident buf v_name
     | _ -> ()
   end;
   ctx

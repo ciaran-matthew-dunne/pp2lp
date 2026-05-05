@@ -52,7 +52,8 @@ status: build
 
 clean: build
 	@$(PP2LP) clean --all
-	@rm -f bench/*/*.lp bench/*/lambdapi.pkg bench/*/.gen_status.tsv
+	@rm -rf lp/bench
+	@rm -f bench/*/.gen_status.tsv
 	@rm -f bench/claude/*.but bench/claude-arith/*.but
 	@rm -f bench/claude/*.trace bench/claude/*.replay \
 	       bench/claude-arith/*.trace bench/claude-arith/*.replay \

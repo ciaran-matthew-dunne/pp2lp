@@ -71,7 +71,10 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AXM7" leaf;
   r "AXM8" leaf ~emit_args:(Some "dynamic:axm8");
   r "AXM9" leaf ~emit_args:(Some "dynamic:axm9");
-  (* §A.7 Universal quantification *)
+  (* §A.7 Universal quantification.
+     ALL1–4 are compound↔nested conversions; thanks to the parser's
+     same-binder collapse, both forms reduce to a single `!! [n]`
+     in the AST, making ALL1–4 genuine no-ops in our emission. *)
   r "ALL1" pass ~hoas_identity:true;
   r "ALL2" pass ~hoas_identity:true;
   r "ALL3" pass ~hoas_identity:true;
@@ -81,7 +84,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ALL7" branch ~emit_args:(Some "dynamic:all7");
   r "ALL8" pass;
   r "ALL9" pass ~intro_antecedent:true;
-  (* §A.8 Existential quantification *)
+  (* §A.8 Existential — XST1–4 likewise collapse to no-ops. *)
   r "XST1" pass ~hoas_identity:true;
   r "XST2" pass ~hoas_identity:true;
   r "XST3" pass ~hoas_identity:true;
@@ -110,6 +113,9 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM5" pass;
   r "NRM6" pass;
   r "NRM7" pass;
+  (* NRM8 converts mixed `forall(x) · ∀ y · …` to compound; the
+     parser's universal-style collapse already merges them, so
+     NRM8 becomes a no-op in our AST. *)
   r "NRM8" pass ~hoas_identity:true;
   r "NRM9" pass;
   r "NRM10" pass;

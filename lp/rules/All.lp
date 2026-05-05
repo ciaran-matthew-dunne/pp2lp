@@ -1,152 +1,128 @@
-// Universal quantification (§A.7) — shallow encoding
+// Universal quantification (§A.7) — tuple-based encoding.
 //
-// With HOAS:
-// - ♢ and ♡ are defined as aliases for ∀ in B.lp.
-// - Variable renaming (ALL5f, ALL7f, ALL8f) is handled by
-//   α-equivalence — these collapse into ALL5, ALL7, ALL8.
-// - Compound variables (ALL1-4) don't exist; nested ∀ IS
-//   the only form. The OCaml emitter should skip ALL1-4.
-// - ALL6 is definitional (¬Q ≡ Q ⇒ ⊥).
-require open pp2lp.B;
-
-// ---- Identity rules (no-ops in HOAS) ----
+// Compound bindings in PP traces map to `!! v : Tuple n, P v`. The
+// per-arity scaffolding the previous version of this file carried
+// (ALL5_2, ALL7_2, ALL7_3, ALL7_2i, ALL7_3i, …) is gone: the uniform
+// tuple-indexed forms below subsume every arity.
 //
-// ALL5f, ALL7f, ALL8f: Variable renaming variants of ALL5,
-//   ALL7, ALL8. In HOAS, α-equivalence is automatic, so
-//   these collapse into their base forms.
+// ALL1–4 are compound↔nested conversions. Per the spec convention,
+// `x` is an n-tuple bundle and `y` is the singleton trailing var,
+// so the rule peels one layer at a time:
+//
+//   compound : `!! v : Tuple (+1 n), P v
+//   nested   : `!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)
+//
+// Tuple (+1 n) constructors are exactly `(w ⨾ a)`, so the harder
+// direction (nested → compound) is provable by a rewrite rule that
+// pattern-matches on the constructor.
 
-// ALL1-4: Compound variable flattening (identity in HOAS).
-// ALL1: x,y distinct; H ⊢ ¬(∀(x,y)·P) ⇒ R → H ⊢ ¬(∀x·∀y·P) ⇒ R
-opaque symbol ALL1 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π (¬ (`∀ x, `∀ y, P x y) ⇒ R)
-  → π (¬ (`∀ x, `∀ y, P x y) ⇒ R) ≔
-begin assume P R h; refine h end;
+require open pp2lp.B pp2lp.Quant;
 
-// ALL2: same pattern for NOT(∀) flattening
-opaque symbol ALL2 [P : τ ι → τ ι → Prop]
-  : π (¬ (`∀ x, `∀ y, P x y))
-  → π (¬ (`∀ x, `∀ y, P x y)) ≔
-begin assume P h; refine h end;
+// Helper: nested → compound. Defined by rewrite rule on the
+// tuple constructor `($w ⨾ $a)`. Used by ALL2, ALL3.
+symbol nested_to_compound [n] (P : Tuple (+1 n) → Prop)
+  (h : π (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)))
+  : Π v : Tuple (+1 n), π (P v);
+rule nested_to_compound [$n] $P $h ($w ⨾ $a) ↪
+  !!_to_pi (λ y, $P ($w ⨾ prj 0 y))
+           (!!_to_pi (λ w, `!! y : Tuple 1, $P (w ⨾ prj 0 y)) $h $w)
+           (unit ⨾ $a);
 
-// ALL3: compound variable flattening for positive ∀ ⇒ R
-opaque symbol ALL3 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`∀ x, `∀ y, P x y) ⇒ R)
-  → π ((`∀ x, `∀ y, P x y) ⇒ R) ≔
-begin assume P R h; refine h end;
-
-// ALL4: flattening for ∀ with implication
-opaque symbol ALL4 [P : τ ι → τ ι → Prop] [Q : Prop]
-  : π ((`∀ x, `∀ y, P x y) ⇒ Q)
-  → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
-begin assume P Q h; refine h end;
-
-// ALL6: H ⊢ (∀x·P) ⇒ FALSE → H ⊢ ¬(∀x·P)
-// Definitional: ¬Q ≡ Q ⇒ ⊥.
-opaque symbol ALL6 [P : τ ι → Prop]
-  : π ((`∀ x, P x) ⇒ ⊥)
-  → π (¬ (`∀ x, P x)) ≔
-begin assume P h; refine h end;
-
-// ---- Substantive rules ----
-
-// ALL5: x not free in R; H ⊢ ∀x·(¬P ⇒ R) → H ⊢ ¬(∀x·P) ⇒ R
-// "x not free in R" means R : Prop (not τ ι → Prop).
-opaque symbol ALL5 [P : τ ι → Prop] [R : Prop]
-  : π (`∀ x, ¬ (P x) ⇒ R)
-  → π (¬ (`∀ x, P x) ⇒ R) ≔
+// ALL1: H ⊢ ¬(∀(x,y)·P) ⇒ R → H ⊢ ¬(∀x·∀y·P) ⇒ R
+opaque symbol ALL1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  : π (¬ (`!! v : Tuple (+1 n), P v) ⇒ R)
+  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
 begin
-  assume P R h1 h2;
+  assume n P R h hnnested;
+  refine h _;
+  assume hcompound;
+  refine hnnested _;
+  refine pi_to_!! _ _; assume w;
+  refine pi_to_!! _ _; assume y;
+  refine !!_to_pi P hcompound (w ⨾ prj 0 y)
+end;
+
+// ALL2: H ⊢ ¬(∀(x,y)·P) → H ⊢ ¬(∀x·∀y·P)
+opaque symbol ALL2 [n] [P : Tuple (+1 n) → Prop]
+  : π (¬ (`!! v : Tuple (+1 n), P v))
+  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y))) ≔
+begin
+  assume n P h hnested;
+  refine h (pi_to_!! P (nested_to_compound P hnested))
+end;
+
+// ALL3: H ⊢ (∀(x,y)·P) ⇒ R → H ⊢ (∀x·∀y·P) ⇒ R
+opaque symbol ALL3 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  : π ((`!! v : Tuple (+1 n), P v) ⇒ R)
+  → π ((`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
+begin
+  assume n P R h hnested;
+  refine h (pi_to_!! P (nested_to_compound P hnested))
+end;
+
+// ALL4: H ⊢ ∀(x,y)·P → H ⊢ ∀x·∀y·P
+opaque symbol ALL4 [n] [P : Tuple (+1 n) → Prop]
+  : π (`!! v : Tuple (+1 n), P v)
+  → π (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ≔
+begin
+  assume n P h;
+  refine pi_to_!! _ _; assume w;
+  refine pi_to_!! _ _; assume y;
+  refine !!_to_pi P h (w ⨾ prj 0 y)
+end;
+
+// ALL5: H ⊢ ∀-block, ¬P ⇒ R → H ⊢ ¬(∀-block, P) ⇒ R
+// "x not free in R" means R : Prop (uniform across arities).
+
+opaque symbol ALL5 [n] [P : Tuple n → Prop] [R : Prop]
+  : π (`!! v, ¬ (P v) ⇒ R)
+  → π (¬ (`!! v, P v) ⇒ R) ≔
+begin
+  assume n P R h1 h2;
   refine ¬¬ₑ R _;
   assume hnr;
-  refine h2 (λ x, ¬¬ₑ (P x) (λ hnpx, hnr (h1 x hnpx)))
+  refine h2 (pi_to_!! P (λ v,
+    ¬¬ₑ (P v) (λ hnpv, hnr (!!_to_pi (λ v, ¬ (P v) ⇒ R) h1 v hnpv))))
 end;
 
-// ALL5_2: Two-variable version.
-opaque symbol ALL5_2 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π (`∀ x, `∀ y, ¬ (P x y) ⇒ R)
-  → π (¬ (`∀ x, `∀ y, P x y) ⇒ R) ≔
+// ALL6: H ⊢ (∀-block, P) ⇒ ⊥ → H ⊢ ¬(∀-block, P)
+// Definitional in HOAS: ¬Q ≡ Q ⇒ ⊥.
+
+opaque symbol ALL6 [n] [P : Tuple n → Prop]
+  : π ((`!! v, P v) ⇒ ⊥)
+  → π (¬ (`!! v, P v)) ≔
+begin assume n P h; refine h end;
+
+// ALL7: result-based form.
+//   premise 1: per-tuple Res chain ρ producing res_tm (ρ v) for each v
+//   premise 2: ((`!! v, res_tm (ρ v)) ⇒ Q) (continuation)
+//   conclusion: (`!! v, P v) ⇒ Q
+//
+// The Res chain provides the equality proof internally via `res_eq`;
+// the emitter constructs ρ as a chain of Res-yielding `_1` rules.
+
+opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
+  (ρ : Π v : Tuple n, Res (P v))
+  : π ((`!! v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔
 begin
-  assume P R h1 h2;
-  refine ¬¬ₑ R _;
-  assume hnr;
-  refine h2 (λ x y, ¬¬ₑ (P x y) (λ hnpxy, hnr (h1 x y hnpxy)))
+  assume n P Q ρ h_after h_P;
+  refine h_after (pi_to_!! (λ v, res_tm (ρ v))
+    (λ v, =⇒ (res_eq (ρ v)) (!!_to_pi P h_P v)))
 end;
 
-// ALL7: x not free in H; (H ⊢ P) ⇝ R; H ⊢ (♢x·R) ⇒ Q → H ⊢ (∀x·P) ⇒ Q
-// First premise: P(x) = R(x) for all x (equality-based normalisation result).
-// Second premise: (♢x R(x)) ⇒ Q.
-opaque symbol ALL7 [P : τ ι → Prop] (R : τ ι → Prop) [Q : Prop]
-  : π (`∀ x, P x = R x)
-  → π ((`♢ x, R x) ⇒ Q)
-  → π ((`∀ x, P x) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x, =⇒ (h1 x) (hP x))
-end;
+// ALL8: H ⊢ P → H ⊢ ∀-block, P
+// Universal-introduction. Spec premise is the body P with the bound
+// variable free in context; HOAS-encoded as a per-tuple proof family
+// (Π v, π (P v)). With `!!` rigid we need `pi_to_!!` to bridge.
 
-// ALL7_2: Two-variable version for compound ∀(x,y).
-opaque symbol ALL7_2 [P : τ ι → τ ι → Prop] (R : τ ι → τ ι → Prop) [Q : Prop]
-  : π (`∀ x, `∀ y, P x y = R x y)
-  → π ((`♢ x, `♢ y, R x y) ⇒ Q)
-  → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x y, =⇒ (h1 x y) (hP x y))
-end;
+opaque symbol ALL8 [n] [P : Tuple n → Prop]
+  : (Π v : Tuple n, π (P v)) → π (`!! v, P v)
+  ≔ λ f, pi_to_!! _ f;
 
-// ALL7_3: Three-variable version for compound ∀(x,y,z).
-opaque symbol ALL7_3 [P : τ ι → τ ι → τ ι → Prop] (R : τ ι → τ ι → τ ι → Prop) [Q : Prop]
-  : π (`∀ x, `∀ y, `∀ z, P x y z = R x y z)
-  → π ((`♢ x, `♢ y, `♢ z, R x y z) ⇒ Q)
-  → π ((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x y z, =⇒ (h1 x y z) (hP x y z))
-end;
+// ALL9: H, (∀-block, T) ⊢ Q → H ⊢ (♡-block, T) ⇒ Q
+// ♡ aliases ∀, so ♡-block = !!-block at the term level.
 
-// ALL7i/ALL7_2i/ALL7_3i: R implicit — inferred from the equality proof.
-// The emitter provides the equality proof; Lambdapi infers R from its RHS.
-opaque symbol ALL7i [P R : τ ι → Prop] [Q : Prop]
-  : π (`∀ x, P x = R x)
-  → π ((`♢ x, R x) ⇒ Q)
-  → π ((`∀ x, P x) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x, =⇒ (h1 x) (hP x))
-end;
-
-opaque symbol ALL7_2i [P R : τ ι → τ ι → Prop] [Q : Prop]
-  : π (`∀ x, `∀ y, P x y = R x y)
-  → π ((`♢ x, `♢ y, R x y) ⇒ Q)
-  → π ((`∀ x, `∀ y, P x y) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x y, =⇒ (h1 x y) (hP x y))
-end;
-
-opaque symbol ALL7_3i [P R : τ ι → τ ι → τ ι → Prop] [Q : Prop]
-  : π (`∀ x, `∀ y, `∀ z, P x y z = R x y z)
-  → π ((`♢ x, `♢ y, `♢ z, R x y z) ⇒ Q)
-  → π ((`∀ x, `∀ y, `∀ z, P x y z) ⇒ Q) ≔
-begin
-  assume P R Q h1 h2 hP;
-  refine h2 (λ x y z, =⇒ (h1 x y z) (hP x y z))
-end;
-
-// ALL8: x not free in H; H ⊢ P → H ⊢ ∀x·P
-// Identity in HOAS: π(∀x, P x) is already Πx, π(P x).
-// The emitter handles ∀-introduction via assume.
-opaque symbol ALL8 [P : τ ι → Prop]
-  : π (`∀ x, P x)
-  → π (`∀ x, P x) ≔
-begin
-  assume P h; refine h
-end;
-
-// ALL9: H, (∀x·T) ⊢ Q → H ⊢ (♡x·T) ⇒ Q
-opaque symbol ALL9 [T : τ ι → Prop] [Q : Prop]
-  : (π (`∀ x, T x) → π Q)
-  → π ((`♡ x, T x) ⇒ Q) ≔
-begin
-  assume T Q h; refine h
-end;
+opaque symbol ALL9 [n] [T : Tuple n → Prop] [Q : Prop]
+  : (π (`!! v, T v) → π Q)
+  → π ((`!! v, T v) ⇒ Q) ≔
+begin assume n T Q h; refine h end;

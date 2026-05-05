@@ -1,436 +1,370 @@
-// Normalisation (§A.12) — shallow encoding
+// Normalisation (§A.12) — tuple-based encoding.
 //
-// With HOAS and ♢/♡ defined as ∀ in B.lp:
-// - Compound variables (⨾) become nested ∀
-// - Substitution is HOAS application
-// - Non-freeness is implicit (Prop vs τ ι → Prop)
-require open pp2lp.B;
+// Compound bindings in PP traces map to `!! v : Tuple n, P v` and
+// `?? v : Tuple n, P v` (with ♢/♡ aliasing ∀, both use `!!` here).
+// The per-arity scaffolding the previous version of this file
+// carried (NRM1_2, NRM3_2, NRM5_2, NRM5_3, NRM6_2, NRM7_2, NRM9_2,
+// NRM12_2, NRM12_3, NRM13_2, NRM13_3, NRM14_2, NRM15_2, NRM19_2,
+// NRM20_3, NRM20_4) is gone: the uniform tuple-indexed forms below
+// subsume every arity.
 
-// ---- NRM1-7: Logical transformations under ♢ ----
+require open pp2lp.B pp2lp.Quant;
 
-// NRM1: x not free in P; H ⊢ P ⇒ S → H ⊢ (♢x · P) ⇒ S
-opaque symbol NRM1 [P S : Prop]
+// ---- NRM1-7: Logical transformations under `!!` ----
+
+// NRM1: x not free in P; H ⊢ P ⇒ S → H ⊢ (`!! _ · P) ⇒ S
+opaque symbol NRM1 [n] [P S : Prop]
   : π (P ⇒ S)
-  → π ((`♢ _ : τ ι, P) ⇒ S) ≔
+  → π ((`!! _ : Tuple n, P) ⇒ S) ≔
 begin
-  assume P S h1 h2;
-  refine h1 (h2 inh)
+  assume n P S h1 h2;
+  refine h1 (!!_to_pi (λ _ : Tuple n, P) h2 (inh_tuple [n]))
 end;
 
-// NRM1_2: Two-variable version.
-opaque symbol NRM1_2 [P S : Prop]
-  : π (P ⇒ S)
-  → π ((`♢ _ : τ ι, `♢ _ : τ ι, P) ⇒ S) ≔
+// NRM2: x not free in P; H ⊢ (P ⇒ `!! · Q) ⇒ S → H ⊢ `!! · (P ⇒ Q) ⇒ S
+opaque symbol NRM2 [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop]
+  : π ((P ⇒ (`!! v, Q v)) ⇒ S)
+  → π ((`!! v, P ⇒ Q v) ⇒ S) ≔
 begin
-  assume P S h1 h2;
-  refine h1 (h2 inh inh)
+  assume n P Q S h1 h2;
+  refine h1 (λ p,
+    pi_to_!! Q (λ v, !!_to_pi (λ v', P ⇒ Q v') h2 v p))
 end;
 
-// NRM1_3: Three-variable version.
-opaque symbol NRM1_3 [P S : Prop]
-  : π (P ⇒ S)
-  → π ((`♢ _ : τ ι, `♢ _ : τ ι, `♢ _ : τ ι, P) ⇒ S) ≔
+// NRM3: x not free in Q; H ⊢ (Q ⇒ S) ∧ ((`!! · ¬P) ⇒ S) → H ⊢ `!! · (P ⇒ Q) ⇒ S
+opaque symbol NRM3 [n] [P : Tuple n → Prop] [Q S : Prop]
+  : π ((Q ⇒ S) ∧ ((`!! v, ¬ (P v)) ⇒ S))
+  → π ((`!! v, P v ⇒ Q) ⇒ S) ≔
 begin
-  assume P S h1 h2;
-  refine h1 (h2 inh inh inh)
+  assume n P Q S h1 h2;
+  refine ∨ₑ (em (`?? v, P v)) _ _
+  { assume hex;
+    refine pi_to_??_elim P
+      (λ v hpv, (∧ₑ₁ h1) (!!_to_pi (λ v', P v' ⇒ Q) h2 v hpv)) hex }
+  { assume hnex;
+    refine (∧ₑ₂ h1) (pi_to_!! (λ v, ¬ (P v))
+      (λ v hpv, hnex (pi_to_??_intro P v hpv))) }
 end;
 
-// NRM2: x not free in P; H ⊢ (P ⇒ ♢x · Q) ⇒ S → H ⊢ ♢x · (P ⇒ Q) ⇒ S
-opaque symbol NRM2 [P : Prop] [Q : τ ι → Prop] [S : Prop]
-  : π ((P ⇒ (`♢ x, Q x)) ⇒ S)
-  → π ((`♢ x, P ⇒ Q x) ⇒ S) ≔
+// NRM4: x not free in Q; H ⊢ (Q ⇒ `!! · (P ⇒ R)) ⇒ S → H ⊢ `!! · (P ⇒ Q ⇒ R) ⇒ S
+opaque symbol NRM4 [n] [P R : Tuple n → Prop] [Q S : Prop]
+  : π ((Q ⇒ (`!! v, P v ⇒ R v)) ⇒ S)
+  → π ((`!! v, P v ⇒ Q ⇒ R v) ⇒ S) ≔
 begin
-  assume P Q S h1 h2;
-  refine h1 (λ hp x, h2 x hp)
+  assume n P R Q S h1 h2;
+  refine h1 (λ hq,
+    pi_to_!! (λ v, P v ⇒ R v)
+      (λ v hpv, !!_to_pi (λ v', P v' ⇒ Q ⇒ R v') h2 v hpv hq))
 end;
 
-// NRM3: x not free in Q; Q is not FALSE; H ⊢ (Q ⇒ S) ∧ ((∀x · ¬P) ⇒ S) → H ⊢ ♢x · (P ⇒ Q) ⇒ S
-opaque symbol NRM3 [P : τ ι → Prop] [Q S : Prop]
-  : π ((Q ⇒ S) ∧ ((`∀ x, ¬ (P x)) ⇒ S))
-  → π ((`♢ x, P x ⇒ Q) ⇒ S) ≔
+// NRM5: H ⊢ `!! · (P ∧ Q ⇒ R) ⇒ S → H ⊢ `!! · (P ⇒ Q ⇒ R) ⇒ S
+opaque symbol NRM5 [n] [P Q R : Tuple n → Prop] [S : Prop]
+  : π ((`!! v, (P v ∧ Q v) ⇒ R v) ⇒ S)
+  → π ((`!! v, P v ⇒ Q v ⇒ R v) ⇒ S) ≔
 begin
-  assume P Q S h1 h2;
-  refine ∨ₑ (em (`∃ x, P x)) _ _ {
-    assume hex;
-    refine ∃ₑ hex (λ x hpx, (∧ₑ₁ h1) (h2 x hpx))
-  } {
-    assume hnex;
-    refine (∧ₑ₂ h1) (λ x hpx, hnex (∃ᵢ x hpx))
-  }
+  assume n P Q R S h1 h2;
+  refine h1 (pi_to_!! (λ v, (P v ∧ Q v) ⇒ R v)
+    (λ v hpq, !!_to_pi (λ v', P v' ⇒ Q v' ⇒ R v') h2 v
+                (∧ₑ₁ hpq) (∧ₑ₂ hpq)))
 end;
 
-// NRM3_2: Two-variable version.
-opaque symbol NRM3_2 [P : τ ι → τ ι → Prop] [Q S : Prop]
-  : π ((Q ⇒ S) ∧ ((`∀ x, `∀ y, ¬ (P x y)) ⇒ S))
-  → π ((`♢ x, `♢ y, P x y ⇒ Q) ⇒ S) ≔
+// NRM6: H ⊢ `!! · (R ⇒ P) ⇒ (`!! · (R ⇒ Q) ⇒ S) → H ⊢ `!! · (R ⇒ P ∧ Q) ⇒ S
+opaque symbol NRM6 [n] [P Q R : Tuple n → Prop] [S : Prop]
+  : π ((`!! v, R v ⇒ P v) ⇒ ((`!! v, R v ⇒ Q v) ⇒ S))
+  → π ((`!! v, R v ⇒ (P v ∧ Q v)) ⇒ S) ≔
 begin
-  assume P Q S h1 h2;
-  refine ∨ₑ (em (`∃ x, `∃ y, P x y)) _ _ {
-    assume hex;
-    refine ∃ₑ hex (λ x hex2, ∃ₑ hex2 (λ y hpxy, (∧ₑ₁ h1) (h2 x y hpxy)))
-  } {
-    assume hnex;
-    refine (∧ₑ₂ h1) (λ x y hpxy, hnex (∃ᵢ x (∃ᵢ y hpxy)))
-  }
+  assume n P Q R S h1 h2;
+  refine h1
+    (pi_to_!! (λ v, R v ⇒ P v)
+      (λ v hr, ∧ₑ₁ (!!_to_pi (λ v', R v' ⇒ (P v' ∧ Q v')) h2 v hr)))
+    (pi_to_!! (λ v, R v ⇒ Q v)
+      (λ v hr, ∧ₑ₂ (!!_to_pi (λ v', R v' ⇒ (P v' ∧ Q v')) h2 v hr)))
 end;
 
-// NRM3_3: Three-variable version.
-opaque symbol NRM3_3 [P : τ ι → τ ι → τ ι → Prop] [Q S : Prop]
-  : π ((Q ⇒ S) ∧ ((`∀ x, `∀ y, `∀ z, ¬ (P x y z)) ⇒ S))
-  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ Q) ⇒ S) ≔
+// NRM7: H ⊢ (`!! · P) ⇒ ((`!! · Q) ⇒ S) → H ⊢ `!! · (P ∧ Q) ⇒ S
+opaque symbol NRM7 [n] [P Q : Tuple n → Prop] [S : Prop]
+  : π ((`!! v, P v) ⇒ ((`!! v, Q v) ⇒ S))
+  → π ((`!! v, P v ∧ Q v) ⇒ S) ≔
 begin
-  assume P Q S h1 h2;
-  refine ∨ₑ (em (`∃ x, `∃ y, `∃ z, P x y z)) _ _ {
-    assume hex;
-    refine ∃ₑ hex (λ x hex2, ∃ₑ hex2 (λ y hex3, ∃ₑ hex3 (λ z hpxyz, (∧ₑ₁ h1) (h2 x y z hpxyz))))
-  } {
-    assume hnex;
-    refine (∧ₑ₂ h1) (λ x y z hpxyz, hnex (∃ᵢ x (∃ᵢ y (∃ᵢ z hpxyz))))
-  }
+  assume n P Q S h1 h2;
+  refine h1
+    (pi_to_!! P (λ v, ∧ₑ₁ (!!_to_pi (λ v', P v' ∧ Q v') h2 v)))
+    (pi_to_!! Q (λ v, ∧ₑ₂ (!!_to_pi (λ v', P v' ∧ Q v') h2 v)))
 end;
 
-opaque symbol NRM4 [P R : τ ι → Prop] [Q S : Prop]
-  : π ((Q ⇒ (`♢ x, P x ⇒ R x)) ⇒ S)
-  → π ((`♢ x, P x ⇒ Q ⇒ R x) ⇒ S) ≔
+// ---- NRM8-9: compound↔mixed binders (one var peeled to the right) ----
+//
+// NRM8/9's spec premise is the COMPOUND form `♢(x,y) · …` (with x as
+// an n-tuple and y as a 1-tuple), conclusion is the MIXED form
+// `♢x · ∀y · …`. With ♢/∀ aliased as ∀, both are `!!` over the full
+// (n+1)-tuple after a structural conversion.
+
+// Helper: nested → compound (mirrors All.lp's `nested_to_compound`).
+symbol nrm_compose [n] (Q : Tuple (+1 n) → Prop)
+  : π (`!! w : Tuple n, `!! y : Tuple 1, Q (w ⨾ prj 0 y))
+  → Π v : Tuple (+1 n), π (Q v);
+rule nrm_compose [$n] $Q $h ($w ⨾ $a) ↪
+  !!_to_pi (λ y, $Q ($w ⨾ prj 0 y))
+           (!!_to_pi (λ w, `!! y : Tuple 1, $Q (w ⨾ prj 0 y)) $h $w)
+           (unit ⨾ $a);
+
+// NRM8: H ⊢ (♢(x,y) · Q) ⇒ S → H ⊢ (♢x · ∀y · Q) ⇒ S
+opaque symbol NRM8 [n] [Q : Tuple (+1 n) → Prop] [S : Prop]
+  : π ((`!! v : Tuple (+1 n), Q v) ⇒ S)
+  → π ((`!! w : Tuple n, `!! y : Tuple 1, Q (w ⨾ prj 0 y)) ⇒ S) ≔
 begin
-  assume P R Q S h1 h2;
-  refine h1 (λ hq x hpx, h2 x hpx hq)
+  assume n Q S h hnested;
+  refine h (pi_to_!! Q (nrm_compose Q hnested))
 end;
 
-opaque symbol NRM5 [P Q R : τ ι → Prop] [S : Prop]
-  : π ((`♢ x, P x ∧ Q x ⇒ R x) ⇒ S)
-  → π ((`♢ x, P x ⇒ Q x ⇒ R x) ⇒ S) ≔
+// NRM9: y not free in P; H ⊢ ♢(x,y) · (P x ⇒ Q x y) ⇒ S
+//                       → H ⊢ ♢x · (P x ⇒ ∀y · Q x y) ⇒ S
+
+// Helper: P applied to the n-tuple "front" of v : Tuple (+1 n).
+symbol nrm9_split_P [n] (P : Tuple n → Prop) : Tuple (+1 n) → Prop;
+rule nrm9_split_P [$n] $P ($w ⨾ _) ↪ $P $w;
+
+// Helper: build per-(+1 n)-tuple body from the nested form.
+symbol nrm9_compose [n] (P : Tuple n → Prop) (Q : Tuple (+1 n) → Prop)
+  : π (`!! w : Tuple n,
+         P w ⇒ (`!! y : Tuple 1, Q (w ⨾ prj 0 y)))
+  → Π v : Tuple (+1 n),
+      π (nrm9_split_P P v ⇒ Q v);
+rule nrm9_compose [$n] $P $Q $h ($w ⨾ $a) ↪
+  λ hp : π ($P $w),
+    !!_to_pi (λ y, $Q ($w ⨾ prj 0 y))
+             (!!_to_pi (λ w', $P w' ⇒ (`!! y : Tuple 1, $Q (w' ⨾ prj 0 y)))
+                       $h $w hp)
+             (unit ⨾ $a);
+
+opaque symbol NRM9 [n] [P : Tuple n → Prop] [Q : Tuple (+1 n) → Prop] [S : Prop]
+  : π ((`!! v : Tuple (+1 n),
+         nrm9_split_P P v ⇒ Q v) ⇒ S)
+  → π ((`!! w : Tuple n, P w ⇒
+         (`!! y : Tuple 1, Q (w ⨾ prj 0 y))) ⇒ S) ≔
 begin
-  assume P Q R S h1 h2;
-  refine h1 (λ x hpq, h2 x (∧ₑ₁ hpq) (∧ₑ₂ hpq))
+  assume n P Q S h hnested;
+  refine h (pi_to_!! (λ v, nrm9_split_P P v ⇒ Q v)
+              (nrm9_compose P Q hnested))
 end;
 
-// NRM5_2: Two-variable version.
-opaque symbol NRM5_2 [P Q R : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, (P x y ∧ Q x y) ⇒ R x y) ⇒ S)
-  → π ((`♢ x, `♢ y, P x y ⇒ (Q x y ⇒ R x y)) ⇒ S) ≔
+// ---- NRM10-15: Implication / negation under `!!`/♡ ----
+
+// NRM10: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ∧ Q ⇒ ⊥) ⇒ R
+opaque symbol NRM10 [n] [P Q : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (P v ∧ Q v)) ⇒ R)
+  → π ((`!! v, (P v ∧ Q v) ⇒ ⊥) ⇒ R) ≔
 begin
-  assume P Q R S h1 h2;
-  refine h1 (λ x y hpq, h2 x y (∧ₑ₁ hpq) (∧ₑ₂ hpq))
+  assume n P Q R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (P v ∧ Q v))
+    (λ v hpq, !!_to_pi (λ v', (P v' ∧ Q v') ⇒ ⊥) h2 v hpq))
 end;
 
-// NRM5_3: Three-variable version.
-opaque symbol NRM5_3 [P Q R : τ ι → τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, `♢ z, (P x y z ∧ Q x y z) ⇒ R x y z) ⇒ S)
-  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ (Q x y z ⇒ R x y z)) ⇒ S) ≔
+// NRM11: H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ R → H ⊢ ♢x · (P ⇒ ⊥) ⇒ R
+opaque symbol NRM11 [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (⊤ ∧ P v)) ⇒ R)
+  → π ((`!! v, P v ⇒ ⊥) ⇒ R) ≔
 begin
-  assume P Q R S h1 h2;
-  refine h1 (λ x y z hpq, h2 x y z (∧ₑ₁ hpq) (∧ₑ₂ hpq))
+  assume n P R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (⊤ ∧ P v))
+    (λ v htpv, !!_to_pi (λ v', P v' ⇒ ⊥) h2 v (∧ₑ₂ htpv)))
 end;
 
-// NRM6: H ⊢ ♢x · (R ⇒ P) ⇒ (♢x · (R ⇒ Q) ⇒ S) → H ⊢ ♢x · (R ⇒ P ∧ Q) ⇒ S
-opaque symbol NRM6 [P Q R : τ ι → Prop] [S : Prop]
-  : π ((`♢ x, R x ⇒ P x) ⇒ ((`♢ x, R x ⇒ Q x) ⇒ S))
-  → π ((`♢ x, R x ⇒ P x ∧ Q x) ⇒ S) ≔
+// NRM12: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ⇒ ¬Q) ⇒ R
+opaque symbol NRM12 [n] [P Q : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (P v ∧ Q v)) ⇒ R)
+  → π ((`!! v, P v ⇒ ¬ (Q v)) ⇒ R) ≔
 begin
-  assume P Q R S h1 h2;
-  refine h1 (λ x hr, ∧ₑ₁ (h2 x hr)) (λ x hr, ∧ₑ₂ (h2 x hr))
+  assume n P Q R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (P v ∧ Q v))
+    (λ v hpq, !!_to_pi (λ v', P v' ⇒ ¬ (Q v')) h2 v
+                (∧ₑ₁ hpq) (∧ₑ₂ hpq)))
 end;
 
-// NRM6_2: Two-variable version.
-opaque symbol NRM6_2 [P Q R : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, R x y ⇒ P x y) ⇒ ((`♢ x, `♢ y, R x y ⇒ Q x y) ⇒ S))
-  → π ((`♢ x, `♢ y, R x y ⇒ P x y ∧ Q x y) ⇒ S) ≔
+// NRM13: H ⊢ ♡x · ¬(P ∧ ¬Q) ⇒ R → H ⊢ ♢x · (P ⇒ Q) ⇒ R
+opaque symbol NRM13 [n] [P Q : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (P v ∧ ¬ (Q v))) ⇒ R)
+  → π ((`!! v, P v ⇒ Q v) ⇒ R) ≔
 begin
-  assume P Q R S h1 h2;
-  refine h1 (λ x y hr, ∧ₑ₁ (h2 x y hr)) (λ x y hr, ∧ₑ₂ (h2 x y hr))
+  assume n P Q R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (P v ∧ ¬ (Q v)))
+    (λ v hc, (∧ₑ₂ hc) (!!_to_pi (λ v', P v' ⇒ Q v') h2 v (∧ₑ₁ hc))))
 end;
 
-// NRM7: H ⊢ (♢x · P) ⇒ ((♢x · Q) ⇒ S) → H ⊢ ♢x · (P ∧ Q) ⇒ S
-opaque symbol NRM7 [P Q : τ ι → Prop] [S : Prop]
-  : π ((`♢ x, P x) ⇒ ((`♢ x, Q x) ⇒ S))
-  → π ((`♢ x, P x ∧ Q x) ⇒ S) ≔
+// NRM14: H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ R → H ⊢ (♢x · ¬P) ⇒ R
+opaque symbol NRM14 [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (⊤ ∧ P v)) ⇒ R)
+  → π ((`!! v, ¬ (P v)) ⇒ R) ≔
 begin
-  assume P Q S h1 h2;
-  refine h1 (λ x, ∧ₑ₁ (h2 x)) (λ x, ∧ₑ₂ (h2 x))
+  assume n P R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (⊤ ∧ P v))
+    (λ v htpv, !!_to_pi (λ v', ¬ (P v')) h2 v (∧ₑ₂ htpv)))
 end;
 
-// NRM7_2: Two-variable version.
-opaque symbol NRM7_2 [P Q : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, P x y) ⇒ ((`♢ x, `♢ y, Q x y) ⇒ S))
-  → π ((`♢ x, `♢ y, P x y ∧ Q x y) ⇒ S) ≔
+// NRM15: H ⊢ ♡x · ¬(⊤ ∧ ¬P) ⇒ R → H ⊢ (♢x · P) ⇒ R
+opaque symbol NRM15 [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (⊤ ∧ ¬ (P v))) ⇒ R)
+  → π ((`!! v, P v) ⇒ R) ≔
 begin
-  assume P Q S h1 h2;
-  refine h1 (λ x y, ∧ₑ₁ (h2 x y)) (λ x y, ∧ₑ₂ (h2 x y))
+  assume n P R h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (⊤ ∧ ¬ (P v)))
+    (λ v htnpv, (∧ₑ₂ htnpv) (!!_to_pi P h2 v)))
 end;
 
-opaque symbol NRM8 [Q : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, Q x y) ⇒ S)
-  → π ((`♢ x, `∀ y, Q x y) ⇒ S) ≔
-begin
-  assume Q S h; refine h
-end;
+// ---- NRM16-19: Universal-instantiation patterns ----
 
-opaque symbol NRM9 [P : τ ι → Prop] [Q : τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, P x ⇒ Q x y) ⇒ S)
-  → π ((`♢ x, P x ⇒ `∀ y, Q x y) ⇒ S) ≔
-begin
-  assume P Q S h1 h2;
-  refine h1 (λ x y hp, h2 x hp y)
-end;
-
-// NRM9_2: Two-variable version (binds an extra z).
-opaque symbol NRM9_2 [P : τ ι → τ ι → Prop] [Q : τ ι → τ ι → τ ι → Prop] [S : Prop]
-  : π ((`♢ x, `♢ y, `♢ z, P x y ⇒ Q x y z) ⇒ S)
-  → π ((`♢ x, `♢ y, P x y ⇒ `∀ z, Q x y z) ⇒ S) ≔
-begin
-  assume P Q S h1 h2;
-  refine h1 (λ x y z hp, h2 x y hp z)
-end;
-
-opaque symbol NRM10 [P Q : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
-  → π ((`♢ x, (P x ∧ Q x) ⇒ ⊥) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x hpq, h2 x hpq)
-end;
-
-opaque symbol NRM11 [P : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ R)
-  → π ((`♢ x, P x ⇒ ⊥) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
-end;
-
-opaque symbol NRM12 [P Q : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (P x ∧ Q x)) ⇒ R)
-  → π ((`♢ x, P x ⇒ ¬ (Q x)) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x hpq, h2 x (∧ₑ₁ hpq) (∧ₑ₂ hpq))
-end;
-
-// NRM12_2: Two-variable version.
-opaque symbol NRM12_2 [P Q : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, ¬ (P x y ∧ Q x y)) ⇒ R)
-  → π ((`♢ x, `♢ y, P x y ⇒ ¬ (Q x y)) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y hpq, h2 x y (∧ₑ₁ hpq) (∧ₑ₂ hpq))
-end;
-
-// NRM12_3: Three-variable version.
-opaque symbol NRM12_3 [P Q : τ ι → τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, `♡ z, ¬ (P x y z ∧ Q x y z)) ⇒ R)
-  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ ¬ (Q x y z)) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y z hpq, h2 x y z (∧ₑ₁ hpq) (∧ₑ₂ hpq))
-end;
-
-opaque symbol NRM13 [P Q : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (P x ∧ ¬ (Q x))) ⇒ R)
-  → π ((`♢ x, P x ⇒ Q x) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x hc, (∧ₑ₂ hc) (h2 x (∧ₑ₁ hc)))
-end;
-
-// NRM13_2: Two-variable version.
-opaque symbol NRM13_2 [P Q : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, ¬ (P x y ∧ ¬ (Q x y))) ⇒ R)
-  → π ((`♢ x, `♢ y, P x y ⇒ Q x y) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y hpnq, (∧ₑ₂ hpnq) (h2 x y (∧ₑ₁ hpnq)))
-end;
-
-// NRM13_3: Three-variable version.
-opaque symbol NRM13_3 [P Q : τ ι → τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, `♡ z, ¬ (P x y z ∧ ¬ (Q x y z))) ⇒ R)
-  → π ((`♢ x, `♢ y, `♢ z, P x y z ⇒ Q x y z) ⇒ R) ≔
-begin
-  assume P Q R h1 h2;
-  refine h1 (λ x y z hpnq, (∧ₑ₂ hpnq) (h2 x y z (∧ₑ₁ hpnq)))
-end;
-
-opaque symbol NRM14 [P : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ R)
-  → π ((`♢ x, ¬ P x) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
-end;
-
-// NRM14_2: Two-variable version.
-opaque symbol NRM14_2 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, ¬ (⊤ ∧ P x y)) ⇒ R)
-  → π ((`♢ x, `♢ y, ¬ (P x y)) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x y htpxy, h2 x y (∧ₑ₂ htpxy))
-end;
-
-opaque symbol NRM15 [P : τ ι → Prop] [R : Prop]
-  : π ((`♡ x, ¬ (⊤ ∧ ¬ P x)) ⇒ R)
-  → π ((`♢ x, P x) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x htnpx, (∧ₑ₂ htnpx) (h2 x))
-end;
-
-// NRM15_2: Two-variable version.
-opaque symbol NRM15_2 [P : τ ι → τ ι → Prop] [R : Prop]
-  : π ((`♡ x, `♡ y, ¬ (⊤ ∧ ¬ (P x y))) ⇒ R)
-  → π ((`♢ x, `♢ y, P x y) ⇒ R) ≔
-begin
-  assume P R h1 h2;
-  refine h1 (λ x y htnpxy, (∧ₑ₂ htnpxy) (h2 x y))
-end;
-
-opaque symbol NRM16 [P : τ ι → Prop] [Q : Prop]
-  : π (`∀ x, P x)
+// NRM16: ∀x.P in H; Q → H ⊢ (♡x · P) ⇒ Q
+opaque symbol NRM16 [n] [P : Tuple n → Prop] [Q : Prop]
+  : π (`!! v, P v)
   → π Q
-  → π ((`♡ x, P x) ⇒ Q) ≔
+  → π ((`!! v, P v) ⇒ Q) ≔
 begin
-  assume P Q hp hq ht; refine hq
+  assume n P Q hp hq ht; refine hq
 end;
 
-// NRM17 has extra spec-level conditions (equality E/R) but the LP proof
-// obligation reduces to the same shape as NRM16 after HOAS/rewrite.
-// Intentionally identical to NRM16 at the LP level.
-opaque symbol NRM17 [P : τ ι → Prop] [Q : Prop]
-  : π (`∀ x, P x)
+// NRM17: NRM16 with extra spec-level equality side-conditions.
+// At the LP level the proof obligation collapses to NRM16's shape.
+opaque symbol NRM17 [n] [P : Tuple n → Prop] [Q : Prop]
+  : π (`!! v, P v)
   → π Q
-  → π ((`♡ x, P x) ⇒ Q) ≔
+  → π ((`!! v, P v) ⇒ Q) ≔
 begin
-  assume P Q hp hq ht; refine hq
+  assume n P Q hp hq ht; refine hq
 end;
 
-opaque symbol NRM18 [P : τ ι → Prop] [R Q : Prop] (E : τ ι)
-  : π (`∀ x, ¬ (⊤ ∧ ¬ P x))
-  → π (P E = R)
-  → π ((`♡ y, ¬ (⊤ ∧ R)) ⇒ Q) ≔
+// NRM18: ∀x · ¬(⊤ ∧ ¬P) in H; ∃E. [x:=E]P = R → H ⊢ ♡y · ¬(⊤ ∧ R) ⇒ Q
+opaque symbol NRM18 [n] [P : Tuple n → Prop] [R Q : Prop] (v : Tuple n)
+  : π (`!! u, ¬ (⊤ ∧ ¬ (P u)))
+  → π (P v = R)
+  → π ((`!! _ : Tuple n, ¬ (⊤ ∧ R)) ⇒ Q) ≔
 begin
-  assume P R Q E hp heq h;
-  // Derive P E classically from hp E : ¬(⊤ ∧ ¬ P E)
-  have hpe : π (P E)
-    { refine ¬¬ₑ (P E) _;
-      assume hnpe;
-      refine hp E (∧ᵢ ⊤ᵢ hnpe) };
-  // Transport P E along heq to R
-  have hr : π R { rewrite left heq; refine hpe };
-  // h E : ¬ (⊤ ∧ R); apply to (⊤ᵢ, hr) → ⊥, then ⊥ₑ to Q
-  refine ⊥ₑ (h E (∧ᵢ ⊤ᵢ hr))
+  assume n P R Q v hp heq h;
+  // Derive π (P v) classically.
+  have hpv : π (P v)
+    { refine ¬¬ₑ (P v) _;
+      assume hnpv;
+      refine !!_to_pi (λ u, ¬ (⊤ ∧ ¬ (P u))) hp v (∧ᵢ ⊤ᵢ hnpv) };
+  // Transport along heq.
+  have hr : π R { rewrite left heq; refine hpv };
+  refine ⊥ₑ (!!_to_pi (λ _ : Tuple n, ¬ (⊤ ∧ R)) h (inh_tuple [n])
+              (∧ᵢ ⊤ᵢ hr))
 end;
 
-opaque symbol NRM19 [Q : Prop] [R : τ ι → Prop] (E : τ ι)
-  : π (R E)
-  → π ((`♡ x, ¬ (⊤ ∧ R x)) ⇒ Q) ≔
+// NRM19: P in H; ∃E. [x:=E]R = P → H ⊢ ♢x · ¬(⊤ ∧ R) ⇒ Q
+opaque symbol NRM19 [n] [Q : Prop] [R : Tuple n → Prop] (v : Tuple n)
+  : π (R v)
+  → π ((`!! u, ¬ (⊤ ∧ R u)) ⇒ Q) ≔
 begin
-  assume Q R E hr hf;
-  refine ⊥ₑ (hf E (∧ᵢ ⊤ᵢ hr))
+  assume n Q R v hr hf;
+  refine ⊥ₑ (!!_to_pi (λ u, ¬ (⊤ ∧ R u)) hf v (∧ᵢ ⊤ᵢ hr))
 end;
 
-// NRM19_2: Two-variable version.
-opaque symbol NRM19_2 [Q : Prop] [R : τ ι → τ ι → Prop] (E F : τ ι)
-  : π (R E F)
-  → π ((`♡ x, `♡ y, ¬ (⊤ ∧ R x y)) ⇒ Q) ≔
+// ---- NRM20-23: Substitution ----
+
+// NRM20: x not free in E; H ⊢ ♡y · ¬[x:=E]P ⇒ Q
+//        → H ⊢ ♡(x,y) · ¬(P ∧ x = E) ⇒ Q
+opaque symbol NRM20 [n] [P : Tuple (+1 n) → Prop] [Q : Prop] (E : τ ι)
+  : π ((`!! y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q)
+  → π ((`!! v : Tuple (+1 n),
+         ¬ (P v ∧ (prj 0 v = E))) ⇒ Q) ≔
 begin
-  assume Q R E F hr hf;
-  refine ⊥ₑ (hf E F (∧ᵢ ⊤ᵢ hr))
+  assume n P Q E h1 h2;
+  refine h1 (pi_to_!! (λ y, ¬ (P (y ⨾ E)))
+    (λ y hpy,
+      !!_to_pi (λ v, ¬ (P v ∧ (prj 0 v = E))) h2 (y ⨾ E)
+        (∧ᵢ hpy (eq_refl E))))
 end;
 
-opaque symbol NRM20 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
-  : π ((`♡ y, ¬ (P E y)) ⇒ Q)
-  → π ((`♡ x, `♡ y, ¬ (P x y ∧ (x = E))) ⇒ Q) ≔
+// NRM21: dual to NRM20 — equality reversed.
+opaque symbol NRM21 [n] [P : Tuple (+1 n) → Prop] [Q : Prop] (E : τ ι)
+  : π ((`!! y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q)
+  → π ((`!! v : Tuple (+1 n),
+         ¬ (P v ∧ (E = prj 0 v))) ⇒ Q) ≔
 begin
-  assume P Q E h1 h2;
-  refine h1 (λ y hpey, h2 E y (∧ᵢ hpey (eq_refl E)))
+  assume n P Q E h1 h2;
+  refine h1 (pi_to_!! (λ y, ¬ (P (y ⨾ E)))
+    (λ y hpy,
+      !!_to_pi (λ v, ¬ (P v ∧ (E = prj 0 v))) h2 (y ⨾ E)
+        (∧ᵢ hpy (eq_refl E))))
 end;
 
-// NRM20_3 / NRM20_4: PP's actual goal shape for NRM20 puts the
-// equality `x = E` as the *leftmost* conjunct in a left-associated
-// chain (the spec's `P ∧ x = E` is matched up to AC), and the body
-// after substitution is x-free. The corpus exercises only the
-// 3-conjunct (81 occurrences) and 4-conjunct (181 occurrences)
-// shapes — these match PP exactly so HOU can infer all metavariables
-// (A/B/C and E) from the goal alone, leaving the antecedent as the
-// only hole.
-opaque symbol NRM20_3 [A B : τ ι → Prop] [Q : Prop] [E : τ ι]
-  : π ((`♡ y, ¬ (A y ∧ B y)) ⇒ Q)
-  → π ((`♡ x, `♡ y, ¬ (((x = E) ∧ A y) ∧ B y)) ⇒ Q) ≔
-begin
-  assume A B Q E h1 h2;
-  refine h1 (λ y hab,
-    h2 E y (∧ᵢ (∧ᵢ (eq_refl E) (∧ₑ₁ hab)) (∧ₑ₂ hab)))
-end;
-
-opaque symbol NRM20_4 [A B C : τ ι → Prop] [Q : Prop] [E : τ ι]
-  : π ((`♡ y, ¬ ((A y ∧ B y) ∧ C y)) ⇒ Q)
-  → π ((`♡ x, `♡ y, ¬ ((((x = E) ∧ A y) ∧ B y) ∧ C y)) ⇒ Q) ≔
-begin
-  assume A B C Q E h1 h2;
-  refine h1 (λ y habc,
-    h2 E y (∧ᵢ (∧ᵢ (∧ᵢ (eq_refl E)
-                       (∧ₑ₁ (∧ₑ₁ habc)))
-                   (∧ₑ₂ (∧ₑ₁ habc)))
-              (∧ₑ₂ habc)))
-end;
-
-opaque symbol NRM21 [P : τ ι → τ ι → Prop] [Q : Prop] (E : τ ι)
-  : π ((`♡ y, ¬ (P E y)) ⇒ Q)
-  → π ((`♡ x, `♡ y, ¬ (P x y ∧ (E = x))) ⇒ Q) ≔
-begin
-  assume P Q E h1 h2;
-  refine h1 (λ y hpey, h2 E y (∧ᵢ hpey (eq_sym (eq_refl E))))
-end;
-
+// NRM22: simpler unary version of NRM20 (no extra y-binder).
 opaque symbol NRM22 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
   : π (¬ (P E) ⇒ Q)
-  → π ((`♡ x, ¬ (P x ∧ (x = E))) ⇒ Q) ≔
+  → π ((`!! v : Tuple 1, ¬ (P (prj 0 v) ∧ (prj 0 v = E))) ⇒ Q) ≔
 begin
   assume P Q E h1 h2;
-  refine h1 (λ hpe, h2 E (∧ᵢ hpe (eq_refl E)))
+  refine h1 (λ hpe,
+    !!_to_pi (λ v : Tuple 1, ¬ (P (prj 0 v) ∧ (prj 0 v = E)))
+             h2 (unit ⨾ E)
+             (∧ᵢ hpe (eq_refl E)))
 end;
 
+// NRM23: NRM22 with reversed equality.
 opaque symbol NRM23 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
   : π (¬ (P E) ⇒ Q)
-  → π ((`♡ x, ¬ (P x ∧ (E = x))) ⇒ Q) ≔
+  → π ((`!! v : Tuple 1, ¬ (P (prj 0 v) ∧ (E = prj 0 v))) ⇒ Q) ≔
 begin
   assume P Q E h1 h2;
-  refine h1 (λ hpe, h2 E (∧ᵢ hpe (eq_sym (eq_refl E))))
+  refine h1 (λ hpe,
+    !!_to_pi (λ v : Tuple 1, ¬ (P (prj 0 v) ∧ (E = prj 0 v)))
+             h2 (unit ⨾ E)
+             (∧ᵢ hpe (eq_refl E)))
 end;
 
-opaque symbol NRM24 [P : τ ι → Prop] [Q : Prop]
-  : π ((`♡ x, ¬ (⊤ ∧ P x)) ⇒ Q)
-  → π ((`♡ x, ¬ (P x)) ⇒ Q) ≔
+// ---- NRM24-26: Trivial structural rules ----
+
+// NRM24: P not of form A ∧ B; H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ Q → H ⊢ ♡x · ¬P ⇒ Q
+opaque symbol NRM24 [n] [P : Tuple n → Prop] [Q : Prop]
+  : π ((`!! v, ¬ (⊤ ∧ P v)) ⇒ Q)
+  → π ((`!! v, ¬ (P v)) ⇒ Q) ≔
 begin
-  assume P Q h1 h2;
-  refine h1 (λ x htpx, h2 x (∧ₑ₂ htpx))
+  assume n P Q h1 h2;
+  refine h1 (pi_to_!! (λ v, ¬ (⊤ ∧ P v))
+    (λ v htpv, !!_to_pi (λ v', ¬ (P v')) h2 v (∧ₑ₂ htpv)))
 end;
 
 // NRM25: x not free in P; H ⊢ P → H ⊢ ♡(x) · P
-opaque symbol NRM25 [P : Prop]
-  : π P
-  → π (`♡ _ : τ ι, P) ≔
+//   = forall2(x).P in PP notation.  Just `pi_to_!!` with constant
+//   predicate (closes over the inhabitant, since P doesn't depend on
+//   the bound var).
+opaque symbol NRM25 [n] [P : Prop]
+  : π P → π (`!! _ : Tuple n, P) ≔
 begin
-  assume P hp x; refine hp
+  assume n P hp;
+  refine pi_to_!! (λ _ : Tuple n, P) (λ _, hp)
 end;
 
-// NRM26: y not free in P; H ⊢ ♡(x, ...) · P → H ⊢ ♡(x, y, ...) · P
-opaque symbol NRM26 [P : τ ι → Prop]
-  : π (`♡ x, P x)
-  → π (`♡ x, `∀ _ : τ ι, P x) ≔
+// NRM26: y not free in P; H ⊢ ♡(x,...) · P → H ⊢ ♡(x,y,...) · P
+//   = extend the binder with a y not appearing in P. The body
+//   ignores the new variable.
+
+// Helper: drop the last element of a Tuple (+1 n).
+symbol nrm26_drop_last [n] : Tuple (+1 n) → Tuple n;
+rule nrm26_drop_last [$n] ($w ⨾ _) ↪ $w;
+
+// Helper: produce P (drop_last v) from a per-tuple-n proof of P.
+symbol nrm26_drop_proof [n] (P : Tuple n → Prop)
+  : π (`!! w, P w)
+  → Π v : Tuple (+1 n), π (P (nrm26_drop_last v));
+rule nrm26_drop_proof [$n] $P $h ($w ⨾ _) ↪ !!_to_pi $P $h $w;
+
+opaque symbol NRM26 [n] [P : Tuple n → Prop]
+  : π (`!! v, P v)
+  → π (`!! v : Tuple (+1 n), P (nrm26_drop_last v)) ≔
 begin
-  assume P h x y; refine h x
+  assume n P h;
+  refine pi_to_!! (λ v : Tuple (+1 n), P (nrm26_drop_last v))
+    (nrm26_drop_proof P h)
 end;
 
 // ---- NRM27-30: Arithmetic solver dispatch ----
 //
-// NRM27: (xᵢ ≤ 0) and (−xᵢ ≤ 0) in (P ∧...∧ Q); R = [xᵢ := 0](P ∧...∧ Q)
-//   → H ⊢ ♢(x₁,...,xᵢ₋₁,xᵢ₊₁,...,xₙ) · ¬R → H ⊢ ♡(x₁,...,xₙ) · ¬(P ∧...∧ Q)
-// NRM28: (x ≤ 0) and (−x ≤ 0) in (P ∧...∧ Q); S = [x := 0](P ∧...∧ Q)
-//   → H ⊢ ¬(S) ⇒ R → H ⊢ (♡(x) · ¬(P ∧...∧ Q)) ⇒ R
-// NRM29: (a + xᵢ ≤ 0) and (b − xᵢ ≤ 0) in (P ∧...∧ Q); solver(a+b) = 0; S = [xᵢ := b](P ∧...∧ Q)
-//   → H ⊢ ♢(...) · ¬S ⇒ R → H ⊢ (♡(x₁,...,xₙ) · ¬(P ∧...∧ Q)) ⇒ R
-// NRM30: (a + x ≤ 0) and (b − x ≤ 0) in (P ∧...∧ Q); solver(a+b) = 0; S = [x := b](P ∧...∧ Q)
-//   → H ⊢ ¬S ⇒ R → H ⊢ (♡x · ¬(P ∧...∧ Q)) ⇒ R
-// TODO: all require arithmetic solver infrastructure
+// These rules encode arithmetic solver outputs. Their full encoding
+// requires arithmetic-solver infrastructure (see Arith.lp's solver
+// rules). Stubs for now.
+//
+// NRM27: (xᵢ ≤ 0) and (−xᵢ ≤ 0) in conjunction; R = [xᵢ := 0]…
+//   → ♢… · ¬R  ⊢  ♡(x₁,...,xₙ) · ¬(P ∧ ⋯ ∧ Q)
+// NRM28-30: variants with solver dispatch.
+// TODO: implement once Arith.lp solver rules are wired.

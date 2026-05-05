@@ -7,7 +7,7 @@ let exp_prec = function
   | AOp _ -> 3
   | Neg _ -> 4
   | SetImage _ -> 5
-  | App _ | Var _ | Nat _ -> 6
+  | App _ | Var _ | Nat _ | Prj _ -> 6
 
 (* ---- Expression → PP text ---- *)
 
@@ -18,6 +18,12 @@ let rec exp_to_pp_buf ?(parent_prec=0) buf e =
   (match e with
   | Var s -> Buffer.add_string buf s
   | Nat n -> Buffer.add_string buf (string_of_int n)
+  | Prj (k, v) ->
+    Buffer.add_string buf "prj(";
+    Buffer.add_string buf (string_of_int k);
+    Buffer.add_char buf ',';
+    Buffer.add_string buf v;
+    Buffer.add_char buf ')'
   | App (f, args) ->
     Buffer.add_string buf f;
     Buffer.add_char buf '(';

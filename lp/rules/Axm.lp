@@ -1,5 +1,5 @@
 // Axiom rules (§A.6) — shallow encoding
-require open pp2lp.B pp2lp.rules.Conj;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Conj;
 
 // ---- Base rules ----
 
@@ -78,22 +78,17 @@ end;
 
 // ---- AXM9: Universal instantiation from hypothesis ----
 
-// AXM9: ∀x·¬(TRUE ∧ P) in H; ∃E such that [x:=E]P = R → H ⊢ R ⇒ Q
-// With HOAS: from ∀x.¬(⊤∧P(x)), instantiate with e to get ¬P(e),
-// so P(e) ⇒ Q is trivially true.
-opaque symbol AXM9 [P : τ ι → Prop] (e : τ ι) [Q]
-  : π (`∀ x, ¬ (⊤ ∧ P x))
-  → π (P e ⇒ Q) ≔
+// AXM9: ∀-block·¬(TRUE ∧ P) in H; v is an instantiation tuple
+//       → H ⊢ P v ⇒ Q
+// With HOAS the substitution is implicit: instantiating the universal
+// at v reduces ¬(⊤ ∧ P v) to ¬P v, so P v ⇒ Q is trivially true.
+// Tuple-uniform: replaces AXM9 (unary) and AXM9_2 (per-arity copy).
+
+opaque symbol AXM9 [n] [P : Tuple n → Prop] (v : Tuple n) [Q]
+  : π (`!! u, ¬ (⊤ ∧ P u))
+  → π (P v ⇒ Q) ≔
 begin
-  assume P e Q h hp;
-  refine ⊥ₑ (h e (∧ᵢ ⊤ᵢ hp))
-end;
-// AXM9_2: Two-variable version.
-opaque symbol AXM9_2 [P : τ ι → τ ι → Prop] (e1 e2 : τ ι) [Q]
-  : π (`∀ x, `∀ y, ¬ (⊤ ∧ P x y))
-  → π (P e1 e2 ⇒ Q) ≔
-begin
-  assume P e1 e2 Q h hp;
-  refine ⊥ₑ (h e1 e2 (∧ᵢ ⊤ᵢ hp))
+  assume n P v Q h hp;
+  refine ⊥ₑ (!!_to_pi (λ u, ¬ (⊤ ∧ P u)) h v (∧ᵢ ⊤ᵢ hp))
 end;
 

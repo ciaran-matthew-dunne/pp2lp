@@ -28,6 +28,10 @@ and exp =
   | SetImage of exp * exp
   | Inter of exp * exp
   | Union of exp * exp
+  | Prj of int * string
+    (* `Prj (k, v)` = `prj _k v` — projection from a tuple variable.
+       Introduced only by the LP-emission stage to encode compound
+       binders as `!! v : Tuple n, body[x_k := prj k v]`. *)
 
 type arg =
   | Pred of prd
