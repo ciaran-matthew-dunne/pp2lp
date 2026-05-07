@@ -12,7 +12,6 @@ let rec collect_exp_fv bound fv = function
   | Var s when SS.mem s bound || SS.mem s reserved -> fv
   | Var s -> { fv with exp_vars = SS.add s fv.exp_vars }
   | Nat _ -> fv
-  | Prj (_, _) -> fv  (* tuple-projection markers introduced by LP emission *)
   | AOp (_, e1, e2) -> collect_exp_fv bound (collect_exp_fv bound fv e1) e2
   | Neg e -> collect_exp_fv bound fv e
   | App (_, args) -> List.fold_left (collect_exp_fv bound) fv args

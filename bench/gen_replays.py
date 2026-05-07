@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""Generate PP `.trace` files from `.but` files.
+"""Generate optional PP `.replay` files from existing `.trace` files.
 
-Pipeline: .but -> PP -> .trace
-
-This script deliberately does not run REPLAY and does not cache results.
-Replays are optional debugging artifacts; use `bench/gen_replays.py` when
-you need them.
+Replays are debugging artifacts only. The OCaml pp2lp tool reads traces
+directly and does not consume these files.
 """
 
 import argparse
@@ -16,7 +13,7 @@ import sys
 from pathlib import Path
 
 
-SATURATION_PATTERNS = [
+FAILURE_PATTERNS = [
     ("saturation:objects",   r"OBJECTS OVERFLOW"),
     ("saturation:goals",     r"GOAL(?:S)? STACK OVERFLOW"),
     ("saturation:hyps",      r"TOO MANY HYPOTHESES"),
@@ -26,6 +23,8 @@ SATURATION_PATTERNS = [
     ("saturation:theories",  r"MAXIMUM NUMBER OF THEORIES .* REACHED"),
     ("saturation:compiler",  r"Compiler Memory Full"),
     ("timer:exceeded",       r"TIMER (?:EXCEEDED|EXPIRED|REAL|VIRTUAL)"),
+    ("parse:missing-atom",   r"missing atomic symbol"),
+    ("parse:error",          r"(?m)^\s*line\s+\d+:.*(?:error|missing)"),
 ]
 
 
@@ -53,19 +52,21 @@ def find_krt():
     return find_tool("krt", ["/opt/atelierb-free-24.04.2/bin/krt"])
 
 
-def find_pp_kin():
+def find_replay_kin():
+    root = Path(__file__).parent.parent
     for path in [
-        "/opt/atelierb-free-24.04.2/bin/PP.kin",
-        os.path.expanduser("~/atelierb/bin/PP.kin"),
+        root / "atelierb/tools/linux_x64/REPLAY.kin",
+        root / "atelierb/tools/macosx/REPLAY.kin",
+        Path("/opt/atelierb-free-24.04.2/bin/REPLAY.kin"),
     ]:
-        if os.path.exists(path):
-            return path
+        if path.exists():
+            return str(path)
     return None
 
 
-def classify_krt_output(stdout, stderr):
+def classify_output(stdout, stderr):
     text = (stdout or "") + "\n" + (stderr or "")
-    for reason, pattern in SATURATION_PATTERNS:
+    for reason, pattern in FAILURE_PATTERNS:
         if re.search(pattern, text):
             return reason
     return ""
@@ -87,7 +88,7 @@ def run_krt(krt, kin, goal_file, cwd, timeout, timer_setting=None, alloc=None):
     except Exception as exc:
         return RunResult(False, reason=f"exc:{type(exc).__name__}")
 
-    reason = classify_krt_output(result.stdout, result.stderr)
+    reason = classify_output(result.stdout, result.stderr)
     if reason:
         return RunResult(False, result.stdout, result.stderr, reason)
     if result.returncode != 0:
@@ -96,93 +97,62 @@ def run_krt(krt, kin, goal_file, cwd, timeout, timer_setting=None, alloc=None):
     return RunResult(True, result.stdout, result.stderr)
 
 
-def strip_existing_flags(content):
-    content = re.sub(r'Flag\(TypeOn\([^)]+\)\)\s*&\s*', '', content)
-    content = re.sub(r'Flag\(TraceOn\([^)]+\)\)\s*&\s*', '', content)
-    content = re.sub(r'Flag\(FileOn\([^)]+\)\)\s*&\s*', '', content)
-    return content
+def input_traces(path):
+    if path.is_file() and path.suffix == ".trace":
+        return [path]
+    files = sorted(path.glob("*.trace"))
+    if not files:
+        raise FileNotFoundError(f"No .trace files in {path}")
+    return files
 
 
-def trace_is_empty(path):
-    if not path.exists():
-        return True
-    data = path.read_bytes()
-    if data.startswith(b"\xef\xbb\xbf"):
-        data = data[3:]
-    return len(data.strip()) == 0
+def process_trace(trace_file, out_dir, krt, replay_kin, timeout, timer_setting,
+                  alloc, quiet):
+    stem = trace_file.stem
+    src_dir = trace_file.parent
+    goal_path = src_dir / f"{stem}.replay.goal"
+    res_name = f"{stem}.replay.res"
+    res_path = src_dir / res_name
+    replay_path = out_dir / f"{stem}.replay"
 
-
-def process_but(but_file, out_dir, krt, pp_kin, timeout, timer_setting,
-                alloc, quiet):
-    stem = but_file.stem
-    src_dir = but_file.parent
-    out_trace = out_dir / f"{stem}.trace"
-    same_output_dir = src_dir.resolve() == out_dir.resolve()
-    trace_name = f"{stem}.trace" if same_output_dir else f"{stem}.trace.tmp"
-    res_name = f"{stem}.res"
-
-    goal_content = strip_existing_flags(but_file.read_text())
-    goal_content = (
-        f'Flag(TraceOn("{trace_name}")) & '
-        f'Flag(FileOn("{res_name}")) & {goal_content}'
-    )
-
-    goal_path = src_dir / f"{stem}.goal"
-    src_trace = src_dir / trace_name
-    src_res = src_dir / res_name
-
-    goal_path.write_text(goal_content)
+    goal_path.write_text(f'Flag(FileOn("{res_name}")) & ("{trace_file}")')
     result = run_krt(
-        krt, pp_kin, goal_path.name, str(src_dir), timeout,
+        krt, replay_kin, goal_path.name, str(src_dir), timeout,
         timer_setting=timer_setting, alloc=alloc,
     )
 
     goal_path.unlink(missing_ok=True)
-    src_res.unlink(missing_ok=True)
+    res_path.unlink(missing_ok=True)
 
-    if not result.ok:
-        src_trace.unlink(missing_ok=True)
-        if not quiet:
-            print(f"  FAIL PP {stem}: {result.reason}")
-        return False, result.reason
+    misc = src_dir / stem
+    if misc.exists() and misc.is_file() and misc.suffix == "":
+        misc.unlink()
 
-    if trace_is_empty(src_trace):
-        src_trace.unlink(missing_ok=True)
-        if not quiet:
-            print(f"  FAIL PP {stem}: empty-trace")
-        return False, "empty-trace"
+    if result.ok and result.stdout and len(result.stdout) > 10:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        replay_path.write_text(result.stdout)
+        return True, ""
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    if not same_output_dir:
-        out_trace.write_bytes(src_trace.read_bytes())
-        src_trace.unlink()
-
-    return True, ""
-
-
-def input_buts(path):
-    if path.is_file() and path.suffix == ".but":
-        return [path]
-    files = sorted(path.glob("*.but"))
-    if not files:
-        raise FileNotFoundError(f"No .but files in {path}")
-    return files
+    reason = result.reason or "empty-output"
+    if not quiet:
+        print(f"  FAIL REPLAY {stem}: {reason}")
+    return False, reason
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate PP .trace files from .but files"
+        description="Generate optional .replay files from .trace files"
     )
     parser.add_argument(
-        "input", help="Directory containing .but files, or one .but file"
+        "input", help="Directory containing .trace files, or one .trace file"
     )
     parser.add_argument(
         "-o", "--output-dir",
-        help="Trace output directory (default: next to each .but file)"
+        help="Replay output directory (default: next to each .trace file)"
     )
     parser.add_argument("-q", "--quiet", action="store_true")
     parser.add_argument(
-        "-t", "--timeout", type=float, default=60.0,
+        "-t", "--timeout", type=float, default=120.0,
         help="Subprocess wall-clock timeout"
     )
     parser.add_argument(
@@ -193,37 +163,37 @@ def main():
         "--alloc", default="",
         help="krt -a allocation setting. Empty uses krt defaults."
     )
-    parser.add_argument("--pp-kin", help="Path to PP.kin")
+    parser.add_argument("--replay-kin", help="Path to REPLAY.kin")
     parser.add_argument("--krt", help="Path to krt")
     args = parser.parse_args()
 
     krt = args.krt or find_krt()
-    pp_kin = args.pp_kin or find_pp_kin()
+    replay_kin = args.replay_kin or find_replay_kin()
     if not krt:
         print("Error: krt not found", file=sys.stderr)
         sys.exit(1)
-    if not pp_kin:
-        print("Error: PP.kin not found", file=sys.stderr)
+    if not replay_kin:
+        print("Error: REPLAY.kin not found", file=sys.stderr)
         sys.exit(1)
 
     input_path = Path(args.input).resolve()
     try:
-        but_files = input_buts(input_path)
+        trace_files = input_traces(input_path)
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
         sys.exit(1)
 
     fixed_out_dir = Path(args.output_dir).resolve() if args.output_dir else None
     if not args.quiet:
-        print(f"Processing {len(but_files)} .but files")
+        print(f"Processing {len(trace_files)} .trace files")
 
     ok = 0
     failed = 0
     breakdown = {}
-    for but_file in but_files:
-        out_dir = fixed_out_dir or but_file.parent
-        success, reason = process_but(
-            but_file, out_dir, krt, pp_kin, args.timeout,
+    for trace_file in trace_files:
+        out_dir = fixed_out_dir or trace_file.parent
+        success, reason = process_trace(
+            trace_file, out_dir, krt, replay_kin, args.timeout,
             args.timer or None, args.alloc or None, args.quiet,
         )
         if success:
@@ -232,7 +202,7 @@ def main():
             failed += 1
             breakdown[reason] = breakdown.get(reason, 0) + 1
 
-    print(f"{ok} traces generated" + (f", {failed} failed" if failed else ""))
+    print(f"{ok} replays generated" + (f", {failed} failed" if failed else ""))
     if failed and not args.quiet:
         print("Failure breakdown:")
         for reason, count in sorted(breakdown.items()):

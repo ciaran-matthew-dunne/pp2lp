@@ -58,7 +58,7 @@ end;
 ```
 ### Replaying Proof Traces.
 
-We can also obtain a 'replay' thus:
+For debugging, we can also obtain a 'replay' thus:
 ```bash
 krt -b REPLAY.kin replay.goal
 ```

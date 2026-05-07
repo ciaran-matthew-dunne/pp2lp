@@ -3,15 +3,13 @@ ocaml/_build
 *.lpo
 
 # Per-suite inputs/outputs.
-# Tracked: bench/og/*.replay + *.trace + *.but
+# Tracked: bench/og/*.trace + *.but
 #          bench/prv/*.but
-bench/*/.cache/
-bench/*/.gen_status.tsv
 bench/prv/*.trace
+# Replays are optional debugging artifacts generated from traces.
 bench/prv/*.replay
 
-# Emitted Lambdapi files for every suite live under the pp2lp package
-# (see Suite.lp_dir). They're regenerated from .replay; don't commit.
+# Emitted Lambdapi files for suite checks live under the pp2lp package.
 lp/bench/
 
 # Experimental / scratch
@@ -90,4 +88,3 @@ btraces
 *.bak
 *.orig
 *.tmp
-.pp2lp-cache

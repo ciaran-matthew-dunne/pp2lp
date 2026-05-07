@@ -24,17 +24,18 @@ The **Status** column in each table uses one of:
 |-------|---------|
 | `proved` | Closed in LP (no `admit`); emitter passes proper proof terms. |
 | `proved · emit-trust` | LP rule is closed, but the emitter passes `trust` for one or more arguments at use sites (because PP's side-condition is solver-confirmed or boolean-membership-style; see Notes). |
+| `proved · partial-emit` | LP rule is closed for supported shapes, but the emitter rejects unsupported shapes instead of using whole-goal `trust`. |
 | `admit` | LP rule has an open `admit` — known gap, not yet closed. |
 | `phantom` | LP rule defined for completeness but never applied by the emitter (PP emits the rule only as a no-op). |
-| `not-impl` | No LP rule. The emitter raises `Ill_formed_replay` (→ SKIP) if PP emits it. |
+| `not-impl` | No LP rule. The trace-first emitter should reject or skip these explicitly until they are formalized. |
 
-## Status summary (≈ 85 rules)
+## Status summary
 
 ```
-proved              72
-proved · emit-trust 10   NRM20–23, INS, BOOL31–42, AR2, AR13
-phantom              2   AR10, AR3_F
-not-impl             6   NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
+proved · emit-trust    AR2–AR9, AR13, INS, BOOL31–42
+proved · partial-emit  NRM20–23
+phantom                AR10, AR3_F
+not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 ```
 
 ## A.1 Conjunction — `lp/rules/Conj.lp`
@@ -186,14 +187,14 @@ not-impl             6   NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 | NRM17 | ∀x·¬(VRAI ∧ P) in H; ∃E with [x := E] P = R | H ⊢ ♡y·¬(VRAI ∧ ¬R) ⇒ Q | ``π (`!! v, P v) → π Q → π ((`♡ v, P v) ⇒ Q)`` | proved | Collapses to NRM16 shape at LP. |
 | NRM18 | ∀x·¬(VRAI ∧ ¬P) in H; ∃E with [x := E] P = R | H ⊢ ♡y·¬(VRAI ∧ R) ⇒ Q | ``(v : Tuple n) → π (`!! u, ¬ (⊤ ∧ ¬ (P u))) → π (P v = R) → π ((`♡ _ : Tuple n, ¬ (⊤ ∧ R)) ⇒ Q)`` | proved | |
 | NRM19 | P in H; ∃E with [x := E] R = P | H ⊢ ♡x·¬(VRAI ∧ R) ⇒ Q | ``(v : Tuple n) → π (R v) → π ((`♡ u, ¬ (⊤ ∧ R u)) ⇒ Q)`` | proved | Emitter pulls the witness from `tuple_binders`. |
-| NRM20 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (prj 0 v = E))) ⇒ Q)`` | proved · emit-trust | Emitter routes 3- and 4-conjunct shapes to dedicated paths and trusts other shapes (`emit_lp.ml` "nrm20-shape-trust"). |
-| NRM21 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (E = prj 0 v))) ⇒ Q)`` | proved · emit-trust | Emitter currently trusts at use sites. |
-| NRM22 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (prj 0 v = E))) ⇒ Q)`` | proved · emit-trust | Emitter trusts. |
-| NRM23 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (E = prj 0 v))) ⇒ Q)`` | proved · emit-trust | Emitter trusts. |
+| NRM20 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (prj 0 v = E))) ⇒ Q)`` | proved · partial-emit | Supported shapes are emitted directly; unsupported shapes should fail explicitly rather than using whole-goal `trust`. |
+| NRM21 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (E = prj 0 v))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
+| NRM22 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (prj 0 v = E))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
+| NRM23 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (E = prj 0 v))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
 | NRM24 | P is not of form A ∧ B; H ⊢ ♡x·¬(VRAI ∧ P) ⇒ Q | H ⊢ ♡x·¬P ⇒ Q | ``π ((`♡ v, ¬ (⊤ ∧ P v)) ⇒ Q) → π ((`♡ v, ¬ (P v)) ⇒ Q)`` | proved | |
 | NRM25 | x not free in P; H ⊢ P | H ⊢ forall2(x)·P | ``π P → π (`♡ _ : Tuple n, P)`` | proved | `pi_to_♡` over a constant body. |
 | NRM26 | y not free in P; H ⊢ forall2(x,…)·P | H ⊢ forall2(x,y,…)·P | ``π (`♡ v, P v) → π (`♡ v : Tuple (+1 n), P (nrm26_drop_last v))`` | proved | Transports input via `♡_eq_!!` and uses `nrm26_drop_proof`. |
-| NRM27 | (xi ≤ 0) and (−xi ≤ 0) in (P ∧ ··· ∧ Q); R = [xi := 0]…; H ⊢ ♢(x1,…,xi−1,xi+1,…,xn)·¬R | H ⊢ ♡(x1,…,xn)·¬(P ∧ ··· ∧ Q) | — | not-impl | Arithmetic solver dispatch; OCaml side raises `Ill_formed_replay` (→ SKIP) if PP emits it. |
+| NRM27 | (xi ≤ 0) and (−xi ≤ 0) in (P ∧ ··· ∧ Q); R = [xi := 0]…; H ⊢ ♢(x1,…,xi−1,xi+1,…,xn)·¬R | H ⊢ ♡(x1,…,xn)·¬(P ∧ ··· ∧ Q) | — | not-impl | Arithmetic solver dispatch; no LP rule yet. |
 | NRM28 | (x ≤ 0) and (−x ≤ 0) in (P ∧ ··· ∧ Q); S = [x := 0]…; H ⊢ ¬(S) ⇒ R | H ⊢ (♡(x)·¬(P ∧ ··· ∧ Q)) ⇒ R | — | not-impl | |
 | NRM29 | (a + xi ≤ 0) and (b − xi ≤ 0) in (P ∧ ··· ∧ Q); solver(a + b) = 0; S = [xi := b]…; H ⊢ ♢·¬S ⇒ R | H ⊢ (♡(x1,…,xn)·¬(P ∧ ··· ∧ Q)) ⇒ R | — | not-impl | |
 | NRM29_1 | (xi + a ≤ 0) and (−xi + b ≤ 0) in (P ∧ ··· ∧ Q); solver(a + b) = 0; … | (same) | — | not-impl | |
@@ -221,8 +222,8 @@ not-impl             6   NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 | EQS2 | H ⊢ FAUX ⇒ R | H ⊢ ¬eql_set(E,F) ⇒ R | `π (¬ (E = F) ⇒ R) → π (¬ eql_set E F ⇒ R)` | proved | Spec writes `H ⊢ FAUX ⇒ R` for the antecedent; the LP form takes `¬ (E = F) ⇒ R` (semantically equivalent given the hypothesis). |
 | EAXM91 | ∀x·¬(VRAI ∧ p = q) in H; ∃E with [x := E](q = p) = (a = b) | H ⊢ (a = b) ⇒ Q | ``(v : Tuple n) → π (`!! u, ¬ (⊤ ∧ (p u = q u))) → π ((q v = p v) ⇒ Q)`` | proved | Tuple-uniform; witness as for AXM9. |
 | EAXM92 | ∀x·¬(VRAI ∧ ¬(p = q)) in H; ∃E with [x := E](q = p) = (a = b) | H ⊢ ¬(a = b) ⇒ Q | ``(v : Tuple n) → π (`!! u, ¬ (⊤ ∧ ¬ (p u = q u))) → π (¬ (q v = p v) ⇒ Q)`` | proved | |
-| OPR1 | x is a variable; x not free in H, E; Q = [x := E] P; H ⊢ Q | H ⊢ (x = E) ⇒ P | `π (P E) → π ((x = E) ⇒ P x)` | proved | `rewrite heq`. The OPR1_1 primed bridge in `Res.lp` is also proved (`opr1_eq` via `propExt`). |
-| OPR2 | (mirror of OPR1, equality reversed) | H ⊢ (E = x) ⇒ P | `π (P E) → π ((E = x) ⇒ P x)` | proved | OPR2_1 also proved. |
+| OPR1 | x is a variable; x not free in H, E; Q = [x := E] P; H ⊢ Q | H ⊢ (x = E) ⇒ P | `π (P E) → π ((x = E) ⇒ P x)` | proved | `rewrite heq`. **Primed-form note:** PP's actual `OPR1_1` does *not* follow the §8.13 Schema 1 derivation: Schema 1 would propagate the antecedent's result, dropping the `(x = E) ⇒` wrapper in the consequent. PP's chain step instead **keeps the wrapper** and only substitutes inside the body — i.e. `Res (x = E ⇒ P E) → Res (x = E ⇒ P x)` (see e.g. `bench/prv/subset_001.replay:19–20`). Reflected in `opr1_eq : π ((x = E ⇒ P x) = (x = E ⇒ P E))` (provable by case-split on `x = E` inside `propExt`); the genuine Schema 1 lift `Res (P E) → Res ((x = E) ⇒ P x)` is *not* propositionally available without a hypothesis `heq`. |
+| OPR2 | (mirror of OPR1, equality reversed) | H ⊢ (E = x) ⇒ P | `π (P E) → π ((E = x) ⇒ P x)` | proved | Same primed-form divergence as OPR1: `OPR2_1` keeps `(E = x) ⇒` on both sides; `opr2_eq` proves the wrapper-preserving equality. |
 | ECTR1 | ¬Q in H; replacing E by F in Q gives R; R in H | H ⊢ (E = F) ⇒ P | `π (¬ (Q E)) → π (Q F) → π ((E = F) ⇒ P)` | proved | |
 | ECTR2 | (mirror) | H ⊢ (F = E) ⇒ P | `π (¬ (Q E)) → π (Q F) → π ((F = E) ⇒ P)` | proved | |
 | ECTR3 | E = F in H; replacing E by F in P gives R; R in H | H ⊢ ¬P ⇒ Q | `π (E = F) → π (P F) → π (¬ (P E) ⇒ Q)` | proved | |
@@ -236,13 +237,13 @@ not-impl             6   NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 |------|-------------|------------|---------|--------|-------|
 | AR1 | H ⊢ R | H ⊢ E ≤ E ⇒ R | `π R → π ((E ≤ E) ⇒ R)` | proved | Uses `B.lp`'s `leq_refl`. |
 | AR2 | a, b numeric; a > b | H ⊢ a ≤ b ⇒ R | `π (a > b) → π ((a ≤ b) ⇒ R)` | proved · emit-trust | Emitter passes the `a > b` proof as `trust`. |
-| AR3 | H ⊢ 1 − a ≤ 0 ⇒ R | H ⊢ ¬(a ≤ 0) ⇒ R | `(a : τ ι) → π ((𝟏 - a ≤ 𝟎) ⇒ R) → π (¬ (a ≤ 𝟎) ⇒ R)` | proved | `AR3_F` (phantom) and `AR3'` (bridged variant) cover solver-normalised shapes. |
-| AR4 | F ≤ 0 in H; E + F > 0 | H ⊢ E ≤ 0 ⇒ R | `(F : τ ι) → π (F ≤ 𝟎) → π ((E + F) > 𝟎) → π ((E ≤ 𝟎) ⇒ R)` | proved | Emitter resolves `F` from a hypothesis and proves the side-condition (`emit_ar4_args`). |
-| AR5 | a ≪ 0 in H; H ⊢ a = 0 ⇒ (−a ≤ 0 ⇒ R) | H ⊢ −a ≤ 0 ⇒ R | `π (a ≪ 𝟎) → π ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R)) → π ((— a ≤ 𝟎) ⇒ R)` | proved | Antecedent order commuted vs. spec (PP commutes via solver). |
-| AR6 | −a ≪ 0 in H; H ⊢ a = 0 ⇒ (a ≤ 0 ⇒ R) | H ⊢ a ≤ 0 ⇒ R | `π ((— a) ≤ 𝟎) → π ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R)) → π ((a ≤ 𝟎) ⇒ R)` | proved | |
-| AR7 | c + b ≪ 0 in H; a + c = 0; H ⊢ a = b ⇒ (a − b ≤ 0 ⇒ R) | H ⊢ a − b ≤ 0 ⇒ R | `(c : τ ι) → π ((c + b) ≪ 𝟎) → π ((a + c) = 𝟎) → π ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R)) → π (((a - b) ≤ 𝟎) ⇒ R)` | proved | |
-| AR8 | a − b ≪ 0 in H; a + c = 0; H ⊢ a = b ⇒ (c + b ≤ 0 ⇒ R) | H ⊢ c + b ≤ 0 ⇒ R | `(a : τ ι) → π ((a - b) ≪ 𝟎) → π ((a + c) = 𝟎) → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R)) → π (((c + b) ≤ 𝟎) ⇒ R)` | proved | Emitter computes the witness `a` from a child equality. |
-| AR9 | solver(E) = F; H ⊢ F ≤ 0 ⇒ R | H ⊢ E ≤ 0 ⇒ R | `(F : τ ι) → π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R)` | proved | Emitter passes the equality as a trusted fact (`emit_args:dynamic:ar9`). |
+| AR3 | H ⊢ 1 − a ≤ 0 ⇒ R | H ⊢ ¬(a ≤ 0) ⇒ R | `(a : τ ι) → π ((𝟏 - a ≤ 𝟎) ⇒ R) → π (¬ (a ≤ 𝟎) ⇒ R)` | proved · emit-trust | `AR3_F` (phantom) and `AR3'` (bridged variant) cover solver-normalised shapes; unknown equality bridges are passed as trusted side-conditions. |
+| AR4 | F ≤ 0 in H; E + F > 0 | H ⊢ E ≤ 0 ⇒ R | `(F : τ ι) → π (F ≤ 𝟎) → π ((E + F) > 𝟎) → π ((E ≤ 𝟎) ⇒ R)` | proved · emit-trust | Emitter resolves `F` from a hypothesis and passes the numeric side-condition as `trust`. |
+| AR5 | a ≪ 0 in H; H ⊢ a = 0 ⇒ (−a ≤ 0 ⇒ R) | H ⊢ −a ≤ 0 ⇒ R | `π (a ≪ 𝟎) → π ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R)) → π ((— a ≤ 𝟎) ⇒ R)` | proved · emit-trust | Antecedent order commuted vs. spec; emitter passes the solver side-condition as `trust`. |
+| AR6 | −a ≪ 0 in H; H ⊢ a = 0 ⇒ (a ≤ 0 ⇒ R) | H ⊢ a ≤ 0 ⇒ R | `π ((— a) ≤ 𝟎) → π ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R)) → π ((a ≤ 𝟎) ⇒ R)` | proved · emit-trust | Emitter passes the solver side-condition as `trust`. |
+| AR7 | c + b ≪ 0 in H; a + c = 0; H ⊢ a = b ⇒ (a − b ≤ 0 ⇒ R) | H ⊢ a − b ≤ 0 ⇒ R | `(c : τ ι) → π ((c + b) ≪ 𝟎) → π ((a + c) = 𝟎) → π ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R)) → π (((a - b) ≤ 𝟎) ⇒ R)` | proved · emit-trust | Emitter passes solver side-conditions as `trust`. |
+| AR8 | a − b ≪ 0 in H; a + c = 0; H ⊢ a = b ⇒ (c + b ≤ 0 ⇒ R) | H ⊢ c + b ≤ 0 ⇒ R | `(a : τ ι) → π ((a - b) ≪ 𝟎) → π ((a + c) = 𝟎) → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R)) → π (((c + b) ≤ 𝟎) ⇒ R)` | proved · emit-trust | Emitter computes the witness `a` from a child equality and passes solver side-conditions as `trust`. |
+| AR9 | solver(E) = F; H ⊢ F ≤ 0 ⇒ R | H ⊢ E ≤ 0 ⇒ R | `(F : τ ι) → π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R)` | proved · emit-trust | Emitter passes the equality as a trusted side-condition (`emit_args:dynamic:ar9`). |
 | AR10 | solver(P) = Q; H ⊢ Q ⇒ R | H ⊢ P ⇒ R | `π (P = Q) → π (Q ⇒ R) → π (P ⇒ R)` | phantom | LP rule defined for completeness — PP emits AR10 only when Q = P (solver no-op), so the LP rule is never applied. |
 | AR11 | *(none)* | H ⊢ ¬(x ≤ x) ⇒ P | `π (¬ (E ≤ E) ⇒ P)` | proved | |
 | AR12 | H, (a ≤ b) ⊢ P | H ⊢ (a ≪ b) ⇒ P | `(π (a ≤ b) → π P) → π ((a ≤ b) ⇒ P)` | proved | HOAS-introduces the antecedent. |

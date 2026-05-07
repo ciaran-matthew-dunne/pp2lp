@@ -1,41 +1,18 @@
-open Proof_tree
-
-(* Extract goal predicate from the root of a proof tree *)
-let goal_of_tree = function
-  | Apply { goal; _ } -> goal
+(* Top-level: read a `.trace` file → emit a Lambdapi proof string. *)
 
 let is_simple_ident = Pp_lp.is_simple_ident
 
-(* Derive a symbol name from a filename, quoting only if needed *)
 let name_of_file (fp : string) : string =
-  let base = Filename.basename fp in
-  let stem =
-    if Filename.check_suffix base ".trace.replay" then
-      Filename.chop_suffix base ".trace.replay"
-    else if Filename.check_suffix base ".replay" then
-      Filename.chop_suffix base ".replay"
-    else base
-  in
+  let stem = Filename.remove_extension (Filename.basename fp) in
   if is_simple_ident stem then stem
   else Printf.sprintf "{|%s|}" stem
 
-(* Reconstruct a replay file into a full Lambdapi file (header + symbol) *)
 let reconstruct_file (fp : string) : string =
-  let lines = Parse_pp.parse_pp_replay fp in
-  if lines = [] then
-    failwith (Printf.sprintf "reconstruct: no lines parsed from %s" fp);
-  let tree = Proof_tree.build lines in
-  let goal = goal_of_tree tree in
-  let name = name_of_file fp in
-  Emit_lp.emit_lp name goal tree
+  let trace = Parse_trace.parse_file fp in
+  let tree = Proof_tree.build trace.rules in
+  Emit_lp.emit_lp (name_of_file fp) trace.goal tree
 
-(* Reconstruct a replay file into just the symbol (no header) *)
 let reconstruct_symbol (fp : string) : string =
-  let lines = Parse_pp.parse_pp_replay fp in
-  if lines = [] then
-    failwith (Printf.sprintf "reconstruct: no lines parsed from %s" fp);
-  let tree = Proof_tree.build lines in
-  let goal = goal_of_tree tree in
-  let name = name_of_file fp in
-  Emit_lp.emit_symbol name goal tree
-
+  let trace = Parse_trace.parse_file fp in
+  let tree = Proof_tree.build trace.rules in
+  Emit_lp.emit_symbol (name_of_file fp) trace.goal tree

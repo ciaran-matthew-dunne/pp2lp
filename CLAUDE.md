@@ -20,30 +20,21 @@ No Co-Authored-By, no Claude/Anthropic attribution.
 ## Commands
 
 ```
-pp2lp check  [--suite=X] [--name=Y] [--job=PFX] [--fresh] [--all-failures]
-pp2lp status [--suite=X]
-pp2lp gen    [--suite=X] [--alloc=...] [--all]
-pp2lp clean  [--lpo] [--cache] [--all] [--suite=X]
-pp2lp emit   REPLAY... [-trace]
-pp2lp prove  FORMULA [--name NAME]
-
-make help                                       # one-line summary of every target
-make build | check | check-all | check-fresh    # default suite is prv
-make test NAME=Y [SUITE=X] | test-cache
-make gen [ALLOC=N] | prove FORMULA=... | status
-make clean | clean-all | repl
+make help
+make build
+make gen-traces DIR=bench/prv [OUT_DIR=bench/prv]
+make gen-replays DIR=bench/prv [OUT_DIR=bench/prv]   # optional debugging only
+make check [NAME=01] [SUITE=og]
+make check TRACE=bench/og/01.trace
+make clean | repl
 ```
 
-## Caching
+## Trace Pipeline
 
-`pp2lp check` skips tests whose `bench/<suite>/.cache/<name>.{ok,fail,skip}`
-marker is newer than both the `.replay` and a sentinel (newest of the
-`pp2lp` binary + any `lp/**/*.lp`). `--fresh` forces. After LP-rule
-signature changes you may need `pp2lp clean --lpo`.
-
-`.ok` body: `"<trust> <admit>"`. `.fail`: raw lambdapi output (NDJSON).
-`.skip`: short reason. Cache logic in `ocaml/src/cache.ml`; tests in
-`ocaml/test/test_cache.ml`.
+The OCaml tool reads PP `.trace` files directly. It does not read REPLAY
+output and has no cache layer. `bench/gen_traces.py` runs PP and writes
+`.trace`; `bench/gen_replays.py` is separate and only creates optional
+`.replay` files for debugging.
 
 ## PP limitations (read before writing goals)
 
@@ -51,34 +42,34 @@ signature changes you may need `pp2lp clean --lpo`.
 - **Cascaded `=>`**: PP's `=>` is left-associative. `(p => q) => (r => s) => g` parses as `((p => q) => (r => s)) => g`. Use `and` for independent hypotheses.
 - **Set-theoretic surface**: `eql_set`, pair decomposition, higher-order set operators aren't in the goal formula syntax.
 - **Arithmetic**: AR1–AR13 reduce to `B.lp`'s integer primitives. Some emitted proofs carry `trust` for solver-level conjuncts.
-- **Trust axioms in prv**: Atelier B corpus exercises documented PP→LP semantic gaps (BOOL membership, arithmetic AC, REPLAY truncation).
+- **Trust axioms in prv**: Atelier B corpus exercises documented PP→LP semantic gaps (BOOL membership, arithmetic AC).
 
 ## Suites
 
-- **prv** — Atelier B Proof Rules Validator corpus. Not a regression target.
-- **og** — frozen pre-baked `.replay`s. Legacy.
+- **prv** — Atelier B Proof Rules Validator corpus. Generated traces are ignored by git.
+- **og** — small checked-in trace corpus for smoke tests.
 
 ## Admits / trust categories
 
 - **`lp/B.lp:16`** — `trust : π P` axiom + B-Book primitives. Intentional.
   No other `admit`s in `lp/`.
 - **Emitted `trust`** — emitter passes `trust` at use sites instead of a
-  real proof term. See `doc/rules.md` for the full per-rule list; the
-  major categories (some tagged by `pp2lp emit -trace`):
-  - NRM20–23 subtree close (HOU blocker after λ-applied form) —
-    tags `nrm20-shape-trust`, `nrm21-23-trust`, `all7-2nd-child-trust`
+  real proof term for inline side-condition arguments. It must not emit
+  whole-goal `refine trust`. See `doc/rules.md` for the full per-rule list;
+  the major categories:
   - BOOL31–42 — `V ϵ BOOL` membership (PP can't reason about BOOL abstractly)
   - INS arithmetic-match conjuncts (solver equality bridge)
-  - AR2, AR13 — solver-confirmed numeric side conditions
+  - AR2–AR9, AR13 — solver-confirmed numeric/equality side conditions
+- **Unsupported shapes** — the trace-first emitter should fail explicitly
+  rather than closing a whole goal with `trust`.
 
-## Replay format
+## Trace Format
 
-Lines: `[RULE] <goal>` | `[RULE(arg)] <goal>` | `[FIN(result)] <FIN(...)>`.
-Rules applied backwards; multi-premise rules branch DFS. `[FIN]` carries
-normalisation result. `[STOP_NORM]`, `[NRM]` are phantoms. `[RULE_1]` is
-primed (inside ALL7/XST8 result chain); non-`_1` NRM between `_1` and FIN
-is bookkeeping.
+Lines are `[RULE] &`, `[RULE(arg)] &`, `[FIN(result)] &`, `[STOP_NORM] &`,
+`[NRM] &`, followed by the final parenthesized goal. PP writes rules in
+right-first DFS postorder; `ocaml/src/proof_tree.ml` rebuilds the tree with
+a stack.
 
 ## References
 
-`doc/spec_pp.md` PP spec · `doc/pp_rules.md` rule summary · `doc/b-book-ref.md` B-Book pointers.
+`doc/spec_pp.md` PP spec · `doc/rules.md` rule notes · `doc/b-book-ref.md` B-Book pointers.

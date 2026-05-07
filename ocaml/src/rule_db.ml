@@ -1,18 +1,22 @@
-(* Rule database: static metadata for PP inference rules. *)
+(* Rule database: static metadata for PP inference rules.
+
+   The trace includes both base rules (e.g. AND1) and primed/n-ary
+   variants (e.g. AND1_1, ALL7_3, ALL7_1_3).  The metadata table is
+   keyed on base names; the suffix helpers below decode the variants. *)
 
 (** Kind of a derivation slot in a rule's signature.
     - [Con]: side-condition proof (e.g. a [trust] arg or a solver lemma).
       Filled inline in the LP application; not a child in the proof tree.
     - [Seq]: sequent derivation — a regular proof-tree child.
-    - [Res]: result derivation — a [_1]-chain child. Currently the
-      first slot of branching quantifiers (ALL7/XST8). *)
+    - [Res]: result derivation — a chain child.  Currently the first
+      slot of branching quantifiers (ALL7/XST8). *)
 type kind = Con | Seq | Res
 
 (** [Arity (slots, output)]: argument-kind list plus the output kind. *)
 type arity = Arity of kind list * kind
 
 type rule_info = {
-  arity: arity option;       (* None = phantom (skipped during replay). *)
+  arity: arity option;       (* None = phantom (skipped during trace processing). *)
   emit_args: string option;
   hoas_identity: bool;       (* rule is absorbed by LP's HOAS — skip in emit *)
   intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
@@ -30,11 +34,10 @@ let rules : (string, rule_info) Hashtbl.t =
       { arity = None; emit_args = None;
         hoas_identity = false; intro_antecedent = false }
   in
-  (* Common arity shapes. *)
-  let leaf   = Arity ([], Seq) in              (* axiom-style leaf       *)
-  let pass   = Arity ([Seq], Seq) in           (* one-child passthrough  *)
-  let conj   = Arity ([Seq; Seq], Seq) in      (* two-child conjunction  *)
-  let branch = Arity ([Res; Seq], Seq) in      (* ALL7 / XST8: _1 chain + cont *)
+  let leaf   = Arity ([], Seq) in
+  let pass   = Arity ([Seq], Seq) in
+  let conj   = Arity ([Seq; Seq], Seq) in
+  let branch = Arity ([Res; Seq], Seq) in
   (* §A.1 Conjunction *)
   r "AND1" conj;
   r "AND2" pass;
@@ -71,10 +74,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AXM7" leaf;
   r "AXM8" leaf ~emit_args:(Some "dynamic:axm8");
   r "AXM9" leaf ~emit_args:(Some "dynamic:axm9");
-  (* §A.7 Universal quantification.
-     ALL1–4 are compound↔nested conversions; thanks to the parser's
-     same-binder collapse, both forms reduce to a single `!! [n]`
-     in the AST, making ALL1–4 genuine no-ops in our emission. *)
+  (* §A.7 Universal quantification *)
   r "ALL1" pass ~hoas_identity:true;
   r "ALL2" pass ~hoas_identity:true;
   r "ALL3" pass ~hoas_identity:true;
@@ -84,7 +84,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ALL7" branch ~emit_args:(Some "dynamic:all7");
   r "ALL8" pass;
   r "ALL9" pass ~intro_antecedent:true;
-  (* §A.8 Existential — XST1–4 likewise collapse to no-ops. *)
+  (* §A.8 Existential quantification *)
   r "XST1" pass ~hoas_identity:true;
   r "XST2" pass ~hoas_identity:true;
   r "XST3" pass ~hoas_identity:true;
@@ -113,9 +113,6 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM5" pass;
   r "NRM6" pass;
   r "NRM7" pass;
-  (* NRM8/NRM9 emit at the LP level: they convert the mixed binder
-     `♢x · ∀y · …` (parser-preserved as Bind (Forall, _, Bind (Bang, ...)))
-     to compound `♢(x,y) · …` via the take/drop split in Quant.lp. *)
   r "NRM8" pass;
   r "NRM9" pass;
   r "NRM10" pass;
@@ -135,9 +132,6 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM24" pass;
   r "NRM25" pass;
   r "NRM26" pass;
-  (* NRM27–30: arithmetic solver dispatch; not yet formalised in LP.
-     Deliberately unregistered — replay_arity raises Ill_formed_replay
-     (→ SKIP) if PP emits them, rather than silently dropping a step. *)
   (* §A.13 Equality *)
   r "EVR1" leaf;
   r "EVR2" pass;
@@ -175,8 +169,6 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR7" pass ~emit_args:(Some "dynamic:ar78");
   r "AR8" pass ~emit_args:(Some "dynamic:ar78");
   r "AR9" pass ~emit_args:(Some "dynamic:ar9");
-  (* AR10 is a solver no-op: P = Q (trivially); the LP symbol in Arith.lp
-     is never applied because PP emits AR10 only when Q = P. Phantom. *)
   phantom "AR10";
   r "AR11" leaf;
   r "AR12" pass ~intro_antecedent:true;
@@ -198,70 +190,11 @@ let rules : (string, rule_info) Hashtbl.t =
   phantom "NRM";
   t
 
-(* --- Lookup --- *)
+(* --- Suffix decoding ----------------------------------------------- *)
 
-(** [true] iff the rule has no entry or has [arity = None]. *)
-let is_phantom name =
-  match Hashtbl.find_opt rules name with
-  | Some { arity = None; _ } -> true
-  | Some _ -> false
-  | None -> true
+(* PP rule names carry structural info in their suffix:
+     FOO, FOO_1, FOO_N, FOO_1_N (N ≥ 2). *)
 
-(** Number of children the rule has in the proof tree
-    (= number of [Seq] + [Res] slots). [Con] slots are inline LP args
-    rather than tree children. Returns [-1] for phantom rules.
-    Raises [Failure] if [name] is unknown. *)
-let rule_arity name =
-  match Hashtbl.find_opt rules name with
-  | Some { arity = Some (Arity (slots, _)); _ } ->
-    List.length
-      (List.filter (function Seq | Res -> true | Con -> false) slots)
-  | Some { arity = None; _ } -> -1
-  | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
-
-(** [true] for rules whose first child is a [_1] result derivation
-    (i.e. an ALL7/XST8-style branching quantifier). *)
-let is_branching name =
-  match Hashtbl.find_opt rules name with
-  | Some { arity = Some (Arity (slots, _)); _ } ->
-    List.exists (function Res -> true | _ -> false) slots
-  | _ -> false
-
-let emit_args name =
-  match Hashtbl.find_opt rules name with
-  | Some r -> r.emit_args
-  | None -> None
-
-let lookup_flag f name =
-  match Hashtbl.find_opt rules name with
-  | Some r -> f r
-  | None -> false
-
-let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
-let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
-
-(* --- Rule-name string predicates ---
-   PP replay rule names carry structural information in their suffix:
-
-     FOO          — base rule (e.g. AND1, IMP4)
-     FOO_1        — primed variant (appears inside a _1 equality chain
-                    that precedes ALL7/XST8)
-     FOO_N        — n-ary variant (e.g. ALL7_2, NRM1_3), N ≥ 2
-     FOO_1_N      — primed + n-ary
-     NRM<digit>…  — normalisation step
-
-   The helpers here are the one authoritative parser of those suffixes.
-   Downstream modules should call these instead of re-implementing
-   substring checks. *)
-
-(* Strip trailing _N where N is a non-empty digit string:
-     ALL7_2      → ALL7
-     ALL7_1_3    → ALL7_1
-     ALL7_1      → ALL7_1   (not stripped, because "1" vs "_N" shape
-                              is resolved by callers via is_primed)
-   Note: we do strip _1 here unless it is the only suffix, because
-   callers (is_primed) want to see the _1 after stripping an outer _N.
-   The rule is: strip *one* trailing numeric suffix. *)
 let strip_suffix rule =
   match String.rindex_opt rule '_' with
   | Some i when i > 0 && i < String.length rule - 1 ->
@@ -271,20 +204,12 @@ let strip_suffix rule =
     else rule
   | _ -> rule
 
-(* Raw suffix check: name ends in "_1".
-   Used when classifying a replay line. *)
 let is_primed_name name =
   String.length name > 2 &&
   String.sub name (String.length name - 2) 2 = "_1"
 
-(* Suffix check that sees through an outer n-ary wrapping:
-     ALL7_1   → true
-     ALL7_1_3 → true   (strip _3, then _1)
-     ALL7_3   → false
-   Used after select_variant has attached a _N tag. *)
 let is_primed rule = is_primed_name (strip_suffix rule)
 
-(* Extract the trailing n-ary count: ALL7_3 → 3, ALL7 → 1. *)
 let nary_count rule =
   match String.rindex_opt rule '_' with
   | Some i when i > 0 && i < String.length rule - 1 ->
@@ -292,9 +217,62 @@ let nary_count rule =
     (try int_of_string suffix with _ -> 1)
   | _ -> 1
 
-(* NRM<digit>... (NRM1, NRM12, NRM1_1, …). Excludes the bare "NRM"
-   phantom (arity -1). *)
 let is_nrm_step name =
   String.starts_with ~prefix:"NRM" name &&
   String.length name > 3 &&
   (let c = name.[3] in c >= '0' && c <= '9')
+
+(* Trace rules use the suffixed form (FOO_1, FOO_3, FOO_1_3).  Look up
+   metadata under the base name. *)
+let base_of name =
+  let s = strip_suffix name in
+  if is_primed_name s then String.sub s 0 (String.length s - 2)
+  else s
+
+let lookup name = Hashtbl.find_opt rules (base_of name)
+
+(* --- Lookup helpers ------------------------------------------------ *)
+
+let is_phantom name =
+  match lookup name with
+  | Some { arity = None; _ } -> true
+  | Some _ -> false
+  | None -> true
+
+(** Number of children the rule has in the proof tree
+    (= number of [Seq] + [Res] slots).  [Con] slots are inline LP args
+    rather than tree children.  Returns [-1] for phantom rules.
+    Raises [Failure] if [name] is unknown. *)
+let rule_arity name =
+  (* STOP_1 is the leaf seed of an equality chain.  STOP itself is a
+     proof step (single-child); the primed variant is arity 0. *)
+  if name = "STOP_1" then 0
+  else
+    match lookup name with
+    | Some { arity = Some (Arity (slots, _)); _ } ->
+      List.length
+        (List.filter (function Seq | Res -> true | Con -> false) slots)
+    | Some { arity = None; _ } -> -1
+    | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+
+let is_branching name =
+  match lookup name with
+  | Some { arity = Some (Arity (slots, _)); _ } ->
+    List.exists (function Res -> true | _ -> false) slots
+  | _ -> false
+
+let slots name =
+  if name = "STOP_1" then []
+  else match lookup name with
+  | Some { arity = Some (Arity (slots, _)); _ } -> slots
+  | Some { arity = None; _ } -> []
+  | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+
+let emit_args name =
+  match lookup name with Some r -> r.emit_args | None -> None
+
+let lookup_flag f name =
+  match lookup name with Some r -> f r | None -> false
+
+let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
+let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)

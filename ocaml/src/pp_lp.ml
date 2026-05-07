@@ -39,73 +39,83 @@ let wrap buf need f =
   f ();
   if need then Buffer.add_char buf ')'
 
-(* ---- Expression pretty-printing (shallow encoding) ---- *)
+(* ---- Expression pretty-printing (shallow encoding) ----
 
-let rec pp_exp ?(min_bp = bp_max) buf e =
+   `env` maps PP variable names bound by an enclosing compound binder to
+   their tuple-projection rendering `(k, v)` — emitted as `(prj k v)`.
+   Compound binders `Bind (_, xs, body)` are rendered as
+   `(\`!! v : Tuple n, body)` with each `xs.(k)` substituted by
+   `prj k v` at emission time, matching the n-ary quantifier kernel
+   exposed by `lp/Quant.lp`. Inner binders shadow outer bindings. *)
+
+let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
   match e with
+  | Var s when List.mem_assoc s env ->
+    let (k, v) = List.assoc s env in
+    Buffer.add_string buf "(prj ";
+    Buffer.add_string buf (string_of_int k);
+    Buffer.add_char buf ' ';
+    pp_ident buf v;
+    Buffer.add_char buf ')'
   | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
   | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
   | Var s -> pp_ident buf s
   | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 *)
   | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 *)
   | Nat n ->
-    (* Bare decimal literal — Lambdapi parses it as ℕ via Stdlib.Nat's
-       builtin and `B.lp`'s `coerce_rule` lifts ℕ → τ ι (via int_lit).  *)
-    Buffer.add_string buf (string_of_int n)
+    Buffer.add_char buf '(';
+    for _ = 1 to n - 1 do
+      Buffer.add_string buf "\xf0\x9d\x9f\x8f + "
+    done;
+    Buffer.add_string buf "\xf0\x9d\x9f\x8f";
+    Buffer.add_char buf ')'
   | App (f, args) ->
     Buffer.add_string buf "(eapp ";
     pp_ident buf f;
     Buffer.add_char buf ' ';
-    pp_exp_args buf args;
-    Buffer.add_char buf ')'
-  | Prj (k, v) ->
-    (* `prj k v` — Lambdapi maps the decimal `k` to `_k` via Stdlib.Nat. *)
-    Buffer.add_string buf "(prj ";
-    Buffer.add_string buf (string_of_int k);
-    Buffer.add_char buf ' ';
-    pp_ident buf v;
+    pp_exp_args ~env buf args;
     Buffer.add_char buf ')'
   | AOp (Add, e1, e2) ->
     wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 buf e1;
+      pp_exp ~min_bp:6 ~env buf e1;
       Buffer.add_string buf " + ";
-      pp_exp ~min_bp:7 buf e2)
+      pp_exp ~min_bp:7 ~env buf e2)
   | AOp (Sub, e1, e2) ->
     wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 buf e1;
+      pp_exp ~min_bp:6 ~env buf e1;
       Buffer.add_string buf " - ";
-      pp_exp ~min_bp:7 buf e2)
+      pp_exp ~min_bp:7 ~env buf e2)
   | Neg e1 ->
     wrap buf (7 < min_bp) (fun () ->
       Buffer.add_string buf "\xe2\x80\x94 "; (* — *)
-      pp_exp ~min_bp:8 buf e1)
+      pp_exp ~min_bp:8 ~env buf e1)
   | SetImage (e1, e2) ->
     Buffer.add_string buf "(eapp set_image (";
-    pp_exp buf e1;
+    pp_exp ~env buf e1;
     Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp buf e2;
+    pp_exp ~env buf e2;
     Buffer.add_string buf "))"
   | Inter (e1, e2) ->
     Buffer.add_string buf "(eapp inter (";
-    pp_exp buf e1;
+    pp_exp ~env buf e1;
     Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp buf e2;
+    pp_exp ~env buf e2;
     Buffer.add_string buf "))"
   | Union (e1, e2) ->
     Buffer.add_string buf "(eapp union (";
-    pp_exp buf e1;
+    pp_exp ~env buf e1;
     Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp buf e2;
+    pp_exp ~env buf e2;
     Buffer.add_string buf "))"
 
-and pp_exp_args buf = function
-  | [e] -> pp_exp buf e
+and pp_exp_args ?(env = []) buf = function
+  | [e] -> pp_exp ~env buf e
   | e :: rest ->
     Buffer.add_char buf '(';
-    pp_exp buf e;
+    pp_exp ~env buf e;
     List.iter (fun e' ->
       Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-      pp_exp buf e') rest;
+      pp_exp ~env buf e') rest;
     Buffer.add_char buf ')'
   | [] -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 as fallback *)
 
@@ -130,20 +140,20 @@ let rec conj_leaves = function
   | Binary (And, l, r) -> conj_leaves l @ conj_leaves r
   | p -> [p]
 
-let rec pp_conj_left ?(min_bp = bp_max) buf elts =
+let rec pp_conj_left ?(min_bp = bp_max) ?(env = []) buf elts =
   match elts with
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
-  | [p] -> pp_prd ~min_bp buf p
+  | [p] -> pp_prd ~min_bp ~env buf p
   | first :: rest ->
     let need_outer = 7 < min_bp in
     let n = List.length rest in
     let n_open = n - 1 + (if need_outer then 1 else 0) in
     for _ = 1 to n_open do Buffer.add_char buf '(' done;
-    pp_prd ~min_bp:8 buf first;
+    pp_prd ~min_bp:8 ~env buf first;
     let closes_left = ref n_open in
     List.iter (fun p ->
       Buffer.add_string buf " \xe2\x88\xa7 "; (* ∧ *)
-      pp_prd ~min_bp:8 buf p;
+      pp_prd ~min_bp:8 ~env buf p;
       if !closes_left > 0 then begin
         Buffer.add_char buf ')';
         decr closes_left
@@ -152,7 +162,7 @@ let rec pp_conj_left ?(min_bp = bp_max) buf elts =
 
 (* ---- Predicate pretty-printing (shallow encoding) ---- *)
 
-and pp_prd ?(min_bp = bp_max) buf p =
+and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
   match p with
   | Lift (Var "VRAI") | Lift (Var "TRUE") ->
     Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
@@ -160,81 +170,72 @@ and pp_prd ?(min_bp = bp_max) buf p =
     Buffer.add_string buf "\xe2\x8a\xa5" (* ⊥ *)
   | Lift (App (f, args)) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_exp_args buf args;
+      pp_exp_args ~env buf args;
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
       pp_ident buf f)
+  | Lift (Var s) when List.mem_assoc s env ->
+    pp_exp ~min_bp ~env buf (Var s)
   | Lift (Var s) ->
     pp_ident buf s
   | Lift e ->
-    pp_exp ~min_bp buf e
+    pp_exp ~min_bp ~env buf e
   | Unary (Not, p1) ->
     wrap buf (35 < min_bp) (fun () ->
       Buffer.add_string buf "\xc2\xac "; (* ¬ *)
-      pp_prd ~min_bp:36 buf p1)
+      pp_prd ~min_bp:36 ~env buf p1)
   | Binary (And, _, _) ->
     let elts = flatten_conj p in
-    pp_conj_left ~min_bp buf elts
+    pp_conj_left ~min_bp ~env buf elts
   | Binary (Or, p1, p2) ->
     wrap buf (6 < min_bp) (fun () ->
-      pp_prd ~min_bp:7 buf p1;
+      pp_prd ~min_bp:7 ~env buf p1;
       Buffer.add_string buf " \xe2\x88\xa8 "; (* ∨ *)
-      pp_prd ~min_bp:6 buf p2)
+      pp_prd ~min_bp:6 ~env buf p2)
   | Binary (Imp, p1, p2) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_prd ~min_bp:6 buf p1;
+      pp_prd ~min_bp:6 ~env buf p1;
       Buffer.add_string buf " \xe2\x87\x92 "; (* ⇒ *)
-      pp_prd ~min_bp:5 buf p2)
+      pp_prd ~min_bp:5 ~env buf p2)
   | Binary (Iff, p1, p2) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_prd ~min_bp:6 buf p1;
+      pp_prd ~min_bp:6 ~env buf p1;
       Buffer.add_string buf " \xe2\x87\x94 "; (* ⇔ *)
-      pp_prd ~min_bp:5 buf p2)
+      pp_prd ~min_bp:5 ~env buf p2)
   | Eq (e1, e2) ->
     wrap buf (10 < min_bp) (fun () ->
-      pp_exp ~min_bp:11 buf e1;
+      pp_exp ~min_bp:11 ~env buf e1;
       Buffer.add_string buf " = ";
-      pp_exp ~min_bp:11 buf e2)
+      pp_exp ~min_bp:11 ~env buf e2)
   | Leq (e1, e2) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 buf e1;
+      pp_exp ~min_bp:6 ~env buf e1;
       Buffer.add_string buf " \xe2\x89\xa4 "; (* ≤ *)
-      pp_exp ~min_bp:6 buf e2)
+      pp_exp ~min_bp:6 ~env buf e2)
   | Mem (es, e) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_exp_args buf es;
+      pp_exp_args ~env buf es;
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
-      pp_exp ~min_bp:6 buf e)
+      pp_exp ~min_bp:6 ~env buf e)
   | Bind (binder, xs, body) ->
-    (* Compound-binder rendering. Each bound var `xs[k]` is substituted
-       with `Prj (k, v_name)` in the body so the tuple-indexed body
-       matches our rule library's expectations. The tuple variable name
-       is derived from the first bound var so printed goals stay
-       readable. Symbol per binder kind:
-         Bang    (`!x.`)       → `!!`   (standard ∀)
-         Forall  (`forall x.`) → ♢      (goal-side n-ary universal)
-         Forall2 (`forall2 x.`)→ ♡      (hypothesis-side n-ary universal)
-         Exists  (`#x.`)       → ?? *)
-    let qbang = match binder with
-      | Bang    -> "!!"
-      | Forall  -> "\xe2\x99\xa2" (* ♢ *)
-      | Forall2 -> "\xe2\x99\xa1" (* ♡ *)
-      | Exists  -> "??"
+    let qsym = match binder with
+      | Bang    -> "`!!"
+      | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
+      | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
+      | Exists  -> "`??"
     in
     let n = List.length xs in
-    let v_name = match xs with
-      | x :: _ -> x ^ "_t"
-      | [] -> "v"
+    let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
+    let env' =
+      List.mapi (fun k x -> (x, (k, v_name))) xs @ env
     in
-    let body' = Subst.subst_prd_to_prjs xs v_name body in
     Buffer.add_char buf '(';
-    Buffer.add_char buf '`';
-    Buffer.add_string buf qbang;
+    Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
     Buffer.add_string buf (string_of_int n);
     Buffer.add_string buf ", ";
-    pp_prd buf body';
+    pp_prd ~env:env' buf body;
     Buffer.add_char buf ')'
 
 (* ---- Left-associative conjunction extraction/reconstruction ---- *)
@@ -308,43 +309,49 @@ let emit_and5_bwd buf var n j =
 (* Column width threshold: if inline rendering fits, skip line breaks. *)
 let block_width = 72
 
-let rec pp_prd_block ?(min_bp = 0) ind buf p =
+let rec pp_prd_block ?(min_bp = 0) ?(env = []) ind buf p =
   (* Try inline first — if it fits, use it *)
   let inline = Buffer.create 128 in
-  pp_prd ~min_bp inline p;
+  pp_prd ~min_bp ~env inline p;
   if Buffer.length inline + ind <= block_width then
     Buffer.add_buffer buf inline
   else
-    pp_prd_block_break ~min_bp ind buf p
+    pp_prd_block_break ~min_bp ~env ind buf p
 
-and pp_prd_block_break ?(min_bp = 0) ind buf p =
+and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
   let pad = String.make ind ' ' in
   match p with
   | Binary (Imp, p1, p2) ->
     wrap buf (5 < min_bp) (fun () ->
-      pp_prd_block ~min_bp:6 ind buf p1;
+      pp_prd_block ~min_bp:6 ~env ind buf p1;
       Buffer.add_char buf '\n';
       Buffer.add_string buf pad;
       Buffer.add_string buf "\xe2\x87\x92 "; (* ⇒ *)
-      pp_prd_block ~min_bp:5 ind buf p2)
+      pp_prd_block ~min_bp:5 ~env ind buf p2)
   | Binary (And, _, _) ->
     let elts = flatten_conj p in
-    pp_conj_left_block ~min_bp ind buf elts
+    pp_conj_left_block ~min_bp ~env ind buf elts
   | Binary (Or, p1, p2) ->
     wrap buf (6 < min_bp) (fun () ->
-      pp_prd_block ~min_bp:7 ind buf p1;
+      pp_prd_block ~min_bp:7 ~env ind buf p1;
       Buffer.add_char buf '\n';
       Buffer.add_string buf pad;
       Buffer.add_string buf "\xe2\x88\xa8 "; (* ∨ *)
-      pp_prd_block ~min_bp:6 ind buf p2)
+      pp_prd_block ~min_bp:6 ~env ind buf p2)
   | Bind (binder, xs, body) ->
-    let qbang = match binder with Exists -> "??" | _ -> "!!" in
+    let qsym = match binder with
+      | Bang    -> "`!!"
+      | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
+      | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
+      | Exists  -> "`??"
+    in
     let n = List.length xs in
     let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
-    let body' = Subst.subst_prd_to_prjs xs v_name body in
+    let env' =
+      List.mapi (fun k x -> (x, (k, v_name))) xs @ env
+    in
     Buffer.add_char buf '(';
-    Buffer.add_char buf '`';
-    Buffer.add_string buf qbang;
+    Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
@@ -352,34 +359,34 @@ and pp_prd_block_break ?(min_bp = 0) ind buf p =
     Buffer.add_char buf ',';
     Buffer.add_char buf '\n';
     Buffer.add_string buf (String.make (ind + 2) ' ');
-    pp_prd_block (ind + 2) buf body';
+    pp_prd_block ~env:env' (ind + 2) buf body;
     Buffer.add_char buf ')'
   | _ ->
-    pp_prd ~min_bp buf p
+    pp_prd ~min_bp ~env buf p
 
-and pp_conj_left_block ?(min_bp = 0) ind buf elts =
+and pp_conj_left_block ?(min_bp = 0) ?(env = []) ind buf elts =
   (* Try inline first *)
   let inline = Buffer.create 128 in
-  pp_conj_left ~min_bp inline elts;
+  pp_conj_left ~min_bp ~env inline elts;
   if Buffer.length inline + ind <= block_width then
     Buffer.add_buffer buf inline
   else
   match elts with
   | [] -> Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
-  | [p] -> pp_prd_block ~min_bp ind buf p
+  | [p] -> pp_prd_block ~min_bp ~env ind buf p
   | first :: rest ->
     let need_outer = 7 < min_bp in
     let pad = String.make ind ' ' in
     let n = List.length rest in
     let n_open = n - 1 + (if need_outer then 1 else 0) in
     for _ = 1 to n_open do Buffer.add_char buf '(' done;
-    pp_prd_block ~min_bp:8 ind buf first;
+    pp_prd_block ~min_bp:8 ~env ind buf first;
     let closes_left = ref n_open in
     List.iter (fun p ->
       Buffer.add_char buf '\n';
       Buffer.add_string buf pad;
       Buffer.add_string buf "\xe2\x88\xa7 "; (* ∧ *)
-      pp_prd_block ~min_bp:8 (ind + 2) buf p;
+      pp_prd_block ~min_bp:8 ~env (ind + 2) buf p;
       if !closes_left > 0 then begin
         Buffer.add_char buf ')';
         decr closes_left
