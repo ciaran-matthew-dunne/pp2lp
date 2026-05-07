@@ -1,1 +1,0 @@
-Flag(TypeOn("ar_one_eq")) & Flag(FileOn("ar_one_eq.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | 1=1 | nn))

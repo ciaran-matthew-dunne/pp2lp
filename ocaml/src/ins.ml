@@ -190,7 +190,7 @@ let ins_heart_resolve ctx =
       match List.assoc_opt x sub with
       | Some e ->
         Buffer.add_char buf '(';
-        Pp_lp.pp_exp buf e;
+        Pp_lp.pp_exp buf (tuple_subst_exp ctx e);
         Buffer.add_char buf ')'
       | None ->
         Buffer.add_char buf '_'

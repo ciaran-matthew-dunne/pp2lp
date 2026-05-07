@@ -1,4 +1,0 @@
-[VR3] <VRAI => not(1<=0)>
-[STOP] <not(1<=0)>
-[NOT1] <not(not(1<=0)) => FAUX>
-[AR2] <1<=0 => FAUX>

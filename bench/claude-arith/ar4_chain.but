@@ -1,1 +1,0 @@
-Flag(TypeOn("ar4_chain")) & Flag(FileOn("ar4_chain.res")) & Set(Valid.1 | Rule(Implication | a<=0 & -1<=0 & not(a-1<=0) | ? | ? | false | nn))

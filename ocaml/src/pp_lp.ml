@@ -49,12 +49,9 @@ let rec pp_exp ?(min_bp = bp_max) buf e =
   | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 *)
   | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 *)
   | Nat n ->
-    Buffer.add_char buf '(';
-    for _ = 1 to n - 1 do
-      Buffer.add_string buf "\xf0\x9d\x9f\x8f + "
-    done;
-    Buffer.add_string buf "\xf0\x9d\x9f\x8f";
-    Buffer.add_char buf ')'
+    (* Bare decimal literal — Lambdapi parses it as ℕ via Stdlib.Nat's
+       builtin and `B.lp`'s `coerce_rule` lifts ℕ → τ ι (via int_lit).  *)
+    Buffer.add_string buf (string_of_int n)
   | App (f, args) ->
     Buffer.add_string buf "(eapp ";
     pp_ident buf f;
@@ -62,13 +59,9 @@ let rec pp_exp ?(min_bp = bp_max) buf e =
     pp_exp_args buf args;
     Buffer.add_char buf ')'
   | Prj (k, v) ->
-    (* prj _k v — use stdlib `+1` literal for k > 0; bare `0` for 0. *)
+    (* `prj k v` — Lambdapi maps the decimal `k` to `_k` via Stdlib.Nat. *)
     Buffer.add_string buf "(prj ";
-    if k = 0 then Buffer.add_char buf '0'
-    else begin
-      Buffer.add_char buf '_';
-      Buffer.add_string buf (string_of_int k)
-    end;
+    Buffer.add_string buf (string_of_int k);
     Buffer.add_char buf ' ';
     pp_ident buf v;
     Buffer.add_char buf ')'
@@ -212,13 +205,21 @@ and pp_prd ?(min_bp = bp_max) buf p =
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
       pp_exp ~min_bp:6 buf e)
   | Bind (binder, xs, body) ->
-    (* Compound-binder rendering. Universals (Bang/Forall/Forall2)
-       map to `!!`, existentials to `??`. Each bound var `xs[k]` is
-       substituted with `Prj (k, v_name)` in the body so the tuple-
-       indexed body matches our rule library's expectations.
-       The tuple variable name is derived from the first bound var so
-       printed goals stay readable. *)
-    let qbang = match binder with Exists -> "??" | _ -> "!!" in
+    (* Compound-binder rendering. Each bound var `xs[k]` is substituted
+       with `Prj (k, v_name)` in the body so the tuple-indexed body
+       matches our rule library's expectations. The tuple variable name
+       is derived from the first bound var so printed goals stay
+       readable. Symbol per binder kind:
+         Bang    (`!x.`)       → `!!`   (standard ∀)
+         Forall  (`forall x.`) → ♢      (goal-side n-ary universal)
+         Forall2 (`forall2 x.`)→ ♡      (hypothesis-side n-ary universal)
+         Exists  (`#x.`)       → ?? *)
+    let qbang = match binder with
+      | Bang    -> "!!"
+      | Forall  -> "\xe2\x99\xa2" (* ♢ *)
+      | Forall2 -> "\xe2\x99\xa1" (* ♡ *)
+      | Exists  -> "??"
+    in
     let n = List.length xs in
     let v_name = match xs with
       | x :: _ -> x ^ "_t"

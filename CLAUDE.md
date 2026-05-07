@@ -11,7 +11,7 @@ verify its own work belongs there, not here.
 ## Layout
 
 `lp/` Lambdapi encoding · `ocaml/src/` pipeline · `ocaml/bin/main.ml` CLI ·
-`bench/{claude,claude-arith,prv,og,fuzz}/` benchmarks · `doc/` spec.
+`bench/{prv,og}/` benchmarks · `doc/` spec.
 
 ## Commits
 
@@ -27,8 +27,11 @@ pp2lp clean  [--lpo] [--cache] [--all] [--suite=X]
 pp2lp emit   REPLAY... [-trace]
 pp2lp prove  FORMULA [--name NAME]
 
-make build | check | check-fresh | test SUITE=X NAME=Y | test-NAME |
-     test-cache | gen | prove FORMULA=... | status | clean | repl
+make help                                       # one-line summary of every target
+make build | check | check-all | check-fresh    # default suite is prv
+make test NAME=Y [SUITE=X] | test-cache
+make gen [ALLOC=N] | prove FORMULA=... | status
+make clean | clean-all | repl
 ```
 
 ## Caching
@@ -48,24 +51,25 @@ signature changes you may need `pp2lp clean --lpo`.
 - **Cascaded `=>`**: PP's `=>` is left-associative. `(p => q) => (r => s) => g` parses as `((p => q) => (r => s)) => g`. Use `and` for independent hypotheses.
 - **Set-theoretic surface**: `eql_set`, pair decomposition, higher-order set operators aren't in the goal formula syntax.
 - **Arithmetic**: AR1–AR13 reduce to `B.lp`'s integer primitives. Some emitted proofs carry `trust` for solver-level conjuncts.
-- **Trust axioms in prv**: Atelier B corpus exercises documented PP→LP semantic gaps (OPR1, arithmetic AC, REPLAY truncation).
+- **Trust axioms in prv**: Atelier B corpus exercises documented PP→LP semantic gaps (BOOL membership, arithmetic AC, REPLAY truncation).
 
 ## Suites
 
-- **claude** — iteration surface. AI-generated goals from `bench/claude/goals.txt`. Stays at 0 failures.
-- **claude-arith** — §A.14 AR-rule coverage. Some `trust`.
 - **prv** — Atelier B Proof Rules Validator corpus. Not a regression target.
 - **og** — frozen pre-baked `.replay`s. Legacy.
-- **fuzz** — random-formula generator slot.
 
 ## Admits / trust categories
 
-- **`lp/B.lp`** — B-Book primitives. Intentional axioms.
-- **`lp/rules/Rw.lp`** admits — OPR1_1 / OPR2_1 (one-point-rule, ← direction only). Known soundness gap.
-- **Emitted `trust`** — three kinds (`pp2lp emit -trace` tags them):
-  - NRM20–23 subtree close (HOU blocker after λ-applied form)
+- **`lp/B.lp:16`** — `trust : π P` axiom + B-Book primitives. Intentional.
+  No other `admit`s in `lp/`.
+- **Emitted `trust`** — emitter passes `trust` at use sites instead of a
+  real proof term. See `doc/rules.md` for the full per-rule list; the
+  major categories (some tagged by `pp2lp emit -trace`):
+  - NRM20–23 subtree close (HOU blocker after λ-applied form) —
+    tags `nrm20-shape-trust`, `nrm21-23-trust`, `all7-2nd-child-trust`
+  - BOOL31–42 — `V ϵ BOOL` membership (PP can't reason about BOOL abstractly)
   - INS arithmetic-match conjuncts (solver equality bridge)
-  - OPR1/OPR2 primed bridge in `_1` chain
+  - AR2, AR13 — solver-confirmed numeric side conditions
 
 ## Replay format
 

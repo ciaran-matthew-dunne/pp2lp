@@ -3,17 +3,10 @@ ocaml/_build
 *.lpo
 
 # Per-suite inputs/outputs.
-# Tracked: bench/claude/goals.txt
-#          bench/og/*.replay + *.trace + *.but
-#          bench/claude-arith/*.but (committed test goals)
+# Tracked: bench/og/*.replay + *.trace + *.but
 #          bench/prv/*.but
 bench/*/.cache/
 bench/*/.gen_status.tsv
-bench/claude/*.but
-bench/claude/*.trace
-bench/claude/*.replay
-bench/claude-arith/*.trace
-bench/claude-arith/*.replay
 bench/prv/*.trace
 bench/prv/*.replay
 

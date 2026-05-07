@@ -1,1 +1,0 @@
-Flag(TypeOn("ar_zero_eq")) & Flag(FileOn("ar_zero_eq.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | 0=0 | nn))

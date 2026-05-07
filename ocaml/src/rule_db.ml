@@ -113,11 +113,10 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM5" pass;
   r "NRM6" pass;
   r "NRM7" pass;
-  (* NRM8: see comment further down. Currently a no-op, since the
-     parser-collapse already merges universal-style binders in the
-     symbol's goal type. The chain residual still has nested form,
-     but for the og corpus this doesn't bite. *)
-  r "NRM8" pass ~hoas_identity:true;
+  (* NRM8/NRM9 emit at the LP level: they convert the mixed binder
+     `♢x · ∀y · …` (parser-preserved as Bind (Forall, _, Bind (Bang, ...)))
+     to compound `♢(x,y) · …` via the take/drop split in Quant.lp. *)
+  r "NRM8" pass;
   r "NRM9" pass;
   r "NRM10" pass;
   r "NRM11" pass;

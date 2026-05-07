@@ -332,12 +332,13 @@ begin
               (λ v hpv, hne (pi_to_??_intro P v hpv)))) }
 end;
 
-// NRM1 bridge: ((♢_:τι, P) ⇒ Q) = (P ⇒ Q) when P is x-free.
-opaque symbol nrm1_eq [P Q : Prop]
-  : π (((`♢ _ : τ ι, P) ⇒ Q) = (P ⇒ Q)) ≔
+// NRM1 bridge: ((♢_:Tuple n, P) ⇒ Q) = (P ⇒ Q) when P is x-free.
+opaque symbol nrm1_eq [n] [P Q : Prop]
+  : π (((`♢ _ : Tuple n, P) ⇒ Q) = (P ⇒ Q)) ≔
 begin
-  assume P Q;
-  have h1 : π ((`♢ _ : τ ι, P) = P) { refine ∀_const ι P };
+  assume n P Q;
+  have h1 : π ((`♢ _ : Tuple n, P) = P)
+    { refine eq_trans (♢_eq_!! (λ _ : Tuple n, P)) (!!_const [n] P) };
   rewrite h1; reflexivity
 end;
 
@@ -420,6 +421,26 @@ symbol IMP4_1 [P Q : Prop]
   (r : Res Q) : Res (P ⇒ Q)
   ≔ mk_1 (P ⇒ res_tm r) (imp_cong_r (res_eq r));
 
+// Helpers used below.
+opaque symbol imp_cong_l [P P' Q : Prop]
+  : π (P = P') → π ((P ⇒ Q) = (P' ⇒ Q)) ≔
+begin assume P P' Q h; rewrite h; reflexivity end;
+
+opaque symbol leq_zero_eq [E F : τ ι]
+  : π (E = F) → π ((E ≤ 𝟎) = (F ≤ 𝟎)) ≔
+begin assume E F h; rewrite h; reflexivity end;
+
+// AR9_1: solver-confirmed equality on the antecedent of a Res chain.
+// Mirrors the spec AR9 but in Res form: given a bridge proof E = F, a
+// chain proving (F ≤ 0 ⇒ R) lifts to one for (E ≤ 0 ⇒ R). F is
+// explicit so emit sites can pin it via the PP-supplied solver result.
+// Transparent — `res_tm (AR9_1 F he r)` reduces to `res_tm r` so the
+// outer chain can decompose the resulting Prop.
+symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop]
+  (he : π (E = F))
+  (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (leq_zero_eq he)) (res_eq r));
+
 // IMP5_1: strip a known antecedent (hp : π P) — collapses the ⇒.
 symbol IMP5_1 [P Q : Prop]
   (hp : π P) (r : Res Q) : Res (P ⇒ Q)
@@ -431,9 +452,9 @@ symbol ALL9_1 [H Q : Prop]
   ≔ mk_1 (H ⇒ res_tm r) (imp_cong_r (res_eq r));
 
 // NRM1_1: strip constant ♢-binder.
-symbol NRM1_1 [P Q : Prop]
-  (r : Res (P ⇒ Q)) : Res ((`♢ _ : τ ι, P) ⇒ Q)
-  ≔ mk_1 (res_tm r) (eq_trans nrm1_eq (res_eq r));
+symbol NRM1_1 [n] [P Q : Prop]
+  (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));
 
 // ALL8_1: congruence under ∀-block.
 symbol ALL8_1 [n] [P : Tuple n → Prop]
@@ -452,16 +473,18 @@ symbol XST8_1 [n] [P : Tuple n → Prop]
   ≔ mk_1 (res_tm r) (eq_trans xst8_eq (res_eq r));
 
 // ALL7_1: branching quantifier — per-tuple Res chain ρ + continuation r.
+//   Continuation premise uses `♢` (post-normalisation form per spec).
 opaque symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
   (ρ : Π v : Tuple n, Res (P v))
-  (r : Res ((`!! v, res_tm (ρ v)) ⇒ Q))
+  (r : Res ((`♢ v, res_tm (ρ v)) ⇒ Q))
   : Res ((`!! v, P v) ⇒ Q) ≔
 begin
   assume n P Q ρ r;
   refine mk_1 (res_tm r) _;
-  have h1 : π ((`!! v, P v) = (`!! v, res_tm (ρ v)))
-    { refine !!_cong (λ v, res_eq (ρ v)) };
-  have h2 : π (((`!! v, P v) ⇒ Q) = ((`!! v, res_tm (ρ v)) ⇒ Q))
+  have h1 : π ((`!! v, P v) = (`♢ v, res_tm (ρ v)))
+    { refine eq_trans (!!_cong (λ v, res_eq (ρ v)))
+        (eq_sym (♢_eq_!! (λ v, res_tm (ρ v)))) };
+  have h2 : π (((`!! v, P v) ⇒ Q) = ((`♢ v, res_tm (ρ v)) ⇒ Q))
     { rewrite h1; reflexivity };
   refine eq_trans h2 (res_eq r)
 end;

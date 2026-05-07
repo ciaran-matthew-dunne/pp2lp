@@ -70,6 +70,17 @@ notation — prefix 25;
 symbol - (x y : τ ι) ≔ x + (— y);
 notation - infix left 20;
 
+// Decimal-literal lift: parse `7` (a ℕ via Stdlib.Nat's builtin) as a
+// τ ι value via `int_lit`. With the coercion rule below, the emitter
+// can write bare integer literals (`7`, `12`, …) anywhere a τ ι is
+// expected; Lambdapi inserts the coercion automatically.
+sequential symbol int_lit : ℕ → τ ι;
+rule int_lit 0     ↪ 𝟎
+with int_lit 1     ↪ 𝟏
+with int_lit (+1 $n) ↪ 𝟏 + int_lit $n;
+
+coerce_rule coerce ℕ (τ ι) $n ↪ int_lit $n;
+
 // Ordering
 constant symbol ≤ : τ ι → τ ι → Prop;
 notation ≤ infix 5;
@@ -255,12 +266,4 @@ constant symbol FIN : τ ι;
 constant symbol card : τ ι;
 
 // ---- PP normalisation quantifiers ----
-// ♢ and ♡ are both semantically ∀, distinguished in PP
-// for proof search heuristics only.
-symbol ♢ [a] : (τ a → Prop) → Prop;
-notation ♢ quantifier;
-rule ♢ $f ↪ ∀ $f;
-
-symbol ♡ [a] : (τ a → Prop) → Prop;
-notation ♡ quantifier;
-rule ♡ $f ↪ ∀ $f;
+// The n-ary ♢ / ♡ live in Quant.lp (tuple-based, alongside `!!` / `??`).

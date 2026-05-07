@@ -1,6 +1,0 @@
-[VR3] <VRAI => 0<=0 and 0<=0>
-[AND4] <0<=0 and 0<=0>
-[STOP] <0<=0>
-[AR11] <not(0<=0) => FAUX>
-[STOP] <0<=0>
-[AR11] <not(0<=0) => FAUX>

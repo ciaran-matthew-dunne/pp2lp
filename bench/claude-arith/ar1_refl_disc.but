@@ -1,1 +1,0 @@
-Flag(TypeOn("ar1_refl_disc")) & Flag(FileOn("ar1_refl_disc.res")) & Set(Valid.1 | Rule(Implication | a<=a | ? | ? | b=b | nn))

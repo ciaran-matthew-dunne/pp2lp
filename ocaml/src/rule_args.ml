@@ -88,10 +88,11 @@ let introduce buf pad ctx rule goal flat =
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
       Buffer.add_string buf "assume ";
-      pp_ident buf v_name
-    | _ -> ()
-  end;
-  ctx
+      pp_ident buf v_name;
+      push_tuple_binder ctx v_name xs
+    | _ -> ctx
+  end
+  else ctx
 
 (* ---- Dynamic argument emitters ---- *)
 
@@ -138,25 +139,33 @@ let emit_axm9_args buf ctx =
     | Bind (_, _, body) -> has_true_and body
     | _ -> false
   in
-  let rec count_bind_depth = function
-    | Bind (_, xs, body) -> List.length xs + count_bind_depth body
+  let rec total_arity = function
+    | Bind (_, xs, body) -> List.length xs + total_arity body
     | _ -> 0
   in
   let rec search = function
     | [] -> None
-    | (name, (Bind (_, _, body) as p)) :: rest ->
-      if has_true_and body then Some (name, count_bind_depth p)
+    | (name, (Bind _ as p)) :: rest ->
+      let rec scan = function
+        | Bind (_, _, body) -> scan body
+        | p -> p
+      in
+      if has_true_and (scan p) then Some (name, total_arity p)
       else search rest
     | _ :: rest -> search rest
   in
+  (* Tuple-uniform AXM9 takes (v : Tuple n) (h : ...). Look up an
+     in-scope Tuple-n binder of the matching arity and pass it as the
+     witness. Falls back to `_` if none found. *)
+  let emit_witness arity =
+    match find_tuple_binder ctx arity with
+    | Some (vname, _) -> Buffer.add_char buf ' '; pp_ident buf vname
+    | None            -> Buffer.add_string buf " _"
+  in
   match search ctx.entries with
-  | Some (name, nvars) when nvars >= 2 ->
-    Buffer.add_string buf (Printf.sprintf "_%d" nvars);
-    for _ = 1 to nvars do Buffer.add_string buf " _" done;
+  | Some (name, arity) ->
+    emit_witness arity;
     Buffer.add_char buf ' ';
-    Buffer.add_string buf name
-  | Some (name, _) ->
-    Buffer.add_string buf " _ ";
     Buffer.add_string buf name
   | None ->
     Buffer.add_string buf " _ _"
@@ -218,7 +227,7 @@ let rec right_assoc_conj = function
     right_assoc_conj (Binary (And, a, Binary (And, b, c)))
   | p -> p
 
-let emit_quant_r_args buf rule node =
+let emit_quant_r_args buf ctx rule node =
   match node with
   | Apply { children; _ } ->
     let extract_r child_goal =
@@ -239,6 +248,11 @@ let emit_quant_r_args buf rule node =
     in
     begin match r_opt with
     | Some (lambda_vars, inner_vars, r_body) ->
+      (* lambda_vars and inner_vars bind names that may shadow outer
+         tuple binders. Only outer-tuple names truly free in r_body need
+         the projection rewrite. *)
+      let r_body' =
+        tuple_subst_prd_excluding ctx (lambda_vars @ inner_vars) r_body in
       Buffer.add_string buf " (\xce\xbb"; (* (λ *)
       List.iter (fun x ->
         Buffer.add_char buf ' ';
@@ -250,10 +264,10 @@ let emit_quant_r_args buf rule node =
           pp_ident buf x;
           Buffer.add_string buf " : \xcf\x84 \xce\xb9, "
         ) inner_vars;
-        pp_prd buf r_body;
+        pp_prd buf r_body';
         Buffer.add_char buf ')'
       end else
-        pp_prd buf r_body;
+        pp_prd buf r_body';
       Buffer.add_char buf ')'
     | None -> ()
     end
@@ -293,14 +307,14 @@ let emit_opr_step buf pad ctx ~base ~skip_rewrite goal =
   end;
   ctx'
 
-let emit_ar3_args buf node =
+let emit_ar3_args buf ctx node =
   (* AR3 (a : τ ι) : π ((𝟏 - a ≤ 𝟎) ⇒ R) → π (¬ (a ≤ 𝟎) ⇒ R).
      PP replay format [AR3(a | 1-a)] supplies `a` (first) and solver
      result 1-a (second, not needed by LP: baked into the signature). *)
   match node with
   | Apply { arg = Some (PipeArg (a_expr, _result_expr)); _ } ->
     Buffer.add_string buf " (";
-    pp_exp buf a_expr;
+    pp_exp buf (tuple_subst_exp ctx a_expr);
     Buffer.add_string buf ")"
   | _ ->
     raise (Emit_admit "AR3 missing pipe arg")
@@ -312,7 +326,7 @@ let emit_ar4_args buf ctx _goal =
   match found with
   | Some (name, Leq (f_expr, _)) ->
     Buffer.add_string buf " (";
-    pp_exp buf f_expr;
+    pp_exp buf (tuple_subst_exp ctx f_expr);
     Buffer.add_string buf ") ";
     Buffer.add_string buf name;
     (* Third arg is π ((E + F) > 𝟎) — a solver side-condition that can
@@ -324,7 +338,7 @@ let emit_ar4_args buf ctx _goal =
 let emit_ar56_args buf =
   Buffer.add_string buf " trust"
 
-let emit_ar78_args buf base (node : proof_node) =
+let emit_ar78_args buf ctx base (node : proof_node) =
   match base with
   | "AR8" ->
     let a_exp = match node with
@@ -335,7 +349,7 @@ let emit_ar78_args buf base (node : proof_node) =
     begin match a_exp with
     | Some e ->
       Buffer.add_string buf " (";
-      pp_exp buf e;
+      pp_exp buf (tuple_subst_exp ctx e);
       Buffer.add_string buf ") trust trust"
     | None ->
       raise (Emit_admit "AR8 could not extract a from child equality")
@@ -389,10 +403,14 @@ let emit_nrm19_args buf ctx goal =
         end
     in
     begin match search ctx.entries with
-    | Some (hyp_name, witness_exps) ->
-      List.iter (fun e ->
-        Buffer.add_char buf ' ';
-        pp_exp buf e) witness_exps;
+    | Some (hyp_name, _witness_exps) ->
+      (* Tuple-uniform NRM19 takes a single Tuple n witness. The
+         binder's arity equals `List.length bvars`; pull a matching
+         in-scope Tuple-n binder if there is one, else `_`. *)
+      let arity = List.length bvars in
+      (match find_tuple_binder ctx arity with
+       | Some (vname, _) -> Buffer.add_char buf ' '; pp_ident buf vname
+       | None            -> Buffer.add_string buf " _");
       Buffer.add_char buf ' ';
       Buffer.add_string buf hyp_name
     | None ->
@@ -417,7 +435,7 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       begin match arg with
       | Some (Pred p) ->
         Buffer.add_string buf " (";
-        pp_prd buf p;
+        pp_prd buf (tuple_subst_prd ctx p);
         Buffer.add_string buf ") trust"
       | _ ->
         raise (Emit_admit "AR9 missing solver arg")
@@ -431,11 +449,11 @@ let emit_rule_args buf ctx eff_rule (node : proof_node) =
       end
     | Some "dynamic:axm9" -> emit_axm9_args buf ctx
     | Some "dynamic:all7" | Some "dynamic:xst8" ->
-      emit_quant_r_args buf eff_rule node
-    | Some "dynamic:ar3" -> emit_ar3_args buf node
+      emit_quant_r_args buf ctx eff_rule node
+    | Some "dynamic:ar3" -> emit_ar3_args buf ctx node
     | Some "dynamic:ar4" -> emit_ar4_args buf ctx goal
     | Some "dynamic:ar56" -> emit_ar56_args buf
-    | Some "dynamic:ar78" -> emit_ar78_args buf base node
+    | Some "dynamic:ar78" -> emit_ar78_args buf ctx base node
     | Some "dynamic:nrm19" -> emit_nrm19_args buf ctx goal
     | _ when primed ->
       begin match ea with

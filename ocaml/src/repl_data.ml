@@ -23,10 +23,8 @@ let replay_path suite name =
 
 let parse suite name = Parse_pp.parse_pp_replay (replay_path suite name)
 
-let og           name = parse "og"           name
-let claude       name = parse "claude"       name
-let claude_arith name = parse "claude-arith" name
-let prv          name = parse "prv"          name
+let og  name = parse "og"  name
+let prv name = parse "prv" name
 
 (* List the replay stem names ("01", "02", …) under bench/<suite>/.
    Empty list if the directory is missing. *)
@@ -48,14 +46,12 @@ let all_in suite =
   |> List.filter_map (fun n ->
        try Some (n, parse suite n) with _ -> None)
 
-let all_og ()           = all_in "og"
-let all_claude ()       = all_in "claude"
-let all_claude_arith () = all_in "claude-arith"
-let all_prv ()          = all_in "prv"
+let all_og ()  = all_in "og"
+let all_prv () = all_in "prv"
 
 (* Eager samples — pre-evaluated at module load so the REPL never has
    to type `()` or `[]` (utop-on-this-opam doesn't auto-open Stdlib).
-   Loading cost is ~30 og replays + 30 claude-arith etc.; trivial. *)
+   Loading cost is ~30 og replays; trivial. *)
 let og_replays  = all_in "og"
 let og_names    = List.map fst og_replays
 let og_27       = try parse "og" "27" with _ -> []

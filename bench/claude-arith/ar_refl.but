@@ -1,1 +1,0 @@
-Flag(TypeOn("ar_refl")) & Flag(FileOn("ar_refl.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | a<=a | nn))

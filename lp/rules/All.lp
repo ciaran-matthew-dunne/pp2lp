@@ -95,18 +95,19 @@ begin assume n P h; refine h end;
 
 // ALL7: result-based form.
 //   premise 1: per-tuple Res chain ρ producing res_tm (ρ v) for each v
-//   premise 2: ((`!! v, res_tm (ρ v)) ⇒ Q) (continuation)
+//   premise 2: ((`♢ v, res_tm (ρ v)) ⇒ Q) (continuation)
 //   conclusion: (`!! v, P v) ⇒ Q
 //
-// The Res chain provides the equality proof internally via `res_eq`;
-// the emitter constructs ρ as a chain of Res-yielding `_1` rules.
+// Per spec: H ⊢ (♢x · R) ⇒ Q | H ⊢ (∀x · P) ⇒ Q. The continuation
+// premise is the "after-normalisation" form, marked ♢; the conclusion
+// matches PP's `!`-binder, encoded as `!!`.
 
 opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
   (ρ : Π v : Tuple n, Res (P v))
-  : π ((`!! v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔
+  : π ((`♢ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔
 begin
   assume n P Q ρ h_after h_P;
-  refine h_after (pi_to_!! (λ v, res_tm (ρ v))
+  refine h_after (pi_to_♢ (λ v, res_tm (ρ v))
     (λ v, =⇒ (res_eq (ρ v)) (!!_to_pi P h_P v)))
 end;
 
@@ -120,9 +121,12 @@ opaque symbol ALL8 [n] [P : Tuple n → Prop]
   ≔ λ f, pi_to_!! _ f;
 
 // ALL9: H, (∀-block, T) ⊢ Q → H ⊢ (♡-block, T) ⇒ Q
-// ♡ aliases ∀, so ♡-block = !!-block at the term level.
+// Transport antecedent ♡ → !! via `♡_eq_!!`, then apply h.
 
 opaque symbol ALL9 [n] [T : Tuple n → Prop] [Q : Prop]
   : (π (`!! v, T v) → π Q)
-  → π ((`!! v, T v) ⇒ Q) ≔
-begin assume n T Q h; refine h end;
+  → π ((`♡ v, T v) ⇒ Q) ≔
+begin
+  assume n T Q h hheart;
+  refine h (=⇒ (♡_eq_!! T) hheart)
+end;

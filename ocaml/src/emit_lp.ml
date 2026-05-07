@@ -50,9 +50,11 @@ let emit_ar3_bridge buf source result =
 
 (* Emit `refine AR3 (SOURCE)` or `refine AR3' (SOURCE) (RESULT) (BRIDGE)`
    depending on whether `1 - SOURCE` matches RESULT structurally. *)
-let emit_ar3_dispatch buf node =
+let emit_ar3_dispatch buf ctx node =
   match node with
   | Apply { arg = Some (PipeArg (source, result)); _ } ->
+    let source = tuple_subst_exp ctx source in
+    let result = tuple_subst_exp ctx result in
     let one_minus_source = AOp (Sub, Nat 1, source) in
     if one_minus_source = result then begin
       trace_emit "ar3-direct" "";
@@ -95,7 +97,7 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
     Buffer.add_string buf "\n";
     Buffer.add_string buf pad;
     begin match rule, children with
-    (* STOP_1: leaf *)
+    (* STOP_1: leaf. P is implicit; lambdapi infers from context. *)
     | "STOP_1", [] ->
       Buffer.add_string buf "refine STOP_1"
 
@@ -137,14 +139,14 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
     | _, [child] when base = "ALL8" ->
       Buffer.add_string buf "refine ALL8_1 _;\n";
       Buffer.add_string buf pad;
-      let v_name = match goal with
-        | Bind (_, x :: _, _) -> x ^ "_t"
-        | _ -> "v" in
+      let xs = match goal with Bind (_, xs, _) -> xs | _ -> [] in
+      let v_name = match xs with x :: _ -> x ^ "_t" | _ -> "v" in
       Buffer.add_string buf "assume ";
       pp_ident buf v_name;
       Buffer.add_string buf ";\n";
       Buffer.add_string buf pad;
-      emit_primed_chain buf ctx pad child
+      let ctx' = push_tuple_binder ctx v_name xs in
+      emit_primed_chain buf ctx' pad child
 
     (* ALL9_1: congruence under hypothesis implication *)
     | _, [child] when base = "ALL9" ->
@@ -170,19 +172,14 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         | _ -> (None, None)
       in
       begin match e_opt, f_opt with
-      | Some e, Some f ->
-        let ar9_id = Printf.sprintf "h_ar9_%d" ctx.counter in
-        Buffer.add_string buf "have ";
-        Buffer.add_string buf ar9_id;
-        Buffer.add_string buf " : \xcf\x80 ("; (* π ( *)
-        pp_exp buf e;
-        Buffer.add_string buf " = ";
+      | Some _e, Some f ->
+        (* AR9_1 takes the solver-normalised RHS F explicitly plus a
+           bridge `π (E = F)` (passed as `trust` — solver-confirmed)
+           and lifts the Res chain through it. *)
+        let f = tuple_subst_exp ctx f in
+        Buffer.add_string buf "refine AR9_1 (";
         pp_exp buf f;
-        Buffer.add_string buf ") { refine trust };\n";
-        Buffer.add_string buf pad;
-        Buffer.add_string buf "rewrite ";
-        Buffer.add_string buf ar9_id;
-        Buffer.add_string buf ";\n";
+        Buffer.add_string buf ") trust _;\n";
         Buffer.add_string buf pad;
         emit_primed_chain buf ctx pad child
       | _ ->
@@ -203,15 +200,21 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
       in
       begin match xy with
       | Some (x_var, body) ->
+        (* Lambda over x_var keeps it as a Var; outer-tuple references
+           in the body get rewritten to projections. The witness handed
+           to OPRn_1 is whatever x_var resolves to in the outer scope
+           (typically `prj k v_t`). *)
+        let body' = tuple_subst_prd_excluding ctx [x_var] body in
+        let x_term = tuple_subst_exp ctx (Var x_var) in
         Buffer.add_string buf "refine ";
         Buffer.add_string buf rule;
         Buffer.add_string buf " (\xce\xbb "; (* λ *)
         pp_ident buf x_var;
         Buffer.add_string buf " : \xcf\x84 \xce\xb9, "; (* τ ι *)
-        pp_prd buf body;
-        Buffer.add_string buf ") ";
-        pp_ident buf x_var;
-        Buffer.add_string buf " _;\n";
+        pp_prd buf body';
+        Buffer.add_string buf ") (";
+        pp_exp buf x_term;
+        Buffer.add_string buf ") _;\n";
         Buffer.add_string buf pad;
         emit_primed_chain buf ctx pad child
       | None ->
@@ -234,7 +237,10 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         let r_is_constant = List.for_all (fun v ->
           not (SS.mem v fv.prop_vars || SS.mem v fv.exp_vars)) bvars in
         let v_name = match bvars with x :: _ -> x ^ "_t" | [] -> "v" in
-        let result_prd' = Subst.subst_prd_to_prjs bvars v_name result_prd in
+        (* Apply outer-tuple subst, then inner-binder subst on top. *)
+        let result_prd_outer = tuple_subst_prd_excluding ctx bvars result_prd in
+        let result_prd' =
+          Subst.subst_prd_to_prjs bvars v_name result_prd_outer in
         Buffer.add_string buf "refine ALL7_1 (\xce\xbb "; (* λ *)
         pp_ident buf v_name;
         Buffer.add_string buf " : Tuple ";
@@ -247,7 +253,8 @@ let rec emit_primed_chain buf ctx pad (node : proof_node) =
         pp_ident buf v_name;
         Buffer.add_string buf ";\n";
         Buffer.add_string buf inner_pad;
-        emit_primed_chain buf ctx inner_pad primed_child;
+        let inner_ctx = push_tuple_binder ctx v_name bvars in
+        emit_primed_chain buf inner_ctx inner_pad primed_child;
         Buffer.add_string buf " }\n";
         Buffer.add_string buf pad;
         Buffer.add_string buf "{ ";
@@ -393,7 +400,8 @@ and emit_branching_quant buf ctx indent pad
   pp_ident buf v_name;
   Buffer.add_string buf ";\n";
   Buffer.add_string buf inner_pad;
-  emit_primed_chain buf ctx inner_pad child1;
+  let inner_ctx = push_tuple_binder ctx v_name bvars in
+  emit_primed_chain buf inner_ctx inner_pad child1;
   Buffer.add_string buf " }\n";
   Buffer.add_string buf pad;
   Buffer.add_string buf "{ ";
@@ -465,13 +473,8 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
 
     | [child] when rule = "NRM1" ->
       emit_comment ();
-      let extra = nrm1_extra_count goal in
       Buffer.add_string buf pad;
-      if extra > 0 then
-        Buffer.add_string buf (Printf.sprintf "refine NRM1_%d _" (extra + 1))
-      else
-        Buffer.add_string buf "refine NRM1 _";
-      Buffer.add_string buf ";\n";
+      Buffer.add_string buf "refine NRM1 _;\n";
       emit_node buf ctx indent child
 
     | [_child] when rule = "INS" ->
@@ -527,7 +530,7 @@ and emit_node buf ctx indent ?(inline=false) ?(flat=0)
     | [child] when rule = "AR3" ->
       emit_comment ();
       Buffer.add_string buf pad;
-      emit_ar3_dispatch buf node;
+      emit_ar3_dispatch buf ctx node;
       Buffer.add_string buf " _";
       let ctx' = introduce buf pad ctx rule goal flat in
       let child_flat = compute_child_flat eff_rule flat in

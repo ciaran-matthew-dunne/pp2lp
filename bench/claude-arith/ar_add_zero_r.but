@@ -1,1 +1,0 @@
-Flag(TypeOn("ar_add_zero_r")) & Flag(FileOn("ar_add_zero_r.res")) & Set(Valid.1 | Rule(Implication | VRAI | ? | ? | a+0=a | nn))

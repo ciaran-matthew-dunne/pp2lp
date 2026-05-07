@@ -70,24 +70,15 @@ binder:
   | EXISTS  { Exists }
 binding:
   | b = binder; x = SYMBOL; PERIOD; p = prd
-  { (* Collapse adjacent universal-style nests so `!x.!y.P`,
-       `forall(x).!y.P`, etc. become a single compound binder.
-       All universal forms (Bang/Forall/Forall2 — which are PP's
-       aliases for ∀) render the same way in our tuple encoding,
-       so PP's ALL4 / NRM8 (binder-shape conversions) degenerate
-       to identity after this normalisation. *)
-    let universal = function Bang | Forall | Forall2 -> true | Exists -> false in
+  { (* Collapse adjacent same-kind binders only. Heterogeneous
+       universals (e.g. `forall(x).!y.P`) stay nested so PP's NRM8/9
+       binder-shape conversions emit at the LP level. *)
     match p with
     | Bind (b', xs, body) when b = b' -> Bind (b, x :: xs, body)
-    | Bind (b', xs, body) when universal b && universal b' ->
-      Bind (b, x :: xs, body)
     | _ -> Bind (b, [x], p) }
   | b = binder; LPAREN; xs = var_seq; RPAREN; PERIOD; p = prd
-  { let universal = function Bang | Forall | Forall2 -> true | Exists -> false in
-    match p with
+  { match p with
     | Bind (b', ys, body) when b = b' -> Bind (b, xs @ ys, body)
-    | Bind (b', ys, body) when universal b && universal b' ->
-      Bind (b, xs @ ys, body)
     | _ -> Bind (b, xs, p) }
 
 prd:

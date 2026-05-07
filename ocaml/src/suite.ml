@@ -3,7 +3,7 @@
 type t = {
   name : string;
   (* Suite synthesises .but files from goals.txt before generating
-     replays. Currently: claude, claude-arith. *)
+     replays. *)
   synth : bool;
   (* Default `krt -a` allocator string passed to gen_traces.py. Empty
      string means "use krt's defaults". *)
@@ -11,10 +11,8 @@ type t = {
 }
 
 let all : t list = [
-  { name = "claude";       synth = true;  alloc = "" };
-  { name = "claude-arith"; synth = true;  alloc = "" };
-  { name = "prv";          synth = false; alloc = "g50000" };
-  { name = "og";           synth = false; alloc = "" };
+  { name = "prv"; synth = false; alloc = "g50000" };
+  { name = "og";  synth = false; alloc = "" };
 ]
 
 let find name =
