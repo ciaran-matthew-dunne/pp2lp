@@ -1,0 +1,1 @@
+Flag(FileOn("subset_union_right.res")) & Set(Valid.1 | Rule(Implication | (t <: s \/ t) & _delta_e(t) & _delta_e(s) | ? | ? | t <: s \/ t | nn))

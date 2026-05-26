@@ -404,11 +404,12 @@ symbol EVR3_1 [E : τ ι] [P : Prop]
   (r : Res P) : Res ((E = E) ⇒ P)
   ≔ mk_1 (res_tm r) (eq_trans evr3_eq (res_eq r));
 
-symbol OPR1_1 [E : τ ι] (P : τ ι → Prop) (x : τ ι)
+
+symbol OPR1_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
   (r : Res (x = E ⇒ P E)) : Res (x = E ⇒ P x)
   ≔ mk_1 (res_tm r) (eq_trans (opr1_eq P x) (res_eq r));
 
-symbol OPR2_1 [E : τ ι] (P : τ ι → Prop) (x : τ ι)
+symbol OPR2_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
   (r : Res (E = x ⇒ P E)) : Res (E = x ⇒ P x)
   ≔ mk_1 (res_tm r) (eq_trans (opr2_eq P x) (res_eq r));
 

@@ -1,0 +1,1 @@
+Flag(FileOn("eq_ran.res")) & Set(Valid.1 | Rule(Implication | (ran(f) = ran(f)) & _delta_e(f) | ? | ? | ran(f) = ran(f) | nn))

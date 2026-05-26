@@ -1,0 +1,1 @@
+Flag(FileOn("mixed_func_set.res")) & Set(Valid.1 | Rule(Implication | (x: dom(f) & f: dom(f) +-> ran(f)) & _delta_e(x) & _delta_e(f) | ? | ? | x: dom(f) & f: dom(f) +-> ran(f) | nn))

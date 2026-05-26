@@ -3,107 +3,35 @@
 
 Pipeline: .but -> PP -> .trace
 
-This script deliberately does not run REPLAY and does not cache results.
-Replays are optional debugging artifacts; use `bench/gen_replays.py` when
-you need them.
+Does not run REPLAY and does not cache.  Replays are optional debugging
+artifacts; use `bench/gen_replays.py` when you want them.
 """
 
 import argparse
 import os
 import re
-import subprocess
 import sys
 from pathlib import Path
 
-
-SATURATION_PATTERNS = [
-    ("saturation:objects",   r"OBJECTS OVERFLOW"),
-    ("saturation:goals",     r"GOAL(?:S)? STACK OVERFLOW"),
-    ("saturation:hyps",      r"TOO MANY HYPOTHESES"),
-    ("saturation:seq-ids",   r"SEQUENCE ID NUMBERS OVERFLOW"),
-    ("saturation:seq-mem",   r"SEQUENCE MEMORY OVERFLOW"),
-    ("saturation:symbols",   r"SYMBOLS OVERFLOW"),
-    ("saturation:theories",  r"MAXIMUM NUMBER OF THEORIES .* REACHED"),
-    ("saturation:compiler",  r"Compiler Memory Full"),
-    ("timer:exceeded",       r"TIMER (?:EXCEEDED|EXPIRED|REAL|VIRTUAL)"),
-]
-
-
-class RunResult:
-    __slots__ = ("ok", "stdout", "stderr", "reason")
-
-    def __init__(self, ok, stdout="", stderr="", reason=""):
-        self.ok = ok
-        self.stdout = stdout
-        self.stderr = stderr
-        self.reason = reason
-
-
-def find_tool(name, hints):
-    result = subprocess.run(["which", name], capture_output=True, text=True)
-    if result.returncode == 0:
-        return result.stdout.strip()
-    for hint in hints:
-        if os.path.exists(hint):
-            return hint
-    return None
-
-
-def find_krt():
-    return find_tool("krt", ["/opt/atelierb-free-24.04.2/bin/krt"])
+import _krt
 
 
 def find_pp_kin():
-    for path in [
+    return _krt.find_kin("PP.kin", [
         "/opt/atelierb-free-24.04.2/bin/PP.kin",
         os.path.expanduser("~/atelierb/bin/PP.kin"),
-    ]:
-        if os.path.exists(path):
-            return path
-    return None
+    ])
 
 
-def classify_krt_output(stdout, stderr):
-    text = (stdout or "") + "\n" + (stderr or "")
-    for reason, pattern in SATURATION_PATTERNS:
-        if re.search(pattern, text):
-            return reason
-    return ""
-
-
-def run_krt(krt, kin, goal_file, cwd, timeout, timer_setting=None, alloc=None):
-    argv = [krt]
-    if alloc:
-        argv += ["-a", alloc]
-    if timer_setting:
-        argv += ["-i", timer_setting]
-    argv += ["-b", kin, goal_file]
-    try:
-        result = subprocess.run(
-            argv, cwd=cwd, capture_output=True, text=True, timeout=timeout
-        )
-    except subprocess.TimeoutExpired:
-        return RunResult(False, reason="timeout")
-    except Exception as exc:
-        return RunResult(False, reason=f"exc:{type(exc).__name__}")
-
-    reason = classify_krt_output(result.stdout, result.stderr)
-    if reason:
-        return RunResult(False, result.stdout, result.stderr, reason)
-    if result.returncode != 0:
-        return RunResult(False, result.stdout, result.stderr,
-                         f"rc={result.returncode}")
-    return RunResult(True, result.stdout, result.stderr)
-
-
-def strip_existing_flags(content):
-    content = re.sub(r'Flag\(TypeOn\([^)]+\)\)\s*&\s*', '', content)
-    content = re.sub(r'Flag\(TraceOn\([^)]+\)\)\s*&\s*', '', content)
-    content = re.sub(r'Flag\(FileOn\([^)]+\)\)\s*&\s*', '', content)
+def strip_existing_flags(content: str) -> str:
+    for pat in (r'Flag\(TypeOn\([^)]+\)\)\s*&\s*',
+                r'Flag\(TraceOn\([^)]+\)\)\s*&\s*',
+                r'Flag\(FileOn\([^)]+\)\)\s*&\s*'):
+        content = re.sub(pat, '', content)
     return content
 
 
-def trace_is_empty(path):
+def trace_is_empty(path: Path) -> bool:
     if not path.exists():
         return True
     data = path.read_bytes()
@@ -112,8 +40,7 @@ def trace_is_empty(path):
     return len(data.strip()) == 0
 
 
-def process_but(but_file, out_dir, krt, pp_kin, timeout, timer_setting,
-                alloc, quiet):
+def process_but(but_file, out_dir, krt, pp_kin, timeout, timer, alloc, quiet):
     stem = but_file.stem
     src_dir = but_file.parent
     out_trace = out_dir / f"{stem}.trace"
@@ -132,10 +59,8 @@ def process_but(but_file, out_dir, krt, pp_kin, timeout, timer_setting,
     src_res = src_dir / res_name
 
     goal_path.write_text(goal_content)
-    result = run_krt(
-        krt, pp_kin, goal_path.name, str(src_dir), timeout,
-        timer_setting=timer_setting, alloc=alloc,
-    )
+    result = _krt.run_krt(krt, pp_kin, goal_path.name, str(src_dir), timeout,
+                          timer=timer, alloc=alloc)
 
     goal_path.unlink(missing_ok=True)
     src_res.unlink(missing_ok=True)
@@ -156,74 +81,41 @@ def process_but(but_file, out_dir, krt, pp_kin, timeout, timer_setting,
     if not same_output_dir:
         out_trace.write_bytes(src_trace.read_bytes())
         src_trace.unlink()
-
     return True, ""
-
-
-def input_buts(path):
-    if path.is_file() and path.suffix == ".but":
-        return [path]
-    files = sorted(path.glob("*.but"))
-    if not files:
-        raise FileNotFoundError(f"No .but files in {path}")
-    return files
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="Generate PP .trace files from .but files"
     )
-    parser.add_argument(
-        "input", help="Directory containing .but files, or one .but file"
-    )
-    parser.add_argument(
-        "-o", "--output-dir",
-        help="Trace output directory (default: next to each .but file)"
-    )
-    parser.add_argument("-q", "--quiet", action="store_true")
-    parser.add_argument(
-        "-t", "--timeout", type=float, default=60.0,
-        help="Subprocess wall-clock timeout"
-    )
-    parser.add_argument(
-        "--timer", default="R45",
-        help="krt -i timer setting, e.g. R60 or V60. Empty disables it."
-    )
-    parser.add_argument(
-        "--alloc", default="",
-        help="krt -a allocation setting. Empty uses krt defaults."
-    )
+    _krt.add_common_args(parser, default_timer="R45", default_timeout=60.0)
     parser.add_argument("--pp-kin", help="Path to PP.kin")
-    parser.add_argument("--krt", help="Path to krt")
     args = parser.parse_args()
 
-    krt = args.krt or find_krt()
+    krt = args.krt or _krt.find_krt()
     pp_kin = args.pp_kin or find_pp_kin()
     if not krt:
-        print("Error: krt not found", file=sys.stderr)
-        sys.exit(1)
+        print("Error: krt not found", file=sys.stderr); sys.exit(1)
     if not pp_kin:
-        print("Error: PP.kin not found", file=sys.stderr)
-        sys.exit(1)
+        print("Error: PP.kin not found", file=sys.stderr); sys.exit(1)
 
-    input_path = Path(args.input).resolve()
+    root = Path(__file__).resolve().parent.parent
+    input_path = _krt.resolve_input_dir(args, root)
     try:
-        but_files = input_buts(input_path)
+        but_files = _krt.gather_inputs(input_path, ".but")
     except FileNotFoundError as exc:
-        print(exc, file=sys.stderr)
-        sys.exit(1)
+        print(exc, file=sys.stderr); sys.exit(1)
 
-    fixed_out_dir = Path(args.output_dir).resolve() if args.output_dir else None
+    fixed_out = Path(args.output_dir).resolve() if args.output_dir else None
     if not args.quiet:
         print(f"Processing {len(but_files)} .but files")
 
-    ok = 0
-    failed = 0
+    ok = failed = 0
     breakdown = {}
-    for but_file in but_files:
-        out_dir = fixed_out_dir or but_file.parent
+    for but in but_files:
+        out_dir = fixed_out or but.parent
         success, reason = process_but(
-            but_file, out_dir, krt, pp_kin, args.timeout,
+            but, out_dir, krt, pp_kin, args.timeout,
             args.timer or None, args.alloc or None, args.quiet,
         )
         if success:
@@ -232,13 +124,8 @@ def main():
             failed += 1
             breakdown[reason] = breakdown.get(reason, 0) + 1
 
-    print(f"{ok} traces generated" + (f", {failed} failed" if failed else ""))
-    if failed and not args.quiet:
-        print("Failure breakdown:")
-        for reason, count in sorted(breakdown.items()):
-            print(f"  {reason:<20} {count}")
-    if failed:
-        sys.exit(1)
+    _krt.print_breakdown("traces generated", ok, failed, breakdown)
+    sys.exit(1 if failed else 0)
 
 
 if __name__ == "__main__":

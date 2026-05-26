@@ -30,7 +30,7 @@ inductive Tuple : ℕ → TYPE ≔
   | unit : Tuple 0
   | ⨾ [n] : Tuple n → τ ι → Tuple (+1 n);
 notation ⨾ infix left 5;
-type ind_Tuple;
+//type ind_Tuple;
 // k-th projection. prj 0 picks the rightmost (most recently
 // appended) element.
 symbol prj [n] (k : ℕ) (_ : Tuple n) : τ ι;
@@ -196,7 +196,7 @@ end;
 // because the result-based ALL7/XST8 in All.lp/Xst.lp need it.
 injective symbol Res [a : Set] : τ a → TYPE;
 symbol mk_1 [a t] (t' : τ a) : π (t = t') → Res t;
-sequential symbol res_tm [a t] : Res [a] t → τ a;
-sequential symbol res_eq [a t] (r : Res [a] t) : π (t = res_tm r);
+symbol res_tm [a t] : Res [a] t → τ a;
+symbol res_eq [a t] (r : Res [a] t) : π (t = res_tm r);
 rule res_tm (mk_1 $t' _) ↪ $t';
 rule res_eq (mk_1 _ $prf) ↪ $prf;

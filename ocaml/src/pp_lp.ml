@@ -288,22 +288,6 @@ let emit_and5_fwd buf var n i j =
     Buffer.add_string buf "))")];
   emit_conj_from_elts buf !elts
 
-let emit_and5_bwd buf var n j =
-  let n' = n in
-  let elts = ref [] in
-  for k = n - 1 downto 0 do
-    if k < j then
-      elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' k; Buffer.add_char buf ')') :: !elts
-    else if k > j then
-      elts := (fun buf -> Buffer.add_char buf '('; emit_extract buf var n' (k - 1); Buffer.add_char buf ')') :: !elts
-    else
-      elts := (fun buf ->
-        Buffer.add_string buf "(\xce\xbb _, "; (* λ _, *)
-        emit_extract buf var n' (n' - 1);
-        Buffer.add_char buf ')') :: !elts
-  done;
-  emit_conj_from_elts buf !elts
-
 (* ---- Block-formatted predicate printing ---- *)
 
 (* Column width threshold: if inline rendering fits, skip line breaks. *)

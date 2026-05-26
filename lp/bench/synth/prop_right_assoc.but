@@ -1,0 +1,1 @@
+Flag(FileOn("prop_right_assoc.res")) & Set(Valid.1 | Rule(Implication | (a & (b & c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a & (b & c) | nn))

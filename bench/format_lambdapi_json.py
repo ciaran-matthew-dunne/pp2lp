@@ -39,10 +39,38 @@ def loc_of(event):
     return f"{path}:{line}:{col}-{end_line}:{end_col}"
 
 
+def print_source_context(event, context=3):
+    """Print ±`context` lines of source around the event location."""
+    file_ = event.get("file")
+    range_ = event.get("range") or {}
+    start = range_.get("start") or {}
+    line = start.get("line")
+    if file_ is None or line is None:
+        return
+    src = Path(file_)
+    if not src.is_absolute():
+        src = Path.cwd() / src
+    try:
+        lines = src.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    idx = int(line) - 1  # lambdapi emits 1-indexed line numbers
+    if not (0 <= idx < len(lines)):
+        return
+    lo = max(0, idx - context)
+    hi = min(len(lines), idx + context + 1)
+    width = len(str(hi))
+    for i in range(lo, hi):
+        marker = ">" if i == idx else " "
+        print(f"  {marker} {i + 1:>{width}} | {lines[i]}")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ok", action="store_true",
                         help="print OK if the input contains no structured summary")
+    parser.add_argument("--context", type=int, default=3,
+                        help="lines of source context per error (default 3; 0 disables)")
     parser.add_argument("paths", nargs="*")
     args = parser.parse_args()
 
@@ -71,13 +99,16 @@ def main():
     has_error = False
     for event in diagnostics:
         severity = event.get("severity", "diagnostic")
-        if severity != "warning":
+        is_error = severity != "warning"
+        if is_error:
             has_error = True
         message = event.get("message", "").rstrip()
         lines = message.splitlines() if message else [""]
         print(f"{loc_of(event)}: {severity}: {lines[0]}")
         for extra in lines[1:]:
             print(f"  {extra}")
+        if is_error and args.context > 0:
+            print_source_context(event, context=args.context)
 
     if has_error:
         return

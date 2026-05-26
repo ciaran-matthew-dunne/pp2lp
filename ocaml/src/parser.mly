@@ -16,7 +16,6 @@
 %token PLUS MINUS
 %token INTER UNION
 %token FORALL0 FORALL1 FORALL2 EXISTS
-%token AMP
 
 %nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
 %nonassoc COMMA
@@ -31,8 +30,6 @@
 %nonassoc LSQ
 
 %start <line option> line_eof
-%start <lhs option> trace_lhs_eof
-%start <prd option> trace_goal_eof
 %%
 var_seq:
   | x = SYMBOL
@@ -156,13 +153,3 @@ line:
 line_eof:
   | EOF { None }
   | l = line { Some l }
-
-(* Trace-format entry points.  A trace line is either a rule application
-   `[RULE] &` or `[RULE(arg)] &` (consumed by trace_lhs_eof) or the final
-   goal `(formula)` (consumed by trace_goal_eof). *)
-trace_lhs_eof:
-  | EOF { None }
-  | l = lhs; AMP; EOF { Some l }
-trace_goal_eof:
-  | EOF { None }
-  | LPAREN; p = prd; RPAREN; EOF { Some p }

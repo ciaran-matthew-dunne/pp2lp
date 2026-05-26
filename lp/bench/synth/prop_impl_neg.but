@@ -1,0 +1,1 @@
+Flag(FileOn("prop_impl_neg.res")) & Set(Valid.1 | Rule(Implication | (a => not(b)) & _delta_p(a) & _delta_p(b) | ? | ? | a => not(b) | nn))

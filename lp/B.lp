@@ -8,7 +8,8 @@ require open
   Stdlib.Eq Stdlib.String
   Stdlib.FOL Stdlib.HOL
   Stdlib.Impred
-  Stdlib.List Stdlib.Nat;
+  Stdlib.List Stdlib.Nat
+  Stdlib.Tactic;
 
 // ---- Trusted arithmetic oracle ----
 // Used to fill computable arithmetic facts (solver-confirmed)
@@ -74,9 +75,9 @@ notation - infix left 20;
 // τ ι value via `int_lit`. With the coercion rule below, the emitter
 // can write bare integer literals (`7`, `12`, …) anywhere a τ ι is
 // expected; Lambdapi inserts the coercion automatically.
-sequential symbol int_lit : ℕ → τ ι;
-rule int_lit 0     ↪ 𝟎
-with int_lit 1     ↪ 𝟏
+symbol int_lit : ℕ → τ ι;
+rule int_lit 0       ↪ 𝟎
+with int_lit (+1 0)  ↪ 𝟏
 with int_lit (+1 $n) ↪ 𝟏 + int_lit $n;
 
 coerce_rule coerce ℕ (τ ι) $n ↪ int_lit $n;

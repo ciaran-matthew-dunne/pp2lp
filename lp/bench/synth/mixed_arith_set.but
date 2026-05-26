@@ -1,0 +1,1 @@
+Flag(FileOn("mixed_arith_set.res")) & Set(Valid.1 | Rule(Implication | (n: s & 0<=n) & _delta_e(n) & _delta_e(s) | ? | ? | n: s & 0<=n | nn))

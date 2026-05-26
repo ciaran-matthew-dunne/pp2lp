@@ -1,0 +1,1 @@
+Flag(FileOn("leq_refl.res")) & Set(Valid.1 | Rule(Implication | (n<=n) & _delta_e(n) | ? | ? | n<=n | nn))

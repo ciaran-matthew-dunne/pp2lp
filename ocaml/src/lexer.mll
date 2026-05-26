@@ -40,8 +40,6 @@ rule token = parse
   (* set operators *)
   | "/\\" { INTER }
   | "\\/" { UNION }
-  (* trace separator *)
-  | '&'   { AMP }
   (* binders *)
   | "#"        { EXISTS  }
   | '!'        { FORALL0 }

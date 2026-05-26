@@ -1,0 +1,1 @@
+Flag(FileOn("rel_app_defined.res")) & Set(Valid.1 | Rule(Implication | (x: dom(f) & f(x) = y) & _delta_e(x) & _delta_e(f) & _delta_e(y) | ? | ? | x: dom(f) & f(x) = y | nn))

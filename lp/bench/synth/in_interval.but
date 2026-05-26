@@ -1,0 +1,1 @@
+Flag(FileOn("in_interval.res")) & Set(Valid.1 | Rule(Implication | (n: n..n) & _delta_e(n) | ? | ? | n: n..n | nn))

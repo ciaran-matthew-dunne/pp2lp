@@ -1,0 +1,1 @@
+Flag(FileOn("in_integer.res")) & Set(Valid.1 | Rule(Implication | (n: INTEGER) & _delta_e(n) | ? | ? | n: INTEGER | nn))

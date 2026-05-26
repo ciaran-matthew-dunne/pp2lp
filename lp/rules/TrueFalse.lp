@@ -69,14 +69,7 @@ begin
 end;
 
 // ---- INS (§A.11) ----
-
-// INS: instantiation contradiction.
-// Derives ⊥ from contradictory hypotheses; the emitter resolves the
-// contradiction from the hypothesis context, so INS is a no-op in LP.
-// The proof term is constructed directly by the emitter (emit_ins).
-opaque symbol INS [P]
-  : π ⊥
-  → π P ≔
-begin
-  assume P h; refine ⊥ₑ h
-end;
+// No LP symbol — the emitter resolves the instantiation contradiction
+// directly from the hypothesis context, emitting:
+//   refine !!_to_pi _ h_univ witness (∧ᵢ h₁ … hₙ)
+// See translate.ml:find_ins_contradiction.

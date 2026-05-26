@@ -1,0 +1,96 @@
+# Synthetic PP goals.
+#
+# Format:
+#   name | kind | goal
+#
+# kind is one of:
+#   prop  identifiers in the goal are propositional variables
+#   expr  identifiers in the goal are expression variables
+#
+# The generated .but file proves each goal from itself plus the inferred
+# delta hypotheses.  Keep this file as the source of truth; regenerate with:
+#   python3 bench/synth/gen_buts.py
+
+prop_atom | prop | a
+prop_conj | prop | a & b
+prop_double_neg | prop | not(not(a))
+prop_neg | prop | not(a)
+prop_impl | prop | a => b
+prop_equiv | prop | a <=> b
+prop_nested | prop | (a & b) => (b & a)
+prop_conj3 | prop | a & b & c
+prop_conj4 | prop | a & b & c & d
+prop_left_assoc | prop | (a & b) & c
+prop_right_assoc | prop | a & (b & c)
+prop_nested_neg | prop | not(a & b)
+prop_impl_chain | prop | a => b => c
+prop_impl_conj_goal | prop | a => b & c
+prop_conj_impl_goal | prop | a & b => c
+prop_equiv_conj | prop | (a & b) <=> (b & a)
+prop_neg_impl | prop | not(a) => b
+prop_impl_neg | prop | a => not(b)
+prop_conj_neg | prop | a & not(b)
+prop_deep_mix | prop | ((a & b) => c) & (c => d)
+
+eq_refl | expr | x = x
+eq_sym_shape | expr | x = y
+eq_true | expr | x = TRUE
+eq_false | expr | x = FALSE
+eq_pair | expr | x = y & z = w
+eq_triple | expr | x = y & y = z & z = w
+eq_arith_plus | expr | x+1 = y
+eq_arith_minus | expr | x-1 = y
+eq_arith_nested | expr | x+(y-z) = w
+eq_interval_bounds | expr | x..y = x..y
+eq_singleton | expr | {x} = {x}
+eq_set_literal2 | expr | {x,y} = {x,y}
+eq_set_literal3 | expr | {x,y,z} = {x,y,z}
+eq_union | expr | s \/ t = s \/ t
+eq_inter | expr | s /\ t = s /\ t
+eq_cartesian_literal | expr | {x} * {y} = {x} * {y}
+eq_app | expr | f(x) = y
+eq_app_nested | expr | f(g(x)) = y
+eq_dom | expr | dom(f) = dom(f)
+eq_ran | expr | ran(f) = ran(f)
+eq_card | expr | card(s) = card(s)
+leq_refl | expr | n<=n
+leq_zero | expr | 0<=n
+leq_one | expr | 1<=n
+leq_plus_right | expr | n<=n+m
+leq_minus_left | expr | n-m<=n
+leq_chain | expr | x<=y & y<=z
+lt_shape | expr | x<y
+geq_shape | expr | x>=y
+gt_shape | expr | x>y
+in_interval | expr | n: n..n
+in_nat | expr | n: NAT
+in_nat1 | expr | n: NAT1
+in_integer | expr | n: INTEGER
+in_bool | expr | b: BOOL
+in_pow | expr | s: POW(t)
+in_union | expr | x: s \/ t
+in_inter | expr | x: s /\ t
+in_singleton | expr | x: {x}
+in_set_literal2 | expr | x: {x,y}
+in_set_literal3 | expr | z: {x,y,z}
+in_cartesian | expr | p: s * t
+in_dom | expr | x: dom(f)
+in_ran | expr | y: ran(f)
+subset_refl | expr | s <: s
+subset_union_left | expr | s <: s \/ t
+subset_union_right | expr | t <: s \/ t
+subset_inter_left | expr | s /\ t <: s
+subset_inter_right | expr | s /\ t <: t
+subset_pow | expr | s <: POW(t)
+subset_singleton | expr | {x} <: s
+subset_literal2 | expr | {x,y} <: s
+subset_interval | expr | x..y <: s
+set_membership | expr | x: {x}
+union_subset | expr | s \/ t <: s \/ t
+rel_total_func | expr | f: s +-> t
+rel_partial_func | expr | f: s --> t
+rel_total_relation | expr | r: s <-> t
+rel_app_defined | expr | x: dom(f) & f(x) = y
+bool_conj_expr | expr | x = TRUE & y = FALSE
+mixed_arith_set | expr | n: s & 0<=n
+mixed_func_set | expr | x: dom(f) & f: dom(f) +-> ran(f)

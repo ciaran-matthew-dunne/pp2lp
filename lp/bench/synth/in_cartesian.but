@@ -1,0 +1,1 @@
+Flag(FileOn("in_cartesian.res")) & Set(Valid.1 | Rule(Implication | (p: s * t) & _delta_e(p) & _delta_e(s) & _delta_e(t) | ? | ? | p: s * t | nn))

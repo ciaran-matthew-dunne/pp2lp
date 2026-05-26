@@ -10,11 +10,11 @@ type term =
   | Pred of prd
   | App of string * term list
   | Lambda of string * binder_ty option * term
+  | Raw of string
 
 type tactic =
   | Refine of string * term list
-  | Rewrite of { rtl : bool; name : string }
-  | Orelse of tactic list
+  | Rewrite of { try_ : bool; rtl : bool; name : string }
 
 type t =
   | Step of tactic
@@ -56,36 +56,20 @@ let rec pp_term buf = function
     Buffer.add_string buf ", ";
     pp_term buf body;
     Buffer.add_char buf ')'
+  | Raw s -> Buffer.add_string buf s
 
-let rec pp_tactic buf = function
+let pp_tactic buf = function
   | Refine (rule, args) ->
     Buffer.add_string buf "refine ";
     Buffer.add_string buf rule;
     List.iter (fun arg ->
       Buffer.add_char buf ' ';
       pp_term buf arg) args
-  | Rewrite { rtl; name } ->
+  | Rewrite { try_; rtl; name } ->
+    if try_ then Buffer.add_string buf "try ";
     Buffer.add_string buf "rewrite ";
     if rtl then Buffer.add_string buf "left ";
     Buffer.add_string buf name
-  | Orelse attempts ->
-    pp_orelse buf attempts
-
-and string_of_tactic tactic =
-  let buf = Buffer.create 128 in
-  pp_tactic buf tactic;
-  Buffer.contents buf
-
-and pp_orelse buf attempts =
-  match List.rev (List.map string_of_tactic attempts) with
-  | [] -> Buffer.add_string buf "refine _"
-  | last :: rest ->
-    let body =
-      List.fold_left
-        (fun acc tactic -> "orelse " ^ tactic ^ " " ^ acc)
-        last rest
-    in
-    Buffer.add_string buf body
 
 (* `lead_pad` is written before the first line; subsequent lines use
    `pad`. Inside `{ ... }`, callers pass `lead_pad = ""` so the first

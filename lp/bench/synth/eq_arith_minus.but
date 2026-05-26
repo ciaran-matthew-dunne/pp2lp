@@ -1,0 +1,1 @@
+Flag(FileOn("eq_arith_minus.res")) & Set(Valid.1 | Rule(Implication | (x-1 = y) & _delta_e(x) & _delta_e(y) | ? | ? | x-1 = y | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("leq_zero.res")) & Set(Valid.1 | Rule(Implication | (0<=n) & _delta_e(n) | ? | ? | 0<=n | nn))

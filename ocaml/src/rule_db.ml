@@ -12,8 +12,8 @@
       slot of branching quantifiers (ALL7/XST8). *)
 type kind = Con | Seq | Res
 
-(** [Arity (slots, output)]: argument-kind list plus the output kind. *)
-type arity = Arity of kind list * kind
+(** [Arity slots]: the rule's argument-kind list. *)
+type arity = Arity of kind list
 
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
@@ -34,10 +34,10 @@ let rules : (string, rule_info) Hashtbl.t =
       { arity = None; emit_args = None;
         hoas_identity = false; intro_antecedent = false }
   in
-  let leaf   = Arity ([], Seq) in
-  let pass   = Arity ([Seq], Seq) in
-  let conj   = Arity ([Seq; Seq], Seq) in
-  let branch = Arity ([Res; Seq], Seq) in
+  let leaf   = Arity [] in
+  let pass   = Arity [Seq] in
+  let conj   = Arity [Seq; Seq] in
+  let branch = Arity [Res; Seq] in
   (* §A.1 Conjunction *)
   r "AND1" conj;
   r "AND2" pass;
@@ -124,7 +124,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM16" leaf;
   r "NRM17" pass;
   r "NRM18" pass;
-  r "NRM19" leaf ~emit_args:(Some "dynamic:nrm19");
+  r "NRM19" pass ~emit_args:(Some "dynamic:nrm19");
   r "NRM20" pass;
   r "NRM21" pass;
   r "NRM22" pass;
@@ -160,7 +160,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ECTR6" leaf;
   (* §A.14 Arithmetic *)
   r "AR1" pass;
-  r "AR2" (Arity ([Con], Seq)) ~emit_args:(Some "trust");
+  r "AR2" (Arity [Con]) ~emit_args:(Some "trust");
   r "AR3" pass ~emit_args:(Some "dynamic:ar3");
   r "AR3_F" pass ~hoas_identity:true;
   r "AR4" leaf ~emit_args:(Some "dynamic:ar4");
@@ -169,19 +169,19 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR7" pass ~emit_args:(Some "dynamic:ar78");
   r "AR8" pass ~emit_args:(Some "dynamic:ar78");
   r "AR9" pass ~emit_args:(Some "dynamic:ar9");
-  phantom "AR10";
+  r "AR10" (Arity []);
   r "AR11" leaf;
   r "AR12" pass ~intro_antecedent:true;
-  r "AR13" (Arity ([Con; Con; Seq], Seq)) ~emit_args:(Some "trust trust");
+  r "AR13" (Arity [Con; Con; Seq]) ~emit_args:(Some "trust trust");
   (* §A.15 Boolean *)
   r "BOOL11" pass;
   r "BOOL12" pass;
   r "BOOL21" pass;
   r "BOOL22" pass;
-  r "BOOL31" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
-  r "BOOL32" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
-  r "BOOL41" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
-  r "BOOL42" (Arity ([Con; Seq], Seq)) ~emit_args:(Some "trust");
+  r "BOOL31" (Arity [Con; Seq]) ~emit_args:(Some "trust");
+  r "BOOL32" (Arity [Con; Seq]) ~emit_args:(Some "trust");
+  r "BOOL41" (Arity [Con; Seq]) ~emit_args:(Some "trust");
+  r "BOOL42" (Arity [Con; Seq]) ~emit_args:(Some "trust");
   r "BOOL51" leaf;
   r "BOOL52" leaf;
   (* Phantom entries *)
@@ -208,7 +208,14 @@ let is_primed_name name =
   String.length name > 2 &&
   String.sub name (String.length name - 2) 2 = "_1"
 
-let is_primed rule = is_primed_name (strip_suffix rule)
+let is_primed rule =
+  match String.rindex_opt rule '_' with
+  | Some i when i > 0 && i < String.length rule - 1 ->
+    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
+    if String.to_seq suffix |> Seq.for_all (fun c -> c >= '0' && c <= '9')
+    then suffix = "1" || is_primed_name (String.sub rule 0 i)
+    else false
+  | _ -> false
 
 let nary_count rule =
   match String.rindex_opt rule '_' with
@@ -233,11 +240,23 @@ let lookup name = Hashtbl.find_opt rules (base_of name)
 
 (* --- Lookup helpers ------------------------------------------------ *)
 
+let is_known name = lookup name <> None
+
+let is_unsupported name =
+  String.length (base_of name) >= 2 &&
+  (base_of name).[0] = 'A' && (base_of name).[1] = 'R' &&
+  String.length (base_of name) > 2 &&
+  (base_of name).[2] >= '0' && (base_of name).[2] <= '9'
+
 let is_phantom name =
   match lookup name with
   | Some { arity = None; _ } -> true
   | Some _ -> false
-  | None -> true
+  | None ->
+    (* Unknown rules must NOT be silently filtered: that's how stack
+       residual / "trace left N nodes" errors get swallowed.  Surface
+       it as a tree-build error pointing at the offending rule. *)
+    failwith (Printf.sprintf "rule_db: unknown rule %S" name)
 
 (** Number of children the rule has in the proof tree
     (= number of [Seq] + [Res] slots).  [Con] slots are inline LP args
@@ -249,7 +268,7 @@ let rule_arity name =
   if name = "STOP_1" then 0
   else
     match lookup name with
-    | Some { arity = Some (Arity (slots, _)); _ } ->
+    | Some { arity = Some (Arity slots); _ } ->
       List.length
         (List.filter (function Seq | Res -> true | Con -> false) slots)
     | Some { arity = None; _ } -> -1
@@ -257,14 +276,14 @@ let rule_arity name =
 
 let is_branching name =
   match lookup name with
-  | Some { arity = Some (Arity (slots, _)); _ } ->
+  | Some { arity = Some (Arity slots); _ } ->
     List.exists (function Res -> true | _ -> false) slots
   | _ -> false
 
 let slots name =
   if name = "STOP_1" then []
   else match lookup name with
-  | Some { arity = Some (Arity (slots, _)); _ } -> slots
+  | Some { arity = Some (Arity slots); _ } -> slots
   | Some { arity = None; _ } -> []
   | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
 
