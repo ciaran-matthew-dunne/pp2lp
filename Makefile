@@ -1,74 +1,98 @@
 .PHONY: help build check rules tree gen-traces gen-replays clean clean-bench repl
 
-# Symlink-friendly: re-resolve PP2LP_ROOT every Make invocation.
 export PP2LP_ROOT := $(CURDIR)
 
-SUITE  ?= og
-NAME   ?=
-REPLAY ?=
+# ── Positional argument parsing ──────────────────────────────
+# `make check og/01` → _ARG=og/01 → _SUITE=og _NAME=01
+# `make check prv`   → _ARG=prv   → _SUITE=prv _NAME=
+# `make tree og/27`  → _ARG=og/27 → _SUITE=og _NAME=27
+FIRST_GOAL := $(firstword $(MAKECMDGOALS))
+ifneq ($(filter check tree rules gen-traces gen-replays,$(FIRST_GOAL)),)
+  _ARG := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ($(_ARG),)
+    $(eval $(_ARG):;@:)
+  endif
+endif
 
-# Resolve the target replay from {REPLAY, NAME, SUITE}.
-# Priority: REPLAY > NAME+SUITE.  Empty if neither given.
-# Support both the root bench directory and the xfail/ subdirectory.
-ONE_REPLAY_BASE = $(if $(REPLAY),$(REPLAY),$(if $(NAME),lp/bench/$(SUITE)/$(NAME).replay))
-ONE_REPLAY_XFAIL = $(if $(REPLAY),$(REPLAY),$(if $(NAME),lp/bench/$(SUITE)/xfail/$(NAME).replay))
-ONE_REPLAY = $(if $(REPLAY),$(REPLAY),$(if $(wildcard $(ONE_REPLAY_BASE)),$(ONE_REPLAY_BASE),$(ONE_REPLAY_XFAIL)))
+ifneq ($(_ARG),)
+  ifneq ($(findstring /,$(_ARG)),)
+    _SUITE := $(firstword $(subst /, ,$(_ARG)))
+    _NAME  := $(word 2,$(subst /, ,$(_ARG)))
+  else
+    _SUITE := $(_ARG)
+  endif
+else
+  _SUITE := $(if $(SUITE),$(SUITE),og)
+  _NAME  := $(NAME)
+endif
 
-# Build a `bench/check.py` argument string from the three user vars.
-# Priority: REPLAY > NAME+SUITE > SUITE.
-CHECK_ARGS = $(if $(REPLAY),--replay $(REPLAY),\
-             $(if $(NAME),--name $(NAME) --suite $(SUITE),\
-             --suite $(SUITE)))
+ifdef V
+  ARGS += --verbose
+endif
+ifdef Q
+  ARGS += --quiet
+endif
 
-PP2LP = ./ocaml/_build/default/bin/main.exe
+# ── Derived paths ────────────────────────────────────────────
+PP2LP := ./ocaml/_build/default/bin/main.exe
 
+_REPLAY_BASE  = lp/bench/$(_SUITE)/$(_NAME).replay
+_REPLAY_XFAIL = lp/bench/$(_SUITE)/xfail/$(_NAME).replay
+_REPLAY       = $(if $(REPLAY),$(REPLAY),$(if $(wildcard $(_REPLAY_BASE)),$(_REPLAY_BASE),$(_REPLAY_XFAIL)))
+
+_CHECK_ARGS = $(if $(REPLAY),--replay $(REPLAY),\
+              $(if $(_NAME),--name $(_NAME) --suite $(_SUITE),\
+              --suite $(_SUITE)))
+
+# ── Targets ──────────────────────────────────────────────────
 help:
-	@echo "Common targets (SUITE defaults to og):"
-	@echo "  build                            build the OCaml binary"
-	@echo "  check                            emit + check the whole suite"
-	@echo "  check NAME=01                    emit + check one replay in SUITE"
-	@echo "  check REPLAY=path.replay         emit + check by path"
-	@echo "  check ARGS='-q'                  pass-through flags to check.py"
-	@echo "  tree NAME=01                     dump rebuilt proof tree"
-	@echo "  rules NAME=01                    dump parsed (rule, arg, kind) lines"
-	@echo "  gen-traces                       .but -> .trace (runs PP)"
-	@echo "  gen-replays                      .trace -> .replay"
-	@echo "  clean-bench                      just lp/bench/ generated files and lp/**/*.lpo"
-	@echo "  clean                            blow away build + emitted LP + .lpo"
-	@echo "  repl                             dune utop with project loaded"
+	@echo "Usage:"
+	@echo "  make check [SUITE[/NAME]]   emit + lambdapi check"
+	@echo "  make tree  SUITE/NAME       dump rebuilt proof tree"
+	@echo "  make rules SUITE/NAME       dump parsed (rule, arg, kind) lines"
 	@echo ""
-	@echo "Variables:"
-	@echo "  SUITE   suite name under lp/bench/   (default: og)"
-	@echo "  NAME    replay stem (e.g. 01)"
-	@echo "  REPLAY  explicit path to a .replay"
-	@echo "  ARGS    extra flags forwarded to check.py (-q, -v)"
+	@echo "Examples:"
+	@echo "  make check                  check og suite (default)"
+	@echo "  make check og               check og suite"
+	@echo "  make check prv              check prv suite"
+	@echo "  make check og/01            check one replay"
+	@echo "  make tree  og/27            dump proof tree"
+	@echo "  make rules og/22            dump parsed rules"
+	@echo "  make check og V=1           verbose output"
+	@echo "  make check og Q=1           summary only"
 	@echo ""
-	@echo "Tips:"
-	@echo "  - 'make tree NAME=27' shows the residual stack on tree-build error."
-	@echo "  - 'make rules NAME=…' lists rules and flags any UNKNOWN ones."
+	@echo "Other:"
+	@echo "  build                       build the OCaml binary"
+	@echo "  gen-traces [SUITE]          .but → .trace (runs PP)"
+	@echo "  gen-replays [SUITE]         .trace → .replay"
+	@echo "  clean-bench                 remove emitted .lp/.lpo files"
+	@echo "  clean                       clean-bench + dune clean"
+	@echo "  repl                        dune utop with project loaded"
+	@echo ""
+	@echo "Suites: og (default), prv, prv-no-arith, synth"
 
 build:
-	@dune build --root ocaml
+	@cd ocaml && dune build
 
 repl:
 	@cd ocaml && dune utop src
 
 check: build
-	@python3 bench/check.py $(CHECK_ARGS) $(ARGS)
+	@python3 bench/check.py $(_CHECK_ARGS) $(ARGS)
 
 tree: build
-	@$(if $(ONE_REPLAY),,$(error need NAME= or REPLAY=))
-	@$(PP2LP) tree $(ONE_REPLAY)
+	@$(if $(_NAME),,$(error usage: make tree SUITE/NAME))
+	@$(PP2LP) tree $(_REPLAY)
 
 rules: build
-	@$(if $(ONE_REPLAY),,$(error need NAME= or REPLAY=))
-	@$(PP2LP) rules $(ONE_REPLAY)
+	@$(if $(_NAME),,$(error usage: make rules SUITE/NAME))
+	@$(PP2LP) rules $(_REPLAY)
 
 gen-traces:
-	@python3 bench/gen_traces.py --suite $(SUITE)
+	@python3 bench/gen_traces.py --suite $(_SUITE)
 
 gen-replays:
-	@python3 bench/gen_replays.py --suite $(SUITE)
+	@python3 bench/gen_replays.py --suite $(_SUITE)
 
 clean-bench:
 	@find lp/bench -name '*.lp' -delete 2>/dev/null || true
@@ -78,5 +102,5 @@ clean-bench:
 	@find lp -name '*.lpo' -delete 2>/dev/null || true
 
 clean: clean-bench
-	@dune clean --root ocaml
+	@cd ocaml && dune clean
 

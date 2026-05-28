@@ -9,8 +9,9 @@ let with_replay_open fp f =
   | Pp2lp.Parse_replay.Bad_replay m -> die "parse error in %s: %s" fp m
   | Pp2lp.Proof_tree.Bad_replay m  -> die "tree-build error in %s: %s" fp m
   | Pp2lp.Proof_tree.Bad_replay_partial (m, _) ->
-    die "tree-build error in %s: %s (run `pp2lp tree …` for residual)" fp m
-  | exn -> die "ERROR %s: %s" fp (Printexc.to_string exn)
+    die "tree-build error in %s: %s" fp m
+  | Failure m -> die "%s: %s" fp m
+  | exn -> die "%s: %s" fp (Printexc.to_string exn)
 
 let emit_replay fp =
   with_replay_open fp (fun fp ->
@@ -36,7 +37,8 @@ let tree_replay fp =
     List.iter (fun n -> Pp2lp.Proof_tree.pp_tree stderr n) residual;
     exit 1
   | Pp2lp.Proof_tree.Bad_replay m  -> die "tree-build error in %s: %s" fp m
-  | exn -> die "ERROR %s: %s" fp (Printexc.to_string exn)
+  | Failure m -> die "%s: %s" fp m
+  | exn -> die "%s: %s" fp (Printexc.to_string exn)
 
 (* Dump the parsed replay as the (rule, arg) list.  Useful when even
    the tree-build is suspect: it shows what the parser produced

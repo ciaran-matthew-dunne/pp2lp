@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
-"""Emit + lambdapi-check pp2lp replays.
-
-Selection (any one):
-  --suite SUITE              all bench/SUITE/*.replay
-  --replay PATH              one replay by path
-  --name NAME --suite SUITE  bench/SUITE/NAME.replay
-
-Output:
-  default     one line per replay, error stanza on failure, summary at end
-  --quiet     summary only (no per-replay lines)
-  --verbose   per-replay lines include OK + timing
-"""
+"""Emit + lambdapi-check pp2lp replays."""
 
 import argparse
+import re
 import subprocess
 import sys
 import time
@@ -22,35 +12,58 @@ ROOT = Path(__file__).resolve().parent.parent
 PP2LP = ROOT / "ocaml" / "_build" / "default" / "bin" / "main.exe"
 FORMATTER = ROOT / "bench" / "format_lambdapi_json.py"
 
+COLOR = sys.stdout.isatty()
 
-def rel(path: Path) -> str:
-    try:
-        return str(path.relative_to(ROOT))
-    except ValueError:
-        return str(path)
+
+def _c(code, t):
+    return f"\033[{code}m{t}\033[0m" if COLOR else str(t)
+
+
+def _green(t):  return _c("32", t)
+def _yellow(t): return _c("33", t)
+def _red(t):    return _c("31", t)
+def _dim(t):    return _c("2", t)
+
+
+_ICON = {
+    "ok":        _green("✓"),
+    "warn":      _yellow("⚠"),
+    "emit_fail": _red("✗"),
+    "lp_fail":   _red("✗"),
+}
 
 
 def out_path(replay: Path) -> Path:
     return replay.with_suffix(".lp")
 
 
-def emit(replay: Path, out: Path) -> tuple[bool, str]:
+def emit(replay: Path, out: Path) -> tuple[bool, list[str], str]:
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(out.suffix + ".tmp")
     try:
+        rel_replay = replay.relative_to(ROOT) if replay.is_relative_to(ROOT) else replay
         with tmp.open("w") as fh:
             r = subprocess.run(
-                [str(PP2LP), "emit", str(replay)],
-                stdout=fh, stderr=subprocess.PIPE,
+                [str(PP2LP), "emit", str(rel_replay)],
+                stdout=fh, stderr=subprocess.PIPE, cwd=ROOT,
             )
     except FileNotFoundError:
         tmp.unlink(missing_ok=True)
-        return False, f"pp2lp binary not found at {PP2LP}; run `make build`."
+        return False, [], "pp2lp not found; run make build"
+
+    stderr = r.stderr.decode().rstrip()
+    warnings, errors = [], []
+    for line in stderr.splitlines():
+        if line.startswith("WARNING: "):
+            warnings.append(line[len("WARNING: "):])
+        elif line:
+            errors.append(line)
+
     if r.returncode != 0:
         tmp.unlink(missing_ok=True)
-        return False, r.stderr.decode().rstrip()
+        return False, warnings, "\n".join(errors) if errors else stderr
     tmp.replace(out)
-    return True, ""
+    return True, warnings, ""
 
 
 def lp_check(lp: Path) -> tuple[bool, str]:
@@ -66,21 +79,18 @@ def lp_check(lp: Path) -> tuple[bool, str]:
     return r.returncode == 0, f.stdout
 
 
-def check_one(replay: Path) -> tuple[str, str, float]:
-    """Return (status, detail, elapsed_seconds).
-
-    status is one of: ok, emit_fail, lp_fail.
-    detail is the diagnostic text (empty for ok).
-    """
+def check_one(replay: Path) -> tuple[str, list[str], str, float]:
     t0 = time.monotonic()
     out = out_path(replay)
-    ok, err = emit(replay, out)
+    ok, warnings, err = emit(replay, out)
     if not ok:
-        return "emit_fail", err, time.monotonic() - t0
+        return "emit_fail", warnings, err, time.monotonic() - t0
     ok, text = lp_check(out)
     if not ok:
-        return "lp_fail", text.rstrip(), time.monotonic() - t0
-    return "ok", "", time.monotonic() - t0
+        return "lp_fail", warnings, text.rstrip(), time.monotonic() - t0
+    if warnings:
+        return "warn", warnings, "", time.monotonic() - t0
+    return "ok", [], "", time.monotonic() - t0
 
 
 def select(args, parser) -> list[Path]:
@@ -111,61 +121,83 @@ def select(args, parser) -> list[Path]:
     parser.error("need --suite, --replay, or --name --suite")
 
 
-def fmt_line(label: str, replay: Path, ms: float) -> str:
-    return f"{label} {rel(replay)} ({ms:.0f}ms)"
+def fmt_ms(ms: float) -> str:
+    return f"{ms / 1000:.1f}s" if ms >= 1000 else f"{ms:.0f}ms"
+
+
+_RE_PATH_PREFIX = re.compile(
+    r'^(?:tree-build error in|parse error in) \S+:\s*'
+    r'|'
+    r'^\S+\.replay:\s*'
+)
+
+
+def _clean_error(text: str) -> str:
+    lines = []
+    for line in text.splitlines():
+        line = _RE_PATH_PREFIX.sub('', line)
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def print_entry(name: str, status: str, warnings: list[str],
+                detail: str, show_time: bool, ms: float):
+    time_str = f"  {_dim(fmt_ms(ms))}" if show_time else ""
+    print(f" {_ICON[status]} {name}{time_str}")
+    for w in warnings:
+        print(f"   {_dim(w)}")
+    if detail:
+        for line in _clean_error(detail).splitlines():
+            print(f"   {line}")
 
 
 def main():
-    ap = argparse.ArgumentParser(
-        description="Emit + lambdapi-check pp2lp replays."
-    )
+    ap = argparse.ArgumentParser(description="Emit + lambdapi-check pp2lp replays.")
     ap.add_argument("--suite", help="lp/bench/SUITE/")
     ap.add_argument("--name", help="replay stem under lp/bench/SUITE/")
     ap.add_argument("--replay", help="path to a .replay file")
-    ap.add_argument("-q", "--quiet", action="store_true",
-                    help="summary only")
-    ap.add_argument("-v", "--verbose", action="store_true",
-                    help="include OK lines in output")
+    ap.add_argument("-q", "--quiet", action="store_true", help="summary only")
+    ap.add_argument("-v", "--verbose", action="store_true", help="show all replays")
     args = ap.parse_args()
 
     replays = select(args, ap)
-
-    # When checking a single replay, default to verbose-style output.
     single = len(replays) == 1
     show_ok = args.verbose or single
     show_lines = not args.quiet
+    show_time = args.verbose or single
 
-    ok = lp_fail = emit_fail = 0
-    failures: list[tuple[str, Path, str]] = []
+    counts = {"ok": 0, "warn": 0, "emit_fail": 0, "lp_fail": 0}
+    t_start = time.monotonic()
 
     for t in replays:
-        status, detail, elapsed = check_one(t)
-        ms = elapsed * 1000
+        status, warnings, detail, elapsed = check_one(t)
+        counts[status] += 1
 
-        if status == "ok":
-            ok += 1
-            if show_ok and show_lines:
-                print(fmt_line("ok   ", t, ms))
-        else:
-            if status == "emit_fail":
-                emit_fail += 1
-            else:
-                lp_fail += 1
-            failures.append((status, t, detail))
-            if show_lines:
-                print(fmt_line(f"FAIL ({status})", t, ms))
-                if detail:
-                    for line in detail.splitlines():
-                        print(f"  {line}")
+        if not show_lines:
+            continue
+        if status == "ok" and not show_ok:
+            continue
 
-    total = len(replays)
-    if total > 1 or args.verbose:
-        bits = [f"{ok} ok"]
-        if lp_fail:    bits.append(f"{lp_fail} lp-fail")
-        if emit_fail:  bits.append(f"{emit_fail} emit-fail")
-        print(f"{total} replays: " + ", ".join(bits))
+        print_entry(t.stem, status, warnings, detail, show_time, elapsed * 1000)
 
-    sys.exit(0 if (lp_fail + emit_fail) == 0 else 1)
+    elapsed_total = (time.monotonic() - t_start) * 1000
+    n_fail = counts["emit_fail"] + counts["lp_fail"]
+
+    if not single or args.verbose:
+        parts = []
+        if counts["ok"]:
+            parts.append(f"{_green(counts['ok'])} ✓")
+        if counts["warn"]:
+            parts.append(f"{_yellow(counts['warn'])} ⚠")
+        if n_fail:
+            parts.append(f"{_red(n_fail)} ✗")
+
+        suite = args.suite or "check"
+        if show_lines:
+            print()
+        print(f"{suite}  {'  '.join(parts)}  {_dim(fmt_ms(elapsed_total))}")
+
+    sys.exit(0 if n_fail == 0 else 1)
 
 
 if __name__ == "__main__":

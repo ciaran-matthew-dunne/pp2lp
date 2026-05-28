@@ -13,10 +13,17 @@ let goal_of_tree tree =
   | None -> failwith "root node of proof tree has no annotation"
 
 let warn_unsupported_rules rules =
-  List.iter (fun ((rule, _arg), _anno) ->
-    if Rule_db.is_unsupported rule && not (Rule_db.is_phantom rule) then
-      Printf.eprintf "WARNING: unsupported arithmetic rule %s\n%!" rule
-  ) rules
+  let seen = Hashtbl.create 16 in
+  let unsup = List.filter_map (fun ((rule, _arg), _anno) ->
+    if Rule_db.is_unsupported rule && not (Rule_db.is_phantom rule)
+       && not (Hashtbl.mem seen rule) then begin
+      Hashtbl.replace seen rule ();
+      Some rule
+    end else None
+  ) rules in
+  match unsup with
+  | [] -> ()
+  | _ -> Printf.eprintf "WARNING: unsupported rules: %s\n%!" (String.concat ", " unsup)
 
 let reconstruct_file (fp : string) : string =
   let replay = Parse_replay.parse_file fp in
