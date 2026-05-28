@@ -1,53 +1,53 @@
 // Conjunction (§A.1) — shallow encoding
-require open pp2lp.B;
+require open pp2lp.B pp2lp.ConjList;
 
 // ---- Base rules ----
 
-// AND1: H ⊢ ¬Q ⇒ R; H ⊢ ¬P ⇒ R → H ⊢ ¬(P ∧ Q) ⇒ R
-opaque symbol AND1 [P Q R]
-  : π (¬ Q ⇒ R)
-  → π (¬ P ⇒ R)
-  → π (¬ (P ∧ Q) ⇒ R) ≔
+// AND1: H ⊢ ¬(last ps) ⇒ R; H ⊢ ¬(init ps) ⇒ R → H ⊢ ¬(⋀ ps) ⇒ R
+opaque symbol AND1 [ps : 𝕃 o] [R : Prop]
+  : π (¬ (last ⊤ ps) ⇒ R)
+  → π (¬ ⋀_init (⋀ ps) ⇒ R)
+  → π (¬ ⋀ ps ⇒ R) ≔
 begin
-  assume P Q R h1 h2 h3;
-  have h : π (¬ P ∨ ¬ Q)
-    { refine =⇒ (deMorgan_∧ P Q) h3 };
-  refine ∨ₑ h _ _
-    { assume hnp; refine h2 hnp }
-    { assume hnq; refine h1 hnq }
+  assume ps R h1 h2 h3;
+  have hne : π (¬ (⋀_init (⋀ ps) ∧ last ⊤ ps))
+    { assume hpair; refine h3 (⋀_rejoin (∧ₑ₁ hpair) (∧ₑ₂ hpair)) };
+  have hor : π (¬ ⋀_init (⋀ ps) ∨ ¬ (last ⊤ ps))
+    { refine =⇒ (deMorgan_∧ (⋀_init (⋀ ps)) (last ⊤ ps)) hne };
+  refine ∨ₑ hor _ _
+    { assume hni; refine h2 hni }
+    { assume hnl; refine h1 hnl }
 end;
 
-// AND2: H ⊢ P ⇒ ¬Q → H ⊢ ¬(P ∧ Q)
-opaque symbol AND2 [P Q]
-  : π (P ⇒ ¬ Q)
-  → π (¬ (P ∧ Q)) ≔
+// AND2: H ⊢ init ps ⇒ ¬(last ps) → H ⊢ ¬(⋀ ps)
+opaque symbol AND2 [ps : 𝕃 o]
+  : π (⋀_init (⋀ ps) ⇒ ¬ (last ⊤ ps))
+  → π (¬ ⋀ ps) ≔
 begin
-  assume P Q h1 h2;
-  refine h1 (∧ₑ₁ h2) (∧ₑ₂ h2)
+  assume ps h1 hc;
+  refine h1 (⋀_front hc) (⋀_back hc)
 end;
 
-// AND3: H ⊢ P ⇒ (Q ⇒ R) → H ⊢ (P ∧ Q) ⇒ R
-opaque symbol AND3 [P Q R]
-  : π (P ⇒ (Q ⇒ R))
-  → π ((P ∧ Q) ⇒ R) ≔
+// AND3: H ⊢ init ps ⇒ (last ps ⇒ R) → H ⊢ ⋀ ps ⇒ R
+opaque symbol AND3 [ps : 𝕃 o] [R : Prop]
+  : π (⋀_init (⋀ ps) ⇒ (last ⊤ ps ⇒ R))
+  → π (⋀ ps ⇒ R) ≔
 begin
-  assume P Q R h1 h2;
-  refine h1 (∧ₑ₁ h2) (∧ₑ₂ h2)
+  assume ps R h hc;
+  refine h (⋀_front hc) (⋀_back hc)
 end;
 
-// AND4: H ⊢ Q; H ⊢ P → H ⊢ P ∧ Q
-opaque symbol AND4 [P Q]
-  : π Q
-  → π P
-  → π (P ∧ Q) ≔
+// AND4: H ⊢ last ps; H ⊢ init ps → H ⊢ ⋀ ps
+opaque symbol AND4 [ps : 𝕃 o]
+  : π (last ⊤ ps)
+  → π (⋀_init (⋀ ps))
+  → π (⋀ ps) ≔
 begin
-  assume P Q h1 h2;
-  refine ∧ᵢ h2 h1
+  assume ps h1 h2;
+  refine ⋀_rejoin h2 h1
 end;
 
 // AND5: modus ponens within a conjunction.
-// The caller supplies a forward function that rebuilds the conjunction
-// with (A ⇒ B) at position j replaced by B (using ∧ₑ₁/∧ₑ₂/∧ᵢ).
 opaque symbol AND5 [C C' r : Prop]
   : (π C → π C')
   → π (C' ⇒ r)

@@ -1,4 +1,5 @@
 require open
+  pp2lp.ConjList
   pp2lp.rules.Conj pp2lp.rules.Disj
   pp2lp.rules.Impl pp2lp.rules.Equiv
   pp2lp.rules.Neg pp2lp.rules.Axm

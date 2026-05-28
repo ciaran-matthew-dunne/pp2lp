@@ -21,7 +21,7 @@
 //     All.lp / Xst.lp. Quantifier-related symbols are arity-uniform
 //     over `Tuple n`.
 
-require open pp2lp.B pp2lp.Quant pp2lp.rules.All pp2lp.rules.Xst;
+require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.All pp2lp.rules.Xst;
 
 // (Res infrastructure — Res, mk_1, res_tm, res_eq — has moved to
 //  Quant.lp so it's available to All.lp/Xst.lp where the result-based
@@ -86,41 +86,17 @@ end;
 // Per-connective equality lemmas (§A.1–A.5, A.13)
 // ============================================================
 
-// AND1: ¬(P∧Q)⇒R = (¬Q⇒R) ∧ (¬P⇒R)
-opaque symbol and1_eq [P Q R : Prop]
-  : π ((¬ (P ∧ Q) ⇒ R) = ((¬ Q ⇒ R) ∧ (¬ P ⇒ R))) ≔
-begin
-  assume P Q R;
-  refine propExt _ _ _ _
-    { assume h; refine ∧ᵢ
-      (λ hnq, h (λ hpq, hnq (∧ₑ₂ hpq)))
-      (λ hnp, h (λ hpq, hnp (∧ₑ₁ hpq))) }
-    { assume h hnpq;
-      have hnpnq : π (¬ P ∨ ¬ Q) { refine =⇒ (deMorgan_∧ P Q) hnpq };
-      refine ∨ₑ hnpnq _ _
-      { assume hnp; refine ∧ₑ₂ h hnp }
-      { assume hnq; refine ∧ₑ₁ h hnq } }
-end;
+// AND1: ¬(⋀ ps)⇒R = (¬(last ps)⇒R) ∧ (¬(init ps)⇒R)
+symbol and1_eq [ps : 𝕃 o] [R : Prop]
+  : π ((¬ ⋀ ps ⇒ R) = ((¬ (last ⊤ ps) ⇒ R) ∧ (¬ ⋀_init (⋀ ps) ⇒ R)));
 
-// AND2: ¬(P∧Q) = (P⇒¬Q)
-opaque symbol and2_eq [P Q : Prop]
-  : π (¬ (P ∧ Q) = (P ⇒ ¬ Q)) ≔
-begin
-  assume P Q;
-  refine propExt _ _ _ _
-    { assume h1 hp hq; refine h1 (∧ᵢ hp hq) }
-    { assume h1 h2; refine h1 (∧ₑ₁ h2) (∧ₑ₂ h2) }
-end;
+// AND2: ¬(⋀ ps) = (init ps ⇒ ¬(last ps))
+symbol and2_eq [ps : 𝕃 o]
+  : π (¬ ⋀ ps = (⋀_init (⋀ ps) ⇒ ¬ (last ⊤ ps)));
 
-// AND3: (P∧Q)⇒R = (P⇒Q⇒R)
-opaque symbol and3_eq [P Q R : Prop]
-  : π (((P ∧ Q) ⇒ R) = (P ⇒ Q ⇒ R)) ≔
-begin
-  assume P Q R;
-  refine propExt _ _ _ _
-    { assume h1 hp hq; refine h1 (∧ᵢ hp hq) }
-    { assume h1 h2; refine h1 (∧ₑ₁ h2) (∧ₑ₂ h2) }
-end;
+// AND3: (⋀ ps)⇒R = (init ps ⇒ last ps ⇒ R)
+symbol and3_eq [ps : 𝕃 o] [R : Prop]
+  : π ((⋀ ps ⇒ R) = (⋀_init (⋀ ps) ⇒ (last ⊤ ps ⇒ R)));
 
 // OR1: ¬(P∨Q)⇒R = (¬P⇒¬Q⇒R)
 opaque symbol or1_eq [P Q R : Prop]
@@ -364,12 +340,12 @@ symbol STOP_1 [P : Prop] : Res P
 // Res passthrough rules
 // ============================================================
 
-symbol AND2_1 [P Q : Prop]
-  (r : Res (P ⇒ ¬ Q)) : Res (¬ (P ∧ Q))
+symbol AND2_1 [ps : 𝕃 o]
+  (r : Res (⋀_init (⋀ ps) ⇒ ¬ (last ⊤ ps))) : Res (¬ ⋀ ps)
   ≔ mk_1 (res_tm r) (eq_trans and2_eq (res_eq r));
 
-symbol AND3_1 [P Q R : Prop]
-  (r : Res (P ⇒ Q ⇒ R)) : Res ((P ∧ Q) ⇒ R)
+symbol AND3_1 [ps : 𝕃 o] [R : Prop]
+  (r : Res (⋀_init (⋀ ps) ⇒ (last ⊤ ps ⇒ R))) : Res (⋀ ps ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans and3_eq (res_eq r));
 
 symbol OR1_1 [P Q R : Prop]
@@ -494,18 +470,19 @@ end;
 // Res branching rules (two children → conjunction normal form)
 // ============================================================
 
-symbol AND1_1 [P Q R : Prop]
-  (r1 : Res (¬ Q ⇒ R)) (r2 : Res (¬ P ⇒ R))
-  : Res (¬ (P ∧ Q) ⇒ R)
+symbol AND1_1 [ps : 𝕃 o] [R : Prop]
+  (r1 : Res (¬ (last ⊤ ps) ⇒ R)) (r2 : Res (¬ ⋀_init (⋀ ps) ⇒ R))
+  : Res (¬ ⋀ ps ⇒ R)
   ≔ mk_1 (res_tm r1 ∧ res_tm r2)
       (eq_trans and1_eq (conj_eq (res_eq r1) (res_eq r2)));
 
-// AND4_1: (P ∧ Q) → (Q ∧ P) via ∧_com, then per-arg Res children.
-// `left_∧` reduces (S1 ∧ S2) to its left-assoc tree definitionally.
-symbol AND4_1 [P Q : Prop]
-  (r1 : Res Q) (r2 : Res P) : Res (P ∧ Q)
+// AND4_1: ⋀ ps via init/last Res children.
+symbol AND4_1 [ps : 𝕃 o]
+  (r1 : Res (last ⊤ ps)) (r2 : Res (⋀_init (⋀ ps))) : Res (⋀ ps)
   ≔ mk_1 (left_∧ (res_tm r1) (res_tm r2))
-           (eq_trans (∧_com P Q) (conj_eq (res_eq r1) (res_eq r2)));
+           (eq_trans ⋀_split
+             (eq_trans (∧_com (⋀_init (⋀ ps)) (last ⊤ ps))
+               (conj_eq (res_eq r1) (res_eq r2))));
 
 symbol OR2_1 [P Q : Prop]
   (r1 : Res (¬ Q)) (r2 : Res (¬ P)) : Res (¬ (P ∨ Q))

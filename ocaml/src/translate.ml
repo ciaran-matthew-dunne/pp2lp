@@ -270,9 +270,7 @@ let replace_last args last =
 
 (* ---- Conjunction helpers ---- *)
 
-let rec left_assoc_conjuncts = function
-  | Binary (And, p1, p2) -> left_assoc_conjuncts p1 @ [p2]
-  | p -> [p]
+let conjuncts = Pp_lp.conj_children_left
 
 let find_conjunct_pos conjs target =
   let rec loop i = function
@@ -289,10 +287,26 @@ let find_and5_pair conjs =
     if !result = None then
       match arr.(j) with
       | Binary (Imp, p, _) ->
-        for i = 0 to n - 1 do
-          if !result = None && i <> j && arr.(i) = p then
-            result := Some (i, j)
-        done
+        (* First try: match whole antecedent as one element *)
+        let found_whole = ref None in
+        for k = 0 to n - 1 do
+          if !found_whole = None && k <> j && arr.(k) = p then
+            found_whole := Some [k]
+        done;
+        (match !found_whole with
+         | Some positions -> result := Some (positions, j)
+         | None ->
+           (* Second try: match antecedent's leaves individually *)
+           let ant_leaves = Pp_lp.conj_leaves p in
+           let positions = List.filter_map (fun leaf ->
+             let rec find k =
+               if k >= n then None
+               else if k <> j && arr.(k) = leaf then Some k
+               else find (k + 1)
+             in find 0
+           ) ant_leaves in
+           if List.length positions = List.length ant_leaves then
+             result := Some (positions, j))
       | _ -> ()
   done;
   !result
@@ -332,14 +346,13 @@ let tactic_for_axm8 ctx rule anno =
   let fallback = L.Refine (rule, [L.Hole]) in
   match goal_of_anno anno with
   | Some (Binary (Imp, lhs, rhs)) ->
-    let conjs = left_assoc_conjuncts lhs in
-    let n = List.length conjs in
+    let conjs = conjuncts lhs in
     (match find_conjunct_pos conjs rhs with
      | Some k ->
        ctx.n <- ctx.n + 1;
        let h = Printf.sprintf "_h%d" ctx.n in
        let buf = Buffer.create 64 in
-       Pp_lp.emit_extract buf h n k;
+       Pp_lp.emit_extract buf h conjs k;
        L.Refine (rule, [L.Lambda (h, None, L.Raw (Buffer.contents buf))])
      | None -> fallback)
   | _ -> fallback
@@ -361,14 +374,13 @@ let rec tree ctx = function
     when base rule = "AND5" ->
     (match goal_of_anno anno with
      | Some (Binary (Imp, lhs, _)) ->
-       let conjs = left_assoc_conjuncts lhs in
-       let n = List.length conjs in
+       let conjs = Pp_lp.conj_children_left lhs in
        (match find_and5_pair conjs with
-        | Some (i, j) ->
+        | Some (ant_positions, j) ->
           ctx.n <- ctx.n + 1;
           let h = Printf.sprintf "_h%d" ctx.n in
           let buf = Buffer.create 64 in
-          Pp_lp.emit_and5_fwd buf h n i j;
+          Pp_lp.emit_and5_fwd buf h conjs ant_positions j;
           let fwd = L.Lambda (h, None, L.Raw (Buffer.contents buf)) in
           L.Then (L.Refine ("AND5", [fwd; L.Hole]), tree ctx c)
         | None -> default ctx rule None anno [c])
