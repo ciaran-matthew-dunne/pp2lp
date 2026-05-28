@@ -26,6 +26,7 @@ else
   _NAME  := $(NAME)
 endif
 
+ARGS :=
 ifdef V
   ARGS += --verbose
 endif

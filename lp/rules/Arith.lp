@@ -1,6 +1,6 @@
 // Arithmetic (§A.14) — shallow encoding
 // Uses ≤ and leq_refl from B.lp.
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- AR1-3: Reflexivity of ≤ ----
 
@@ -186,3 +186,63 @@ begin
   have h1 : π (𝟏 - a ≤ 𝟎) { rewrite heq; refine hb };
   refine one_not_leq_zero (leq_trans 𝟏 a 𝟎 (leq_of_sub 𝟏 a h1) ha)
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// AR9_1 below uses leq_zero_eq to bridge the solver-supplied
+// equality. Other AR rules use `trust` for the propositional equality
+// since the chain emit doesn't thread the solver side-conditions.
+
+symbol AR1_1 [E : τ ι] [R : Prop]
+  (r : Res R) : Res ((E ≤ E) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_1 ⊤ trust;
+
+symbol AR3_1 (a : τ ι) [R : Prop]
+  (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι) : Res ((E ≤ 𝟎) ⇒ R)
+  ≔ mk_1 ⊤ trust;
+
+symbol AR5_1 [a : τ ι] [R : Prop]
+  (r : Res ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))) : Res ((— a ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR6_1 [a : τ ι] [R : Prop]
+  (r : Res ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))) : Res ((a ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR7_1 [a b : τ ι] (c : τ ι) [R : Prop]
+  (r : Res ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R)))
+  : Res (((a - b) ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR8_1 (a : τ ι) [b c : τ ι] [R : Prop]
+  (r : Res ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R)))
+  : Res (((c + b) ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+// AR9_1: solver-confirmed equality on the antecedent of a Res chain.
+// Mirrors the spec AR9 but in Res form: given a bridge proof E = F, a
+// chain proving (F ≤ 0 ⇒ R) lifts to one for (E ≤ 0 ⇒ R). F is
+// explicit so emit sites can pin it via the PP-supplied solver result.
+// Transparent — `res_tm (AR9_1 F he r)` reduces to `res_tm r` so the
+// outer chain can decompose the resulting Prop.
+symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop]
+  (he : π (E = F))
+  (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (leq_zero_eq he)) (res_eq r));
+
+symbol AR10_1 [P Q R : Prop]
+  (heq : π (P = Q)) (r : Res (Q ⇒ R)) : Res (P ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P) ≔ mk_1 ⊤ trust;
+
+symbol AR12_1 [a b : τ ι] [P : Prop]
+  (r : Res P) : Res ((a ≤ b) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol AR13_1 [a b : τ ι] : Res (¬ (a ≤ 𝟎)) ≔ mk_1 ⊤ trust;

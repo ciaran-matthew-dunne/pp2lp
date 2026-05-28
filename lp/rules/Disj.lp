@@ -1,5 +1,5 @@
 // Disjunction (§A.2) — shallow encoding
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 
@@ -53,3 +53,28 @@ begin
     assume hnp; refine ∨ᵢ₂ (h1 hnp)
   }
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+
+// OR1_1: Schema 1 — passthrough.
+symbol OR1_1 [P Q R : Prop]
+  (r : Res (¬ P ⇒ ¬ Q ⇒ R)) : Res (¬ (P ∨ Q) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans or1_eq (res_eq r));
+
+// OR2_1: Schema 2 — combine.
+symbol OR2_1 [P Q : Prop]
+  (r1 : Res (¬ Q)) (r2 : Res (¬ P)) : Res (¬ (P ∨ Q))
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans or2_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// OR3_1: Schema 2 — combine.
+symbol OR3_1 [P Q R : Prop]
+  (r1 : Res (Q ⇒ R)) (r2 : Res (P ⇒ R))
+  : Res ((P ∨ Q) ⇒ R)
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans or3_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// OR4_1: Schema 1 — passthrough.
+symbol OR4_1 [P Q : Prop]
+  (r : Res (¬ P ⇒ Q)) : Res (P ∨ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (or4_eq P Q) (res_eq r));

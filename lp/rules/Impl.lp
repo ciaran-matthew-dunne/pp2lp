@@ -1,5 +1,5 @@
 // Implication (§A.3) — shallow encoding
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 
@@ -60,3 +60,34 @@ opaque symbol IMP5 [P Q]
 begin
   assume P Q hq hp; refine hq
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+
+// IMP1_1: Schema 1 — passthrough.
+symbol IMP1_1 [P Q R : Prop]
+  (r : Res (P ⇒ ¬ Q ⇒ R)) : Res (¬ (P ⇒ Q) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans imp1_eq (res_eq r));
+
+// IMP2_1: Schema 2 — combine.
+symbol IMP2_1 [P Q : Prop]
+  (r1 : Res (¬ Q)) (r2 : Res P) : Res (¬ (P ⇒ Q))
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans imp2_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// IMP3_1: Schema 2 — combine.
+symbol IMP3_1 [P Q R : Prop]
+  (r1 : Res (Q ⇒ R)) (r2 : Res (¬ P ⇒ R))
+  : Res ((P ⇒ Q) ⇒ R)
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans imp3_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// IMP4_1: special case — result is P ⇒ R (the antecedent prepended to
+// the child's result).
+symbol IMP4_1 [P Q : Prop]
+  (r : Res Q) : Res (P ⇒ Q)
+  ≔ mk_1 (P ⇒ res_tm r) (imp_cong_r (res_eq r));
+
+// IMP5_1: strip a known antecedent (hp : π P) — collapses the ⇒.
+symbol IMP5_1 [P Q : Prop]
+  (hp : π P) (r : Res Q) : Res (P ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop hp) (res_eq r));

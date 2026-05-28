@@ -16,15 +16,13 @@
    overall goal.
 
    This module produces:
-     replay = { rules : (Syntax_pp.lhs * Syntax_pp.rhs) list;
-                goal  : Syntax_pp.prd }
+     replay = { rules : (Syntax_pp.lhs * Syntax_pp.rhs) list }
    where [rules] preserves the replay file's order. *)
 
 open Syntax_pp
 
 type replay = {
   rules : (lhs * rhs) list;
-  goal  : prd;
 }
 
 exception Bad_replay of string
@@ -72,8 +70,5 @@ let parse_file (path : string) : replay =
         bad "unrecognised line %d in %s: %S" !lineno path line
     done with End_of_file -> ());
     let rules = List.rev !lines in
-    let goal = match rules with
-      | [] -> bad "no rule lines in %s" path
-      | (_, rhs) :: _ -> Syntax_pp.prd_of_rhs rhs
-    in
-    { rules; goal })
+    if rules = [] then bad "no rule lines in %s" path;
+    { rules })

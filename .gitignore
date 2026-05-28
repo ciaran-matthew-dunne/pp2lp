@@ -3,14 +3,19 @@ ocaml/_build
 *.lpo
 
 # Per-suite inputs/outputs.
-# Tracked: lp/bench/og/*.trace + *.replay
-#          lp/bench/prv/*.but
-#          lp/bench/prv-no-arith/*.but
-lp/bench/prv/*.trace
-# Replays are optional debugging artifacts generated from traces.
-lp/bench/prv/*.replay
-lp/bench/prv-no-arith/*.trace
-lp/bench/prv-no-arith/*.replay
+# Tracked: lp/bench/og/*.trace + *.replay (og has no .but, traces are source)
+#          lp/bench/{prv,prv-no-arith,synth,nrm_test}/**/*.but
+# Generated artifacts (.trace/.replay) for any suite with .but inputs
+# are reproducible via `make gen-traces` / `make gen-replays`, so
+# they're ignored.
+lp/bench/prv/**/*.trace
+lp/bench/prv/**/*.replay
+lp/bench/prv-no-arith/**/*.trace
+lp/bench/prv-no-arith/**/*.replay
+lp/bench/synth/**/*.trace
+lp/bench/synth/**/*.replay
+lp/bench/nrm_test/**/*.trace
+lp/bench/nrm_test/**/*.replay
 
 # Emitted/generated Lambdapi/PP files under the pp2lp package.
 lp/bench/**/*.lp

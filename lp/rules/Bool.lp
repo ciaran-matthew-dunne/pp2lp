@@ -1,6 +1,6 @@
 // Boolean (§A.15) — shallow encoding
 // BTRUE, BFALSE : τ ι with bool_cases (guarded by ϵ BOOL).
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- BOOL11/12: Context extension ----
 
@@ -120,3 +120,49 @@ begin
   assume P h;
   refine ⊥ₑ (bool_distinct (eq_sym h))
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// BOOL11/12: Schema 1 with antecedent introduction (HOAS).
+// BOOL21/22: Schema 1 passthrough through eq commutativity.
+// BOOL31/32/41/42: Schema 1 with the `V ϵ BOOL` side-condition.
+// BOOL51/52: Schema 0 — `bool_distinct` makes the antecedent ⊥.
+
+symbol BOOL11_1 [V : τ ι] [P : Prop]
+  (r : Res P) : Res ((V = BTRUE) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL12_1 [V : τ ι] [P : Prop]
+  (r : Res P) : Res ((V = BFALSE) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL21_1 [V : τ ι] [P : Prop]
+  (r : Res ((V = BTRUE) ⇒ P)) : Res ((BTRUE = V) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL22_1 [V : τ ι] [P : Prop]
+  (r : Res ((V = BFALSE) ⇒ P)) : Res ((BFALSE = V) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL31_1 [V : τ ι] [P : Prop]
+  (hb : π (V ϵ BOOL)) (r : Res ((V = BFALSE) ⇒ P))
+  : Res (¬ (V = BTRUE) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL32_1 [V : τ ι] [P : Prop]
+  (hb : π (V ϵ BOOL)) (r : Res ((V = BTRUE) ⇒ P))
+  : Res (¬ (V = BFALSE) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL41_1 [V : τ ι] [P : Prop]
+  (hb : π (V ϵ BOOL)) (r : Res ((V = BFALSE) ⇒ P))
+  : Res (¬ (BTRUE = V) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL42_1 [V : τ ι] [P : Prop]
+  (hb : π (V ϵ BOOL)) (r : Res ((V = BTRUE) ⇒ P))
+  : Res (¬ (BFALSE = V) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol BOOL51_1 [P : Prop] : Res ((BTRUE = BFALSE) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol BOOL52_1 [P : Prop] : Res ((BFALSE = BTRUE) ⇒ P) ≔ mk_1 ⊤ trust;

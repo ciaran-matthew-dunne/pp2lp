@@ -1,6 +1,6 @@
 // Equality rules (§A.13) — shallow encoding
 // Exp ≃ Exp becomes Leibniz equality (polymorphic)
-require open pp2lp.B pp2lp.Quant;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- EVR (equality reflexivity) ----
 
@@ -275,3 +275,116 @@ begin
   have hpf : π (P F) { rewrite heq; refine hp };
   refine ⊥ₑ (hnr hpf)
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// EVR1/4/11, EAXM1/2, ECTR1–6: Schema 0 leaves; res_tm = ⊤.
+// EVR2, EVR3: Schema 1 with specific equality bridges (¬=_idem, evr3_eq).
+// EAXM31, EAXM32, EIMP51, EIMP52, EAXM91, EAXM92, EQC1, EQC2, EQS1,
+// EQS2: Schema 1 passthrough.
+// OPR1, OPR2: Schema 1 via the opr1_eq / opr2_eq bridges.
+
+// EVR1: ¬(E=E) ⇒ P ≡ ⊥ ⇒ P ≡ ⊤ via stdlib's `=_idem` + `⊥⇒`.
+symbol EVR1_1 [E : τ ι] [P : Prop] : Res (¬ (E = E) ⇒ P) ≔ mk_1 ⊤ trust;
+
+// EVR2: Schema 1 — passthrough through stdlib's `¬=_idem`.
+symbol EVR2_1 [E : τ ι]
+  (r : Res ⊥) : Res (¬ (E = E))
+  ≔ mk_1 (res_tm r) (eq_trans (¬=_idem ι E) (res_eq r));
+
+// EVR3: Schema 1 — passthrough via the `evr3_eq` bridge.
+symbol EVR3_1 [E : τ ι] [P : Prop]
+  (r : Res P) : Res ((E = E) ⇒ P)
+  ≔ mk_1 (res_tm r) (eq_trans evr3_eq (res_eq r));
+
+// EVR4: trivial — `E = E = ⊤` via stdlib's `=_idem`.
+symbol EVR4_1 [E : τ ι] : Res (E = E) ≔ mk_1 ⊤ (=_idem ι E);
+
+// EVR11: numeric ≠ — trusted.
+symbol EVR11_1 [n m : τ ι] [P : Prop] : Res ((n = m) ⇒ P) ≔ mk_1 ⊤ trust;
+
+// EAXM1/EAXM2: hyp-driven contradictions, leaf form.
+symbol EAXM1_1 [E F : τ ι] [P : Prop] : Res ((E = F) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol EAXM2_1 [E F : τ ι] [P : Prop] : Res (¬ (E = F) ⇒ P) ≔ mk_1 ⊤ trust;
+
+// EAXM31/EAXM32: Schema 1 passthrough.
+symbol EAXM31_1 [E F : τ ι]
+  (r : Res (F = E)) : Res (E = F)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol EAXM32_1 [E F : τ ι]
+  (r : Res (¬ (F = E))) : Res (¬ (E = F))
+  ≔ mk_1 (res_tm r) trust;
+
+// EIMP51/EIMP52: Schema 1 passthrough.
+symbol EIMP51_1 [E F : τ ι] [P : Prop]
+  (r : Res P) : Res (¬ (E = F) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol EIMP52_1 [E F : τ ι] [P : Prop]
+  (r : Res P) : Res ((E = F) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+// EAXM91/EAXM92: Schema 1 passthrough through eq commutativity.
+symbol EAXM91_1 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q : Prop]
+  (r : Res Q) : Res ((q v = p v) ⇒ Q)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol EAXM92_1 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q : Prop]
+  (r : Res Q) : Res (¬ (q v = p v) ⇒ Q)
+  ≔ mk_1 (res_tm r) trust;
+
+// OPR1_1: Schema 1 via the opr1_eq bridge.
+symbol OPR1_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
+  (r : Res (x = E ⇒ P E)) : Res (x = E ⇒ P x)
+  ≔ mk_1 (res_tm r) (eq_trans (opr1_eq P x) (res_eq r));
+
+// OPR2_1: Schema 1 via the opr2_eq bridge.
+symbol OPR2_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
+  (r : Res (E = x ⇒ P E)) : Res (E = x ⇒ P x)
+  ≔ mk_1 (res_tm r) (eq_trans (opr2_eq P x) (res_eq r));
+
+// EQC1/EQC2: pair-equality decomposition, Schema 1 passthrough.
+symbol EQC1_1 [a b c d : τ ι] [P : Prop]
+  (r : Res ((¬ (a = c) ∨ ¬ (b = d)) ⇒ P))
+  : Res (¬ ((a ↦ b) = (c ↦ d)) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol EQC2_1 [a b c d : τ ι] [P : Prop]
+  (r : Res (((a = c) ∧ (b = d)) ⇒ P))
+  : Res (((a ↦ b) = (c ↦ d)) ⇒ P)
+  ≔ mk_1 (res_tm r) trust;
+
+// EQS1/EQS2: set-equality lifting, Schema 1 passthrough.
+symbol EQS1_1 [E F : τ ι] [R : Prop]
+  (r : Res ((E = F) ⇒ R)) : Res (eql_set E F ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol EQS2_1 [E F : τ ι] [R : Prop]
+  (r : Res (¬ (E = F) ⇒ R)) : Res (¬ eql_set E F ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+// ECTR1–6: hyp-driven contradictions, Schema 0 leaves.
+symbol ECTR1_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
+  : Res ((E = F) ⇒ P)
+  ≔ mk_1 ⊤ trust;
+
+symbol ECTR2_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
+  : Res ((F = E) ⇒ P)
+  ≔ mk_1 ⊤ trust;
+
+symbol ECTR3_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
+  : Res (¬ (P E) ⇒ Q)
+  ≔ mk_1 ⊤ trust;
+
+symbol ECTR4_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
+  : Res (¬ (P E) ⇒ Q)
+  ≔ mk_1 ⊤ trust;
+
+symbol ECTR5_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
+  : Res ((P E) ⇒ Q)
+  ≔ mk_1 ⊤ trust;
+
+symbol ECTR6_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
+  : Res ((P E) ⇒ Q)
+  ≔ mk_1 ⊤ trust;

@@ -12,29 +12,24 @@ small Python helpers under `bench/`.
 ## Commands
 
 ```
-# Build + check
-make                                 # alias for `make help`
-make build                           # dune build for ocaml/
-make check                           # full suite (default SUITE=og)
-make check NAME=01                   # one replay from bench/SUITE/
-make check REPLAY=bench/og/01.replay # one replay by path
-make check ARGS='-v'                 # extra flags to bench/check.py
-
-# Diagnostic dumps
-make tree NAME=27                    # rebuilt proof tree (residual on failure)
-make rules NAME=22                   # parsed (rule, arg, kind) listing
-
-# PP / replay generation (only if you have Atelier B's krt + .kin files)
-make gen-traces SUITE=prv            # .but → .trace
-make gen-replays SUITE=prv           # .trace → .replay   (debug-only)
-
-# Cleanup
-make clean-bench                     # lp/bench/ + lp/**/*.lpo
-make clean                           # also dune clean
-make repl                            # dune utop with project loaded
+make                       # help
+make build                 # dune build for ocaml/
+make check                 # og suite (default)
+make check og              # og suite
+make check prv             # prv suite
+make check og/01           # one replay
+make tree  og/27           # rebuilt proof tree (residual on failure)
+make rules og/22           # parsed (rule, arg, kind) listing
+make check og V=1          # verbose output
+make check og Q=1          # summary only
+make gen-traces prv        # .but → .trace (runs PP)
+make gen-replays prv       # .trace → .replay (debug-only)
+make clean-bench           # lp/bench/ + lp/**/*.lpo
+make clean                 # also dune clean
+make repl                  # dune utop with project loaded
 ```
 
-Variables: `SUITE` (default `og`), `NAME`, `REPLAY`, `ARGS`. `PP2LP_ROOT`
+Suites: `og` (default), `prv`, `prv-no-arith`, `synth`. `PP2LP_ROOT`
 is exported so symlinked checkouts work.
 
 ### The pp2lp binary directly
@@ -46,14 +41,8 @@ pp2lp rules REPLAY  # parsed (rule, arg, kind) lines, flags UNKNOWN rules
 pp2lp REPLAY        # alias for `emit`
 ```
 
-### check.py flags
-
-```
--q / --quiet      summary line only
--v / --verbose    include `ok` lines + per-replay timing
-```
-
-Outcomes per replay: `ok`, `FAIL`. Exit status is non-zero iff any FAIL.
+Outcomes per replay: `✓` (pass), `⚠` (pass with warnings), `✗` (fail).
+Exit status is non-zero iff any fail.
 
 ## Mental model
 
@@ -70,8 +59,7 @@ emits an `opaque symbol` whose body is a tactic script — each PP rule
 becomes a `refine RULE …` against a lemma in `lp/rules/`. Lambdapi then
 type-checks the symbol.
 
-Three rule shapes, decoded by `Rule_db.strip_suffix` / `is_primed` /
-`nary_count`:
+Three rule shapes, decoded by `Rule_db.strip_suffix` / `is_primed`:
 
 - **base** — `[AND2]`. Plain LP refine.
 - **`_1` primed** — `[AND2_1]`. Inside a Res-typed equality chain
@@ -92,7 +80,7 @@ phantoms: `is_phantom` raises `Failure "rule_db: unknown rule …"`.
 ocaml/src/
   lexer.mll          lex bracketed rule lines + annotations
   parser.mly         parse them
-  parse_replay.ml    .replay file → (rules list, goal)
+  parse_replay.ml    .replay file → rules list
   rule_db.ml         rule metadata: arity, suffix, phantom, emit-args
   proof_tree.ml      rules list → proof tree (replay-native rebuild)
   syntax_pp.ml       PP-side AST
@@ -107,11 +95,12 @@ ocaml/bin/main.ml    CLI: emit | tree | rules
 
 lp/
   lambdapi.pkg       package_name = pp2lp
-  B.lp               B-Book primitives + the intentional `trust` axiom (line 16)
+  B.lp               B-Book primitives + the intentional `trust` axiom (line 17)
+  ConjList.lp        n-ary conjunction (⋀) abstraction layer
   Rules.lp           top-level require-open for all rule files
-  rules/*.lp         per-section: Conj, Disj, Impl, Equiv, Neg, Axm,
-                     TrueFalse, All, Xst, Nrm, Eq, Arith, Bool, Res
-  Quant.lp           quantifier helpers
+  Quant.lp           quantifier helpers (!! ?? ♢ ♡)
+  rules/*.lp         per-section: All, Arith, Axm, Bool, Conj, Disj,
+                     Eq, Equiv, Impl, Neg, Nrm, Res, TrueFalse, Xst
   bench/<suite>/     emitted .lp files (gitignored)
 
 bench/
@@ -121,11 +110,10 @@ bench/
   gen_replays.py     .trace → .replay (REPLAY runner; debug only)
   format_lambdapi_json.py    pretty-print `lambdapi check --json` output,
                              ±3 lines of source context per error
-  og/                28 traces checked in (no .but files) + .expected_fail
-                     listing the 7 known-bad ones
+  og/                30 traces checked in (no .but files)
   prv/               Atelier B PRV corpus. .but checked in; .trace and
-                     .replay gitignored. Suite-wide status: currently
-                     **all-fail** — see “Known broken” below.
+                     .replay gitignored. Currently all-fail — see
+                     "Known broken" below.
 
 doc/
   spec_pp.md         PP specification (translated)
@@ -137,22 +125,21 @@ doc/
 
 ### Iterating on the emitter
 
-`make build` is fast. The `.claude/hooks/post-edit.sh` hook rebuilds
-after any Edit/Write under `ocaml/`, so the next `make check` uses
-fresh code. Build errors surface in the hook output.
+`make build` is fast. Run `make build` after editing OCaml source,
+then `make check` or `make check og/01` to test.
 
-Single-trace round trip: `make check NAME=01`. Output is `ok …` /
-`FAIL …` with a one-line summary. The lambdapi diagnostic
-gets ±3 lines of source context pointing into `lp/bench/SUITE/NAME.lp`.
+Single-trace round trip: `make check og/01`. Output is `✓` / `✗`
+with detail on failure. The lambdapi diagnostic gets ±3 lines of
+source context pointing into `lp/bench/SUITE/NAME.lp`.
 
 ### Debugging a failing trace
 
 Order of escalation:
 
-1. `make check NAME=…` — see the lambdapi error in source context.
-2. `make tree  NAME=…` — see the rebuilt proof tree (or the residual
+1. `make check og/01` — see the lambdapi error in source context.
+2. `make tree  og/01` — see the rebuilt proof tree (or the residual
    stack if the rebuild itself failed).
-3. `make rules NAME=…` — dump the parsed `(rule, arg, kind)` lines.
+3. `make rules og/01` — dump the parsed `(rule, arg, kind)` lines.
    Look for `UNKNOWN`: that means `rule_db.ml` is missing an entry.
 4. `Read lp/bench/SUITE/NAME.lp` — the emitted file, at the reported
    `offset`. Files can be large; use `offset` / `limit`.
@@ -177,9 +164,9 @@ begin
 end;
 ```
 
-Run `lambdapi check lp/rules/Foo_probe.lp`. Delete when done. `*.lpo`
-is gitignored, and the post-edit hook clears `lp/**/*.lpo` on any
-`lp/` edit so the next check re-elaborates.
+Run `lambdapi check lp/rules/Foo_probe.lp`. **Delete when done** —
+probe files must not be committed. `*.lpo` is gitignored; run
+`make clean-bench` if stale `.lpo` files cause compatibility errors.
 
 For scoped traces, wrap a region in `debug +u;` / `debug -u;` (or `+a`
 for all).
@@ -187,19 +174,20 @@ for all).
 ### Adding a corpus trace
 
 1. Drop `name.but` in `lp/bench/SUITE/`.
-2. `make gen-traces SUITE=SUITE` — runs PP, writes `name.trace`.
-3. `make check NAME=name` — emit + lambdapi check.
+2. `make gen-traces SUITE` — runs PP, writes `name.trace`.
+3. `make check SUITE/name` — emit + lambdapi check.
 
 ### Pre-commit audit
 
 1. `make check` — verify all pass.
-2. `Grep '≔ begin admit end' lp/` — only `lp/B.lp:16` (`trust`)
-   should match. (Tactic-language builtins come from `Stdlib.Tactic`;
-   those are meta-level bindings, not proof-position admits.)
+2. `Grep '≔ begin admit end' lp/` — only `lp/B.lp:17` (`trust`)
+   should match.
 3. `Grep 'refine trust;\s*$' lp/bench/og/` — no whole-goal `trust`
    in any emitted file. Inline `trust` (as an argument to a refine)
    is fine and documented; a bare `refine trust;` means the emitter
    gave up.
+4. No probe files (`*_probe.lp`, `*_test.lp`, `*_experiment.lp`)
+   under `lp/`.
 
 The prv suite is exempt — see below.
 
@@ -209,8 +197,8 @@ The prv suite is exempt — see below.
   - `INST_FINAL(pred | exp | FAUX)` — three-piece pipe argument,
     parser only knows the two-piece form (`parser.mly:106-110`).
   - Several traces (e.g. `eq_020`) leave many nodes on the stack —
-    `make tree NAME=eq_020 SUITE=prv` shows the residual.
-  Don't run `make check SUITE=prv` as a gate until these are fixed.
+    `make tree prv/eq_020` shows the residual.
+  Don't run `make check prv` as a gate until these are fixed.
 
 ## PP limitations
 
@@ -228,7 +216,7 @@ Show up regularly when authoring goals:
 
 ## Admits / trust categories
 
-- **`lp/B.lp:16` — `symbol trust : π P`.** Intentional. The only
+- **`lp/B.lp:17` — `symbol trust : π P`.** Intentional. The only
   declared `axiom`/`admit` in `lp/`.
 - **Emitted `trust` at use sites.** The emitter passes `trust` for
   inline side-condition arguments where PP's check is solver-confirmed
@@ -236,7 +224,7 @@ Show up regularly when authoring goals:
   Categories (see `doc/rules.md`):
   - BOOL31–42 — `V ϵ BOOL` membership
   - INS arithmetic-match conjuncts
-  - AR2–AR9, AR13 — solver-confirmed numeric side conditions
+  - AR2, AR10, AR13 — solver-confirmed side conditions
 - **Unsupported shapes.** `translate.ml` should `failwith` rather than
   emit a whole-goal `trust`. New shapes get explicit dispatch.
 
@@ -266,19 +254,22 @@ names raise.
 | `rule_db: unknown rule "X"`                            | `proof_tree.ml`/`rule_db.ml`       | Add `X` to `rule_db.ml` (arity / phantom / hoas_identity).        |
 | `rule_db: X unsupported arity N`                       | `proof_tree.ml`                    | Review the rule's slot kinds in `rule_db.ml`.                      |
 | `translate: X arity N unsupported`                     | `translate.ml`                     | New rule shape needs a dispatch arm.                               |
-| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | `make tree NAME=…` shows the residual; an earlier rule has wrong arity. |
+| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | `make tree SUITE/NAME` shows the residual; an earlier rule has wrong arity. |
 | `tree-build error: X expected a child but stack is empty` | `proof_tree.ml`                 | Wrong arity for an earlier rule.                                   |
 | `parse error in PATH: …`                               | `parser.mly` / `parse_replay.ml`   | Bad replay line; inspect the column reported.                      |
-| `File X.lpo is incompatible with current binary`       | lambdapi                           | Hook should clear; otherwise `make clean-bench`.                   |
+| `File X.lpo is incompatible with current binary`       | lambdapi                           | `make clean-bench`.                                                |
 | `package X cannot be mapped under the library root`    | lambdapi                           | Missing `lambdapi.pkg`. `lp/lambdapi.pkg` covers the whole package. |
 
 ## Suites
 
-- **og** — 28 traces checked in. The smoke-test floor. No `.but`
+- **og** — 30 traces checked in. The smoke-test floor. No `.but`
   files (the traces are the source of truth).
 - **prv** — Atelier B PRV corpus. `.but` checked in; `.trace` and
   `.replay` gitignored. Currently all-fail; see Known broken.
-- **prv-no-arith** — Non-arithmetic subset of the PRV suite. Used to isolate and debug translation and proof failures without arithmetic solver noise.
+- **prv-no-arith** — Non-arithmetic subset of the PRV suite. Used to
+  isolate and debug translation and proof failures without arithmetic
+  solver noise.
+- **synth** — Synthetic `.but` files for targeted feature testing.
 
 ## Commits
 

@@ -5,7 +5,7 @@
 // `♢_eq_!!` / `♡_eq_!!` axioms in Quant.lp; bodies use the dedicated
 // `pi_to_♢` / `♢_to_pi` (and ♡ analogues) bridges.
 
-require open pp2lp.B pp2lp.Quant;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- NRM1-7: Logical transformations under `♢` ----
 
@@ -359,3 +359,13 @@ end;
 //   → ♢… · ¬R  ⊢  ♡(x₁,...,xₙ) · ¬(P ∧ ⋯ ∧ Q)
 // NRM28-30: variants with solver dispatch.
 // TODO: implement once Arith.lp solver rules are wired.
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// Per discussion, no NRM_1 rules are emitted in the current corpus.
+// NRM1_1 is the lone exception — it strips a constant ♢-binder via
+// `nrm1_eq`, mirroring NRM1's role at the chain level.
+
+symbol NRM1_1 [n] [P Q : Prop]
+  (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));

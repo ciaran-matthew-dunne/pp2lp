@@ -1,5 +1,5 @@
 // Equivalence (§A.4) — shallow encoding
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // EQV1: H ⊢ P ⇒ (¬Q ⇒ R); H ⊢ ¬P ⇒ (Q ⇒ R) → H ⊢ ¬(P ⇔ Q) ⇒ R
 opaque symbol EQV1 [P Q R]
@@ -89,3 +89,34 @@ begin
   assume P Q h1 h2;
   refine ∧ᵢ h1 h2
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+
+// EQV1_1: Schema 2 — combine.
+symbol EQV1_1 [P Q R : Prop]
+  (r1 : Res (P ⇒ ¬ Q ⇒ R)) (r2 : Res (¬ P ⇒ Q ⇒ R))
+  : Res (¬ (P ⇔ Q) ⇒ R)
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans eqv1_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// EQV2_1: Schema 2 — combine.
+symbol EQV2_1 [P Q : Prop]
+  (r1 : Res (P ⇒ ¬ Q)) (r2 : Res (¬ Q ⇒ P))
+  : Res (¬ (P ⇔ Q))
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans eqv2_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// EQV3_1: Schema 2 — combine.
+symbol EQV3_1 [P Q R : Prop]
+  (r1 : Res (P ⇒ Q ⇒ R)) (r2 : Res (¬ P ⇒ ¬ Q ⇒ R))
+  : Res ((P ⇔ Q) ⇒ R)
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans eqv3_eq (conj_eq (res_eq r1) (res_eq r2)));
+
+// EQV4_1: Schema 2 — combine. `⇔` reduces to `(⇒) ∧ (⇒)` in stdlib,
+// so the equality bridge is just reflexivity.
+symbol EQV4_1 [P Q : Prop]
+  (r1 : Res (P ⇒ Q)) (r2 : Res (Q ⇒ P))
+  : Res (P ⇔ Q)
+  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
+      (eq_trans eqv4_eq (conj_eq (res_eq r1) (res_eq r2)));

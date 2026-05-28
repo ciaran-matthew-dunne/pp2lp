@@ -1,5 +1,5 @@
 // TRUE/FALSE (§A.9) / STOP (§A.10) / INS (§A.11) — shallow encoding
-require open pp2lp.B;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // ---- TRUE (§A.9) ----
 
@@ -73,3 +73,48 @@ end;
 // directly from the hypothesis context, emitting:
 //   refine !!_to_pi _ h_univ witness (∧ᵢ h₁ … hₙ)
 // See translate.ml:find_ins_contradiction.
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// Schema 0 (rules without genuine antecedents, except STOP): Result is
+// TRUE — encoded as `mk_1 ⊤ (eq lemma)` where the lemma is propositional.
+// Schema 1 (passthrough): res_tm = child's res_tm.
+// STOP_1 (Schema 0 special — STOP'): Result is P (the goal itself).
+
+// STOP_1: leaf of every chain. res_tm = P (the implicit goal).
+symbol STOP_1 [P : Prop] : Res P
+  ≔ mk_1 P (eq_refl P);
+
+// VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤.
+symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_1 ⊤ trust;
+
+// VR2_1: Schema 1 — child's Res ⊥ becomes Res (¬⊤). Uses stdlib's
+// `¬⊥ : π (¬⊥ = ⊤)` after swapping the direction.
+symbol VR2_1
+  (r : Res ⊥) : Res (¬ ⊤)
+  ≔ mk_1 ⊤ trust;
+
+// VR3_1: Schema 1 — passthrough. Uses stdlib's `⊤⇒ P : π ((⊤ ⇒ P) = P)`.
+symbol VR3_1 [P : Prop]
+  (r : Res P) : Res (⊤ ⇒ P)
+  ≔ mk_1 (res_tm r) (eq_trans (⊤⇒ P) (res_eq r));
+
+// VR4_1: Schema 0 — trivially `⊤ = ⊤`.
+symbol VR4_1 : Res ⊤ ≔ mk_1 ⊤ (eq_refl ⊤);
+
+// FX1_1: Schema 1 — passthrough through `¬⊥ ⇒ R = R`.
+symbol FX1_1 [R : Prop]
+  (r : Res R) : Res (¬ ⊥ ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+// FX2_1: Schema 0 — `¬⊥ = ⊤` from stdlib.
+symbol FX2_1 : Res (¬ ⊥) ≔ mk_1 ⊤ ¬⊥;
+
+// FX3_1: Schema 0 — `⊥ ⇒ R = ⊤` from stdlib.
+symbol FX3_1 [R : Prop] : Res (⊥ ⇒ R) ≔ mk_1 ⊤ (⊥⇒ R);
+
+// INS_1: Schema 1 — passthrough. The chain leaf is supplied by PP's
+// instantiation phase; LP-side carries res_tm through.
+symbol INS_1 [P : Prop]
+  (r : Res ⊥) : Res P
+  ≔ mk_1 ⊤ trust;

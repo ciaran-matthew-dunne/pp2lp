@@ -169,7 +169,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR7" pass ~emit_args:(Some "dynamic:ar78");
   r "AR8" pass ~emit_args:(Some "dynamic:ar78");
   r "AR9" pass ~emit_args:(Some "dynamic:ar9");
-  r "AR10" (Arity []);
+  r "AR10" (Arity [Con; Seq]) ~emit_args:(Some "dynamic:ar10");
   r "AR11" leaf;
   r "AR12" pass ~intro_antecedent:true;
   r "AR13" (Arity [Con; Con; Seq]) ~emit_args:(Some "trust trust");
@@ -217,18 +217,6 @@ let is_primed rule =
     else false
   | _ -> false
 
-let nary_count rule =
-  match String.rindex_opt rule '_' with
-  | Some i when i > 0 && i < String.length rule - 1 ->
-    let suffix = String.sub rule (i + 1) (String.length rule - i - 1) in
-    (try int_of_string suffix with _ -> 1)
-  | _ -> 1
-
-let is_nrm_step name =
-  String.starts_with ~prefix:"NRM" name &&
-  String.length name > 3 &&
-  (let c = name.[3] in c >= '0' && c <= '9')
-
 (* Trace rules use the suffixed form (FOO_1, FOO_3, FOO_1_3).  Look up
    metadata under the base name. *)
 let base_of name =
@@ -241,12 +229,6 @@ let lookup name = Hashtbl.find_opt rules (base_of name)
 (* --- Lookup helpers ------------------------------------------------ *)
 
 let is_known name = lookup name <> None
-
-let is_unsupported name =
-  String.length (base_of name) >= 2 &&
-  (base_of name).[0] = 'A' && (base_of name).[1] = 'R' &&
-  String.length (base_of name) > 2 &&
-  (base_of name).[2] >= '0' && (base_of name).[2] <= '9'
 
 let is_phantom name =
   match lookup name with

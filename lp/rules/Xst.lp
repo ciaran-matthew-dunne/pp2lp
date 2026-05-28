@@ -10,7 +10,7 @@
 // nested forms are *definitionally equal* — XST1–4 are identity in
 // HOAS.
 
-require open pp2lp.B pp2lp.Quant;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // Helper: compound → nested for `??`. Defined by rewrite rule on
 // the tuple constructor; pattern-match exposes (w ⨾ a) shape.
@@ -158,3 +158,61 @@ begin
     =⇒ (res_eq (ρ v))
        (λ hpv, hne (pi_to_??_intro P v hpv))))
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// XST1–XST4: compound↔nested conversions for `??` — HOAS-identity at
+// the value level; res_tm propagates via a trusted equality bridge.
+// XST5–XST6 and XST51/XST61: Schema 1 passthrough.
+// XST7_1: Schema 1 via the `xst7_eq` bridge.
+// XST8_1: special — chain-shaped, see below.
+
+symbol XST1_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  (r : Res (¬ (`?? v : Tuple (+1 n), P v) ⇒ R))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST2_1 [n] [P : Tuple (+1 n) → Prop]
+  (r : Res (¬ (`?? v : Tuple (+1 n), P v)))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)))
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST3_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  (r : Res ((`?? v : Tuple (+1 n), P v) ⇒ R))
+  : Res ((`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST4_1 [n] [P : Tuple (+1 n) → Prop]
+  (r : Res (`?? v : Tuple (+1 n), P v))
+  : Res (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST5_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res ((`!! v, ¬ (P v)) ⇒ R))
+  : Res (¬ (`?? v, P v) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST51_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res ((`!! v, P v) ⇒ R))
+  : Res (¬ (`?? v, ¬ (P v)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST6_1 [n] [P : Tuple n → Prop]
+  (r : Res (`!! v, ¬ (P v)))
+  : Res (¬ (`?? v, P v))
+  ≔ mk_1 (res_tm r) trust;
+
+symbol XST61_1 [n] [P : Tuple n → Prop]
+  (r : Res (`!! v, P v))
+  : Res (¬ (`?? v, ¬ (P v)))
+  ≔ mk_1 (res_tm r) trust;
+
+// XST7_1: (∃-block, P) ⇒ R via (∀-block, P ⇒ R).
+symbol XST7_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res (`!! v, P v ⇒ R)) : Res ((`?? v, P v) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans xst7_eq (res_eq r));
+
+// XST8_1 (XST8'): chain leaf for ∃ — packaging ((`!! v, ¬P v) ⇒ ⊥).
+symbol XST8_1 [n] [P : Tuple n → Prop]
+  (r : Res ((`!! v, ¬ (P v)) ⇒ ⊥)) : Res (`?? v, P v)
+  ≔ mk_1 (res_tm r) (eq_trans xst8_eq (res_eq r));

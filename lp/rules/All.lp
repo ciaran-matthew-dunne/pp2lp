@@ -16,7 +16,7 @@
 // direction (nested → compound) is provable by a rewrite rule that
 // pattern-matches on the constructor.
 
-require open pp2lp.B pp2lp.Quant;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
 
 // Helper: nested → compound. Defined by rewrite rule on the
 // tuple constructor `($w ⨾ $a)`. Used by ALL2, ALL3.
@@ -130,3 +130,72 @@ begin
   assume n T Q h hheart;
   refine h (=⇒ (♡_eq_!! T) hheart)
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// ALL1–ALL6: Schema 1 passthrough. ALL1–4 are compound↔nested
+// conversions whose LP encoding is HOAS-identity at the value level;
+// res_tm propagates via `trust` for the equality bridge between the
+// compound and nested forms.
+// ALL5: Schema 1 — passthrough through the `¬∀ ⇒ R = ∀ ¬ ⇒ R` bridge.
+// ALL6: Schema 1 — passthrough through `¬P ≡ P ⇒ ⊥`.
+// ALL7' / ALL8' / ALL9': special cases (see spec §8.13).
+
+symbol ALL1_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  (r : Res (¬ (`!! v : Tuple (+1 n), P v) ⇒ R))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol ALL2_1 [n] [P : Tuple (+1 n) → Prop]
+  (r : Res (¬ (`!! v : Tuple (+1 n), P v)))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)))
+  ≔ mk_1 (res_tm r) trust;
+
+symbol ALL3_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  (r : Res ((`!! v : Tuple (+1 n), P v) ⇒ R))
+  : Res ((`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol ALL4_1 [n] [P : Tuple (+1 n) → Prop]
+  (r : Res (`!! v : Tuple (+1 n), P v))
+  : Res (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y))
+  ≔ mk_1 (res_tm r) trust;
+
+symbol ALL5_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res (`!! v, ¬ (P v) ⇒ R))
+  : Res (¬ (`!! v, P v) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+symbol ALL6_1 [n] [P : Tuple n → Prop]
+  (r : Res ((`!! v, P v) ⇒ ⊥))
+  : Res (¬ (`!! v, P v))
+  ≔ mk_1 (res_tm r) (res_eq r);
+
+// ALL7_1 (ALL7'): branching quantifier — per-tuple Res chain ρ +
+// continuation r. The continuation premise uses `♢`
+// (post-normalisation form per spec).
+opaque symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
+  (ρ : Π v : Tuple n, Res (P v))
+  (r : Res ((`♢ v, res_tm (ρ v)) ⇒ Q))
+  : Res ((`!! v, P v) ⇒ Q) ≔
+begin
+  assume n P Q ρ r;
+  refine mk_1 (res_tm r) _;
+  have h1 : π ((`!! v, P v) = (`♢ v, res_tm (ρ v)))
+    { refine eq_trans (!!_cong (λ v, res_eq (ρ v)))
+        (eq_sym (♢_eq_!! (λ v, res_tm (ρ v)))) };
+  have h2 : π (((`!! v, P v) ⇒ Q) = ((`♢ v, res_tm (ρ v)) ⇒ Q))
+    { rewrite h1; reflexivity };
+  refine eq_trans h2 (res_eq r)
+end;
+
+// ALL8_1 (ALL8'): congruence under ∀-block.
+symbol ALL8_1 [n] [P : Tuple n → Prop]
+  (ρ : Π v : Tuple n, Res (P v)) : Res (`!! v, P v)
+  ≔ mk_1 (`!! v, res_tm (ρ v))
+           (!!_cong (λ v, res_eq (ρ v)));
+
+// ALL9_1 (ALL9'): same shape as IMP4_1 — H ⇒ continuation.
+symbol ALL9_1 [H Q : Prop]
+  (r : Res Q) : Res (H ⇒ Q)
+  ≔ mk_1 (H ⇒ res_tm r) (imp_cong_r (res_eq r));

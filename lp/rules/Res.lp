@@ -1,31 +1,18 @@
-// Res.lp — Σ-type encoding of normalisation chains, self-contained.
+// Res.lp — helpers shared by the per-rule `_1` (Result) variants.
 //
-// `Res t = (t' : τ a) × π (t = t')` packages a normalised term with a
-// proof of equality to the original.  Each `_1` rule consumes child
-// Res values and produces a new Res; chains are term-level function
-// compositions (e.g. `AND2_1 (VR3_1 STOP_1)`) where `res_tm`
-// projects the final normal form and `res_eq` projects the cumulative
-// equality witness.  No external `_1` lemmas; every proof is inline.
+// Each `_1` rule lives in its own topic file (Conj.lp, Disj.lp, …);
+// this file collects the cross-cutting infrastructure they share:
 //
-// Helper structure:
 //   - generic equality combinators (eq_trans, conj_eq, ∧_assoc, …)
-//   - per-connective equality lemmas (and1_eq, and2_eq, …) — these are
+//   - per-connective equality lemmas (and1_eq, or1_eq, …) — these are
 //     just propositional facts about the connective transformations
 //     specified by §A of the PP rule reference
-//   - the `_1` rules themselves
-//   - the `left_∧` autoflatten combinator (used by AND4_1 so chained
-//     AND4s reduce to a left-associated conjunction without explicit
-//     ∧_assoc rewrites at the call site)
-//   - `ALL7_close` / `XST8_close` chain-exit operators that re-package
-//     a per-tuple Res chain into the propositional form expected by
-//     All.lp / Xst.lp. Quantifier-related symbols are arity-uniform
-//     over `Tuple n`.
+//   - special bridges (opr1_eq, opr2_eq, xst7_eq, xst8_eq, nrm1_eq)
+//
+// The `Res`, `mk_1`, `res_tm`, `res_eq` primitives themselves live in
+// Quant.lp so that All.lp / Xst.lp can refer to them.
 
-require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.All pp2lp.rules.Xst;
-
-// (Res infrastructure — Res, mk_1, res_tm, res_eq — has moved to
-//  Quant.lp so it's available to All.lp/Xst.lp where the result-based
-//  ALL7 / XST8 are now defined.)
+require open pp2lp.B pp2lp.ConjList pp2lp.Quant;
 
 // ============================================================
 // Generic equality combinators
@@ -64,13 +51,15 @@ begin
     { assume h hc; refine h (fwd hc) }
 end;
 
-// (`!!_cong` — pointwise equality lifts to `!!` equality —
-//  is provided by Quant.lp.)
-
 // Implication right congruence.
 opaque symbol imp_cong_r [P Q R : Prop]
   : π (Q = R) → π ((P ⇒ Q) = (P ⇒ R)) ≔
 begin assume P Q R h; rewrite h; reflexivity end;
+
+// Implication left congruence.
+opaque symbol imp_cong_l [P P' Q : Prop]
+  : π (P = P') → π ((P ⇒ Q) = (P' ⇒ Q)) ≔
+begin assume P P' Q h; rewrite h; reflexivity end;
 
 // Strip a known antecedent: π P → ((P ⇒ Q) = Q).
 opaque symbol imp_known_drop [P Q : Prop]
@@ -82,21 +71,26 @@ begin
   { assume hq hp2; refine hq }
 end;
 
+// LHS-of-≤-zero congruence (for AR9_1).
+opaque symbol leq_zero_eq [E F : τ ι]
+  : π (E = F) → π ((E ≤ 𝟎) = (F ≤ 𝟎)) ≔
+begin assume E F h; rewrite h; reflexivity end;
+
 // ============================================================
 // Per-connective equality lemmas (§A.1–A.5, A.13)
 // ============================================================
 
 // AND1: ¬(⋀ ps)⇒R = (¬(last ps)⇒R) ∧ (¬(init ps)⇒R)
 symbol and1_eq [ps : 𝕃 o] [R : Prop]
-  : π ((¬ ⋀ ps ⇒ R) = ((¬ (last ⊤ ps) ⇒ R) ∧ (¬ ⋀_init (⋀ ps) ⇒ R)));
+  : π ((¬ ⋀ ps ⇒ R) = ((¬ ⋀_last (⋀ ps) ⇒ R) ∧ (¬ ⋀_init (⋀ ps) ⇒ R)));
 
 // AND2: ¬(⋀ ps) = (init ps ⇒ ¬(last ps))
 symbol and2_eq [ps : 𝕃 o]
-  : π (¬ ⋀ ps = (⋀_init (⋀ ps) ⇒ ¬ (last ⊤ ps)));
+  : π (¬ ⋀ ps = (⋀_init (⋀ ps) ⇒ ¬ ⋀_last (⋀ ps)));
 
 // AND3: (⋀ ps)⇒R = (init ps ⇒ last ps ⇒ R)
 symbol and3_eq [ps : 𝕃 o] [R : Prop]
-  : π ((⋀ ps ⇒ R) = (⋀_init (⋀ ps) ⇒ (last ⊤ ps ⇒ R)));
+  : π ((⋀ ps ⇒ R) = (⋀_init (⋀ ps) ⇒ (⋀_last (⋀ ps) ⇒ R)));
 
 // OR1: ¬(P∨Q)⇒R = (¬P⇒¬Q⇒R)
 opaque symbol or1_eq [P Q R : Prop]
@@ -210,6 +204,27 @@ begin
           refine ⊥ₑ (hneqv heqv) } } }
 end;
 
+// EQV2: ¬(P⇔Q) = (P⇒¬Q) ∧ (¬Q⇒P)
+opaque symbol eqv2_eq [P Q : Prop]
+  : π (¬ (P ⇔ Q) = ((P ⇒ ¬ Q) ∧ (¬ Q ⇒ P))) ≔
+begin
+  assume P Q;
+  refine propExt _ _ _ _
+    { assume hneqv;
+      refine ∧ᵢ
+        (λ hp hq,
+          hneqv (∧ᵢ (λ h0, hq) (λ h0, hp)))
+        (λ hnq, ¬¬ₑ P (λ hnp,
+          hneqv (∧ᵢ (λ hp, ⊥ₑ (hnp hp)) (λ hq, ⊥ₑ (hnq hq))))) }
+    { assume hand heqv;
+      refine ∨ₑ (em Q) _ _
+        { assume hq; refine ∧ₑ₁ hand (∧ₑ₂ heqv hq) hq }
+        { assume hnq;
+          have hp : π P { refine ∧ₑ₂ hand hnq };
+          have hq : π Q { refine ∧ₑ₁ heqv hp };
+          refine hnq hq } }
+end;
+
 // EQV3: (P⇔Q)⇒R = (P⇒Q⇒R) ∧ (¬P⇒¬Q⇒R)
 opaque symbol eqv3_eq [P Q R : Prop]
   : π (((P ⇔ Q) ⇒ R) = ((P ⇒ (Q ⇒ R)) ∧ (¬ P ⇒ (¬ Q ⇒ R)))) ≔
@@ -233,6 +248,11 @@ begin
           refine ⊥ₑ (hnp hp) }
         { assume hnq; refine ∧ₑ₂ h hnp hnq } } }
 end;
+
+// EQV4: (P⇔Q) = (P⇒Q) ∧ (Q⇒P). Definitional in stdlib (⇔ ≔ λp q, …).
+opaque symbol eqv4_eq [P Q : Prop]
+  : π ((P ⇔ Q) = ((P ⇒ Q) ∧ (Q ⇒ P))) ≔
+begin assume P Q; reflexivity end;
 
 // NOT1: ¬¬P⇒R = (P⇒R)
 opaque symbol not1_eq [P R : Prop]
@@ -317,206 +337,3 @@ begin
     { refine eq_trans (♢_eq_!! (λ _ : Tuple n, P)) (!!_const [n] P) };
   rewrite h1; reflexivity
 end;
-
-// ============================================================
-// left_∧: left-fold combinator for AND4 chains
-// ============================================================
-// `left_∧ x y` left-folds x into the binary ∧-tree y, accumulating on
-// the left.  Fires automatically and correctly at any chain depth:
-//   left_∧ r (q ∧ p)       ↪ left_∧ (left_∧ r q) p ↪ (r ∧ q) ∧ p
-//   left_∧ d ((c ∧ b) ∧ a) ↪ left_∧ (left_∧ d (c ∧ b)) a ↪ ((d ∧ c) ∧ b) ∧ a
-sequential symbol left_∧ : τ o → τ o → τ o;
-rule left_∧ $x ($a ∧ $b) ↪ left_∧ (left_∧ $x $a) $b
-with left_∧ $x $y ↪ $x ∧ $y;
-
-// ============================================================
-// Res leaf
-// ============================================================
-
-symbol STOP_1 [P : Prop] : Res P
-  ≔ mk_1 P (eq_refl P);
-
-// ============================================================
-// Res passthrough rules
-// ============================================================
-
-symbol AND2_1 [ps : 𝕃 o]
-  (r : Res (⋀_init (⋀ ps) ⇒ ¬ (last ⊤ ps))) : Res (¬ ⋀ ps)
-  ≔ mk_1 (res_tm r) (eq_trans and2_eq (res_eq r));
-
-symbol AND3_1 [ps : 𝕃 o] [R : Prop]
-  (r : Res (⋀_init (⋀ ps) ⇒ (last ⊤ ps ⇒ R))) : Res (⋀ ps ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans and3_eq (res_eq r));
-
-symbol OR1_1 [P Q R : Prop]
-  (r : Res (¬ P ⇒ ¬ Q ⇒ R)) : Res (¬ (P ∨ Q) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans or1_eq (res_eq r));
-
-symbol OR4_1 [P Q : Prop]
-  (r : Res (¬ P ⇒ Q)) : Res (P ∨ Q)
-  ≔ mk_1 (res_tm r) (eq_trans (or4_eq P Q) (res_eq r));
-
-symbol NOT1_1 [P R : Prop]
-  (r : Res (P ⇒ R)) : Res (¬ ¬ P ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans not1_eq (res_eq r));
-
-symbol NOT2_1 [P : Prop]
-  (r : Res P) : Res (¬ ¬ P)
-  ≔ mk_1 (res_tm r) (eq_trans (¬¬ₑ_eq P) (res_eq r));
-
-symbol IMP1_1 [P Q R : Prop]
-  (r : Res (P ⇒ ¬ Q ⇒ R)) : Res (¬ (P ⇒ Q) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans imp1_eq (res_eq r));
-
-symbol VR3_1 [P : Prop]
-  (r : Res P) : Res (⊤ ⇒ P)
-  ≔ mk_1 (res_tm r) (eq_trans (⊤⇒ P) (res_eq r));
-
-symbol EVR2_1 [E : τ ι]
-  (r : Res ⊥) : Res (¬ (E = E))
-  ≔ mk_1 (res_tm r) (eq_trans (¬=_idem ι E) (res_eq r));
-
-symbol EVR3_1 [E : τ ι] [P : Prop]
-  (r : Res P) : Res ((E = E) ⇒ P)
-  ≔ mk_1 (res_tm r) (eq_trans evr3_eq (res_eq r));
-
-
-symbol OPR1_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
-  (r : Res (x = E ⇒ P E)) : Res (x = E ⇒ P x)
-  ≔ mk_1 (res_tm r) (eq_trans (opr1_eq P x) (res_eq r));
-
-symbol OPR2_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
-  (r : Res (E = x ⇒ P E)) : Res (E = x ⇒ P x)
-  ≔ mk_1 (res_tm r) (eq_trans (opr2_eq P x) (res_eq r));
-
-// ============================================================
-// Res structural rules
-// ============================================================
-
-// IMP4_1: congruence of ⇒ on the right (P doesn't depend on context).
-symbol IMP4_1 [P Q : Prop]
-  (r : Res Q) : Res (P ⇒ Q)
-  ≔ mk_1 (P ⇒ res_tm r) (imp_cong_r (res_eq r));
-
-// Helpers used below.
-opaque symbol imp_cong_l [P P' Q : Prop]
-  : π (P = P') → π ((P ⇒ Q) = (P' ⇒ Q)) ≔
-begin assume P P' Q h; rewrite h; reflexivity end;
-
-opaque symbol leq_zero_eq [E F : τ ι]
-  : π (E = F) → π ((E ≤ 𝟎) = (F ≤ 𝟎)) ≔
-begin assume E F h; rewrite h; reflexivity end;
-
-// AR9_1: solver-confirmed equality on the antecedent of a Res chain.
-// Mirrors the spec AR9 but in Res form: given a bridge proof E = F, a
-// chain proving (F ≤ 0 ⇒ R) lifts to one for (E ≤ 0 ⇒ R). F is
-// explicit so emit sites can pin it via the PP-supplied solver result.
-// Transparent — `res_tm (AR9_1 F he r)` reduces to `res_tm r` so the
-// outer chain can decompose the resulting Prop.
-symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop]
-  (he : π (E = F))
-  (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (leq_zero_eq he)) (res_eq r));
-
-// IMP5_1: strip a known antecedent (hp : π P) — collapses the ⇒.
-symbol IMP5_1 [P Q : Prop]
-  (hp : π P) (r : Res Q) : Res (P ⇒ Q)
-  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop hp) (res_eq r));
-
-// ALL9_1: same shape as IMP4_1 — H ⇒ continuation.
-symbol ALL9_1 [H Q : Prop]
-  (r : Res Q) : Res (H ⇒ Q)
-  ≔ mk_1 (H ⇒ res_tm r) (imp_cong_r (res_eq r));
-
-// NRM1_1: strip constant ♢-binder.
-symbol NRM1_1 [n] [P Q : Prop]
-  (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
-  ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));
-
-// ALL8_1: congruence under ∀-block.
-symbol ALL8_1 [n] [P : Tuple n → Prop]
-  (ρ : Π v : Tuple n, Res (P v)) : Res (`!! v, P v)
-  ≔ mk_1 (`!! v, res_tm (ρ v))
-           (!!_cong (λ v, res_eq (ρ v)));
-
-// XST7_1: (∃-block, P) ⇒ R via (∀-block, P ⇒ R).
-symbol XST7_1 [n] [P : Tuple n → Prop] [R : Prop]
-  (r : Res (`!! v, P v ⇒ R)) : Res ((`?? v, P v) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans xst7_eq (res_eq r));
-
-// XST8_1: ∃-block, P via ((∀-block, ¬P) ⇒ ⊥).
-symbol XST8_1 [n] [P : Tuple n → Prop]
-  (r : Res ((`!! v, ¬ (P v)) ⇒ ⊥)) : Res (`?? v, P v)
-  ≔ mk_1 (res_tm r) (eq_trans xst8_eq (res_eq r));
-
-// ALL7_1: branching quantifier — per-tuple Res chain ρ + continuation r.
-//   Continuation premise uses `♢` (post-normalisation form per spec).
-opaque symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
-  (ρ : Π v : Tuple n, Res (P v))
-  (r : Res ((`♢ v, res_tm (ρ v)) ⇒ Q))
-  : Res ((`!! v, P v) ⇒ Q) ≔
-begin
-  assume n P Q ρ r;
-  refine mk_1 (res_tm r) _;
-  have h1 : π ((`!! v, P v) = (`♢ v, res_tm (ρ v)))
-    { refine eq_trans (!!_cong (λ v, res_eq (ρ v)))
-        (eq_sym (♢_eq_!! (λ v, res_tm (ρ v)))) };
-  have h2 : π (((`!! v, P v) ⇒ Q) = ((`♢ v, res_tm (ρ v)) ⇒ Q))
-    { rewrite h1; reflexivity };
-  refine eq_trans h2 (res_eq r)
-end;
-
-// ============================================================
-// Res branching rules (two children → conjunction normal form)
-// ============================================================
-
-symbol AND1_1 [ps : 𝕃 o] [R : Prop]
-  (r1 : Res (¬ (last ⊤ ps) ⇒ R)) (r2 : Res (¬ ⋀_init (⋀ ps) ⇒ R))
-  : Res (¬ ⋀ ps ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans and1_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-// AND4_1: ⋀ ps via init/last Res children.
-symbol AND4_1 [ps : 𝕃 o]
-  (r1 : Res (last ⊤ ps)) (r2 : Res (⋀_init (⋀ ps))) : Res (⋀ ps)
-  ≔ mk_1 (left_∧ (res_tm r1) (res_tm r2))
-           (eq_trans ⋀_split
-             (eq_trans (∧_com (⋀_init (⋀ ps)) (last ⊤ ps))
-               (conj_eq (res_eq r1) (res_eq r2))));
-
-symbol OR2_1 [P Q : Prop]
-  (r1 : Res (¬ Q)) (r2 : Res (¬ P)) : Res (¬ (P ∨ Q))
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans or2_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-symbol OR3_1 [P Q R : Prop]
-  (r1 : Res (Q ⇒ R)) (r2 : Res (P ⇒ R))
-  : Res ((P ∨ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans or3_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-symbol IMP3_1 [P Q R : Prop]
-  (r1 : Res (Q ⇒ R)) (r2 : Res (¬ P ⇒ R))
-  : Res ((P ⇒ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans imp3_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-symbol IMP2_1 [P Q : Prop]
-  (r1 : Res (¬ Q)) (r2 : Res P) : Res (¬ (P ⇒ Q))
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans imp2_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-symbol EQV1_1 [P Q R : Prop]
-  (r1 : Res (P ⇒ ¬ Q ⇒ R)) (r2 : Res (¬ P ⇒ Q ⇒ R))
-  : Res (¬ (P ⇔ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv1_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-symbol EQV3_1 [P Q R : Prop]
-  (r1 : Res (P ⇒ Q ⇒ R)) (r2 : Res (¬ P ⇒ ¬ Q ⇒ R))
-  : Res ((P ⇔ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv3_eq (conj_eq (res_eq r1) (res_eq r2)));
-
-// (Chain-exit operators ALL7_close / XST8_close have been folded
-//  into the canonical ALL7 / XST8 in All.lp / Xst.lp respectively.)

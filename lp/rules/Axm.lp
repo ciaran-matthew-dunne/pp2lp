@@ -1,5 +1,5 @@
 // Axiom rules (§A.6) — shallow encoding
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Conj;
+require open pp2lp.B pp2lp.Quant pp2lp.rules.Conj pp2lp.rules.Res;
 
 // ---- Base rules ----
 
@@ -91,4 +91,27 @@ begin
   assume n P v Q h hp;
   refine ⊥ₑ (!!_to_pi (λ u, ¬ (⊤ ∧ P u)) h v (∧ᵢ ⊤ᵢ hp))
 end;
+
+// ---- `_1` (Result-form) variants — §8.13 ----
+//
+// All AXM rules are Schema 0 (no genuine antecedent — the hyp lookup
+// is a side-condition). Per spec the result is TRUE. The proofs of
+// `(rule_consequent = ⊤)` rely on PP's having confirmed the rule's
+// applicability and are passed as `trust` since the chain emit does
+// not thread the hyp arg.
+
+// AXM7_1: the only AXM_N_1 whose proof is unconditional — `P ⇒ P` is
+// always propositionally `⊤` (stdlib `⇒_idem`).
+symbol AXM7_1 [P : Prop] : Res (P ⇒ P) ≔ mk_1 ⊤ (⇒_idem P);
+
+symbol AXM1_1 [P Q : Prop] : Res (P ⇒ Q) ≔ mk_1 ⊤ trust;
+symbol AXM2_1 [P Q : Prop] : Res (¬ P ⇒ Q) ≔ mk_1 ⊤ trust;
+symbol AXM3_1 [P : Prop] : Res P ≔ mk_1 ⊤ trust;
+symbol AXM4_1 [P R : Prop] : Res (P ⇒ R) ≔ mk_1 ⊤ trust;
+symbol AXM5_1 [P Q R : Prop] : Res (P ⇒ (Q ⇒ R)) ≔ mk_1 ⊤ trust;
+symbol AXM6_1 [P Q R : Prop] : Res (P ⇒ (¬ Q ⇒ R)) ≔ mk_1 ⊤ trust;
+symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_1 ⊤ trust;
+symbol AXM9_1 [n] [P : Tuple n → Prop] [Q : Prop]
+  : Res (P (@inh_tuple n) ⇒ Q)
+  ≔ mk_1 ⊤ trust;
 

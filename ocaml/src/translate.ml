@@ -244,6 +244,7 @@ let metadata_extra_args rule =
   | None -> []
   | Some "dynamic:ar3"
   | Some "dynamic:ar9"
+  | Some "dynamic:ar10"
   | Some "dynamic:hyp" -> []
   | Some "dynamic:axm9"
   | Some "dynamic:nrm19" -> [L.Hole; L.Hole]
@@ -298,10 +299,13 @@ let find_and5_pair conjs =
          | None ->
            (* Second try: match antecedent's leaves individually *)
            let ant_leaves = Pp_lp.conj_leaves p in
+           let used = Array.make n false in
+           used.(j) <- true;
            let positions = List.filter_map (fun leaf ->
              let rec find k =
                if k >= n then None
-               else if k <> j && arr.(k) = leaf then Some k
+               else if not used.(k) && arr.(k) = leaf then
+                 (used.(k) <- true; Some k)
                else find (k + 1)
              in find 0
            ) ant_leaves in
@@ -364,6 +368,13 @@ let tactic_for_rule ctx rule arg anno children =
   | Some "dynamic:axm9" when children = [] ->
     tactic_for_witness_hyp ctx rule anno
   | Some "dynamic:nrm19" -> tactic_for_witness_hyp ctx rule anno
+  | Some "dynamic:ar10" ->
+    (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).
+       Supply Q explicitly so Lambdapi can type the `trust` equality. *)
+    (match arg with
+     | Some (Pred q) ->
+       L.Refine ("@AR10", [L.Hole; L.Pred q; L.Hole; L.Trust; L.Hole])
+     | _ -> L.Refine (rule, [L.Trust; L.Hole]))
   | _ -> L.Refine (rule, default_rule_args rule arg)
 
 let rec tree ctx = function

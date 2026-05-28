@@ -165,7 +165,13 @@ let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
       Buffer.add_string buf "\xc2\xac "; (* ¬ *)
       pp_prd ~min_bp:36 ~env buf p1)
   | Binary (And, _, _) ->
-    let elts = conj_leaves p in
+    (* Use [conj_children_left] to preserve right-hand sub-conjunctions
+       as nested `⋀` cells: PP treats `a and (b and c)` as a 2-element
+       conjunction whose second element is itself a conjunction, and
+       its AND4 proof tree mirrors that nesting.  Flattening with
+       [conj_leaves] would merge `(b and c)` into the outer list and
+       desynchronise the proof tree from the encoded goal. *)
+    let elts = conj_children_left p in
     pp_conj_list ~min_bp ~env buf elts
   | Binary (Or, p1, p2) ->
     wrap buf (6 < min_bp) (fun () ->
@@ -335,7 +341,10 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
       Buffer.add_string buf "\xe2\x87\x92 "; (* ⇒ *)
       pp_prd_block ~min_bp:5 ~env ind buf p2)
   | Binary (And, _, _) ->
-    let elts = conj_leaves p in
+    (* Mirror the inline branch: preserve right-hand sub-conjunctions
+       (`conj_children_left`) so block formatting agrees with the
+       proof-tree nesting that PP's AND4 chain expects. *)
+    let elts = conj_children_left p in
     pp_conj_list_block ~min_bp ~env ind buf elts
   | Binary (Or, p1, p2) ->
     wrap buf (6 < min_bp) (fun () ->
