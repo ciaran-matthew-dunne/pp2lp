@@ -1,1 +1,0 @@
-Flag(FileOn("leq_minus_left.res")) & Set(Valid.1 | Rule(Implication | (n-m<=n) & _delta_e(n) & _delta_e(m) | ? | ? | n-m<=n | nn))

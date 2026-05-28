@@ -1,1 +1,0 @@
-Flag(FileOn("leq_one.res")) & Set(Valid.1 | Rule(Implication | (1<=n) & _delta_e(n) | ? | ? | 1<=n | nn))

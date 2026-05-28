@@ -38,10 +38,6 @@ eq_true | expr | x = TRUE
 eq_false | expr | x = FALSE
 eq_pair | expr | x = y & z = w
 eq_triple | expr | x = y & y = z & z = w
-eq_arith_plus | expr | x+1 = y
-eq_arith_minus | expr | x-1 = y
-eq_arith_nested | expr | x+(y-z) = w
-eq_interval_bounds | expr | x..y = x..y
 eq_singleton | expr | {x} = {x}
 eq_set_literal2 | expr | {x,y} = {x,y}
 eq_set_literal3 | expr | {x,y,z} = {x,y,z}
@@ -52,20 +48,6 @@ eq_app | expr | f(x) = y
 eq_app_nested | expr | f(g(x)) = y
 eq_dom | expr | dom(f) = dom(f)
 eq_ran | expr | ran(f) = ran(f)
-eq_card | expr | card(s) = card(s)
-leq_refl | expr | n<=n
-leq_zero | expr | 0<=n
-leq_one | expr | 1<=n
-leq_plus_right | expr | n<=n+m
-leq_minus_left | expr | n-m<=n
-leq_chain | expr | x<=y & y<=z
-lt_shape | expr | x<y
-geq_shape | expr | x>=y
-gt_shape | expr | x>y
-in_interval | expr | n: n..n
-in_nat | expr | n: NAT
-in_nat1 | expr | n: NAT1
-in_integer | expr | n: INTEGER
 in_bool | expr | b: BOOL
 in_pow | expr | s: POW(t)
 in_union | expr | x: s \/ t
@@ -84,7 +66,6 @@ subset_inter_right | expr | s /\ t <: t
 subset_pow | expr | s <: POW(t)
 subset_singleton | expr | {x} <: s
 subset_literal2 | expr | {x,y} <: s
-subset_interval | expr | x..y <: s
 set_membership | expr | x: {x}
 union_subset | expr | s \/ t <: s \/ t
 rel_total_func | expr | f: s +-> t
@@ -92,5 +73,4 @@ rel_partial_func | expr | f: s --> t
 rel_total_relation | expr | r: s <-> t
 rel_app_defined | expr | x: dom(f) & f(x) = y
 bool_conj_expr | expr | x = TRUE & y = FALSE
-mixed_arith_set | expr | n: s & 0<=n
 mixed_func_set | expr | x: dom(f) & f: dom(f) +-> ran(f)

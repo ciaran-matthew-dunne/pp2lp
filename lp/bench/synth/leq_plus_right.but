@@ -1,1 +1,0 @@
-Flag(FileOn("leq_plus_right.res")) & Set(Valid.1 | Rule(Implication | (n<=n+m) & _delta_e(n) & _delta_e(m) | ? | ? | n<=n+m | nn))
