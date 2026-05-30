@@ -1,15 +1,19 @@
 # Synthetic PP goals.
 #
 # Format:
-#   name | kind | goal
+#   name | kind | goal [| xfail]
 #
 # kind is one of:
 #   prop  identifiers in the goal are propositional variables
 #   expr  identifiers in the goal are expression variables
 #
+# A trailing `| xfail` routes the goal to xfail/ (excluded from the bulk
+# `make check synth` run; still inspectable by name). Used for goals the
+# Atelier B REPLAY tool truncates — see CLAUDE.md "Known broken".
+#
 # The generated .but file proves each goal from itself plus the inferred
 # delta hypotheses.  Keep this file as the source of truth; regenerate with:
-#   python3 bench/synth/gen_buts.py
+#   python3 lp/bench/synth/gen_buts.py
 
 prop_atom | prop | a
 prop_conj | prop | a & b
@@ -46,8 +50,8 @@ eq_inter | expr | s /\ t = s /\ t
 eq_cartesian_literal | expr | {x} * {y} = {x} * {y}
 eq_app | expr | f(x) = y
 eq_app_nested | expr | f(g(x)) = y
-eq_dom | expr | dom(f) = dom(f)
-eq_ran | expr | ran(f) = ran(f)
+eq_dom | expr | dom(f) = dom(f) | xfail
+eq_ran | expr | ran(f) = ran(f) | xfail
 in_bool | expr | b: BOOL
 in_pow | expr | s: POW(t)
 in_union | expr | x: s \/ t
@@ -59,8 +63,8 @@ in_cartesian | expr | p: s * t
 in_dom | expr | x: dom(f)
 in_ran | expr | y: ran(f)
 subset_refl | expr | s <: s
-subset_union_left | expr | s <: s \/ t
-subset_union_right | expr | t <: s \/ t
+subset_union_left | expr | s <: s \/ t | xfail
+subset_union_right | expr | t <: s \/ t | xfail
 subset_inter_left | expr | s /\ t <: s
 subset_inter_right | expr | s /\ t <: t
 subset_pow | expr | s <: POW(t)
@@ -73,4 +77,78 @@ rel_partial_func | expr | f: s --> t
 rel_total_relation | expr | r: s <-> t
 rel_app_defined | expr | x: dom(f) & f(x) = y
 bool_conj_expr | expr | x = TRUE & y = FALSE
-mixed_func_set | expr | x: dom(f) & f: dom(f) +-> ran(f)
+mixed_func_set | expr | x: dom(f) & f: dom(f) +-> ran(f) | xfail
+
+# ============================================================
+# Extended sample set (added to widen coverage).
+# ============================================================
+
+# ---- propositional (extended) ----
+prop_or | prop | a or b
+prop_or3 | prop | a or b or c
+prop_disj4 | prop | a or b or c or d
+prop_disj_in_conj | prop | (a or b) & c
+prop_conj_in_disj | prop | (a & b) or c
+prop_impl_quad | prop | a => b => c => d
+prop_conj5 | prop | a & b & c & d & e
+prop_excluded_middle | prop | a or not(a)
+prop_noncontradiction | prop | not(a & not(a))
+prop_demorgan_and | prop | not(a & b) <=> (not(a) or not(b))
+prop_demorgan_or | prop | not(a or b) <=> (not(a) & not(b))
+prop_distrib | prop | a & (b or c) <=> (a & b) or (a & c)
+prop_contrapositive | prop | (a => b) <=> (not(b) => not(a))
+prop_curry | prop | (a & b => c) <=> (a => (b => c))
+prop_iff_chain | prop | (a <=> b) & (b <=> c)
+
+# ---- equality (extended) ----
+eq_chain4 | expr | x = y & y = z & z = w & w = v
+eq_app_both | expr | f(x) = f(y)
+eq_app_binary | expr | f(x,y) = z
+eq_app_cross | expr | f(x) = g(y)
+eq_union3 | expr | s \/ t \/ u = s \/ t \/ u
+eq_inter3 | expr | s /\ t /\ u = s /\ t /\ u
+eq_union_inter | expr | s \/ (t /\ u) = s \/ (t /\ u)
+eq_card | expr | card(s) = card(s)
+
+# ---- membership (extended) ----
+in_union3 | expr | x: s \/ t \/ u
+in_inter3 | expr | x: s /\ t /\ u
+in_set_literal4 | expr | w: {x,y,z,w}
+in_app | expr | f(x): t
+in_cartesian3 | expr | p: s * t * u
+
+# ---- subset (extended) ----
+subset_trans_hyp | expr | s <: t & t <: u
+subset_inter3_left | expr | s /\ t /\ u <: s
+# union subsets hit the REPLAY-tool truncation (see CLAUDE.md "Known broken")
+subset_union3_left | expr | s <: s \/ t \/ u | xfail
+subset_inter_union | expr | s /\ t <: s \/ t | xfail
+
+# ---- relations / functions (extended) ----
+rel_total_inj | expr | f: s >-> t
+rel_partial_inj | expr | f: s >+> t
+rel_total_surj | expr | f: s -->> t
+rel_bijection | expr | f: s >->> t
+rel_two | expr | r: s <-> t & q: t <-> u
+
+# ---- arithmetic (new category) ----
+ar_leq_refl | expr | x <= x
+ar_leq_shape | expr | x <= y
+ar_lt_shape | expr | x < y
+ar_geq_shape | expr | x >= y
+ar_add_zero | expr | x + 0 = x
+ar_sub_self | expr | x - x = 0
+ar_add_shape | expr | x + y = z
+ar_leq_trans_hyp | expr | x <= y & y <= z
+# `n: NAT` sends lambdapi into a memory blowup (caught by check.py's timeout /
+# RLIMIT_AS now, but excluded so the bulk run stays fast). NAT membership is
+# not yet supported.
+ar_in_nat | expr | n: NAT | xfail
+
+# ---- n-ary conjunction chains (explicit universal; ConjList ⋀ stress) ----
+conj3_chain | expr | !x.(x: u => x: a & x: b & x: c)
+conj4_chain | expr | !x.(x: u => x: a & x: b & x: c & x: d)
+conj5_chain | expr | !x.(x: u => x: a & x: b & x: c & x: d & x: e)
+conj_nested_paren | expr | !x.(x: u => x: a & x: b & (x: c & x: d))
+conj_right_assoc | expr | !x.(x: u => x: a & (x: b & (x: c & x: d)))
+conj_two_universals | expr | !x.(x: u => x: a & x: b & x: c) & !y.(y: v => y: p & y: q & y: r)

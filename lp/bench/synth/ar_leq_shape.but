@@ -1,0 +1,1 @@
+Flag(FileOn("ar_leq_shape.res")) & Set(Valid.1 | Rule(Implication | (x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x <= y | nn))
