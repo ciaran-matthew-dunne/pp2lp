@@ -200,6 +200,44 @@ The prv suite is exempt — see below.
     `make tree prv/eq_020` shows the residual.
   Don't run `make check prv` as a gate until these are fixed.
 
+- **synth suite: 10 known failures + an `xfail/` set.** `make check synth`
+  is the gate (currently 96 ✓ / 10 ✗, 114 goals incl. xfail).
+  - `lp/bench/synth/xfail/` (8 goals) holds the unrunnable ones, each
+    `xfail`-tagged in `goals.txt`:
+    - REPLAY-tool truncation (`eq_dom`, `eq_ran`, `mixed_func_set`,
+      `subset_union_left/right`, `subset_union3_left`, `subset_inter_union`):
+      the tool drops the sequent continuation after a branching quantifier,
+      so the `.replay` ends at `ALL7`/`XST8` and pp2lp reports "ALL7 replay
+      branch has no sequent continuation after its result-chain". Unfixable
+      in pp2lp.
+    - `ar_in_nat` (`n: NAT`): sends lambdapi into a memory blowup. Caught by
+      check.py's caps now (see below) but excluded to keep the run fast.
+    The bulk glob is non-recursive so `xfail/` is skipped, but
+    `make tree synth/<name>` / `make check synth/<name>` still find them.
+  - 10 fail in the bulk run, all left visible as TODO markers:
+    - ConjList/`Res` snoc-refactor incompleteness (`rel_partial_func`,
+      `rel_total_func`, `rel_total_inj`, `rel_partial_inj`, `rel_total_surj`,
+      `rel_bijection`, `subset_literal2`, `subset_pow`, `subset_singleton`):
+      an `ALL7` continuation's `res_tm` over a simple `STOP_1` chain doesn't
+      resolve the universal predicate via HO-unification, breaking NRM14/22
+      and the INS contradiction (functional-uniqueness goals hit this hard).
+    - `ar_add_shape` — proves an equality via ≤-antisymmetry, reaching
+      `AR7`/`AR8`, which need solver witness values (the `a` in `a + c = 𝟎`)
+      not recorded in the replay. Deeper than the env/trust AR fixes below.
+
+  The two AR emit bugs that previously bit `AR9`/`AR3` are now fixed:
+  rule value-arguments are rendered through the tuple-projection env
+  (`translate.ml` `render_exp_term`/`render_pred_term`, used by
+  `dynamic_value_args`), and `AR9`'s solver-confirmed `E = F` premise is
+  supplied as `trust` (`metadata_extra_args`). This fixed `ar_leq_trans_hyp`.
+
+- **Benchmark safety caps.** `bench/check.py` bounds every child process so a
+  runaway goal can't take down the host: a wall-clock timeout and (POSIX) an
+  `RLIMIT_AS` address-space + `RLIMIT_CPU` cap. Tunable via env —
+  `PP2LP_CHECK_TIMEOUT` (lambdapi, default 60s), `PP2LP_EMIT_TIMEOUT` (pp2lp,
+  30s), `PP2LP_CHECK_MEM_GB` (default 4). The `.trace`/`.replay` generators
+  already time out via `_krt.run_krt`.
+
 ## PP limitations
 
 Show up regularly when authoring goals:
@@ -269,7 +307,15 @@ names raise.
 - **prv-no-arith** — Non-arithmetic subset of the PRV suite. Used to
   isolate and debug translation and proof failures without arithmetic
   solver noise.
-- **synth** — Synthetic `.but` files for targeted feature testing.
+- **synth** — Synthetic `.but` files for targeted feature testing, generated
+  from `lp/bench/synth/goals.txt` (`name | kind | goal [| xfail]`) by
+  `python3 lp/bench/synth/gen_buts.py`. Each goal is proved from itself plus
+  inferred `_delta_{e,p}` hypotheses; the generator is binder-aware (bound
+  `!x`/`#x` vars get no delta). `goals.txt` is the source of truth — gen_buts
+  rewrites *every* top-level `.but`, so add goals there, not as loose files.
+  After editing: `gen_buts.py`, then `make gen-traces synth` +
+  `make gen-replays synth`, then `make check synth`. `xfail/` holds the
+  unrunnable goals (see Known broken).
 
 ## Commits
 
