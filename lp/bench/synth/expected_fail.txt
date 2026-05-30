@@ -1,0 +1,29 @@
+# expected_fail.txt — synth goals that emit and run but are known to FAIL
+# `lambdapi check`.  This is the gate BASELINE used by bench/check.py:
+#   • a listed goal that fails        → expected (xfail); does NOT break the gate
+#   • a goal NOT listed that fails     → unexpected; BREAKS the gate
+#   • a listed goal that now PASSES    → stale entry; BREAKS the gate (prune it)
+#
+# One goal name per line; `#` comments and blank lines are ignored.  Keep in
+# sync with CLAUDE.md "Known broken" → synth.  This is DISTINCT from goals.txt's
+# `xfail` tag, which routes UNRUNNABLE goals into xfail/ (physically excluded
+# from the bulk run); the goals below do run, they just don't type-check yet.
+
+# ── ConjList / Res snoc-refactor incompleteness ───────────────────────────
+# An ALL7 continuation's res_tm over a simple STOP_1 chain doesn't resolve the
+# universal predicate via HO-unification, breaking NRM14/22 and the INS
+# contradiction (functional-uniqueness goals hit this hardest).
+rel_partial_func
+rel_total_func
+rel_total_inj
+rel_partial_inj
+rel_total_surj
+rel_bijection
+subset_literal2
+subset_pow
+subset_singleton
+
+# ── AR solver-witness gap ─────────────────────────────────────────────────
+# Proves an equality via ≤-antisymmetry, reaching AR7/AR8, which need solver
+# witness values (the `a` in `a + c = 𝟎`) not recorded in the replay.
+ar_add_shape

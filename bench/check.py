@@ -175,6 +175,22 @@ def select(args, parser) -> list[Path]:
     parser.error("need --suite, --replay, or --name --suite")
 
 
+def load_expected_fail(suite: str) -> set:
+    """Goal stems known to fail `lambdapi check` for this suite — the gate
+    baseline.  One name per line in lp/bench/<suite>/expected_fail.txt; blank
+    lines and `#` comments are ignored.  An absent file yields the empty set, so
+    every failure breaks the gate (this keeps og a hard 100-percent gate)."""
+    path = ROOT / "lp" / "bench" / suite / "expected_fail.txt"
+    if not path.exists():
+        return set()
+    names = set()
+    for raw in path.read_text().splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            names.add(line)
+    return names
+
+
 def fmt_ms(ms: float) -> str:
     return f"{ms / 1000:.1f}s" if ms >= 1000 else f"{ms:.0f}ms"
 
@@ -195,7 +211,8 @@ def _clean_error(text: str) -> str:
 
 
 def print_entry(name: str, status: str, warnings: list[str],
-                detail: str, show_time: bool, emit_ms: float, check_ms: float):
+                detail: str, show_time: bool, emit_ms: float, check_ms: float,
+                suffix: str = ""):
     if show_time:
         if check_ms > 0:
             time_str = f"  {_dim(f'emit {fmt_ms(emit_ms)} / check {fmt_ms(check_ms)}')}"
@@ -203,7 +220,7 @@ def print_entry(name: str, status: str, warnings: list[str],
             time_str = f"  {_dim(f'emit {fmt_ms(emit_ms)}')}"
     else:
         time_str = ""
-    print(f" {_ICON[status]} {name}{time_str}")
+    print(f" {_ICON[status]} {name}{suffix}{time_str}")
     for w in warnings:
         print(f"   {_dim(w)}")
     if detail:
@@ -225,11 +242,15 @@ def main():
     show_ok = args.verbose or single
     show_lines = not args.quiet
     show_time = args.verbose or single
+    expected_fail = load_expected_fail(args.suite) if args.suite else set()
 
     counts = {"ok": 0, "warn": 0, "emit_fail": 0, "lp_fail": 0}
     total_emit = 0.0
     total_check = 0.0
     t_start = time.monotonic()
+    xfail = []        # in the baseline and did fail — expected, gate-neutral
+    xpass = []        # in the baseline but passed — stale entry, breaks the gate
+    unexpected = []   # not in the baseline but failed — breaks the gate
 
     for t in replays:
         status, warnings, detail, t_emit, t_check = check_one(t)
@@ -237,16 +258,33 @@ def main():
         total_emit += t_emit
         total_check += t_check
 
+        failed = status in ("emit_fail", "lp_fail")
+        known = t.stem in expected_fail
+        if failed and known:
+            xfail.append(t.stem)
+        elif failed:
+            unexpected.append(t.stem)
+        elif known:
+            xpass.append(t.stem)
+
         if not show_lines:
             continue
-        if status == "ok" and not show_ok:
+        if status == "ok" and not show_ok and not known:
             continue
 
-        print_entry(t.stem, status, warnings, detail, show_time,
-                    t_emit * 1000, t_check * 1000)
+        # In a bulk run, mute the verbose diagnostic for KNOWN failures so the
+        # gate output stays readable; a single-trace or -v run still shows it.
+        suppress = failed and known and not single and not args.verbose
+        if failed and known:
+            suffix = _dim(" (expected)")
+        elif known and not failed:
+            suffix = _yellow(" (UNEXPECTED PASS — prune expected_fail.txt)")
+        else:
+            suffix = ""
+        print_entry(t.stem, status, warnings, "" if suppress else detail,
+                    show_time, t_emit * 1000, t_check * 1000, suffix)
 
     elapsed_total = (time.monotonic() - t_start) * 1000
-    n_fail = counts["emit_fail"] + counts["lp_fail"]
 
     if not single or args.verbose:
         parts = []
@@ -254,8 +292,12 @@ def main():
             parts.append(f"{_green(counts['ok'])} ✓")
         if counts["warn"]:
             parts.append(f"{_yellow(counts['warn'])} ⚠")
-        if n_fail:
-            parts.append(f"{_red(n_fail)} ✗")
+        if unexpected:
+            parts.append(f"{_red(len(unexpected))} ✗")
+        if xfail:
+            parts.append(_dim(f"{len(xfail)} xfail"))
+        if xpass:
+            parts.append(_yellow(f"{len(xpass)} xpass"))
 
         suite = args.suite or "check"
         if show_lines:
@@ -265,7 +307,9 @@ def main():
         )
         print(f"{suite}  {'  '.join(parts)}  {_dim(fmt_ms(elapsed_total))}  {breakdown}")
 
-    sys.exit(0 if n_fail == 0 else 1)
+    # Gate fails on any deviation from the baseline: an unexpected failure, or a
+    # stale expected_fail.txt entry that now passes.
+    sys.exit(1 if (unexpected or xpass) else 0)
 
 
 if __name__ == "__main__":
