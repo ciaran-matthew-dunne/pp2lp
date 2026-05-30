@@ -67,6 +67,11 @@ tex/**/*.pdf
 *.vrb
 *.xdv
 *.run.xml
+*.listing
+*.bcf-SAVE-ERROR
+
+# Menhir conflict report (generated, may be empty)
+*.conflicts
 
 # Atelier B build artefacts
 *.bxml
@@ -87,6 +92,9 @@ tex/**/*.pdf
 aaaa*
 replay.*
 btraces
+
+# Claude Code local state (settings + agent worktrees) — never commit
+.claude/
 
 # Editor and IDE files
 .vscode/
