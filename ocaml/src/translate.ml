@@ -234,9 +234,7 @@ let conj_intro = "\xe2\x8b\x80_intro"           (* ⋀_intro *)
 let conj_nil_prf = "\xe2\x8b\x80_nil_prf"       (* ⋀_nil_prf *)
 let true_intro = "\xe2\x8a\xa4\xe1\xb5\xa2"     (* ⊤ᵢ *)
 
-let rec collect_conj_leaves = function
-  | Binary (And, l, r) -> collect_conj_leaves l @ collect_conj_leaves r
-  | leaf -> [leaf]
+let collect_conj_leaves = Pp_lp.conj_leaves
 
 (* Build a ⋀-form evidence term from a list of leaf proofs.
    Snoc left-fold bottoming in ⋀_nil_prf:
@@ -526,7 +524,8 @@ and default ctx rule arg anno children =
     let eq_pred =
       match goal with
       | Some (Binary (Imp, eq, _)) -> eq
-      | _ -> Lift (Var "?_opr_unknown")
+      | _ -> failwith (Printf.sprintf
+          "translate: %s expected an implication annotation (got non-⇒ goal)" rule)
     in
     let h = fresh_h ctx eq_pred in
     let rtl = base rule = "OPR2" in
@@ -540,7 +539,8 @@ and default ctx rule arg anno children =
       let ant =
         match goal with
         | Some (Binary (Imp, ant, _)) -> ant
-        | _ -> Lift (Var "?_ant_unknown")
+        | _ -> failwith (Printf.sprintf
+          "translate: %s (intro-antecedent) expected an implication annotation" rule)
       in
       let h = fresh_h ctx ant in
       L.Assume_then (tactic, h, tree ctx c)
@@ -616,21 +616,24 @@ and chain_tree ctx = function
       Pp_lp.pp_prd ~env:pp_env buf prd;
       Buffer.contents buf
     in
+    (* Bind a fresh `_xN` (PP vars never start with `_`, so it cannot be
+       captured by a variable already free in `consequent`). *)
+    let z = fresh_x_local ctx in
     let p_lambda =
       match goal_of_anno anno with
       | Some (Binary (Imp, Eq (lhs, _rhs), consequent))
         when base rule = "OPR1" ->
         (match lhs with
          | Var v ->
-           L.Lambda ("z", Some L.Tau_i,
-             L.Raw (render_pred (subst_prd [(v, Var "z")] consequent)))
+           L.Lambda (z, Some L.Tau_i,
+             L.Raw (render_pred (subst_prd [(v, Var z)] consequent)))
          | _ -> L.Hole)
       | Some (Binary (Imp, Eq (_lhs, rhs), consequent))
         when base rule = "OPR2" ->
         (match rhs with
          | Var v ->
-           L.Lambda ("z", Some L.Tau_i,
-             L.Raw (render_pred (subst_prd [(v, Var "z")] consequent)))
+           L.Lambda (z, Some L.Tau_i,
+             L.Raw (render_pred (subst_prd [(v, Var z)] consequent)))
          | _ -> L.Hole)
       | _ -> L.Hole
     in

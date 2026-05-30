@@ -34,11 +34,11 @@ type mode = Seq_mode | Res_mode
 let is_res_rule rule =
   rule = "STOP_1" || Rule_db.is_primed rule
 
+(* A "base branch" is a branching rule (one with a Res slot — ALL7/XST8)
+   in its un-primed form.  Derived from rule_db's slot metadata rather
+   than hard-coding the rule names. *)
 let is_base_branch rule =
-  (match Rule_db.base_of rule with
-   | "ALL7" | "XST8" -> true
-   | _ -> false)
-  && not (is_res_rule rule)
+  Rule_db.is_branching rule && not (is_res_rule rule)
 
 let derivation_slots rule =
   Rule_db.slots rule

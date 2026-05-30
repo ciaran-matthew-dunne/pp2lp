@@ -240,17 +240,6 @@ and pp_conj_list ?(min_bp = bp_max) ?(env = []) buf elts =
     Buffer.add_char buf ')';
     if need_wrap then Buffer.add_char buf ')'
 
-and pp_conj_tail ?(env = []) buf elts =
-  match elts with
-  | [] -> Buffer.add_string buf "\xe2\x96\xa1" (* □ *)
-  | _ ->
-    Buffer.add_char buf '(';
-    List.iter (fun p ->
-      pp_prd ~min_bp:21 ~env buf p;
-      Buffer.add_string buf " \xe2\xb8\xac "; (* ⸬ *)
-    ) elts;
-    Buffer.add_string buf "\xe2\x96\xa1)" (* □) *)
-
 (* ---- ⋀ extraction/reconstruction ----
    ⋀ (∎ ∷ P₀ ∷ P₁ ∷ … ∷ Pₙ₋₁)
    Element k: peel (n-1-k) elements off the tail with ⋀_init, then take
