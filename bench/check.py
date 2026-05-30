@@ -2,17 +2,55 @@
 """Emit + lambdapi-check pp2lp replays."""
 
 import argparse
+import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+try:
+    import resource  # POSIX-only; used to cap child address space / CPU
+except ImportError:
+    resource = None
+
 ROOT = Path(__file__).resolve().parent.parent
 PP2LP = ROOT / "ocaml" / "_build" / "default" / "bin" / "main.exe"
 FORMATTER = ROOT / "bench" / "format_lambdapi_json.py"
 
 COLOR = sys.stdout.isatty()
+
+# ── Safety caps for child processes ──────────────────────────
+# A runaway emit/check (e.g. a goal that sends lambdapi into a memory or
+# unification blowup) must never take down the host.  Each child gets a
+# wall-clock timeout and — on POSIX — an address-space and CPU-time cap.
+# All tunable via env; 0 disables a given cap.
+CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "60"))   # lambdapi, seconds
+EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "30"))     # pp2lp emit, seconds
+CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
+
+
+def _child_limits(timeout: float):
+    """Build a preexec_fn that caps the child's address space and CPU time.
+    Returns None where unsupported (non-POSIX), so callers can pass it through."""
+    if resource is None or os.name != "posix":
+        return None
+
+    def apply():
+        if CHILD_MEM_GB > 0:
+            n = int(CHILD_MEM_GB * 1024 ** 3)
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (n, n))
+            except (ValueError, OSError):
+                pass
+        if timeout > 0:
+            cpu = int(timeout) + 10  # backstop if the wall-clock timeout can't fire
+            try:
+                resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
+            except (ValueError, OSError):
+                pass
+
+    return apply
 
 
 def _c(code, t):
@@ -46,10 +84,16 @@ def emit(replay: Path, out: Path) -> tuple[bool, list[str], str]:
             r = subprocess.run(
                 [str(PP2LP), "emit", str(rel_replay)],
                 stdout=fh, stderr=subprocess.PIPE, cwd=ROOT,
+                timeout=EMIT_TIMEOUT or None,
+                preexec_fn=_child_limits(EMIT_TIMEOUT),
+                start_new_session=True,
             )
     except FileNotFoundError:
         tmp.unlink(missing_ok=True)
         return False, [], "pp2lp not found; run make build"
+    except subprocess.TimeoutExpired:
+        tmp.unlink(missing_ok=True)
+        return False, [], f"emit timed out after {EMIT_TIMEOUT:.0f}s (PP2LP_EMIT_TIMEOUT)"
 
     stderr = r.stderr.decode().rstrip()
     warnings, errors = [], []
@@ -67,10 +111,17 @@ def emit(replay: Path, out: Path) -> tuple[bool, list[str], str]:
 
 
 def lp_check(lp: Path) -> tuple[bool, str]:
-    r = subprocess.run(
-        ["lambdapi", "check", "--json", "-c", str(lp)],
-        capture_output=True, text=True,
-    )
+    try:
+        r = subprocess.run(
+            ["lambdapi", "check", "--json", "-c", str(lp)],
+            capture_output=True, text=True,
+            timeout=CHECK_TIMEOUT or None,
+            preexec_fn=_child_limits(CHECK_TIMEOUT),
+            start_new_session=True,
+        )
+    except subprocess.TimeoutExpired:
+        return False, (f"lambdapi check timed out after {CHECK_TIMEOUT:.0f}s "
+                       f"(PP2LP_CHECK_TIMEOUT); likely a unification/memory blowup")
     f = subprocess.run(
         [sys.executable, str(FORMATTER)],
         input=r.stdout + r.stderr,
@@ -79,18 +130,21 @@ def lp_check(lp: Path) -> tuple[bool, str]:
     return r.returncode == 0, f.stdout
 
 
-def check_one(replay: Path) -> tuple[str, list[str], str, float]:
-    t0 = time.monotonic()
+def check_one(replay: Path) -> tuple[str, list[str], str, float, float]:
     out = out_path(replay)
+    t0 = time.monotonic()
     ok, warnings, err = emit(replay, out)
+    t_emit = time.monotonic() - t0
     if not ok:
-        return "emit_fail", warnings, err, time.monotonic() - t0
+        return "emit_fail", warnings, err, t_emit, 0.0
+    t1 = time.monotonic()
     ok, text = lp_check(out)
+    t_check = time.monotonic() - t1
     if not ok:
-        return "lp_fail", warnings, text.rstrip(), time.monotonic() - t0
+        return "lp_fail", warnings, text.rstrip(), t_emit, t_check
     if warnings:
-        return "warn", warnings, "", time.monotonic() - t0
-    return "ok", [], "", time.monotonic() - t0
+        return "warn", warnings, "", t_emit, t_check
+    return "ok", [], "", t_emit, t_check
 
 
 def select(args, parser) -> list[Path]:
@@ -141,8 +195,14 @@ def _clean_error(text: str) -> str:
 
 
 def print_entry(name: str, status: str, warnings: list[str],
-                detail: str, show_time: bool, ms: float):
-    time_str = f"  {_dim(fmt_ms(ms))}" if show_time else ""
+                detail: str, show_time: bool, emit_ms: float, check_ms: float):
+    if show_time:
+        if check_ms > 0:
+            time_str = f"  {_dim(f'emit {fmt_ms(emit_ms)} / check {fmt_ms(check_ms)}')}"
+        else:
+            time_str = f"  {_dim(f'emit {fmt_ms(emit_ms)}')}"
+    else:
+        time_str = ""
     print(f" {_ICON[status]} {name}{time_str}")
     for w in warnings:
         print(f"   {_dim(w)}")
@@ -167,18 +227,23 @@ def main():
     show_time = args.verbose or single
 
     counts = {"ok": 0, "warn": 0, "emit_fail": 0, "lp_fail": 0}
+    total_emit = 0.0
+    total_check = 0.0
     t_start = time.monotonic()
 
     for t in replays:
-        status, warnings, detail, elapsed = check_one(t)
+        status, warnings, detail, t_emit, t_check = check_one(t)
         counts[status] += 1
+        total_emit += t_emit
+        total_check += t_check
 
         if not show_lines:
             continue
         if status == "ok" and not show_ok:
             continue
 
-        print_entry(t.stem, status, warnings, detail, show_time, elapsed * 1000)
+        print_entry(t.stem, status, warnings, detail, show_time,
+                    t_emit * 1000, t_check * 1000)
 
     elapsed_total = (time.monotonic() - t_start) * 1000
     n_fail = counts["emit_fail"] + counts["lp_fail"]
@@ -195,7 +260,10 @@ def main():
         suite = args.suite or "check"
         if show_lines:
             print()
-        print(f"{suite}  {'  '.join(parts)}  {_dim(fmt_ms(elapsed_total))}")
+        breakdown = _dim(
+            f"emit {fmt_ms(total_emit * 1000)} / check {fmt_ms(total_check * 1000)}"
+        )
+        print(f"{suite}  {'  '.join(parts)}  {_dim(fmt_ms(elapsed_total))}  {breakdown}")
 
     sys.exit(0 if n_fail == 0 else 1)
 
