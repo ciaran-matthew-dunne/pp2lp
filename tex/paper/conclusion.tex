@@ -1,0 +1,27 @@
+% ── conclusion.tex · §6 · STATUS: skeleton (expand) ─────────────────
+% Summary + future work + acknowledgements (ICSPA / CLEARSY).
+\section{Conclusion and Future Work}\label{sec:conclusion}
+
+We have presented \tool, which independently re-checks \ab's Predicate
+Prover by reconstructing its proofs in \lp. Unlike approaches that
+postulate each rule as an axiom, every \pp{} rule is encoded as a symbol
+whose body \emph{proves} the rule sound against a small \bbook{} kernel,
+so a reconstructed proof type-checks against a trusted base consisting of
+that kernel and a handful of enumerated, argument-level solver
+side-conditions. \tool{} covers nearly all of \pp's rule set and
+reconstructs the non-arithmetic fragment of \ab's own proof corpus in
+full.
+
+The main avenue for future work is closing the arithmetic gap---either by
+proving \pp's normalisation rules from an arithmetic theory on
+\(\El\,\iota\) or by enriching the trace so the solver's reasoning becomes
+reconstructible---and extending the parser to \pp's remaining argument
+forms so the whole \texttt{prv} corpus can be attempted. Beyond coverage,
+the soundness-proved encoding makes \pp{} a first-class citizen of the
+\dedukti{} interoperability ecosystem, opening the door to exporting
+\ab{} proofs to other proof assistants.
+
+\subsubsection*{Acknowledgements.}
+This work is supported by the ANR project ICSPA
+(ANR-21-CE25-0015) in collaboration with CLEARSY.
+% TODO: confirm grant number and any additional acknowledgements.

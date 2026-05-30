@@ -1,0 +1,132 @@
+% ── encoding.tex · §3 · STATUS: full draft (the core section) ────────
+% Owns the AND2 figure (fig:and2). The "rules are PROVED sound, not
+% axiomatized" point is the paper's differentiator — keep it prominent.
+\section{Encoding PP's rules in LambdaPi}\label{sec:encoding}
+
+\subsection{The trusted base}
+In \lp, propositions are terms of a type \(\Prop\), and \(\Prf\) maps a
+proposition to the type of its proofs (\(\Prf : \Prop \to \mathsf{TYPE}\)).
+\bmethod{} expressions are terms of \(\El\,\iota\), where \(\iota\) is the
+universal domain of \bbook{} set theory. A single module, \texttt{B.lp},
+fixes this kernel: it reuses the logical connectives from \lp's standard
+library and adds the \bbook{} primitives our proofs need---set membership
+\(\,\epsilon\,\), the maplet \(\,\mapsto\,\), equality, the Boolean
+elements, and just enough of a discretely ordered abelian group on
+\(\El\,\iota\) to discharge \pp's arithmetic rules. The \emph{only} outright
+axiom is \(\trust : \Pi P,\ \Prf\,P\) (\autoref{sec:trust}); everything else
+is a standard-library primitive or a lemma proved from it. This kernel is
+the entire trusted base against which reconstructed proofs are checked.
+
+\subsection{Rules as soundness-proved symbols}
+We encode each \pp{} inference rule as a \lp{} symbol whose \emph{dependent
+type expresses the rule's soundness}: its premises become the symbol's
+argument types and its conclusion the return type, each wrapped in
+\(\Prf\). The symbol's body is a proof term---written as a tactic
+script---that derives the conclusion from the premises using only the
+kernel. Because \lp{} type-checks the body, the rule is \emph{proved}
+sound rather than assumed. This is the key difference from encodings that
+postulate each rule as an axiom and verify only its well-typedness, as is
+done when reconstructing SMT proofs through hand-written per-rule
+lemmas~\cite{coltellacciReconstructionSMTProofs2024a,mohamed25leansmt}:
+here the per-rule justification is itself a checked object.
+
+% --- AND2 figure ----------------------------------------------------
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.34\linewidth}\centering
+    {\footnotesize\bfseries \pp{} specification}\\[3pt]
+    \begin{tcolorbox}[colback=lpBoxBg, colframe=lpBoxFr, arc=2pt,
+        boxrule=0.4pt, left=4pt, right=4pt, top=6pt, bottom=6pt]
+      \[ \dfrac{H \seq P \Rightarrow \lnot Q}{H \seq \lnot(P \land Q)}\ \;\rn{AND2} \]
+    \end{tcolorbox}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.62\linewidth}\centering
+    {\footnotesize\bfseries \lp{} encoding \& soundness proof}\\[3pt]
+\begin{codeLP}
+opaque symbol AND2 [ps : 𝕃* o] [P : Prop]
+  : π (⋀ ps ⇒ ¬ P)
+  → π (¬ ⋀ (ps ∷ P)) ≔
+begin
+  assume ps P h1 hc;
+  refine h1 (⋀_init hc) (⋀_last hc)
+end;
+\end{codeLP}
+  \end{minipage}
+  \caption{\pp's rule \rn{AND2} and its \lp{} encoding. The premise
+    \(H \seq P \Rightarrow \lnot Q\) becomes the argument type and the
+    conclusion the return type; the body is a proof that the rule is
+    sound. \pp's conjunction is binary but left-associative, so we encode
+    an \(n\)-ary conjunction as \(\bigwedge ps\) over a snoc list
+    \(ps : \mathbb{L}^{*}\,o\), whose last element \(P\) and initial
+    segment \(ps\) are exposed by \texttt{∷}; \texttt{⋀\_init} and
+    \texttt{⋀\_last} project them (\autoref{sec:infra}).}
+  \label{fig:and2}
+\end{figure}
+% --------------------------------------------------------------------
+
+\autoref{fig:and2} shows the rule \rn{AND2}. Its body reads directly: from
+a proof \(h_1\) of \(\bigwedge ps \Rightarrow \lnot P\) and the full
+conjunction \(hc : \bigwedge(ps \mathbin{::} P)\), the term
+\(h_1\,(\texttt{⋀\_init}\,hc)\,(\texttt{⋀\_last}\,hc)\) derives a
+contradiction, which witnesses \(\lnot\bigwedge(ps \mathbin{::} P)\). The
+same \(\mathbin{::}\)-pattern handles every conjunction rule uniformly,
+whatever the arity \(n\), because \lp{} infers \(ps\) and \(P\) from the
+goal.
+
+\subsection{The shape of a rule}
+A \pp{} rule appears in a replay as a bracketed name, and its shape is
+decoded from that name by \tool's rule database (the single source of
+truth for rule metadata):
+\begin{itemize}
+  \item \emph{base} --- e.g. \rn{AND2}: a plain \refine{} against the
+    encoded symbol.
+  \item \emph{\(n\)-ary} (suffix \texttt{\_N}) --- e.g. \rn{ALL7\_2},
+    \rn{NRM1\_3}: the suffix is a binder count, so the rule is applied
+    with \(N\) bound variables. Quantifier and normalisation rules range
+    over tuples of variables (\autoref{sec:infra}).
+  \item \emph{result-form} (suffix \texttt{\_1}, ``primed'') --- e.g.
+    \rn{AND2\_1}: a variant living in \(\Res\), the type of the
+    equality-/rewrite-\emph{chain} \pp{} threads through a proof before a
+    branching quantifier. Rather than a \(\Prf\)-proof, such a rule
+    produces a \(\Res\,\varphi\): a term carrying the running goal's
+    proof together with a proof that it equals \(\varphi\)
+    (\(\mathsf{mk\_res}\), \(\mathsf{concat}\), \(\restm\)).
+\end{itemize}
+The two introduction rules that branch, \rn{ALL7} and \rn{XST8}, are
+two-child: a \(\Res\)-typed chain establishing the body for an arbitrary
+tuple witness, followed by a continuation under the bound variable. Their
+types thread a per-tuple result \(\rho : \Pi v : \Tuple\,n,\ \Res(P\,v)\)
+into the conclusion.
+
+\subsection{Quantifiers and conjunction lists}\label{sec:infra}
+Two pieces of infrastructure support the rules above. \emph{(i)~Conjunction
+lists.} \pp's left-associative \(n\)-ary conjunction is represented as
+\(\bigwedge : \mathbb{L}^{*}\,o \to \Prop\) over a snoc list of
+propositions, with constructor \texttt{⋀\_intro} and projections
+\texttt{⋀\_init}/\texttt{⋀\_last}; a unification rule lets a goal
+\(\bigwedge(ps \mathbin{::} P)\) split structurally, so one rule matches all
+arities. \emph{(ii)~Tuple quantifiers.} \pp's quantifiers range over lists
+of variables, which we encode uniformly over \(\Tuple\,n\) (an \(n\)-tuple
+of \(\El\,\iota\)) with projection \(\prj\) and tuple snoc. Four quantifier
+formers appear: \(\allI\)/\(\xstI\) for the single-variable
+\(\forall\)/\(\exists\) (over \(\Tuple\,1\)), and the \(n\)-ary
+\(\Dia\)/\(\Hrt\)---\pp's \texttt{forall}/\texttt{forall2}, distinguished
+by whether the quantified formula sits on the goal or the hypothesis side.
+A single \(\Tuple\)-based rule then covers a whole family of arities, and
+the emitter selects quantifier witnesses by tuple projection.
+
+\subsection{Trust, audited}\label{sec:trust}
+A few \pp{} steps are discharged by its internal solver rather than by
+tracked inference: the replay records the conclusion but no checkable
+justification. For these, the encoding passes the kernel's \(\trust\)
+axiom \emph{as an argument} to an otherwise fully proved rule---never as a
+whole-goal proof. Three categories occur:
+(i)~\(\,\epsilon\,\)\,\textsc{bool} membership side-conditions (\pp{}
+cannot reason about \(v : \textsc{bool}\) abstractly);
+(ii)~the arithmetic-match conjuncts of the instantiation rule \rn{INS};
+and (iii)~solver-confirmed numeric side-conditions of the arithmetic
+rules (e.g. \rn{AR2}, \rn{AR13}). Each use is localized to one argument
+and documented, and a pre-commit audit checks that no emitted proof
+contains a bare whole-goal \(\refine\,\trust\). The trusted base is thus
+exactly the \texttt{B.lp} kernel plus these enumerated, argument-level
+uses.

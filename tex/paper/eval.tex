@@ -1,0 +1,72 @@
+% ── eval.tex · §5 · STATUS: skeleton (expand) ───────────────────────
+% Tool + coverage + benchmarks. The table reads numbers from
+% results-data.tex — never hard-code a benchmark number in this file.
+\section{Implementation and Evaluation}\label{sec:eval}
+
+\subsection{The tool}
+\tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}% TODO: confirm URL
+is an OCaml program. An \texttt{ocamllex} lexer and a Menhir parser read a
+replay; \texttt{rule\_db.ml} holds all rule metadata (arity, suffix
+decoding, phantom predicate) and is the single source of truth;
+\texttt{proof\_tree.ml} rebuilds the tree; and \texttt{translate.ml}
+dispatches each rule shape to its emission. The rule encodings live in
+\texttt{lp/rules/} and are checked once by \lp, independently of any proof.
+% TODO(loc): report tool size + B.lp/rules line counts.
+
+\subsection{Coverage}
+\tool{} encodes \numRulesCovered{} of \pp's roughly \numRulesSpec{}
+specified rules. Only \numRulesNotImpl{} remain unimplemented---the
+\rn{NRM27}--\rn{NRM30} family of arithmetic \emph{normalisation} rules,
+which \pp{} discharges by dispatching to its internal arithmetic solver;
+because the solver's reasoning is not recorded in the trace, these steps
+have no checkable justification to reconstruct. A pre-commit audit
+confirms that the only declared axiom is \texttt{B.lp}'s \(\trust\), and
+that no emitted proof closes a goal with a bare \(\refine\,\trust\)
+(\autoref{sec:trust}).
+
+\subsection{Benchmarks}
+We exercise \tool{} on four suites (\autoref{tab:results}). \texttt{og} is
+a curated smoke-test floor; \texttt{synth} is a set of targeted
+feature tests; and \texttt{prv} is \ab's own PRV proof corpus, with
+\texttt{prv-no-arith} its non-arithmetic subset. Each entry is
+\emph{emitted} by \tool{} and then \emph{checked} by \texttt{lambdapi
+check}; ``pass'' means both succeed.
+
+\begin{table}[t]
+  \centering
+  \caption{Reconstruction by suite. Numbers are a snapshot of \texttt{main}
+    (the tool and this paper are developed together and will change up to
+    submission); the single source is \texttt{results-data.tex}. ``Pass''
+    = emitted and independently \lp-checked.}
+  \label{tab:results}
+  \begin{tabular}{l r r l}
+    \toprule
+    Suite                  & Pass        & Total      & Character\\
+    \midrule
+    \texttt{og}            & \ogPass     & \ogTot     & smoke-test floor\\
+    \texttt{prv-no-arith}  & \pvnaPass   & \pvnaTot   & non-arithmetic \ab{} subset\\
+    \texttt{synth}         & \synthPass  & \synthTot  & targeted feature tests\\
+    \texttt{prv}           & \prvPass    & \prvTot    & full \ab{} PRV corpus\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The non-arithmetic core reconstructs completely: \texttt{og}
+(\ogPass/\ogTot) and \texttt{prv-no-arith} (\pvnaPass/\pvnaTot) pass in
+full. On the complete \texttt{prv} corpus (\prvPass/\prvTot) the gap is
+concentrated, as expected, in arithmetic: the unimplemented
+normalisation rules above, together with proofs whose instantiation steps
+use \pp's three-argument \rn{INST\_FINAL} form, which the parser does not
+yet accept. Crucially, the failures we see are coverage and parsing gaps,
+not soundness disagreements---no proof that \pp{} accepts and \tool{}
+emits is \emph{rejected} by \lp{} on semantic grounds.
+% TODO: confirm INST_FINAL framing; break out synth failure causes.
+
+\subsection{Limitations}
+The principal limitation is arithmetic normalisation that bottoms out in
+\pp's closed-source solver (\rn{NRM27}--\rn{NRM30}); reconstructing it
+would require either an arithmetic decision procedure on \(\El\,\iota\) or
+a richer trace from \pp. Some set-theoretic surface syntax and the
+three-piece \rn{INST\_FINAL} argument form are not yet parsed. These bound
+coverage on \texttt{prv}; none affects the soundness of what is
+reconstructed.

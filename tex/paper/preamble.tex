@@ -1,0 +1,119 @@
+% ════════════════════════════════════════════════════════════════════
+%  pp2lp — LPAR-26 preamble.  Compile with lualatex; biber for refs.
+%  Font stack + listings mirror the eo2lp paper, adapted to EasyChair.
+% ════════════════════════════════════════════════════════════════════
+
+% Maths first, then unicode-math + New Computer Modern (the eo2lp stack).
+\usepackage{mathtools}
+\usepackage{unicode-math}
+\usepackage{newcomputermodern}
+\setmonofont{JetBrains Mono}[Scale=0.85]
+\usepackage{microtype}
+
+% A few glyphs that we map explicitly to math mode.
+\usepackage{newunicodechar}
+\newunicodechar{↪}{\ensuremath{\hookrightarrow}}
+\newunicodechar{⊢}{\ensuremath{\vdash}}
+\newunicodechar{≔}{\ensuremath{\coloneqq}}
+
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{positioning, calc, fit, arrows.meta}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{listings, skins}
+
+% Boxed full-width figures + capitalised \Autoref (jbw helpers, as eo2lp).
+\usepackage{jbw-boxfigure}
+\usepackage{jbw-fix-hyperref-autoref}
+
+% easychair already loads hyperref; just restyle the links.
+\definecolor{link}{HTML}{1A5276}
+\hypersetup{colorlinks=true, linkcolor=link, citecolor=link, urlcolor=link}
+
+% ── Syntax colours (shared by the lambdapi + replay listings) ─────────
+\definecolor{lpKeyword}{HTML}{e14775}   % keywords (pink)
+\definecolor{lpModifier}{HTML}{4a7fb5}  % modifiers (muted blue)
+\definecolor{lpType}{HTML}{7058be}      % types (purple)
+\definecolor{lpComment}{HTML}{3b5998}   % comments (dark blue)
+\definecolor{lpPunct}{HTML}{918c8e}     % punctuation (grey)
+\definecolor{lpFg}{HTML}{3a3338}        % foreground
+\definecolor{lpBoxBg}{HTML}{fbfaf9}     % box background
+\definecolor{lpBoxFr}{HTML}{c5c1bf}     % box frame
+\newcommand{\lmark}[1]{\textcolor{lpPunct}{#1}}
+
+% ── LambdaPi listings language + style ────────────────────────────────
+\lstdefinelanguage{lambdapi}{
+  comment=[l]{//},
+  alsoletter={_},
+  keywords={symbol, rule, with, assert, require, open, type,
+            begin, end, assume, refine, have, rewrite, apply,
+            admit, admitted, simplify, reflexivity, symmetry},
+  keywords=[2]{constant, sequential, opaque, injective},
+  keywords=[3]{TYPE, Prop, Set},
+  sensitive=true,
+}
+\lstdefinestyle{lp}{
+  language=lambdapi,
+  basicstyle=\footnotesize\ttfamily\color{lpFg},
+  keywordstyle=\color{lpKeyword}\bfseries,
+  keywordstyle=[2]\color{lpModifier},
+  keywordstyle=[3]\color{lpType},
+  commentstyle=\color{lpComment}\itshape,
+  showstringspaces=false, columns=flexible, keepspaces=true,
+  mathescape=true, frame=none, numbers=none,
+  % GLYPH MAP: every non-ASCII char shown in LP code needs an entry here,
+  % else it renders as tofu. To show a new symbol, add {glyph}{{$...$}}1.
+  % (mathescape is on, so $...$ also works inline inside a listing.)
+  literate=
+    {π}{{$π$}}1  {τ}{{$τ$}}1  {ι}{{$ι$}}1  {Π}{{$Π$}}1  {λ}{{$λ$}}1
+    {∧}{{$∧$}}1  {∨}{{$∨$}}1  {¬}{{$¬$}}1  {⇒}{{$⇒$}}1  {⇔}{{$⇔$}}1
+    {⊤}{{$⊤$}}1  {⊥}{{$⊥$}}1  {→}{{$→$}}1  {↦}{{$↦$}}1  {ϵ}{{$∈$}}1
+    {⋀}{{$\bigwedge$}}1  {♢}{{$\diamondsuit$}}1  {♡}{{$\heartsuit$}}1
+    {∷}{{$\mathbin{::}$}}1  {𝕃}{{$\mathbb{L}$}}1  {≔}{{$\coloneqq$}}1  {∈}{{$∈$}}1
+    {≤}{{$≤$}}1  {≪}{{$≪$}}1  {≠}{{$≠$}}1  {∀}{{$∀$}}1  {∃}{{$∃$}}1
+    {𝟎}{{$\mathbf{0}$}}1  {𝟏}{{$\mathbf{1}$}}1  {⨾}{{$\mathbin{;}$}}1
+    {(}{{\lmark{(}}}1  {)}{{\lmark{)}}}1
+    {[}{{\lmark{[}}}1  {]}{{\lmark{]}}}1
+    {;}{{\lmark{;}}}1,
+  aboveskip=0pt, belowskip=0pt,
+}
+
+% ── PP replay listing style ───────────────────────────────────────────
+\lstdefinestyle{ppreplay}{
+  basicstyle=\footnotesize\ttfamily\color{lpFg},
+  showstringspaces=false, columns=flexible, keepspaces=true,
+  mathescape=true, frame=none, numbers=none,
+  literate={[}{{\lmark{[}}}1  {]}{{\lmark{]}}}1,
+  aboveskip=0pt, belowskip=0pt,
+}
+
+% ── Framed code boxes for use in body text ────────────────────────────
+\newtcblisting{codeLP}{
+  enhanced, listing only, listing options={style=lp},
+  colback=lpBoxBg, colframe=lpBoxFr, arc=1pt, boxrule=0.4pt,
+  left=4pt, right=4pt, top=2pt, bottom=2pt,
+  before skip=\medskipamount, after skip=\medskipamount,
+}
+\newtcblisting{codePP}{
+  enhanced, listing only, listing options={style=ppreplay},
+  colback=lpBoxBg, colframe=lpBoxFr, arc=1pt, boxrule=0.4pt,
+  left=4pt, right=4pt, top=2pt, bottom=2pt,
+  before skip=\medskipamount, after skip=\medskipamount,
+}
+
+% Springer/EPiC-style alt-text shim (no-op in PDF; documents figures).
+\providecommand{\alttext}[2]{#2}
+
+% Proceedings-style autoref names.
+\AtBeginDocument{%
+  \def\sectionautorefname{Section}%
+  \def\subsectionautorefname{Section}%
+  \def\subsubsectionautorefname{Section}%
+  \def\figureautorefname{Figure}%
+  \def\tableautorefname{Table}%
+}
+
+% ── Bibliography (biblatex + biber, as eo2lp) ─────────────────────────
+\usepackage[backend=biber, style=numeric, sorting=none, maxbibnames=99]{biblatex}
+\addbibresource{pp2lp.bib}

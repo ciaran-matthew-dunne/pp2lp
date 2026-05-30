@@ -1,0 +1,41 @@
+% ── background.tex · §2 · STATUS: skeleton (expand) ──────────────────
+% PP + trace/replay mechanism + λΠ-calculus modulo rewriting. Sets up §4.
+\section{Background}\label{sec:background}
+
+\subsection{The Predicate Prover and its proofs}
+\pp{} is \ab's automated prover for a typed first-order set theory: given a
+proof obligation---a sequent \(H \seq G\) of hypotheses and a goal---it
+searches for a proof using a fixed set of inference rules (roughly
+\numRulesSpec{} of them, catalogued in \pp's specification: conjunction,
+disjunction, implication, equivalence, negation, universal and
+existential quantification, equality, normalisation, arithmetic, and
+Booleans). Each rule transforms the current sequent, and a successful
+search yields a tree of rule applications closing the goal.
+% TODO(cite): PP specification / Atelier B reference manual.
+
+\subsection{Traces and replays}\label{sec:replay-format}
+\pp{} can be instrumented to record a compact \emph{trace}: a postorder
+listing of the rules it applied. \ab's REPLAY utility re-runs a trace and
+expands it into a \emph{replay}, in which the main sequent proof is written
+\emph{prefix}-style (a rule before its child subproofs) and every line
+carries the per-rule formula annotation \pp{} saw when it applied that
+rule. Three details matter for reconstruction
+(\autoref{sec:replay}): some lines are \emph{phantom} normalisation
+markers that carry no inference and must be filtered; the result-chain
+child of a branching quantifier is emitted \emph{before} its branch rule;
+and the rule name encodes its arity and variant
+(\autoref{sec:encoding}). The first non-phantom annotation is the overall
+goal.
+
+\subsection{The \texorpdfstring{$\lambda\Pi$}{lambda-Pi}-calculus modulo rewriting}
+\lp~\cite{hondet:hal-02981561} and \dedukti~\cite{assaf2023dedukti}
+implement the \lpcmr~\cite{CousineauDowek}: a dependently typed
+\(\lambda\)-calculus in which the conversion relation used by type-checking
+is extended with user-declared rewrite rules. This combination gives a
+small, well-understood proof-checking kernel together with the ability to
+embed an object logic by declaring its connectives and computation rules,
+which is why it is used as an interoperability target for many proof
+systems. We exploit both features: \bbook{} connectives and arithmetic are
+declared in \texttt{B.lp}, and \pp's structural conventions (\(n\)-ary
+conjunction, tuple quantifiers) are made to compute via rewrite rules so
+that one encoded rule matches goals of any arity.

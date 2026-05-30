@@ -1,0 +1,120 @@
+% ════════════════════════════════════════════════════════════════════
+%  pp2lp.bib — seeded from eo2lp's inria.bib (λΠ / Dedukti / LambdaPi)
+%  plus B-method entries.  Entries marked "VERIFY" need their
+%  bibliographic details double-checked before submission.
+% ════════════════════════════════════════════════════════════════════
+
+% ---- B method / Atelier B / Predicate Prover ------------------------
+
+@book{abrial1996bbook,
+  author    = {Abrial, Jean-Raymond},
+  title     = {The {B-Book}: Assigning Programs to Meanings},
+  publisher = {Cambridge University Press},
+  year      = {1996},
+  doi       = {10.1017/CBO9780511624162},
+}
+
+@inproceedings{behm1999meteor,
+  author    = {Behm, Patrick and Benoit, Paul and Faivre, Alain and
+               Meynadier, Jean-Marc},
+  title     = {M{\'e}t{\'e}or: A Successful Application of {B} in a Large Project},
+  booktitle = {FM'99 --- Formal Methods},
+  series    = {LNCS},
+  volume    = {1708},
+  pages     = {369--387},
+  publisher = {Springer},
+  year      = {1999},
+  doi       = {10.1007/3-540-48119-2_22},
+}
+
+% VERIFY: pick the canonical citation for Atelier B (manual / ClearSy).
+@misc{clearsy_atelierb,
+  author       = {{ClearSy System Engineering}},
+  title        = {Atelier {B}},
+  howpublished = {\url{https://www.atelierb.eu/}},
+  note         = {Accessed 2026-05},
+}
+
+% VERIFY: the Predicate Prover specification (Atelier B reference,
+% "Annexe A"); fill in the exact document title/edition.
+@misc{pp_spec,
+  author       = {{ClearSy System Engineering}},
+  title        = {Atelier {B}: The {Predicate Prover} (Reference Manual, Annexe~A)},
+  howpublished = {\url{https://www.atelierb.eu/}},
+  note         = {VERIFY edition and exact title},
+}
+
+% ---- LambdaPi / Dedukti / λΠ-calculus modulo rewriting --------------
+
+@inproceedings{CousineauDowek,
+  author    = {Denis Cousineau and Gilles Dowek},
+  title     = {Embedding Pure Type Systems in the lambda-{P}i-calculus modulo},
+  booktitle = {TLCA},
+  pages     = {102--117},
+  year      = {2007},
+  editor    = {Ronchi Della Rocca, Simona},
+  volume    = {4583},
+  series    = {LNCS},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-540-73228-0_9},
+}
+
+@misc{assaf2023dedukti,
+  title         = {Dedukti: a Logical Framework based on the $\lambda\Pi$-Calculus Modulo Theory},
+  author        = {Ali Assaf and Guillaume Burel and Rapha{\"e}l Cauderlier and
+                   David Delahaye and Gilles Dowek and Catherine Dubois and
+                   Fr{\'e}d{\'e}ric Gilbert and Pierre Halmagrand and
+                   Olivier Hermant and Ronan Saillard},
+  year          = {2023},
+  eprint        = {2311.07185},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LO},
+  url           = {https://arxiv.org/abs/2311.07185},
+}
+
+@inproceedings{hondet:hal-02981561,
+  title     = {The New Rewriting Engine of Dedukti},
+  author    = {Hondet, Gabriel and Blanqui, Fr{\'e}d{\'e}ric},
+  booktitle = {FSCD},
+  pages     = {35:1--35:16},
+  year      = {2020},
+  doi       = {10.4230/LIPIcs.FSCD.2020.35},
+}
+
+@inproceedings{Blanqui2021,
+  title     = {Some Axioms for Mathematics},
+  booktitle = {FSCD},
+  author    = {Blanqui, Fr{\'e}d{\'e}ric and Dowek, Gilles and
+               Grienenberger, {\'E}milie and Hondet, Gabriel and Thir{\'e}, Fran{\c c}ois},
+  year      = {2021},
+  publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
+  doi       = {10.4230/LIPIcs.FSCD.2021.20},
+}
+
+% ---- Related: SMT proof reconstruction in LP / Lean -----------------
+
+@inproceedings{coltellacciReconstructionSMTProofs2024a,
+  title     = {Reconstruction of {SMT} Proofs with {Lambdapi}},
+  booktitle = {International Workshop on Satisfiability Modulo Theories (SMT)},
+  author    = {Coltellacci, Alessio and Dowek, Gilles and Merz, Stephan},
+  year      = {2024},
+  series    = {CEUR Workshop Proceedings},
+  volume    = {3725},
+  pages     = {13--23},
+  url       = {https://ceur-ws.org/Vol-3725/paper8.pdf},
+}
+
+@inproceedings{mohamed25leansmt,
+  author    = {Abdalrhman Mohamed and Tomaz Gomes Mascarenhas and
+               Muhammad Harun Ali Khan and Haniel Barbosa and
+               Andrew Reynolds and Yicheng Qian and Cesare Tinelli and
+               Clark W. Barrett},
+  title     = {lean-smt: An {SMT} Tactic for Discharging Proof Goals in {Lean}},
+  booktitle = {CAV},
+  series    = {LNCS},
+  volume    = {15893},
+  pages     = {196--220},
+  publisher = {Springer},
+  year      = {2025},
+  doi       = {10.1007/978-3-031-98682-6_11},
+}

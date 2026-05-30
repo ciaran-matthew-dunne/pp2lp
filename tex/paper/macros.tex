@@ -1,0 +1,52 @@
+% ════════════════════════════════════════════════════════════════════
+%  pp2lp — notation macros
+% ════════════════════════════════════════════════════════════════════
+
+% Safety shims (in case the class version lacks them).
+\providecommand{\email}[1]{\texttt{#1}}
+\providecommand{\inst}[1]{\textsuperscript{#1}}
+\providecommand{\titlerunning}[1]{}
+\providecommand{\authorrunning}[1]{}
+
+% ── System / tool / format names ──────────────────────────────────────
+\newcommand{\pp}{PP}                       % the Predicate Prover
+\newcommand{\ab}{Atelier~B}
+\newcommand{\lp}{LambdaPi}                 % the proof assistant
+\newcommand{\dedukti}{Dedukti}
+\newcommand{\tool}{\texttt{pp2lp}}         % our tool
+\newcommand{\bmethod}{B~method}
+\newcommand{\bbook}{B\nobreakdash-Book}
+\newcommand{\lpcmr}{\ensuremath{\lambda\Pi}-calculus modulo rewriting}
+\newcommand{\lpc}{\ensuremath{\lambda\Pi}}
+
+% File-format names.
+\newcommand{\trace}{\texttt{.trace}}
+\newcommand{\replay}{\texttt{.replay}}
+\newcommand{\butf}{\texttt{.but}}
+\newcommand{\lpf}{\texttt{.lp}}
+
+% Rule names, e.g. \rn{AND2}, \rn{ALL7}.
+\newcommand{\rn}[1]{\textsf{#1}}
+
+% ── Logic / B-Book primitives (math mode) ─────────────────────────────
+\newcommand{\Prf}{\pi}                     % proof-of:  π P
+\newcommand{\El}{\tau}                     % type coercion:  τ ι
+\newcommand{\Prop}{\mathsf{Prop}}
+\newcommand{\Setu}{\mathsf{Set}}
+\newcommand{\Res}{\mathsf{Res}}
+\newcommand{\restm}{\mathsf{res\_tm}}
+\newcommand{\Tuple}{\mathsf{Tuple}}
+\newcommand{\prj}{\mathsf{prj}}
+\newcommand{\trust}{\texttt{trust}}
+\newcommand{\refine}{\texttt{refine}}
+
+% n-ary quantifier glyphs (matching the LP encoding).
+\newcommand{\Dia}{\diamondsuit}            % ♢  n-ary ∀, goal side  (forall)
+\newcommand{\Hrt}{\heartsuit}              % ♡  n-ary ∀, hyp side   (forall2)
+\newcommand{\allI}{\mathop{!\!!}}          % !! single-var ∀ over Tuple 1
+\newcommand{\xstI}{\mathop{?\!?}}          % ?? existential
+
+% Sequent / yields.
+\newcommand{\seq}{\vdash}
+\newcommand{\yields}{\rightsquigarrow}     % ⇝  "yields result"
+\newcommand{\subst}[2]{[#1 \mathbin{:=} #2]}

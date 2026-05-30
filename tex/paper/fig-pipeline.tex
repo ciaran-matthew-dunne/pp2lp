@@ -1,0 +1,34 @@
+\begin{tikzpicture}[
+    node distance=7mm and 12mm,
+    box/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
+                align=center, inner sep=4pt, minimum height=7mm,
+                minimum width=13mm, text=lpFg, draw=lpBoxFr},
+    kernel/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
+                align=center, inner sep=4pt, minimum height=7mm,
+                text=lpType, draw=lpType},
+    arr/.style={-{Stealth[length=5pt]}, semithick, color=lpPunct},
+    dep/.style={-{Stealth[length=4pt]}, dashed, color=lpPunct},
+    lbl/.style={font=\scriptsize\sffamily, text=lpFg},
+  ]
+  \node[box] (but) {.but};
+  \node[box, right=of but]    (trace)  {.trace};
+  \node[box, right=of trace]  (replay) {.replay};
+  \node[box, right=of replay] (lp)     {.lp};
+  \node[right=10mm of lp]     (chk)
+       {{\color{lpModifier}$\checkmark$}\,/\,{\color{lpKeyword}$\times$}};
+
+  \draw[arr] (but)    -- node[lbl, above] {\pp}              (trace);
+  \draw[arr] (trace)  -- node[lbl, above] {REPLAY}          (replay);
+  \draw[arr] (replay) -- node[lbl, above] {\texttt{pp2lp}}  (lp);
+  \draw[arr] (lp)     -- node[lbl, above] {\texttt{lambdapi}} (chk);
+
+  % The soundness-proved encoding the emitted proof links against.
+  \node[kernel, below=9mm of lp]
+       (kernel) {\texttt{B.lp} + \texttt{rules/}\\soundness-proved};
+  \draw[dep] (kernel) -- (lp);
+
+  \node[lbl, text=lpPunct, font=\scriptsize\itshape, below=2pt of but]
+       {formula};
+  \node[lbl, text=lpPunct, font=\scriptsize\itshape, below=2pt of replay]
+       {rule + goal lines};
+\end{tikzpicture}

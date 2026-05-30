@@ -1,0 +1,103 @@
+% ── intro.tex · §1 · STATUS: full draft ──────────────────────────────
+% Trust-gap lead. Owns the pipeline figure (fig:pipeline).
+% Voice/structure reference: ~/prog/eo2lp/tex/intro.tex.
+\section{Introduction}\label{sec:intro}
+%
+The \bmethod~\cite{abrial1996bbook} is a formal method for developing
+software by stepwise refinement, from an abstract specification down to
+executable code, in which every refinement step is justified by
+discharging a set of \emph{proof obligations}. It is used industrially to
+develop and certify safety-critical systems---most prominently in railway
+signalling and automatic train control, where it underpins deployed
+systems such as the driverless metro line~14 in
+Paris~\cite{behm1999meteor}. Its principal tool support is
+\ab~\cite{clearsy_atelierb}, which generates the proof obligations of a
+development and tries to discharge them automatically with its
+\emph{Predicate Prover} (\pp), an automated theorem prover for a typed
+first-order set theory.
+
+For a development to be certified, its proof obligations must be proved.
+A proof obligation that \pp{} reports as proved is therefore taken to be a
+theorem of \ab's logic. Yet \pp{} is a large, closed-source piece of
+software: its inference engine is not publicly available, and its
+verdicts are trusted without independent verification. In a setting whose
+entire purpose is to establish confidence in critical software, this is an
+uncomfortable gap---a bug in \pp{} could let an unsound proof obligation
+pass unnoticed.
+
+We address this gap with \tool, a tool that \emph{reconstructs} \pp{}
+proofs in \lp~\cite{hondet:hal-02981561}, a proof assistant based on the
+\lpcmr~\cite{CousineauDowek}. \lp{} and \dedukti~\cite{assaf2023dedukti}
+are designed as a small, trustworthy kernel and an interoperability hub
+for proof systems, which makes the calculus a natural target for
+independently checking the output of an external prover. Crucially, we do
+not merely \emph{transcribe} \pp's rules: we encode each \pp{} inference
+rule as a \lp{} symbol whose type captures the rule's premises and
+conclusion, and whose body is a proof that derives the rule from a small
+set of \bbook~\cite{abrial1996bbook} logical primitives. The encoded
+rules are thus \emph{proved sound} once and for all, rather than
+postulated as axioms; every reconstructed proof then type-checks against
+this small trusted base.
+
+% --- pipeline figure ------------------------------------------------
+\begin{boxfigure}{fig:pipeline}{%
+    The \tool{} pipeline. \pp, instrumented, emits a \trace{} of the
+    rules it applied; \ab's REPLAY utility expands this into a \replay{}
+    annotating each step with its intermediate goal; \tool{} rebuilds the
+    proof tree and emits an \lpf{} tactic script, which \lp{} checks
+    against the soundness-proved rule encoding (\texttt{B.lp} and
+    \texttt{rules/}).}
+  \centering
+  \alttext{Left-to-right pipeline of five boxes. A formula file (.but)
+    maps via PP to a .trace, via REPLAY to a .replay, via pp2lp to a .lp
+    file, and via lambdapi to a tick-or-cross verdict. A soundness-proved
+    kernel box (B.lp plus rules) feeds into the .lp file.}{%
+    \input{fig-pipeline.tex}}
+\end{boxfigure}
+% --------------------------------------------------------------------
+
+The translation works from data \pp{} can already produce. \pp{} can be
+instrumented to record a compact \emph{trace} listing the inference rules
+it applied during a proof; \ab's REPLAY utility expands this trace into a
+\emph{replay} that annotates each step with the rule applied and the
+intermediate goal it was applied to. Given a replay, \tool{} parses it,
+rebuilds the proof tree, and emits an \lp{} tactic script that composes
+the encoded rules following the tree, yielding a complete, independently
+checkable proof (\autoref{fig:pipeline}).
+
+\subsubsection*{Contributions.}
+\begin{itemize}
+  \item A \lp{} encoding of \pp's inference rules in which each rule is
+    given a dependent type expressing its soundness and a proof term
+    witnessing it, reducing the trusted base to a small kernel of
+    \bbook{} primitives (\autoref{sec:encoding}).
+  \item \tool, an OCaml tool that turns a \pp{} replay into a \lp{} proof
+    script by rebuilding the proof tree and emitting a tactic script that
+    \lp{} type-checks (\autoref{sec:replay}).
+  \item An evaluation of coverage and reconstruction across several
+    benchmark suites, including \ab's own proof corpus
+    (\autoref{sec:eval}).
+\end{itemize}
+
+\subsubsection*{Related work.}
+The idea of reducing proof checking to type checking in a logical
+framework goes back to \textsc{lf} and, for \pp's parent ecosystem, to
+the \dedukti/\lp{}
+line~\cite{CousineauDowek,assaf2023dedukti,hondet:hal-02981561}, which
+has been used to import proofs from many systems. Closest to our setting,
+Coltellacci et al.~\cite{coltellacciReconstructionSMTProofs2024a}
+reconstruct \textsc{cvc5} proofs in \lp{} via hand-written soundness
+lemmas per Alethe rule, and lean-smt~\cite{mohamed25leansmt} reconstructs
+SMT proofs in Lean~4. Our target is different: \ab's \pp, an industrial
+first-order prover for a typed set theory rather than an SMT solver, for
+which---to our knowledge---no independent proof checker exists. Like those
+works we provide per-rule soundness justifications, but we drive
+reconstruction automatically from \pp's existing trace/replay mechanism.
+% TODO: cite PP specification \cite{pp_spec}; consider ProB, SMTCoq.
+
+\subsubsection*{Outline.}
+\autoref{sec:background} recalls \pp, its trace/replay mechanism, and the
+\lpcmr. \autoref{sec:encoding} describes the soundness-proved rule
+encoding. \autoref{sec:replay} describes how \tool{} turns a replay into
+a \lp{} proof. \autoref{sec:eval} reports coverage and benchmark results,
+and \autoref{sec:conclusion} concludes.
