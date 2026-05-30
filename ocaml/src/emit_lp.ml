@@ -43,7 +43,3 @@ let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
   Lp_tree.pp ~pad:"  " buf lp_tree;
   Buffer.add_string buf "\nend;\n";
   Buffer.contents buf
-
-let emit_lp (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
-    : string =
-  lp_header ^ "\n" ^ emit_symbol name goal pp_tree

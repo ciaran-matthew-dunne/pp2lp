@@ -12,12 +12,6 @@ let goal_of_tree tree =
   | Some anno -> Syntax_pp.prd_of_rhs anno
   | None -> failwith "root node of proof tree has no annotation"
 
-let reconstruct_file (fp : string) : string =
-  let replay = Parse_replay.parse_file fp in
-  let tree = Proof_tree.build replay.rules in
-  let goal = Syntax_pp.flatten_binds (goal_of_tree tree) in
-  Emit_lp.emit_lp (name_of_file fp) goal tree
-
 let reconstruct_symbol (fp : string) : string =
   let replay = Parse_replay.parse_file fp in
   let tree = Proof_tree.build replay.rules in
