@@ -85,11 +85,11 @@ end;
 // Tuple-uniform: replaces AXM9 (unary) and AXM9_2 (per-arity copy).
 
 opaque symbol AXM9 [n] [P : Tuple n → Prop] (v : Tuple n) [Q]
-  : π (`!! u, ¬ (⊤ ∧ P u))
+  : π (`!! u, ¬ ⋀ (∎ ∷ ⊤ ∷ P u))
   → π (P v ⇒ Q) ≔
 begin
   assume n P v Q h hp;
-  refine ⊥ₑ (!!_to_pi (λ u, ¬ (⊤ ∧ P u)) h v (∧ᵢ ⊤ᵢ hp))
+  refine ⊥ₑ (!!_to_pi (λ u, ¬ ⋀ (∎ ∷ ⊤ ∷ P u)) h v (⋀₂_intro ⊤ᵢ hp))
 end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----

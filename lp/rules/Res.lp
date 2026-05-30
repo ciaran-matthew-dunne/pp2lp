@@ -78,19 +78,61 @@ begin assume E F h; rewrite h; reflexivity end;
 
 // ============================================================
 // Per-connective equality lemmas (§A.1–A.5, A.13)
+//
+// The AND lemmas decompose the snoc conjunction `⋀ (ps ∷ P)` into init
+// `⋀ ps` and last `P`.  Proved directly from the ConjList eliminators:
+// build the conjunction with `⋀_intro hps hp` and destruct it with
+// `⋀_init`/`⋀_last`, in place of the `∧ᵢ`/`∧ₑ₁`/`∧ₑ₂` of the OR/IMP lemmas.
 // ============================================================
 
-// AND1: ¬(⋀ ps)⇒R = (¬(last ps)⇒R) ∧ (¬(init ps)⇒R)
-symbol and1_eq [ps : 𝕃 o] [R : Prop]
-  : π ((¬ ⋀ ps ⇒ R) = ((¬ ⋀_last (⋀ ps) ⇒ R) ∧ (¬ ⋀_init (⋀ ps) ⇒ R)));
+// AND1: (¬⋀(ps∷P)⇒R) = ((¬P⇒R) ∧ (¬⋀ps⇒R))   [last-first]
+opaque symbol and1_eq [ps : 𝕃* o] [P R : Prop]
+  : π ((¬ ⋀ (ps ∷ P) ⇒ R) = ((¬ P ⇒ R) ∧ (¬ ⋀ ps ⇒ R))) ≔
+begin
+  assume ps P R;
+  refine propExt _ _ _ _
+    { assume h; refine ∧ᵢ
+        (λ hnp, h (λ hand, hnp (⋀_last hand)))
+        (λ hni, h (λ hand, hni (⋀_init hand))) }
+    { assume h hnand;
+      have hnand2 : π (¬ (⋀ ps ∧ P))
+        { assume hand; refine hnand (⋀_intro (∧ₑ₁ hand) (∧ₑ₂ hand)) };
+      have hor : π (¬ ⋀ ps ∨ ¬ P)
+        { refine =⇒ (deMorgan_∧ (⋀ ps) P) hnand2 };
+      refine ∨ₑ hor _ _
+        { assume hni; refine ∧ₑ₂ h hni }
+        { assume hnp; refine ∧ₑ₁ h hnp } }
+end;
 
-// AND2: ¬(⋀ ps) = (init ps ⇒ ¬(last ps))
-symbol and2_eq [ps : 𝕃 o]
-  : π (¬ ⋀ ps = (⋀_init (⋀ ps) ⇒ ¬ ⋀_last (⋀ ps)));
+// AND2: ¬⋀(ps∷P) = (⋀ps ⇒ ¬P)
+opaque symbol and2_eq [ps : 𝕃* o] [P : Prop]
+  : π (¬ ⋀ (ps ∷ P) = (⋀ ps ⇒ ¬ P)) ≔
+begin
+  assume ps P;
+  refine propExt _ _ _ _
+    { assume h hps hp; refine h (⋀_intro hps hp) }
+    { assume h hand; refine h (⋀_init hand) (⋀_last hand) }
+end;
 
-// AND3: (⋀ ps)⇒R = (init ps ⇒ last ps ⇒ R)
-symbol and3_eq [ps : 𝕃 o] [R : Prop]
-  : π ((⋀ ps ⇒ R) = (⋀_init (⋀ ps) ⇒ (⋀_last (⋀ ps) ⇒ R)));
+// AND3: (⋀(ps∷P)⇒R) = (⋀ps ⇒ (P⇒R))
+opaque symbol and3_eq [ps : 𝕃* o] [P R : Prop]
+  : π ((⋀ (ps ∷ P) ⇒ R) = (⋀ ps ⇒ (P ⇒ R))) ≔
+begin
+  assume ps P R;
+  refine propExt _ _ _ _
+    { assume h hps hp; refine h (⋀_intro hps hp) }
+    { assume h hand; refine h (⋀_init hand) (⋀_last hand) }
+end;
+
+// AND4: ⋀(ps∷P) = (P ∧ ⋀ps)   [last-first reordering for AND4_1]
+opaque symbol and4_eq [ps : 𝕃* o] [P : Prop]
+  : π (⋀ (ps ∷ P) = (P ∧ ⋀ ps)) ≔
+begin
+  assume ps P;
+  refine propExt _ _ _ _
+    { assume h; refine ∧ᵢ (⋀_last h) (⋀_init h) }
+    { assume h; refine ⋀_intro (∧ₑ₂ h) (∧ₑ₁ h) }
+end;
 
 // OR1: ¬(P∨Q)⇒R = (¬P⇒¬Q⇒R)
 opaque symbol or1_eq [P Q R : Prop]

@@ -64,15 +64,19 @@ symbol OR1_1 [P Q R : Prop]
 // OR2_1: Schema 2 — combine.
 symbol OR2_1 [P Q : Prop]
   (r1 : Res (¬ Q)) (r2 : Res (¬ P)) : Res (¬ (P ∨ Q))
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans or2_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans or2_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // OR3_1: Schema 2 — combine.
 symbol OR3_1 [P Q R : Prop]
   (r1 : Res (Q ⇒ R)) (r2 : Res (P ⇒ R))
   : Res ((P ∨ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans or3_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans or3_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // OR4_1: Schema 1 — passthrough.
 symbol OR4_1 [P Q : Prop]

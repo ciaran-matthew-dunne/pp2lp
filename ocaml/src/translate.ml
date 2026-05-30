@@ -99,6 +99,48 @@ let find_hyp_by_pred ctx pred =
   List.find_map
     (fun (name, p) -> if p = pred then Some name else None) ctx.hyps
 
+(* ---- Alpha + universal-binder-kind-insensitive predicate equality ----
+
+   PP normalisation produces the same propositional content under different
+   universal binders — `!` (Bang), `forall` (Forall), `forall2` (Forall2) —
+   and with different bound-variable names.  All three map to the single LP
+   `!!` (the user aliased `♢`/`♡` to it), so two such predicates have the
+   *same* LP type.  Canonicalise to De Bruijn levels and fold the universal
+   binders into one kind, then compare structurally.  Used by the INS leaf
+   search so a needed conjunct like `!x.¬(⊤ ∧ P x)` matches an in-scope hyp
+   written `forall2 y.¬(⊤ ∧ P y)`. *)
+let canon_binder = function
+  | Bang | Forall | Forall2 -> Forall
+  | Exists -> Exists
+
+let rec canon_exp env = function
+  | Var s -> (match List.assoc_opt s env with Some n -> Var n | None -> Var s)
+  | Nat n -> Nat n
+  | App (f, args) -> App (f, List.map (canon_exp env) args)
+  | AOp (op, a, b) -> AOp (op, canon_exp env a, canon_exp env b)
+  | Neg e -> Neg (canon_exp env e)
+  | SetImage (a, b) -> SetImage (canon_exp env a, canon_exp env b)
+  | Inter (a, b) -> Inter (canon_exp env a, canon_exp env b)
+  | Union (a, b) -> Union (canon_exp env a, canon_exp env b)
+
+let rec canon_prd depth env = function
+  | Lift e -> Lift (canon_exp env e)
+  | Unary (op, p) -> Unary (op, canon_prd depth env p)
+  | Binary (op, a, b) -> Binary (op, canon_prd depth env a, canon_prd depth env b)
+  | Mem (es, e) -> Mem (List.map (canon_exp env) es, canon_exp env e)
+  | Eq (a, b) -> Eq (canon_exp env a, canon_exp env b)
+  | Leq (a, b) -> Leq (canon_exp env a, canon_exp env b)
+  | Bind (k, xs, body) ->
+    let names = List.mapi (fun i _ -> Printf.sprintf "#%d" (depth + i)) xs in
+    let env' = List.map2 (fun x n -> (x, n)) xs names @ env in
+    Bind (canon_binder k, names, canon_prd (depth + List.length xs) env' body)
+
+let prd_equiv a b = canon_prd 0 [] a = canon_prd 0 [] b
+
+let find_hyp_by_equiv ctx pred =
+  List.find_map
+    (fun (name, p) -> if prd_equiv p pred then Some name else None) ctx.hyps
+
 (* ---- Witness + hyp lookup for AXM9 / NRM19 ----
 
    AXM9 (`P v ⇒ Q`): the antecedent is `P v` for some witness v of
@@ -188,18 +230,42 @@ let ins_hyp_shape = function
     Some (vars, body)
   | _ -> None
 
-let conj_i = "\xe2\x88\xa7\xe1\xb5\xa2"   (* ∧ᵢ *)
+let conj_intro = "\xe2\x8b\x80_intro"           (* ⋀_intro *)
+let conj_nil_prf = "\xe2\x8b\x80_nil_prf"       (* ⋀_nil_prf *)
+let true_intro = "\xe2\x8a\xa4\xe1\xb5\xa2"     (* ⊤ᵢ *)
 
-let rec match_conj ctx env = function
-  | Binary (And, left, right) ->
-    (match match_conj ctx env left, match_conj ctx env right with
-     | Some l_ev, Some r_ev -> Some (L.App (conj_i, [l_ev; r_ev]))
-     | _ -> None)
-  | leaf ->
+let rec collect_conj_leaves = function
+  | Binary (And, l, r) -> collect_conj_leaves l @ collect_conj_leaves r
+  | leaf -> [leaf]
+
+(* Build a ⋀-form evidence term from a list of leaf proofs.
+   Snoc left-fold bottoming in ⋀_nil_prf:
+   ⋀_intro (… (⋀_intro ⋀_nil_prf ev₀) …) evₙ₋₁
+   ⋀_intro's list/elt implicits are inferred from the expected type. *)
+let rec build_conj_chain_rev = function
+  | [] -> L.Name conj_nil_prf
+  | ev :: rest ->
+    L.App (conj_intro, [build_conj_chain_rev rest; ev])
+
+let build_conj_chain evs = build_conj_chain_rev (List.rev evs)
+
+let leaf_evidence ctx env leaf =
+  if is_true_atom leaf then Some (L.Name true_intro)
+  else
     let needed = subst_prd env leaf in
-    match find_hyp_by_pred ctx needed with
+    (* Match up to alpha + universal-binder kind: a conjunct may be a
+       universal (e.g. the "no image" `!x.¬(⊤ ∧ …)` of a totality goal)
+       whose in-scope hyp uses a different binder/var but the same LP type. *)
+    match find_hyp_by_equiv ctx needed with
     | Some h -> Some (L.Name h)
     | None -> None
+
+let match_conj ctx env body =
+  let leaves = collect_conj_leaves body in
+  let opt_evs = List.map (leaf_evidence ctx env) leaves in
+  if List.for_all Option.is_some opt_evs then
+    Some (build_conj_chain (List.map Option.get opt_evs))
+  else None
 
 let find_ins_contradiction ctx =
   let try_candidate (lp_witness, pp_vars) (h_name, h_pred) =
@@ -233,17 +299,50 @@ let is_trust_spec rule =
   | [] -> false
   | words -> List.for_all ((=) "trust") words
 
-let dynamic_value_args rule arg =
+(* ---- Tuple-projection rendering of rule arguments ----
+
+   Rule arguments carrying a predicate/expression (AR9/AR3/AR10 solver
+   results) may mention PP variables bound by an enclosing ALL8/ALL7
+   binder.  In LP those binders introduce a single `Tuple n` value, so var
+   k of tuple `x` must render as `prj k x` — exactly the env the n-ary
+   quantifier kernel uses.  Build that env from `ctx.xs` and pre-render to
+   a `Raw` term.  (With no in-scope binder the env is empty and these
+   render identically to `L.Pred` / `L.Exp`.) *)
+let pp_env_of ctx =
+  List.concat_map (fun (x_name, pp_vars) ->
+    List.mapi (fun i v -> (v, (i, x_name))) pp_vars
+  ) ctx.xs
+
+let render_pred_term ctx prd =
+  let buf = Buffer.create 64 in
+  Buffer.add_char buf '(';
+  Pp_lp.pp_prd ~env:(pp_env_of ctx) buf prd;
+  Buffer.add_char buf ')';
+  L.Raw (Buffer.contents buf)
+
+let render_exp_term ctx e =
+  let buf = Buffer.create 64 in
+  Buffer.add_char buf '(';
+  Pp_lp.pp_exp ~env:(pp_env_of ctx) buf e;
+  Buffer.add_char buf ')';
+  L.Raw (Buffer.contents buf)
+
+let dynamic_value_args ctx rule arg =
   match Rule_db.emit_args rule, arg with
-  | Some "dynamic:ar3", Some (PipeArg (a, _b)) -> [L.Exp a]
-  | Some "dynamic:ar9", Some (Pred p) -> [L.Pred p]
+  | Some "dynamic:ar3", Some (PipeArg (a, _b)) -> [render_exp_term ctx a]
+  | Some "dynamic:ar9", Some (Pred p) -> [render_pred_term ctx p]
   | _, _ -> []
 
 let metadata_extra_args rule =
   match Rule_db.emit_args rule with
   | None -> []
+  | Some "dynamic:ar9" ->
+    (* AR9 (F) : π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R).
+       After the F expression (a dynamic value arg) comes the solver-confirmed
+       equality E = F — supply `trust` for it; the Seq slot (the F ≤ 𝟎 ⇒ R
+       continuation) is the remaining hole. *)
+    [L.Trust]
   | Some "dynamic:ar3"
-  | Some "dynamic:ar9"
   | Some "dynamic:ar10"
   | Some "dynamic:hyp" -> []
   | Some "dynamic:axm9"
@@ -261,8 +360,8 @@ let slot_hole_args rule =
        | _ -> L.Hole)
     | Rule_db.Seq | Rule_db.Res -> L.Hole)
 
-let default_rule_args rule arg =
-  dynamic_value_args rule arg @ metadata_extra_args rule @ slot_hole_args rule
+let default_rule_args ctx rule arg =
+  dynamic_value_args ctx rule arg @ metadata_extra_args rule @ slot_hole_args rule
 
 let replace_last args last =
   match List.rev args with
@@ -318,7 +417,7 @@ let find_and5_pair conjs =
 (* ---- Per-rule tactic emission ---- *)
 
 let tactic_for_hyp ctx rule arg anno =
-  let default_args = default_rule_args rule arg in
+  let default_args = default_rule_args ctx rule arg in
   let fallback = L.Refine (rule, default_args) in
   match goal_of_anno anno with
   | None -> fallback
@@ -370,12 +469,14 @@ let tactic_for_rule ctx rule arg anno children =
   | Some "dynamic:nrm19" -> tactic_for_witness_hyp ctx rule anno
   | Some "dynamic:ar10" ->
     (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).
-       Supply Q explicitly so Lambdapi can type the `trust` equality. *)
+       Supply Q explicitly so Lambdapi can type the `trust` equality.
+       Q may mention enclosing-binder vars, so render it with the
+       tuple-projection env rather than the raw PP names. *)
     (match arg with
      | Some (Pred q) ->
-       L.Refine ("@AR10", [L.Hole; L.Pred q; L.Hole; L.Trust; L.Hole])
+       L.Refine ("@AR10", [L.Hole; render_pred_term ctx q; L.Hole; L.Trust; L.Hole])
      | _ -> L.Refine (rule, [L.Trust; L.Hole]))
-  | _ -> L.Refine (rule, default_rule_args rule arg)
+  | _ -> L.Refine (rule, default_rule_args ctx rule arg)
 
 let rec tree ctx = function
   | P.Apply { rule; children = [c]; _ }
@@ -494,7 +595,7 @@ and branching ctx rule anno chain_node cont =
    Res-typed rule forms. *)
 and chain_tree ctx = function
   | P.Apply { rule; children = []; arg; _ } ->
-    let args = dynamic_value_args rule arg @ slot_hole_args rule in
+    let args = dynamic_value_args ctx rule arg @ slot_hole_args rule in
     L.Step (L.Refine (rule, args))
   | P.Apply { rule; anno; children = [c]; _ } when base rule = "ALL8" ->
     let pp_vars =
@@ -535,14 +636,50 @@ and chain_tree ctx = function
     in
     let tactic = L.Refine (rule, [p_lambda] @ slot_hole_args rule) in
     L.Then (tactic, chain_tree ctx c)
-  | P.Apply { rule; arg; children = [c]; _ } ->
+  | P.Apply { rule; arg; children = [c]; _ }
+    when Rule_db.emit_args rule = Some "dynamic:ar10" ->
+    (* AR10_1 [P Q R] (heq : P = Q) (r : Res (Q ⇒ R)) : Res (P ⇒ R).
+       Q is the solver result and can't be inferred from P ⇒ R alone, so
+       supply it explicitly (env-rendered) with `trust` for the equality;
+       the chain continuation fills the Res hole.  Mirrors the main-tree
+       AR10 dispatch. *)
+    let q_term = match arg with
+      | Some (Pred q) -> render_pred_term ctx q
+      | _ -> L.Hole
+    in
     let tactic =
-      L.Refine (rule, dynamic_value_args rule arg @ slot_hole_args rule)
+      L.Refine ("@" ^ rule, [L.Hole; q_term; L.Hole; L.Trust; L.Hole])
     in
     L.Then (tactic, chain_tree ctx c)
+  | P.Apply { rule; arg; children = [c]; _ } ->
+    let tactic =
+      L.Refine (rule, dynamic_value_args ctx rule arg @ slot_hole_args rule)
+    in
+    L.Then (tactic, chain_tree ctx c)
+  | P.Apply { rule; anno; children = [c0; c1]; _ }
+    when base rule = "ALL7" || base rule = "XST8" ->
+    (* ALL7_1 / XST8_1 inside a Res chain: a per-tuple Res chain ρ (under
+       the bound v) plus the continuation r.  Mirrors `branching` but stays
+       in Res mode — the ρ child must bind v, exactly like the main-tree
+       form, otherwise its `Π v, Res …` goal is left unproven. *)
+    let pp_vars =
+      match base rule, goal_of_anno anno with
+      | "ALL7", Some (Binary (Imp, b, _)) ->
+        Option.value ~default:[] (binder_vars_of b)
+      | "XST8", Some g ->
+        Option.value ~default:[] (binder_vars_of g)
+      | _ -> []
+    in
+    let tactic = L.Refine (rule, [L.Hole; L.Hole]) in
+    let v = fresh_x_local ctx in
+    let rho = scoped_hyps ctx (fun () ->
+      with_x ctx v pp_vars (fun () -> L.Assume (v, chain_tree ctx c0)))
+    in
+    let cont = scoped_hyps ctx (fun () -> chain_tree ctx c1) in
+    L.Branches (tactic, rho, cont)
   | P.Apply { rule; arg; children = [c0; c1]; _ } ->
     let tactic =
-      L.Refine (rule, dynamic_value_args rule arg @ slot_hole_args rule)
+      L.Refine (rule, dynamic_value_args ctx rule arg @ slot_hole_args rule)
     in
     let left = scoped_hyps ctx (fun () -> chain_tree ctx c0) in
     let right = scoped_hyps ctx (fun () -> chain_tree ctx c1) in

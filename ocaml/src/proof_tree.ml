@@ -18,6 +18,10 @@ type pp_tree =
       arg: arg option;
       anno: rhs option;
       children: pp_tree list;
+      (* For branching rules (ALL7/XST8): the FIN annotation that
+         follows in the replay.  Records what `res_tm` the result
+         chain produces — the term the continuation will see. *)
+      fin_hint: rhs option;
     }
 
 exception Bad_replay of string
@@ -71,8 +75,8 @@ let rec skip_phantoms = function
     skip_phantoms rest
   | lines -> lines
 
-let make_node rule arg anno children =
-  Apply { rule; arg; anno = Some anno; children }
+let make_node ?(fin_hint=None) rule arg anno children =
+  Apply { rule; arg; anno = Some anno; children; fin_hint }
 
 let pop_res rule stack =
   match stack with
@@ -126,8 +130,15 @@ and parse_branch_seq lines =
     if skip_phantoms rest = [] then
       bad "%s replay branch has no sequent continuation after its result-chain"
         rule;
+    (* The first FIN after a branching rule describes the `res_tm` the
+       chain supplies — the form the continuation will work with via
+       the res_eq equality.  Capture for tree-display purposes. *)
+    let fin_hint = match rest with
+      | (((r, _), fin_anno) :: _) when r = "FIN" -> Some fin_anno
+      | _ -> None
+    in
     let cont, rest = parse_prefix Seq_mode rest in
-    make_node rule arg anno [chain; cont], rest
+    make_node ~fin_hint rule arg anno [chain; cont], rest
   | [] ->
     bad "result-chain proof was not followed by ALL7/XST8 in replay"
   | line :: _ ->
@@ -194,22 +205,86 @@ let children_of (Apply { children; _ }) = children
 
 let debug = ref false
 
-let rec pp_tree ?(indent="") ?(last=true) ch node =
+(* Render an annotation: the goal at this point in the proof. *)
+let rhs_to_pp = function
+  | Simple p -> Emit_pp.prd_to_pp p
+  | Fin (norm, _, _, _) -> Printf.sprintf "FIN→ %s" (Emit_pp.prd_to_pp norm)
+
+(* Like rhs_to_pp but strips the "FIN→ " prefix from FIN annotations —
+   used when composing equalities from FIN-supplied terms. *)
+let rhs_to_term = function
+  | Simple p -> Emit_pp.prd_to_pp p
+  | Fin (norm, _, _, _) -> Emit_pp.prd_to_pp norm
+
+(* Label a child by its parent's slot kind.  Both labels use the same
+   trailing-parens style: `(equality)` for the result chain (its node
+   is the equality it derives), `(continuation)` for the sequent
+   subproof. *)
+let child_label_for parent_rule i =
+  let slots = Rule_db.slots parent_rule in
+  if not (Rule_db.is_branching parent_rule) then ""
+  else match List.nth_opt slots i with
+  | Some Rule_db.Res -> " (equality)"
+  | Some Rule_db.Seq -> " (continuation)"
+  | _ -> ""
+
+(* Extract a node's annotation as a printable goal. *)
+let node_goal = function
+  | Apply { anno = Some r; _ } -> rhs_to_term r
+  | Apply { anno = None; _ } -> "?"
+
+(* Render a node as a flat Lisp-style proof term — the whole result
+   chain collapsed into one expression.  Arguments are dropped. *)
+let rec render_term = function
+  | Apply { rule; children; _ } ->
+    if children = [] then rule
+    else
+      let children_s =
+        List.map render_term children |> String.concat " "
+      in
+      Printf.sprintf "(%s %s)" rule children_s
+
+(* Tree visualization: nodes are GOALS; rules label the arrows.
+   Each node prints:
+     <prefix> goal
+     <indent>  | rule(arg)        ← the rule applied to this goal
+   Children render below as subgoals.
+   For a result-chain child of a branching rule (ALL7/XST8), its
+   "goal" is the equality `<chain top> = <res_tm>` — the equality the
+   chain derives for use by the continuation. *)
+let rec pp_tree ?(indent="") ?(last=true) ?(child_label="") ch node =
   let prefix = if last then "+-- " else "|-- " in
   let child_indent = indent ^ (if last then "    " else "|   ") in
   match node with
-  | Apply { rule; arg; children; _ } ->
-    let arg_s = match arg with
-      | None -> ""
-      | Some (Pred p) -> Printf.sprintf " (%s)" (Emit_pp.prd_to_pp p)
-      | Some (PipeArg (a, b)) ->
-        Printf.sprintf " (%s | %s)"
-          (Emit_pp.prd_to_pp (Lift a)) (Emit_pp.prd_to_pp (Lift b))
+  | Apply { rule; anno; children; fin_hint; _ } ->
+    let goal_s = match anno with
+      | None -> "(no annotation)"
+      | Some r -> rhs_to_pp r
     in
-    Printf.fprintf ch "%s%s%s%s\n" indent prefix rule arg_s;
+    (* Goal node: `+-- goal (label)`.
+       Edge (rule applied here, points down to children): `rule ↓`.
+       Proof term (for collapsed result chains, proves goal above): `(term) ⊢`. *)
+    Printf.fprintf ch "%s%s%s%s\n" indent prefix goal_s child_label;
+    Printf.fprintf ch "%s%s ↓\n" child_indent rule;
     let n = List.length children in
     List.iteri (fun i c ->
-      pp_tree ~indent:child_indent ~last:(i = n - 1) ch c
+      let is_result_chain = i = 0 && Rule_db.is_branching rule in
+      let label = child_label_for rule i in
+      if is_result_chain then begin
+        (* Result chain: one node for the equality, one node for the
+           proof term that derives it. *)
+        let last_child = i = n - 1 in
+        let inner_prefix = if last_child then "+-- " else "|-- " in
+        let inner_indent = child_indent ^ (if last_child then "    " else "|   ") in
+        let eq_goal = match fin_hint with
+          | Some fin_anno ->
+            Printf.sprintf "%s = %s" (node_goal c) (rhs_to_term fin_anno)
+          | None -> node_goal c
+        in
+        Printf.fprintf ch "%s%s%s%s\n" child_indent inner_prefix eq_goal label;
+        Printf.fprintf ch "%s+-- %s\n" inner_indent (render_term c)
+      end else
+        pp_tree ~indent:child_indent ~last:(i = n - 1) ~child_label:label ch c
     ) children
 
 let debug_tree label node =

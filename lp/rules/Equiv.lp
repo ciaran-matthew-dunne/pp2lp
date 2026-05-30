@@ -96,27 +96,34 @@ end;
 symbol EQV1_1 [P Q R : Prop]
   (r1 : Res (P ⇒ ¬ Q ⇒ R)) (r2 : Res (¬ P ⇒ Q ⇒ R))
   : Res (¬ (P ⇔ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv1_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans eqv1_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // EQV2_1: Schema 2 — combine.
 symbol EQV2_1 [P Q : Prop]
   (r1 : Res (P ⇒ ¬ Q)) (r2 : Res (¬ Q ⇒ P))
   : Res (¬ (P ⇔ Q))
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv2_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans eqv2_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // EQV3_1: Schema 2 — combine.
 symbol EQV3_1 [P Q R : Prop]
   (r1 : Res (P ⇒ Q ⇒ R)) (r2 : Res (¬ P ⇒ ¬ Q ⇒ R))
   : Res ((P ⇔ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv3_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans eqv3_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
-// EQV4_1: Schema 2 — combine. `⇔` reduces to `(⇒) ∧ (⇒)` in stdlib,
-// so the equality bridge is just reflexivity.
+// EQV4_1: Schema 2 — combine.
 symbol EQV4_1 [P Q : Prop]
   (r1 : Res (P ⇒ Q)) (r2 : Res (Q ⇒ P))
   : Res (P ⇔ Q)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans eqv4_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans eqv4_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));

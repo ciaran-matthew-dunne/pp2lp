@@ -22,7 +22,7 @@
 //   pi_to_??_intro : Π v, π (P v) → π (`?? v, P v)        — intro
 //   pi_to_??_elim  : (Π v, π (P v) → π R) → π (`?? v, P v) → π R
 //                                                          — elim
-require open pp2lp.B;
+require open pp2lp.B ;
 
 // ---- Tuple ------------------------------------------------------
 
@@ -152,7 +152,7 @@ end;
 // the dedicated bridges or transport via `♢_eq_!!` where helpers are
 // `!!`-typed.
 
-constant symbol ♢ [n] : (Tuple n → Prop) → Prop;
+symbol ♢ [n] : (Tuple n → Prop) → Prop ≔ !!;
 notation ♢ quantifier;
 
 constant symbol pi_to_♢ [n] (P : Tuple n → Prop)
@@ -161,7 +161,7 @@ constant symbol pi_to_♢ [n] (P : Tuple n → Prop)
 constant symbol ♢_to_pi [n] (P : Tuple n → Prop)
   : π (`♢ v, P v) → Π v : Tuple n, π (P v);
 
-constant symbol ♡ [n] : (Tuple n → Prop) → Prop;
+symbol ♡ [n] : (Tuple n → Prop) → Prop ≔ !!;
 notation ♡ quantifier;
 
 constant symbol pi_to_♡ [n] (P : Tuple n → Prop)
@@ -190,13 +190,10 @@ begin
   { assume h; refine pi_to_♡ P (!!_to_pi P h) }
 end;
 
+
+
 // ---- Res: Σ-type for normalisation chains ----------------------
 // `Res t = (t' : τ a) × π (t = t')` packages a normalised term with
 // a proof of equality to the original. Lives here (not in Res.lp)
 // because the result-based ALL7/XST8 in All.lp/Xst.lp need it.
-injective symbol Res [a : Set] : τ a → TYPE;
-symbol mk_1 [a t] (t' : τ a) : π (t = t') → Res t;
-symbol res_tm [a t] : Res [a] t → τ a;
-symbol res_eq [a t] (r : Res [a] t) : π (t = res_tm r);
-rule res_tm (mk_1 $t' _) ↪ $t';
-rule res_eq (mk_1 _ $prf) ↪ $prf;
+//

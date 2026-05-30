@@ -83,7 +83,7 @@ end;
 
 // STOP_1: leaf of every chain. res_tm = P (the implicit goal).
 symbol STOP_1 [P : Prop] : Res P
-  ≔ mk_1 P (eq_refl P);
+  ≔ mk_res (∎ ∷ P) (eq_refl P);
 
 // VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤.
 symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_1 ⊤ trust;

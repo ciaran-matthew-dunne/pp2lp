@@ -1,50 +1,55 @@
-// Conjunction (§A.1) — shallow encoding
+// Conjunction (§A.1) — shallow encoding over the snoc list 𝕃*.
+//
+// PP's ∧ is left-associative, so a conjunction goal `⋀ (ps ∷ P)` splits
+// structurally: init = `⋀ ps`, last = `P`.  Each rule pattern-matches the
+// `∷` directly; Lambdapi infers `ps`/`P` from the goal (via the `⋀`
+// unification rule in ConjList.lp).
 require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 
-// AND1: H ⊢ ¬(last ps) ⇒ R; H ⊢ ¬(init ps) ⇒ R → H ⊢ ¬(⋀ ps) ⇒ R
-opaque symbol AND1 [ps : 𝕃 o] [R : Prop]
-  : π (¬ ⋀_last (⋀ ps) ⇒ R)
-  → π (¬ ⋀_init (⋀ ps) ⇒ R)
-  → π (¬ ⋀ ps ⇒ R) ≔
+// AND1: H ⊢ ¬P ⇒ R; H ⊢ ¬⋀ps ⇒ R → H ⊢ ¬⋀(ps∷P) ⇒ R
+opaque symbol AND1 [ps : 𝕃* o] [P R : Prop]
+  : π (¬ P ⇒ R)
+  → π (¬ ⋀ ps ⇒ R)
+  → π (¬ ⋀ (ps ∷ P) ⇒ R) ≔
 begin
-  assume ps R h1 h2 h3;
-  have hne : π (¬ (⋀_init (⋀ ps) ∧ ⋀_last (⋀ ps)))
-    { assume hpair; refine h3 (⋀_rejoin (∧ₑ₁ hpair) (∧ₑ₂ hpair)) };
-  have hor : π (¬ ⋀_init (⋀ ps) ∨ ¬ ⋀_last (⋀ ps))
-    { refine =⇒ (deMorgan_∧ (⋀_init (⋀ ps)) (⋀_last (⋀ ps))) hne };
+  assume ps P R h1 h2 h3;
+  have hnand : π (¬ (⋀ ps ∧ P))
+    { assume hand; refine h3 (⋀_intro (∧ₑ₁ hand) (∧ₑ₂ hand)) };
+  have hor : π (¬ ⋀ ps ∨ ¬ P)
+    { refine =⇒ (deMorgan_∧ (⋀ ps) P) hnand };
   refine ∨ₑ hor _ _
     { assume hni; refine h2 hni }
-    { assume hnl; refine h1 hnl }
+    { assume hnp; refine h1 hnp }
 end;
 
-// AND2: H ⊢ init ps ⇒ ¬(last ps) → H ⊢ ¬(⋀ ps)
-opaque symbol AND2 [ps : 𝕃 o]
-  : π (⋀_init (⋀ ps) ⇒ ¬ ⋀_last (⋀ ps))
-  → π (¬ ⋀ ps) ≔
+// AND2: H ⊢ ⋀ps ⇒ ¬P → H ⊢ ¬⋀(ps∷P)
+opaque symbol AND2 [ps : 𝕃* o] [P : Prop]
+  : π (⋀ ps ⇒ ¬ P)
+  → π (¬ ⋀ (ps ∷ P)) ≔
 begin
-  assume ps h1 hc;
-  refine h1 (⋀_front hc) (⋀_back hc)
+  assume ps P h1 hc;
+  refine h1 (⋀_init hc) (⋀_last hc)
 end;
 
-// AND3: H ⊢ init ps ⇒ (last ps ⇒ R) → H ⊢ ⋀ ps ⇒ R
-opaque symbol AND3 [ps : 𝕃 o] [R : Prop]
-  : π (⋀_init (⋀ ps) ⇒ (⋀_last (⋀ ps) ⇒ R))
-  → π (⋀ ps ⇒ R) ≔
+// AND3: H ⊢ ⋀ps ⇒ (P ⇒ R) → H ⊢ ⋀(ps∷P) ⇒ R
+opaque symbol AND3 [ps : 𝕃* o] [P R : Prop]
+  : π (⋀ ps ⇒ (P ⇒ R))
+  → π (⋀ (ps ∷ P) ⇒ R) ≔
 begin
-  assume ps R h hc;
-  refine h (⋀_front hc) (⋀_back hc)
+  assume ps P R h hc;
+  refine h (⋀_init hc) (⋀_last hc)
 end;
 
-// AND4: H ⊢ last ps; H ⊢ init ps → H ⊢ ⋀ ps
-opaque symbol AND4 [ps : 𝕃 o]
-  : π (⋀_last (⋀ ps))
-  → π (⋀_init (⋀ ps))
-  → π (⋀ ps) ≔
+// AND4: H ⊢ P; H ⊢ ⋀ps → H ⊢ ⋀(ps∷P)   (PP order: last then init)
+opaque symbol AND4 [ps : 𝕃* o] [P : Prop]
+  : π P
+  → π (⋀ ps)
+  → π (⋀ (ps ∷ P)) ≔
 begin
-  assume ps h1 h2;
-  refine ⋀_rejoin h2 h1
+  assume ps P h1 h2;
+  refine ⋀_intro h2 h1
 end;
 
 // AND5: modus ponens within a conjunction.
@@ -59,33 +64,34 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 
-// AND1_1: Schema 2 — combine two Res children into Res (¬⋀ ps ⇒ R).
-symbol AND1_1 [ps : 𝕃 o] [R : Prop]
-  (r1 : Res (¬ ⋀_last (⋀ ps) ⇒ R)) (r2 : Res (¬ ⋀_init (⋀ ps) ⇒ R))
-  : Res (¬ ⋀ ps ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans and1_eq (conj_eq (res_eq r1) (res_eq r2)));
+// AND1_1: Schema 2 — combine two Res children into Res (¬⋀(ps∷P) ⇒ R).
+symbol AND1_1 [ps : 𝕃* o] [P R : Prop]
+  (r1 : Res (¬ P ⇒ R)) (r2 : Res (¬ ⋀ ps ⇒ R))
+  : Res (¬ ⋀ (ps ∷ P) ⇒ R)
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans and1_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // AND2_1: Schema 1 — passthrough Res child.
-symbol AND2_1 [ps : 𝕃 o]
-  (r : Res (⋀_init (⋀ ps) ⇒ ¬ ⋀_last (⋀ ps))) : Res (¬ ⋀ ps)
+symbol AND2_1 [ps : 𝕃* o] [P : Prop]
+  (r : Res (⋀ ps ⇒ ¬ P)) : Res (¬ ⋀ (ps ∷ P))
   ≔ mk_1 (res_tm r) (eq_trans and2_eq (res_eq r));
 
 // AND3_1: Schema 1 — passthrough Res child.
-symbol AND3_1 [ps : 𝕃 o] [R : Prop]
-  (r : Res (⋀_init (⋀ ps) ⇒ (⋀_last (⋀ ps) ⇒ R))) : Res (⋀ ps ⇒ R)
+symbol AND3_1 [ps : 𝕃* o] [P R : Prop]
+  (r : Res (⋀ ps ⇒ (P ⇒ R))) : Res (⋀ (ps ∷ P) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans and3_eq (res_eq r));
 
-// AND4_1: Schema 2 — combine two Res children into Res (⋀ ps).
-// `⋀_join (last init)` reduces to `last ∧ init`, matching the order
-// downstream NRM rules expect when they decompose the result chain's
-// conclusion.
-symbol AND4_1 [ps : 𝕃 o]
-  (r1 : Res (⋀_last (⋀ ps))) (r2 : Res (⋀_init (⋀ ps))) : Res (⋀ ps)
-  ≔ mk_1 (⋀_join (res_tm r1) (res_tm r2))
-           (eq_trans ⋀_split
-             (eq_trans (∧_com (⋀_init (⋀ ps)) (⋀_last (⋀ ps)))
-               (conj_eq (res_eq r1) (res_eq r2))));
+// AND4_1: Schema 2 — combine two Res children into Res (⋀ (ps ∷ P)).
+// `and4_eq` reorders `⋀ (ps ∷ P)` to the last-first binary `P ∧ ⋀ ps`,
+// then it follows the same `conj_eq`/`conj_concat_eq` chain as every combine.
+symbol AND4_1 [ps : 𝕃* o] [P : Prop]
+  (r1 : Res P) (r2 : Res (⋀ ps)) : Res (⋀ (ps ∷ P))
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans and4_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // AND5_1: Schema 1 with antecedent congruence on the implication's LHS.
 // Mirrors AND5's PP shape: an extraction `fwd : π C → π C'` plus its

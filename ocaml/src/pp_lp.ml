@@ -232,12 +232,12 @@ and pp_conj_list ?(min_bp = bp_max) ?(env = []) buf elts =
   | _ ->
     let need_wrap = 30 < min_bp in
     if need_wrap then Buffer.add_char buf '(';
-    Buffer.add_string buf "\xe2\x8b\x80 ("; (* ⋀ ( *)
+    Buffer.add_string buf "\xe2\x8b\x80 (\xe2\x88\x8e"; (* ⋀ (∎ *)
     List.iter (fun p ->
+      Buffer.add_string buf " \xe2\x88\xb7 "; (* ∷ *)
       pp_prd ~min_bp:21 ~env buf p;
-      Buffer.add_string buf " \xe2\xb8\xac "; (* ⸬ *)
     ) elts;
-    Buffer.add_string buf "\xe2\x96\xa1)"; (* □) *)
+    Buffer.add_char buf ')';
     if need_wrap then Buffer.add_char buf ')'
 
 and pp_conj_tail ?(env = []) buf elts =
@@ -252,43 +252,48 @@ and pp_conj_tail ?(env = []) buf elts =
     Buffer.add_string buf "\xe2\x96\xa1)" (* □) *)
 
 (* ---- ⋀ extraction/reconstruction ----
-   ⋀ (P₀ ⸬ P₁ ⸬ … ⸬ Pₙ₋₁ ⸬ □)
-   Element k: k applications of ⋀_tl then ⋀_hd.
-   ⋀_hd/⋀_tl take (P : Prop) (rest : 𝕃 o) — passed as _ _. *)
+   ⋀ (∎ ∷ P₀ ∷ P₁ ∷ … ∷ Pₙ₋₁)
+   Element k: peel (n-1-k) elements off the tail with ⋀_init, then take
+   the last with ⋀_last.  ⋀_init/⋀_last infer their list/elt implicits
+   from the argument's type.  Element 0 is special: ⋀_init^(n-1) bottoms at
+   ⋀ (∎ ∷ P₀), which the singleton-collapse rule reduces to P₀, so no
+   ⋀_last is applied. *)
 
-let rec emit_tl_chain buf var k =
-  if k = 0 then Buffer.add_string buf var
+let rec emit_init_chain buf var j =
+  if j = 0 then Buffer.add_string buf var
   else begin
-    Buffer.add_string buf "(\xe2\x8b\x80_tl _ _ "; (* (⋀_tl _ _  *)
-    emit_tl_chain buf var (k - 1);
+    Buffer.add_string buf "(\xe2\x8b\x80_init "; (* (⋀_init  *)
+    emit_init_chain buf var (j - 1);
     Buffer.add_char buf ')'
   end
 
-let emit_extract buf var _conjs k =
-  Buffer.add_string buf "\xe2\x8b\x80_hd _ _ "; (* ⋀_hd _ _  *)
-  emit_tl_chain buf var k
+let emit_extract buf var conjs k =
+  let n = List.length conjs in
+  if k = 0 then
+    emit_init_chain buf var (n - 1)
+  else begin
+    Buffer.add_string buf "\xe2\x8b\x80_last "; (* ⋀_last  *)
+    emit_init_chain buf var (n - 1 - k)
+  end
 
-let rec emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
-  match elts with
-  | [] ->
-    Buffer.add_string buf "\xe2\x8b\x80_nil_prf" (* ⋀_nil_prf *)
-  | [e] -> e buf
-  | [e1; e2] ->
-    (* 2-element base: use ⋀_bin transport to avoid opaque singleton *)
-    Buffer.add_string buf "(=\xe2\x87\x92 (eq_sym (\xe2\x8b\x80_bin _ _)) (\xe2\x88\xa7\xe1\xb5\xa2 ";
-    (* (=⇒ (eq_sym (⋀_bin _ _)) (∧ᵢ  *)
-    e1 buf;
-    Buffer.add_char buf ' ';
-    e2 buf;
-    Buffer.add_string buf "))"
+(* Build a proof of `π (⋀ (∎ ∷ e₀ ∷ … ∷ eₙ₋₁))` from element proofs.
+   Snoc left-fold bottoming in ⋀_nil_prf:
+   ⋀_intro (… (⋀_intro ⋀_nil_prf e₀) …) eₙ₋₁.  ⋀_intro's implicits are
+   inferred from the expected type.  A singleton needs no wrapping
+   (⋀ (∎ ∷ e) ≡ e). *)
+let rec emit_conj_rev buf = function
+  | [] -> Buffer.add_string buf "\xe2\x8b\x80_nil_prf" (* ⋀_nil_prf *)
   | e :: rest ->
-    (* 3+ elements: ⋀_cons transport, rest is 2+ so ⋀ stays opaque *)
-    Buffer.add_string buf "(=\xe2\x87\x92 (eq_sym (\xe2\x8b\x80_cons _ _)) (\xe2\x88\xa7\xe1\xb5\xa2 ";
-    (* (=⇒ (eq_sym (⋀_cons _ _)) (∧ᵢ  *)
-    e buf;
+    Buffer.add_string buf "(\xe2\x8b\x80_intro "; (* (⋀_intro  *)
+    emit_conj_rev buf rest;
     Buffer.add_char buf ' ';
-    emit_conj_from_elts buf rest;
-    Buffer.add_string buf "))"
+    e buf;
+    Buffer.add_char buf ')'
+
+let emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
+  match elts with
+  | [e] -> e buf
+  | _ -> emit_conj_rev buf (List.rev elts)
 
 let emit_and5_fwd buf var conjs ant_positions j =
   let n = List.length conjs in
@@ -388,13 +393,13 @@ and pp_conj_list_block ?(min_bp = 0) ?(env = []) ind buf elts =
     let pad = String.make ind ' ' in
     let need_wrap = 30 < min_bp in
     if need_wrap then Buffer.add_char buf '(';
-    Buffer.add_string buf "\xe2\x8b\x80 ("; (* ⋀ ( *)
+    Buffer.add_string buf "\xe2\x8b\x80 (\xe2\x88\x8e"; (* ⋀ (∎ *)
     List.iter (fun p ->
-      pp_prd_block ~min_bp:21 ~env (ind + 4) buf p;
       Buffer.add_char buf '\n';
       Buffer.add_string buf pad;
-      Buffer.add_string buf " \xe2\xb8\xac "; (* ⸬ *)
+      Buffer.add_string buf " \xe2\x88\xb7 "; (* ∷ *)
+      pp_prd_block ~min_bp:21 ~env (ind + 4) buf p;
     ) elts;
-    Buffer.add_string buf "\xe2\x96\xa1)"; (* □) *)
+    Buffer.add_char buf ')';
     if need_wrap then Buffer.add_char buf ')'
   end

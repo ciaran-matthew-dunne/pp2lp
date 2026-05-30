@@ -71,15 +71,19 @@ symbol IMP1_1 [P Q R : Prop]
 // IMP2_1: Schema 2 — combine.
 symbol IMP2_1 [P Q : Prop]
   (r1 : Res (¬ Q)) (r2 : Res P) : Res (¬ (P ⇒ Q))
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans imp2_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans imp2_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // IMP3_1: Schema 2 — combine.
 symbol IMP3_1 [P Q R : Prop]
   (r1 : Res (Q ⇒ R)) (r2 : Res (¬ P ⇒ R))
   : Res ((P ⇒ Q) ⇒ R)
-  ≔ mk_1 (res_tm r1 ∧ res_tm r2)
-      (eq_trans imp3_eq (conj_eq (res_eq r1) (res_eq r2)));
+  ≔ mk_res (concat (res_ts r1) (res_ts r2))
+      (eq_trans imp3_eq
+        (eq_trans (conj_eq (res_eq r1) (res_eq r2))
+                  (conj_concat_eq (res_ts r1) (res_ts r2))));
 
 // IMP4_1: special case — result is P ⇒ R (the antecedent prepended to
 // the child's result).

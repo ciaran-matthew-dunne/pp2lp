@@ -167,11 +167,11 @@ end;
 
 // EQC2: H ⊢ (a=c) ∧ (b=d) ⇒ P → H ⊢ ((a↦b)=(c↦d)) ⇒ P
 opaque symbol EQC2 [a b c d : τ ι] [P]
-  : π (((a = c) ∧ (b = d)) ⇒ P)
+  : π (⋀ (∎ ∷ (a = c) ∷ (b = d)) ⇒ P)
   → π (((a ↦ b) = (c ↦ d)) ⇒ P) ≔
 begin
   assume a b c d P h1 h2;
-  refine h1 (pair_inj a b c d h2)
+  refine h1 (⋀₂_intro (∧ₑ₁ (pair_inj a b c d h2)) (∧ₑ₂ (pair_inj a b c d h2)))
 end;
 
 // ---- EQS (set equality) ----
@@ -351,7 +351,7 @@ symbol EQC1_1 [a b c d : τ ι] [P : Prop]
   ≔ mk_1 (res_tm r) trust;
 
 symbol EQC2_1 [a b c d : τ ι] [P : Prop]
-  (r : Res (((a = c) ∧ (b = d)) ⇒ P))
+  (r : Res (⋀ (∎ ∷ (a = c) ∷ (b = d)) ⇒ P))
   : Res (((a ↦ b) = (c ↦ d)) ⇒ P)
   ≔ mk_1 (res_tm r) trust;
 

@@ -263,6 +263,12 @@ constant symbol eapp : τ ι → τ ι → τ ι;
 constant symbol set_image : τ ι;
 constant symbol inter : τ ι;
 constant symbol union : τ ι;
+
+// Pair projections: PP's `_pj1(p)` / `_pj2(p)` (the components of a pair
+// `p`), applied via `eapp`.  Uninterpreted — proofs use them purely
+// syntactically (membership matching), never computing on them.
+constant symbol pj1 : τ ι;
+constant symbol pj2 : τ ι;
 constant symbol FIN : τ ι;
 constant symbol card : τ ι;
 

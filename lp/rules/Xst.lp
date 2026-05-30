@@ -212,7 +212,18 @@ symbol XST7_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res (`!! v, P v ⇒ R)) : Res ((`?? v, P v) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans xst7_eq (res_eq r));
 
-// XST8_1 (XST8'): chain leaf for ∃ — packaging ((`!! v, ¬P v) ⇒ ⊥).
-symbol XST8_1 [n] [P : Tuple n → Prop]
-  (r : Res ((`!! v, ¬ (P v)) ⇒ ⊥)) : Res (`?? v, P v)
-  ≔ mk_1 (res_tm r) (eq_trans xst8_eq (res_eq r));
+// XST8_1 (XST8'): result-form ∃-introduction, mirroring XST8 (cf. ALL7_1).
+// Per-tuple Res chain ρ (normalising ¬(P v)) + continuation r packaging
+// ((`!! v, res_tm (ρ v)) ⇒ ⊥).  The chain emitter supplies ρ under the
+// bound v, so ρ is non-trivial in general (not the identity the old
+// 1-argument form assumed).
+opaque symbol XST8_1 [n] [P : Tuple n → Prop]
+  (ρ : Π v : Tuple n, Res (¬ (P v)))
+  (r : Res ((`!! v, res_tm (ρ v)) ⇒ ⊥)) : Res (`?? v, P v) ≔
+begin
+  assume n P ρ r;
+  refine mk_1 (res_tm r) _;
+  have h1 : π ((`?? v, P v) = ((`!! v, res_tm (ρ v)) ⇒ ⊥))
+    { refine eq_trans (@xst8_eq n P) (imp_cong_l (!!_cong (λ v, res_eq (ρ v)))) };
+  refine eq_trans h1 (res_eq r)
+end;
