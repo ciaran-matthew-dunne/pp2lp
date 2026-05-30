@@ -90,7 +90,7 @@ ocaml/src/
   pp_lp.ml           pretty-printer: PP AST → LP source
   emit_pp.ml         PP-side encoding
   emit_lp.ml         emit_symbol wrapper + lp_header
-  reconstruct.ml     parse_replay → proof_tree → emit_lp
+  reconstruct.ml     parse_replay → proof_tree → emit_symbol
 ocaml/bin/main.ml    CLI: emit | tree | rules
 
 lp/
@@ -179,7 +179,7 @@ for all).
 
 ### Pre-commit audit
 
-1. `make check` — verify all pass.
+1. `make check` (og — all pass) and `make check synth` (matches its baseline).
 2. `Grep '≔ begin admit end' lp/` — only `lp/B.lp:17` (`trust`)
    should match.
 3. `Grep 'refine trust;\s*$' lp/bench/og/` — no whole-goal `trust`
@@ -200,8 +200,11 @@ The prv suite is exempt — see below.
     `make tree prv/eq_020` shows the residual.
   Don't run `make check prv` as a gate until these are fixed.
 
-- **synth suite: 10 known failures + an `xfail/` set.** `make check synth`
-  is the gate (currently 96 ✓ / 10 ✗, 114 goals incl. xfail).
+- **synth suite: 10 baselined failures + an `xfail/` set.** `make check synth`
+  is a real gate now: it exits 0 when the bulk run's failures exactly match the
+  baseline in `lp/bench/synth/expected_fail.txt`, and non-zero on any deviation
+  — a *new* failure, or a baselined goal that starts *passing* (a stale entry to
+  prune). Current baseline: 96 ✓ / 10 xfail (114 goals incl. the 8 in `xfail/`).
   - `lp/bench/synth/xfail/` (8 goals) holds the unrunnable ones, each
     `xfail`-tagged in `goals.txt`:
     - REPLAY-tool truncation (`eq_dom`, `eq_ran`, `mixed_func_set`,
@@ -214,7 +217,9 @@ The prv suite is exempt — see below.
       check.py's caps now (see below) but excluded to keep the run fast.
     The bulk glob is non-recursive so `xfail/` is skipped, but
     `make tree synth/<name>` / `make check synth/<name>` still find them.
-  - 10 fail in the bulk run, all left visible as TODO markers:
+  - 10 fail in the bulk run, baselined in `lp/bench/synth/expected_fail.txt`
+    (shown as `✗ … (expected)`; single-trace `make check synth/<name>` still
+    prints the full diagnostic):
     - ConjList/`Res` snoc-refactor incompleteness (`rel_partial_func`,
       `rel_total_func`, `rel_total_inj`, `rel_partial_inj`, `rel_total_surj`,
       `rel_bijection`, `subset_literal2`, `subset_pow`, `subset_singleton`):
@@ -315,7 +320,8 @@ names raise.
   rewrites *every* top-level `.but`, so add goals there, not as loose files.
   After editing: `gen_buts.py`, then `make gen-traces synth` +
   `make gen-replays synth`, then `make check synth`. `xfail/` holds the
-  unrunnable goals (see Known broken).
+  unrunnable goals (see Known broken); `expected_fail.txt` baselines the goals
+  that run but don't type-check yet, making the suite a deviation gate.
 
 ## Commits
 
