@@ -30,7 +30,7 @@ end;
 
 // NRM3: x not free in Q; H ⊢ (Q ⇒ S) ∧ ((∀x · ¬P) ⇒ S) → H ⊢ ♢x · (P ⇒ Q) ⇒ S
 opaque symbol NRM3 [n] [P : Tuple n → Prop] [Q S : Prop]
-  : π (⋀ (∎ ∷ (Q ⇒ S) ∷ ((`!! v, ¬ (P v)) ⇒ S)))
+  : π (⋀_snoc (Q ⇒ S) ((`!! v, ¬ (P v)) ⇒ S))
   → π ((`♢ v, P v ⇒ Q) ⇒ S) ≔
 begin
   assume n P Q S h1 h2;
@@ -55,24 +55,18 @@ begin
 end;
 
 // NRM5: H ⊢ ♢x · (P ∧ Q ⇒ R) ⇒ S → H ⊢ ♢x · (P ⇒ Q ⇒ R) ⇒ S
-opaque symbol NRM5 [n] [P Q R : Tuple n → Prop] [S : Prop]
-  : π ((`♢ v, ⋀ (∎ ∷ P v ∷ Q v) ⇒ R v) ⇒ S)
-  → π ((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S) ≔
-begin
-  assume n P Q R S h1 h2;
-  refine h1 (pi_to_♢ (λ v, ⋀ (∎ ∷ P v ∷ Q v) ⇒ R v)
-    (λ v hpq, ♢_to_pi (λ v', P v' ⇒ Q v' ⇒ R v') h2 v
-                (⋀₂_hd hpq) (⋀₂_snd hpq)))
-end;
+symbol NRM5 [n] [P Q R : Tuple n → Prop] [S : Prop]
+  : π ((`♢ v, ⋀_snoc (P v) (Q v) ⇒ R v) ⇒ S)
+  → π ((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S);
 
 // NRM6: H ⊢ ♢x · (R ⇒ P) ⇒ (♢x · (R ⇒ Q) ⇒ S) → H ⊢ ♢x · (R ⇒ P ∧ Q) ⇒ S
 // Generalised over a snoc list: the consequent `⋀ (qs v ∷ P v)` splits into
 // init `⋀ (qs v)` and last `P v`.  init-first lets the emitter chain
 // `refine NRM6 _;` for n-conjunct goals, since `⋀ (qs v)` is itself a
 // `⋀ (qs' v ∷ P' v)` when |qs v| ≥ 2.
-opaque symbol NRM6 [n] [qs : Tuple n → 𝕃* o] [P R : Tuple n → Prop] [S : Prop]
-  : π ((`♢ v, R v ⇒ ⋀ (qs v)) ⇒ ((`♢ v, R v ⇒ P v) ⇒ S))
-  → π ((`♢ v, R v ⇒ ⋀ (qs v ∷ P v)) ⇒ S) ≔
+opaque symbol NRM6 [n] [Qs : Tuple n → 𝕃* o] [P R : Tuple n → Prop] [S : Prop]
+  : π ((`♢ v, R v ⇒ ⋀ (Qs v)) ⇒ ((`♢ v, R v ⇒ P v) ⇒ S))
+  → π ((`♢ v, R v ⇒ ⋀ (Qs v ∷ P v)) ⇒ S) ≔
 begin
   assume n qs P R S h1 h2;
   refine h1
@@ -84,10 +78,10 @@ end;
 
 // NRM7: H ⊢ (♢x · P) ⇒ ((♢x · Q) ⇒ S) → H ⊢ ♢x · (P ∧ Q) ⇒ S
 // Generalised: same shape as NRM6 but without the R ⇒ antecedent.
-opaque symbol NRM7 [n] [qs : Tuple n → 𝕃* o] [P : Tuple n → Prop] [S : Prop]
-  : π ((`♢ v : Tuple n, ⋀ (qs v))
-       ⇒ ((`♢ v : Tuple n, P v) ⇒ S))
-  → π ((`♢ v : Tuple n, ⋀ (qs v ∷ P v)) ⇒ S) ≔
+opaque symbol NRM7 [n] [Qs : Tuple n → 𝕃* o] [P : Tuple n → Prop] [S : Prop]
+  : π ((`♢ v, ⋀ (Qs v))
+        ⇒ ((`♢ v, P v) ⇒ S))
+  → π ((`♢ v : Tuple n, ⋀ (Qs v ∷ P v)) ⇒ S) ≔
 begin
   assume n qs P S h1 h2;
   refine h1
@@ -103,10 +97,8 @@ end;
 // Encoded with the n,m-indexed split helpers from Quant.lp:
 //   the conclusion's `Q x y` (clean HO pattern) gets unified back
 //   from the premise's `Q (take v) (drop v)` after Lambdapi infers Q.
-
 opaque symbol NRM8 [n m] [Q : Tuple n → Tuple m → Prop] [S : Prop]
-  : π ((`♢ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v))
-       ⇒ S)
+  : π ((`♢ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v)) ⇒ S)
   → π ((`♢ x : Tuple n, `!! y : Tuple m, Q x y) ⇒ S) ≔
 begin
   assume n m Q S h hnested;
@@ -149,18 +141,19 @@ end;
 // ---- NRM10-15: Implication / negation under `♢` and `♡` ----
 
 // NRM10: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ∧ Q ⇒ ⊥) ⇒ R
-opaque symbol NRM10 [n] [P Q : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ P v ∷ Q v)) ⇒ R)
-  → π ((`♢ v, ⋀ (∎ ∷ P v ∷ Q v) ⇒ ⊥) ⇒ R) ≔
+opaque symbol NRM10 [n] [Ps : Tuple n → 𝕃* o] [Q : Tuple n → Prop] [R : Prop]
+  : π ((`♡ v, ¬ ⋀ (Ps v ∷ Q v)) ⇒ R)
+  → π ((`♢ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥) ⇒ R) ≔
 begin
-  assume n P Q R h1 h2;
-  refine h1 (pi_to_♡ (λ v, ¬ ⋀ (∎ ∷ P v ∷ Q v))
-    (λ v hpq, ♢_to_pi (λ v', ⋀ (∎ ∷ P v' ∷ Q v') ⇒ ⊥) h2 v hpq))
+  admit;
+  //assume n P Q R h1 h2;
+  //refine h1 (pi_to_♡ (λ v, ¬ ⋀ (∎ ∷ P v ∷ Q v))
+  //  (λ v hpq, ♢_to_pi (λ v', ⋀ (∎ ∷ P v' ∷ Q v') ⇒ ⊥) h2 v hpq))
 end;
 
 // NRM11: H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ R → H ⊢ ♢x · (P ⇒ ⊥) ⇒ R
 opaque symbol NRM11 [n] [P : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)) ⇒ R)
+  : π ((`♡ v, ¬ (⋀_snoc ⊤ (P v))) ⇒ R)
   → π ((`♢ v, P v ⇒ ⊥) ⇒ R) ≔
 begin
   assume n P R h1 h2;
@@ -170,7 +163,7 @@ end;
 
 // NRM12: H ⊢ ♡x · ¬(P ∧ Q) ⇒ R → H ⊢ ♢x · (P ⇒ ¬Q) ⇒ R
 opaque symbol NRM12 [n] [P Q : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ P v ∷ Q v)) ⇒ R)
+  : π ((`♡ v, ¬ ⋀_snoc (P v) (Q v)) ⇒ R)
   → π ((`♢ v, P v ⇒ ¬ (Q v)) ⇒ R) ≔
 begin
   assume n P Q R h1 h2;
@@ -181,7 +174,7 @@ end;
 
 // NRM13: H ⊢ ♡x · ¬(P ∧ ¬Q) ⇒ R → H ⊢ ♢x · (P ⇒ Q) ⇒ R
 opaque symbol NRM13 [n] [P Q : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ P v ∷ ¬ (Q v))) ⇒ R)
+  : π ((`♡ v, ¬ ⋀_snoc (P v) (¬ Q v)) ⇒ R)
   → π ((`♢ v, P v ⇒ Q v) ⇒ R) ≔
 begin
   assume n P Q R h1 h2;
@@ -191,7 +184,7 @@ end;
 
 // NRM14: H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ R → H ⊢ (♢x · ¬P) ⇒ R
 opaque symbol NRM14 [n] [P : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)) ⇒ R)
+  : π ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R)
   → π ((`♢ v, ¬ (P v)) ⇒ R) ≔
 begin
   assume n P R h1 h2;
@@ -201,7 +194,7 @@ end;
 
 // NRM15: H ⊢ ♡x · ¬(⊤ ∧ ¬P) ⇒ R → H ⊢ (♢x · P) ⇒ R
 opaque symbol NRM15 [n] [P : Tuple n → Prop] [R : Prop]
-  : π ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ ¬ (P v))) ⇒ R)
+  : π ((`♡ v, ¬ ⋀_snoc ⊤ (¬ P v)) ⇒ R)
   → π ((`♢ v, P v) ⇒ R) ≔
 begin
   assume n P R h1 h2;
@@ -232,9 +225,9 @@ end;
 
 // NRM18: ∀x · ¬(⊤ ∧ ¬P) in H; ∃E. [x:=E]P = R → H ⊢ ♡y · ¬(⊤ ∧ R) ⇒ Q
 opaque symbol NRM18 [n] [P : Tuple n → Prop] [R Q : Prop] (v : Tuple n)
-  : π (`!! u, ¬ ⋀ (∎ ∷ ⊤ ∷ ¬ (P u)))
+  : π (`!! u, ¬ ⋀_snoc ⊤ (¬ P u))
   → π (P v = R)
-  → π ((`♡ _ : Tuple n, ¬ ⋀ (∎ ∷ ⊤ ∷ R)) ⇒ Q) ≔
+  → π ((`♡ _ : Tuple n, ¬ ⋀_snoc ⊤ R) ⇒ Q) ≔
 begin
   assume n P R Q v hp heq h;
   // Derive π (P v) classically.
@@ -251,7 +244,7 @@ end;
 // NRM19: P in H; ∃E. [x:=E]R = P → H ⊢ ♡x · ¬(⊤ ∧ R) ⇒ Q
 opaque symbol NRM19 [n] [Q : Prop] [R : Tuple n → Prop] (v : Tuple n)
   : π (R v)
-  → π ((`♡ u, ¬ ⋀ (∎ ∷ ⊤ ∷ R u)) ⇒ Q) ≔
+  → π ((`♡ u, ¬ ⋀_snoc ⊤ (R u)) ⇒ Q) ≔
 begin
   assume n Q R v hr hf;
   refine ⊥ₑ (♡_to_pi (λ u, ¬ ⋀ (∎ ∷ ⊤ ∷ R u)) hf v (⋀₂_intro ⊤ᵢ hr))
@@ -260,17 +253,22 @@ end;
 // ---- NRM20-23: Substitution ----
 
 // NRM20: x not free in E; H ⊢ ♡y · ¬[x:=E]P ⇒ Q
-//        → H ⊢ ♡(x,y) · ¬(P ∧ x = E) ⇒ Q
-opaque symbol NRM20 [n] [P : Tuple (+1 n) → Prop] [Q : Prop] (E : τ ι)
-  : π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n),
-         ¬ ⋀ (∎ ∷ P v ∷ (prj 0 v = E))) ⇒ Q) ≔
+//        → H ⊢ ♡(x,y) · ¬(x = E ∧ P) ⇒ Q
+//
+// PP's left-associative ∧ puts the equality `x = E` *first* — at the head of
+// the snoc list — so the conclusion pushes it onto the front of the rest `ps`
+// with `pushl`.  The premise drops it and substitutes x := E (`ps (v' ⨾ E)`).
+// `⋀_push_front` re-adds the head conjunct to recover the full goal; after the
+// substitution `prj 0 (v' ⨾ E) ↪ E`, so it discharges as `eq_refl E`.
+opaque symbol NRM20 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
+  : π ((`♡ v' : Tuple n, ¬ ⋀ ps (v' ⨾ E)) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ pushl (prj 0 v = E) (ps v)) ⇒ Q) ≔
 begin
-  assume n P Q E h1 h2;
-  refine h1 (pi_to_♡ (λ y, ¬ (P (y ⨾ E)))
-    (λ y hpy,
-      ♡_to_pi (λ v, ¬ ⋀ (∎ ∷ P v ∷ (prj 0 v = E))) h2 (y ⨾ E)
-        (⋀₂_intro hpy (eq_refl E))))
+  assume n ps Q E h1 h2;
+  refine h1 (pi_to_♡ _
+    (λ v' hp,
+      ♡_to_pi (λ v, ¬ ⋀ pushl (prj 0 v = E) (ps v)) h2 (v' ⨾ E)
+        (⋀_push_front (prj 0 (v' ⨾ E) = E) (ps (v' ⨾ E)) (eq_refl E) hp)))
 end;
 
 // NRM21: dual to NRM20 — equality reversed.

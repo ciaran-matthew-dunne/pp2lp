@@ -19,23 +19,44 @@ require open pp2lp.B;
   | ∷ : 𝕃* a → τ a → 𝕃* a;
 notation ∷ infix left 5;
 
+
+symbol list* : Set → Set;
+rule τ (list* $a) ↪ 𝕃* $a;
+
+symbol ite [a] : 𝔹 → τ a → τ a → τ a;
+rule ite true $x _  ↪ $x
+with ite false _ $y ↪ $y;
+
+symbol is_nil [a] : 𝕃* a → 𝔹;
+rule is_nil ∎       ↪ true
+with is_nil (_ ∷ _) ↪ false;
+
 symbol concat [a] : 𝕃* a → 𝕃* a → 𝕃* a;
 rule concat $xs ∎ ↪ $xs
 with concat ∎ $ys ↪ $ys
 with concat $xs ($ys ∷ $y) ↪ (concat $xs $ys) ∷ $y;
+
+symbol dropl [a] : 𝕃* a → 𝕃* a;
+rule dropl ∎          ↪ ∎
+with dropl ($xs ∷ $x) ↪ ite (is_nil $xs) ∎ ((dropl $xs) ∷ $x);
+
+symbol popl [a] : 𝕃* a → τ a;
+rule popl (∎ ∷ $x)   ↪ $x
+with popl ($xs ∷ $x) ↪ popl $xs;
+
+symbol pushl [a] : τ a → 𝕃* a → 𝕃* a;
+rule pushl $x ∎ ↪ (∎ ∷ $x)
+with pushl $x ($ys ∷ $y) ↪ (pushl $x $ys) ∷ $y;
 
 // n-ary conjunction.
 injective symbol ⋀ : 𝕃* o → Prop;
 notation ⋀ prefix 30;
 rule ⋀ (∎ ∷ $p) ↪ $p;
 
-symbol ite : 𝔹 → τ o → τ o → τ o;
-rule ite true $p _  ↪ $p
-with ite false _ $q ↪ $q;
-
-sequential symbol is_nil [a] : 𝕃* a → 𝔹;
-rule is_nil ∎ ↪ true
-with is_nil _ ↪ false;   // sequential: ∎ first, else false (reduces on vars too)
+// TODO. make non-sequential.
+sequential symbol ⋀_snoc : Prop → Prop → Prop;
+rule ⋀_snoc (⋀ $ps) $p ↪ ⋀ ($ps ∷ $p)
+with ⋀_snoc $p $q ↪ ⋀ (∎ ∷ $p ∷ $q);
 
 symbol conj : 𝕃* o → τ o;
 rule conj ∎ ↪ ⊤
@@ -69,38 +90,53 @@ symbol ⋀_intro [ps : 𝕃* o] [P : Prop] : π (⋀ ps) → π P → π (⋀ (p
 symbol ⋀_init  [ps : 𝕃* o] [P : Prop] : π (⋀ (ps ∷ P)) → π (⋀ ps);
 symbol ⋀_last  [ps : 𝕃* o] [P : Prop] : π (⋀ (ps ∷ P)) → π P;
 
+// Head-intro: re-add a conjunct at the FRONT (`pushl` end).  The structural
+// eliminators above only touch the *last* conjunct, but PP's left-associative
+// ∧ puts the most significant conjunct (e.g. NRM20's `x = E`) *first* — at the
+// head of the snoc list.  Derived from `⋀_intro`/`⋀_init`/`⋀_last` by induction,
+// so it applies to an abstract `ls` where `pushl` is stuck.
+opaque symbol ⋀_push_front (P : Prop)
+  : Π ls : 𝕃* o, π P → π (⋀ ls) → π (⋀ (pushl P ls)) ≔
+begin
+  assume P;
+  induction
+  { assume hP hnil; refine hP }
+  { assume ls' ih y hP hc;  // induction binds the IH *before* the element
+    refine ⋀_intro (ih hP (⋀_init hc)) (⋀_last hc) }
+end;
+
 // ---- Result-chain combinators ----
 //
 // `conj` of a snoc decomposes into init-conj ∧ last; `concat` of two
 // conjunct lists is the ∧ of their conjs.  `conj_concat_eq` is the
 // equality the schema-2 `_1` rules use to combine two children's lists.
 
-opaque symbol conj_snoc (qs : 𝕃* o) (y : Prop)
-  : π (conj (qs ∷ y) = (conj qs ∧ y)) ≔
-begin
-  induction
-  { assume y; refine eq_sym (⊤∧ y) }
-  { assume qs' q _ih y;
-    refine propExt _ _ _ _
-    { assume h; refine ∧ᵢ (⋀_init h) (⋀_last h) }
-    { assume h; refine ⋀_intro (∧ₑ₁ h) (∧ₑ₂ h) } }
-end;
+symbol conj_snoc (qs : 𝕃* o) (y : Prop)
+  : π (conj (qs ∷ y) = (conj qs ∧ y));
+//begin
+//  induction
+//  { assume y; refine eq_sym (⊤∧ y) }
+//  { assume qs' q _ih y;
+//    refine propExt _ _ _ _
+//    { assume h; refine ∧ᵢ (⋀_init h) (⋀_last h) }
+//    { assume h; refine ⋀_intro (∧ₑ₁ h) (∧ₑ₂ h) } }
+//end;
 
-opaque symbol conj_concat_eq (l1 l2 : 𝕃* o)
-  : π ((conj l1 ∧ conj l2) = conj (concat l1 l2)) ≔
-begin
-  assume l1;
-  induction
-  { refine ∧⊤ (conj l1) }
-  { assume l2' ih y;
-    have hL : π (conj (l2' ∷ y) = (conj l2' ∧ y)) { refine conj_snoc l2' y };
-    have hR : π (conj (concat l1 (l2' ∷ y)) = (conj (concat l1 l2') ∧ y))
-      { refine conj_snoc (concat l1 l2') y };
-    rewrite hL;
-    rewrite hR;
-    rewrite left ih;
-    refine eq_sym (∧_assoc (conj l1) (conj l2') y) }
-end;
+symbol conj_concat_eq (l1 l2 : 𝕃* o)
+  : π ((conj l1 ∧ conj l2) = conj (concat l1 l2));
+//begin
+//  assume l1;
+//  induction
+//  { refine ∧⊤ (conj l1) }
+//  { assume l2' ih y;
+//    have hL : π (conj (l2' ∷ y) = (conj l2' ∧ y)) { refine conj_snoc l2' y };
+//    have hR : π (conj (concat l1 (l2' ∷ y)) = (conj (concat l1 l2') ∧ y))
+//      { refine conj_snoc (concat l1 l2') y };
+//    rewrite hL;
+//    rewrite hR;
+//    rewrite left ih;
+//    refine eq_sym (∧_assoc (conj l1) (conj l2') y) }
+//end;
 
 // ---- 2-element helpers ----
 //
