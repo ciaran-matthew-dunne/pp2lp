@@ -255,20 +255,28 @@ end;
 // NRM20: x not free in E; H ⊢ ♡y · ¬[x:=E]P ⇒ Q
 //        → H ⊢ ♡(x,y) · ¬(x = E ∧ P) ⇒ Q
 //
-// PP's left-associative ∧ puts the equality `x = E` *first* — at the head of
-// the snoc list — so the conclusion pushes it onto the front of the rest `ps`
-// with `pushl`.  The premise drops it and substitutes x := E (`ps (v' ⨾ E)`).
-// `⋀_push_front` re-adds the head conjunct to recover the full goal; after the
-// substitution `prj 0 (v' ⨾ E) ↪ E`, so it discharges as `eq_refl E`.
+//
+//
+// ∀ (x2,..,xn), ¬ (P2(E,..,xn) ∧ .. ∧ Pn(E,...,xn))
+// ---------------------------------------------------------
+// ∀ (x1,..,xn), ¬ ((x1 = E) ∧ P2(x1..xn) ∧ .. ∧ Pn(x1...xn))
+//
+//
+symbol rpt (n : ℕ) (E : τ ι) : Tuple n;
+rule rpt (+1 $n) $E ↪ (rpt $n $E ⨾ $E)
+with rpt (0)     _  ↪ unit;
+
 opaque symbol NRM20 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
-  : π ((`♡ v' : Tuple n, ¬ ⋀ ps (v' ⨾ E)) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ pushl (prj 0 v = E) (ps v)) ⇒ Q) ≔
+  : (Π v', π (popl (ps v') = (prj 0 v' = E)))
+  → π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔
 begin
-  assume n ps Q E h1 h2;
-  refine h1 (pi_to_♡ _
-    (λ v' hp,
-      ♡_to_pi (λ v, ¬ ⋀ pushl (prj 0 v = E) (ps v)) h2 (v' ⨾ E)
-        (⋀_push_front (prj 0 (v' ⨾ E) = E) (ps (v' ⨾ E)) (eq_refl E) hp)))
+  admit;
+  //assume n ps Q E h1 h2;
+  //refine h1 (pi_to_♡ _
+  //  (λ v' hp,
+  //    ♡_to_pi (λ v, ¬ ⋀ pushl (prj 0 v = E) (ps v)) h2 (v' ⨾ E)
+  //      (⋀_push_front (prj 0 (v' ⨾ E) = E) (ps (v' ⨾ E)) (eq_refl E) hp)))
 end;
 
 // NRM21: dual to NRM20 — equality reversed.

@@ -41,8 +41,7 @@ rule dropl ∎          ↪ ∎
 with dropl ($xs ∷ $x) ↪ ite (is_nil $xs) ∎ ((dropl $xs) ∷ $x);
 
 symbol popl [a] : 𝕃* a → τ a;
-rule popl (∎ ∷ $x)   ↪ $x
-with popl ($xs ∷ $x) ↪ popl $xs;
+rule popl ($xs ∷ $x) ↪ ite (is_nil $xs) $x (popl $xs);
 
 symbol pushl [a] : τ a → 𝕃* a → 𝕃* a;
 rule pushl $x ∎ ↪ (∎ ∷ $x)
