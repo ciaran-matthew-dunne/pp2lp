@@ -29,7 +29,7 @@ make clean                 # also dune clean
 make repl                  # dune utop with project loaded
 ```
 
-Suites: `og` (default), `prv`, `prv-no-arith`, `synth`. `PP2LP_ROOT`
+Suites: `og` (default), `prv`, `prv-no-arith`, `synth`, `nrm_test`. `PP2LP_ROOT`
 is exported so symlinked checkouts work.
 
 ### The pp2lp binary directly
@@ -200,11 +200,11 @@ The prv suite is exempt — see below.
     `make tree prv/eq_020` shows the residual.
   Don't run `make check prv` as a gate until these are fixed.
 
-- **synth suite: 10 baselined failures + an `xfail/` set.** `make check synth`
+- **synth suite: 6 baselined failures + an `xfail/` set.** `make check synth`
   is a real gate now: it exits 0 when the bulk run's failures exactly match the
   baseline in `lp/bench/synth/expected_fail.txt`, and non-zero on any deviation
   — a *new* failure, or a baselined goal that starts *passing* (a stale entry to
-  prune). Current baseline: 96 ✓ / 10 xfail (114 goals incl. the 8 in `xfail/`).
+  prune). Current baseline: 100 ✓ / 6 xfail (114 goals incl. the 8 in `xfail/`).
   - `lp/bench/synth/xfail/` (8 goals) holds the unrunnable ones, each
     `xfail`-tagged in `goals.txt`:
     - REPLAY-tool truncation (`eq_dom`, `eq_ran`, `mixed_func_set`,
@@ -217,15 +217,18 @@ The prv suite is exempt — see below.
       check.py's caps now (see below) but excluded to keep the run fast.
     The bulk glob is non-recursive so `xfail/` is skipped, but
     `make tree synth/<name>` / `make check synth/<name>` still find them.
-  - 10 fail in the bulk run, baselined in `lp/bench/synth/expected_fail.txt`
+  - 6 fail in the bulk run, baselined in `lp/bench/synth/expected_fail.txt`
     (shown as `✗ … (expected)`; single-trace `make check synth/<name>` still
     prints the full diagnostic):
     - ConjList/`Res` snoc-refactor incompleteness (`rel_partial_func`,
-      `rel_total_func`, `rel_total_inj`, `rel_partial_inj`, `rel_total_surj`,
-      `rel_bijection`, `subset_literal2`, `subset_pow`, `subset_singleton`):
-      an `ALL7` continuation's `res_tm` over a simple `STOP_1` chain doesn't
-      resolve the universal predicate via HO-unification, breaking NRM14/22
-      and the INS contradiction (functional-uniqueness goals hit this hard).
+      `rel_total_inj`, `rel_total_surj`, `rel_bijection`, `subset_pow`): an
+      `ALL7` continuation's `res_tm` over a simple `STOP_1` chain doesn't
+      resolve the universal predicate via HO-unification, breaking NRM14 and
+      the INS contradiction (functional-uniqueness goals hit this hard).
+      `subset_literal2` / `subset_singleton` left this set when NRM22 was fixed
+      (literal-`⊤` head + emitter-supplied `E`); `rel_total_func` /
+      `rel_partial_inj` were *stale* entries (NRM5/6/13 goals, already passing —
+      pruned, not fixed).
     - `ar_add_shape` — proves an equality via ≤-antisymmetry, reaching
       `AR7`/`AR8`, which need solver witness values (the `a` in `a + c = 𝟎`)
       not recorded in the replay. Deeper than the env/trust AR fixes below.
@@ -322,6 +325,14 @@ names raise.
   `make gen-replays synth`, then `make check synth`. `xfail/` holds the
   unrunnable goals (see Known broken); `expected_fail.txt` baselines the goals
   that run but don't type-check yet, making the suite a deviation gate.
+- **nrm_test** — NRM-rule coverage suite, same `goals.txt` mechanism as synth
+  (drive the shared generator with `python3 lp/bench/synth/gen_buts.py --suite
+  nrm_test`). Goals are chosen so promoting the goal-as-hypothesis fires a
+  target NRM rule; `COVERAGE.md` maps each rule → goal and tracks the 20/26
+  implemented rules currently reached. Also a deviation gate
+  (`expected_fail.txt`). **Caution:** never loop raw `lambdapi check` over its
+  `.lp` — the `x: NAT` goals (in `xfail/`) OOM the host; use `make check
+  nrm_test` (capped) and emit-only `pp2lp rules` for coverage.
 
 ## Commits
 

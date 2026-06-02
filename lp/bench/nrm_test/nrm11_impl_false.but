@@ -1,0 +1,1 @@
+Flag(FileOn("nrm11_impl_false.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t => not(x: s))) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => x: t => not(x: s)) | nn))

@@ -104,6 +104,32 @@ begin
     refine ⋀_intro (ih hP (⋀_init hc)) (⋀_last hc) }
 end;
 
+// Pop-front reconstruction: rebuild `⋀ L` from its head conjunct (`popl L`)
+// and the conjunction of its tail (`⋀ (dropl L)`).  The dual of the popl/dropl
+// split, used by NRM20 to reconstruct the full conjunction `⋀ (ps v)` after
+// substituting the leading `x = E` conjunct.  Holds for non-empty L; the `∎`
+// case is degenerate (its `popl ∎` hypothesis is vacuous) but provable since
+// `dropl ∎ ≡ ∎`.  `popl`/`dropl` branch on `is_nil` of the *sub*-list, so the
+// snoc induction must re-generalise and case-split that sub-list.
+opaque symbol ⋀_pop_intro :
+  Π L : 𝕃* o, π (popl L) → π (⋀ (dropl L)) → π (⋀ L) ≔
+begin
+  induction
+  // L = ∎ : dropl ∎ ≡ ∎, so the tail hypothesis *is* π (⋀ ∎).
+  { assume hpop htail; refine htail }
+  // L = xs ∷ x : popl/dropl branch on `is_nil xs`, so re-generalise and
+  // case-split xs to fire those rules.
+  { assume xs ih0 x;
+    generalize xs;
+    induction
+    // xs = ∎ : L = ∎ ∷ x is a singleton; popl L ≡ x ≡ ⋀ (∎ ∷ x).
+    { assume ih x2 hpop htail; refine hpop }
+    // xs = ys ∷ y : popl L ≡ popl (ys∷y), dropl L ≡ dropl (ys∷y) ∷ x; the
+    // re-bound outer IH does the recursion on the shorter sub-list.
+    { assume ys rec y ih x2 hpop htail;
+      refine ⋀_intro (ih hpop (⋀_init htail)) (⋀_last htail) } }
+end;
+
 // ---- Result-chain combinators ----
 //
 // `conj` of a snoc decomposes into init-conj ∧ last; `concat` of two

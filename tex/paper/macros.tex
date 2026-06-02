@@ -39,6 +39,10 @@
 \newcommand{\prj}{\mathsf{prj}}
 \newcommand{\trust}{\texttt{trust}}
 \newcommand{\refine}{\texttt{refine}}
+% ⋀ for prose/identifier use. JetBrains Mono lacks U+22C0, and the listings
+% literate map only applies inside code boxes, so a raw ⋀ in a body \texttt{}
+% renders as tofu — use \bwand (e.g. \texttt{\bwand\_init}) there instead.
+\newcommand{\bwand}{\ensuremath{\bigwedge}}
 
 % n-ary quantifier glyphs (matching the LP encoding).
 \newcommand{\Dia}{\diamondsuit}            % ♢  n-ary ∀, goal side  (forall)

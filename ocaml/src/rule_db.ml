@@ -125,9 +125,9 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM17" pass;
   r "NRM18" pass;
   r "NRM19" pass ~emit_args:(Some "dynamic:nrm19");
-  r "NRM20" pass;
+  r "NRM20" (Arity [Con; Seq]) ~emit_args:(Some "dynamic:nrm20");
   r "NRM21" pass;
-  r "NRM22" pass;
+  r "NRM22" pass ~emit_args:(Some "dynamic:nrm22");
   r "NRM23" pass;
   r "NRM24" pass;
   r "NRM25" pass;

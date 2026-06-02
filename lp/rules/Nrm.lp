@@ -255,31 +255,39 @@ end;
 // NRM20: x not free in E; H ⊢ ♡y · ¬[x:=E]P ⇒ Q
 //        → H ⊢ ♡(x,y) · ¬(x = E ∧ P) ⇒ Q
 //
+//   ∀ (x2,..,xn), ¬ (P2(E,..,xn) ∧ .. ∧ Pn(E,...,xn))
+//   ----------------------------------------------------------
+//   ∀ (x1,..,xn), ¬ ((x1 = E) ∧ P2(x1..xn) ∧ .. ∧ Pn(x1...xn))
 //
-//
-// ∀ (x2,..,xn), ¬ (P2(E,..,xn) ∧ .. ∧ Pn(E,...,xn))
-// ---------------------------------------------------------
-// ∀ (x1,..,xn), ¬ ((x1 = E) ∧ P2(x1..xn) ∧ .. ∧ Pn(x1...xn))
-//
-//
-symbol rpt (n : ℕ) (E : τ ι) : Tuple n;
-rule rpt (+1 $n) $E ↪ (rpt $n $E ⨾ $E)
-with rpt (0)     _  ↪ unit;
-
+// `ps v` is the *full* conjunct list.  Its head `popl (ps v)` is the leading
+// equality `x1 = E` (≡ `prj 0 v = E`, pinned by the first premise); its tail
+// `dropl (ps v)` is the body `P2 ∧ .. ∧ Pn`.  Instantiating the goal's
+// universal at `v' ⨾ E` performs the substitution x1 := E: the head becomes
+// `E = E` (true by `eq_refl`) and the tail matches the hypothesis's body, so
+// `⋀_pop_intro` rebuilds `⋀ (ps (v' ⨾ E))` to discharge the negation.
 opaque symbol NRM20 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
   : (Π v', π (popl (ps v') = (prj 0 v' = E)))
   → π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q)
   → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔
 begin
-  admit;
-  //assume n ps Q E h1 h2;
-  //refine h1 (pi_to_♡ _
-  //  (λ v' hp,
-  //    ♡_to_pi (λ v, ¬ ⋀ pushl (prj 0 v = E) (ps v)) h2 (v' ⨾ E)
-  //      (⋀_push_front (prj 0 (v' ⨾ E) = E) (ps (v' ⨾ E)) (eq_refl E) hp)))
+  assume n ps Q E heq hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E)))
+    (λ v' hp,
+      ♡_to_pi (λ v, ¬ ⋀ (ps v)) hbig (v' ⨾ E)
+        (⋀_pop_intro (ps (v' ⨾ E))
+          (=⇒ (eq_sym (heq (v' ⨾ E))) (eq_refl E))
+          hp)))
 end;
 
-// NRM21: dual to NRM20 — equality reversed.
+// NRM21 / NRM23 — reversed-equality (`E = x`) duals of NRM20 / NRM22.
+//
+// UNVERIFIED: no replay in the corpus exercises these, so their signatures
+// below are spec-derived and have NOT been checked against PP's actual output.
+// NRM20 and NRM22 both needed rewriting once a real replay showed the spec was
+// wrong (NRM20's head-equality `ps` list; NRM22's literal-⊤ head) — expect the
+// same here.  Before relying on NRM21/23, obtain a triggering trace and re-derive
+// the shape from it; the emitter still emits a bare `refine NRM2{1,3} _` (no E),
+// which will fail loudly rather than silently mis-prove.
 opaque symbol NRM21 [n] [P : Tuple (+1 n) → Prop] [Q : Prop] (E : τ ι)
   : π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q)
   → π ((`♡ v : Tuple (+1 n),
@@ -293,16 +301,23 @@ begin
 end;
 
 // NRM22: simpler unary version of NRM20 (no extra y-binder).
-opaque symbol NRM22 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
-  : π (¬ (P E) ⇒ Q)
-  → π ((`♡ v : Tuple 1,
-         ¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (prj 0 v = E))) ⇒ Q) ≔
+//
+// Per the *replays* (not the spec): NRM22 is always fed by NRM14, whose output
+// is `⋀_snoc ⊤ (x = E)` — a *literal* ⊤ head, not an abstract body P.  The
+// earlier `¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (prj 0 v = E))` form forced Lambdapi to solve
+// `?P (prj 0 v) ≡ ⊤` by higher-order unification, which it strands as a
+// deferred constraint (the metavar survives → "missing subproofs").  Pinning
+// the head to ⊤ makes the antecedent match first-order; the premise is then
+// exactly VR1's `¬ ⊤ ⇒ Q`.
+opaque symbol NRM22 [Q : Prop] (E : τ ι)
+  : π (¬ ⊤ ⇒ Q)
+  → π ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E))) ⇒ Q) ≔
 begin
-  assume P Q E h1 h2;
-  refine h1 (λ hpe,
-    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (prj 0 v = E)))
+  assume Q E h1 h2;
+  refine h1 (λ ht,
+    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E)))
             h2 (unit ⨾ E)
-            (⋀₂_intro hpe (eq_refl E)))
+            (⋀₂_intro ht (eq_refl E)))
 end;
 
 // NRM23: NRM22 with reversed equality.
@@ -385,3 +400,10 @@ end;
 symbol NRM1_1 [n] [P Q : Prop]
   (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));
+
+// NRM14_1 — chain (Res) form of NRM14.  PP leaves NRM rules *unprimed* in the
+// first-normalisation chain (unlike ALL7/ALL9/STOP/IMP), so the emitter maps a
+// chain-context `NRM14` to this; `nrm14_eq` (Res.lp) is the bridge equality.
+symbol NRM14_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R)) : Res ((`♢ v, ¬ (P v)) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm14_eq n P R) (res_eq r));

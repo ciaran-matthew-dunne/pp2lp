@@ -1,0 +1,1 @@
+Flag(FileOn("nrm_arith_antisym.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= a => a <= x => x: s)) & _delta_e(a) & _delta_e(s) | ? | ? | !x.(x <= a => a <= x => x: s) | nn))

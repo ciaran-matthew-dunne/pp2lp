@@ -65,11 +65,14 @@
   % GLYPH MAP: every non-ASCII char shown in LP code needs an entry here,
   % else it renders as tofu. To show a new symbol, add {glyph}{{$...$}}1.
   % (mathescape is on, so $...$ also works inline inside a listing.)
+  % NB: big operators (e.g. ⋀, U+22C0) can't be mapped here — unicode-math
+  % makes them math-active, which defeats the literate key. Write them with
+  % mathescape in the listing body instead, e.g. $\bigwedge$ for ⋀.
   literate=
     {π}{{$π$}}1  {τ}{{$τ$}}1  {ι}{{$ι$}}1  {Π}{{$Π$}}1  {λ}{{$λ$}}1
     {∧}{{$∧$}}1  {∨}{{$∨$}}1  {¬}{{$¬$}}1  {⇒}{{$⇒$}}1  {⇔}{{$⇔$}}1
     {⊤}{{$⊤$}}1  {⊥}{{$⊥$}}1  {→}{{$→$}}1  {↦}{{$↦$}}1  {ϵ}{{$∈$}}1
-    {⋀}{{$\bigwedge$}}1  {♢}{{$\diamondsuit$}}1  {♡}{{$\heartsuit$}}1
+    {♢}{{$\diamondsuit$}}1  {♡}{{$\heartsuit$}}1
     {∷}{{$\mathbin{::}$}}1  {𝕃}{{$\mathbb{L}$}}1  {≔}{{$\coloneqq$}}1  {∈}{{$∈$}}1
     {≤}{{$≤$}}1  {≪}{{$≪$}}1  {≠}{{$≠$}}1  {∀}{{$∀$}}1  {∃}{{$∃$}}1
     {𝟎}{{$\mathbf{0}$}}1  {𝟏}{{$\mathbf{1}$}}1  {⨾}{{$\mathbin{;}$}}1

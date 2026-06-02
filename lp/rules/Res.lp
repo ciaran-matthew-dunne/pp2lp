@@ -379,3 +379,22 @@ begin
     { refine eq_trans (♢_eq_!! (λ _ : Tuple n, P)) (!!_const [n] P) };
   rewrite h1; reflexivity
 end;
+
+// NRM14 bridge: ((♢v·¬P v) ⇒ R) = ((♡v·¬(⊤ ∧ P v)) ⇒ R).  ⊤ ∧ X ⟺ X, so the
+// ⊤-padded ♡ body matches the bare ♢ body; ♢/♡ both reduce to !!, so !!_cong
+// lifts the per-v equality.  Used by NRM14_1 (the chain-form NRM14).
+opaque symbol nrm14_eq [n] [P : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, ¬ (P v)) ⇒ R) = ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R)) ≔
+begin
+  assume n P R;
+  have hbody : Π v, π ((¬ (P v)) = (¬ ⋀_snoc ⊤ (P v)))
+    { assume v;
+      refine propExt _ _
+        (λ hnp hcon, hnp (⋀₂_snd hcon))
+        (λ hncon hp, hncon (⋀₂_intro ⊤ᵢ hp)) };
+  have hpred : π ((`♢ v, ¬ (P v)) = (`♡ v, ¬ ⋀_snoc ⊤ (P v)))
+    { refine eq_trans (♢_eq_!! (λ v, ¬ (P v)))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc ⊤ (P v))))) };
+  rewrite hpred; reflexivity
+end;

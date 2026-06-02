@@ -1,0 +1,1 @@
+Flag(FileOn("nrm21_rev_eq.res")) & Set(Valid.1 | Rule(Implication | (!x.(a = x => x: s)) & _delta_e(a) & _delta_e(s) | ? | ? | !x.(a = x => x: s) | nn))

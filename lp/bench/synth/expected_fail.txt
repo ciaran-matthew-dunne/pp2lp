@@ -11,17 +11,18 @@
 
 # ── ConjList / Res snoc-refactor incompleteness ───────────────────────────
 # An ALL7 continuation's res_tm over a simple STOP_1 chain doesn't resolve the
-# universal predicate via HO-unification, breaking NRM14/22 and the INS
+# universal predicate via HO-unification, breaking NRM14 and the INS
 # contradiction (functional-uniqueness goals hit this hardest).
+# Pruned recently: subset_literal2, subset_singleton — genuinely fixed by the
+# NRM22 literal-⊤ rewrite + emitter-supplied E (they route through NRM22).
+# Also pruned: rel_total_func, rel_partial_inj — these were STALE entries that
+# already passed (they use NRM5/6/13, untouched by the NRM20/22 work); not a
+# fix, just baseline drift corrected.
 rel_partial_func
-rel_total_func
 rel_total_inj
-rel_partial_inj
 rel_total_surj
 rel_bijection
-subset_literal2
 subset_pow
-subset_singleton
 
 # ── AR solver-witness gap ─────────────────────────────────────────────────
 # Proves an equality via ≤-antisymmetry, reaching AR7/AR8, which need solver

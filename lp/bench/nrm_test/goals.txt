@@ -1,0 +1,76 @@
+# nrm_test — goals aiming to exercise every NRM normalisation rule.
+#
+# Each goal is proved from itself + inferred `_delta` hypotheses (shared
+# generator: ../synth/gen_buts.py, driven here via `--suite nrm_test`).
+# Promoting the goal-as-hypothesis drives PP's ALL7 normalisation, which fires
+# the NRM rules on the body's structure (spec §8.13–8.16).  The `→ NRMnn` notes
+# are the *intended* targets; actual coverage is measured with `pp2lp rules`
+# (kept in sync in COVERAGE.md).  This suite is a NRM test/iteration harness:
+# goals that don't type-check yet are expected and baselined in expected_fail.txt.
+#
+# Format (shared with synth): name | kind | goal [| xfail]
+
+# ── Vacuous predicates / set equality (NRM1) ──
+nrm1_subset_refl     | expr | s <: s
+nrm1_eq_singleton    | expr | {x} = {x}
+
+# ── Implication body with x = E substitution (NRM3, 5, 13, 20, 22) ──
+nrm_subset_singleton | expr | {x} <: s
+nrm_subset_literal2  | expr | {x,y} <: s
+nrm20_cart_singleton | expr | {a}*b <: c
+nrm20_cart_pair      | expr | {a,b}*c <: d
+
+# ── Conjunction in the consequent (NRM6) ──
+nrm6_subset_inter    | expr | s <: t /\ u
+nrm6_conj3           | expr | !x.(x: u => x: a & x: b & x: c)
+
+# ── Conjunction in the antecedent / cascaded ⇒ (NRM4, 5) ──
+nrm5_inter_subset    | expr | s /\ t <: u
+nrm5_cascade         | expr | !x.(x: a => x: b => x: c)
+
+# ── Negation / FALSE bodies (NRM10, 11, 12, 14, 15, 24) ──
+nrm14_neg_mem        | expr | !x.not(x: s)
+nrm10_neg_conj       | expr | !x.not(x: s & x: t)
+nrm12_neg_impl       | expr | !x.(x: s => not(x: t))
+nrm11_impl_false     | expr | !x.(x: s => x: t => not(x: s))
+
+# ── Relations / functions (NRM5, 6, 8, 9, 10, 13) ──
+nrm_partial_func     | expr | f: s +-> t
+nrm_total_func       | expr | f: s --> t
+nrm_injection        | expr | f: s >-> t
+nrm_bijection        | expr | f: s >->> t
+nrm_relation         | expr | r: s <-> t
+
+# ── Domain / range: witness instantiation (NRM14, 19) ──
+nrm19_in_dom         | expr | x: dom(f)
+nrm19_in_ran         | expr | y: ran(f)
+nrm_app_defined      | expr | x: dom(f) & f(x) = y
+
+# ── Power set (NRM9, 13) ──
+nrm9_subset_pow      | expr | s <: POW(t)
+nrm_in_pow           | expr | s: POW(t)
+
+# ── Nested universals → compound binder (NRM8, 25, 26) ──
+nrm8_nested_univ     | expr | !x.!y.(x: s => y: t => x: s)
+nrm25_const_univ     | expr | !x.(x: s => a: t)
+
+# ── Reversed equality E = x (NRM2, 4, 21, 23) — may be PP-normalised away ──
+nrm21_rev_eq         | expr | !x.(a = x => x: s)
+nrm2_const_ante      | expr | !x.(a: t => x: s)
+
+# ── Arithmetic (NRM27–30, not yet implemented) ──
+nrm_arith_leq        | expr | x <= x
+nrm_arith_nat        | expr | x: NAT | xfail
+
+# ── Propositional sanity ──
+nrm_prop_impl        | prop | a => a
+
+# ── Round 2: candidates for NRM4/11/24/25 + arithmetic (27–30) ──
+nrm21_rev_pair       | expr | !(x,y).(a = x & y: b => x,y: c)
+nrm4_double_mid      | expr | !x.(x: s => a: t => b: u => x: v)
+nrm24_neg_impl_atom  | expr | !x.not(x: s => x: t)
+nrm25_two_binder     | expr | !x.!y.(x: s => a: t)
+nrm11_disjoint       | expr | !x.(x: s => x: t => x: u => not(x: s))
+nrm_arith_antisym    | expr | !x.(x <= a => a <= x => x: s)
+nrm_arith_nat_zero   | expr | !x.(x: NAT => x <= x) | xfail
+nrm_arith_succ       | expr | !x.(x <= a => x <= a => x: s)

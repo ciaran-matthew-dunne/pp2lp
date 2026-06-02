@@ -33,7 +33,8 @@ The **Status** column in each table uses one of:
 
 ```
 proved · emit-trust    AR2–AR9, AR13, INS, BOOL31–42
-proved · partial-emit  NRM20–23
+proved · emitted       NRM20, NRM22
+proved · partial-emit  NRM21, NRM23   (unexercised; shape unverified vs replays)
 phantom                AR10, AR3_F
 not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 ```
@@ -187,9 +188,9 @@ not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 | NRM17 | ∀x·¬(VRAI ∧ P) in H; ∃E with [x := E] P = R | H ⊢ ♡y·¬(VRAI ∧ ¬R) ⇒ Q | ``π (`!! v, P v) → π Q → π ((`♡ v, P v) ⇒ Q)`` | proved | Collapses to NRM16 shape at LP. |
 | NRM18 | ∀x·¬(VRAI ∧ ¬P) in H; ∃E with [x := E] P = R | H ⊢ ♡y·¬(VRAI ∧ R) ⇒ Q | ``(v : Tuple n) → π (`!! u, ¬ (⊤ ∧ ¬ (P u))) → π (P v = R) → π ((`♡ _ : Tuple n, ¬ (⊤ ∧ R)) ⇒ Q)`` | proved | |
 | NRM19 | P in H; ∃E with [x := E] R = P | H ⊢ ♡x·¬(VRAI ∧ R) ⇒ Q | ``(v : Tuple n) → π (R v) → π ((`♡ u, ¬ (⊤ ∧ R u)) ⇒ Q)`` | proved | Emitter pulls the witness from `tuple_binders`. |
-| NRM20 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (prj 0 v = E))) ⇒ Q)`` | proved · partial-emit | Supported shapes are emitted directly; unsupported shapes should fail explicitly rather than using whole-goal `trust`. |
+| NRM20 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(x = E ∧ P) ⇒ Q | ``[ps : Tuple (+1 n) → 𝕃* o] (E : τ ι) → (Π v, π (popl (ps v) = (prj 0 v = E))) → π ((`♡ y : Tuple n, ¬ ⋀ dropl (ps (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q)`` | proved · emitted | `ps` is the *full* conjunct list, inferred by unification from the goal; the leading `x = E` is its head (`popl`), the body its tail (`dropl`). `dynamic:nrm20` supplies E (env-rendered) and the `eq_refl` head-equality witness; `⋀_pop_intro` rebuilds `⋀ (ps v)`. |
 | NRM21 | x not free in E; H ⊢ ♡y·¬[x := E] P ⇒ Q | H ⊢ ♡(x,y)·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q) → π ((`♡ v : Tuple (+1 n), ¬ (P v ∧ (E = prj 0 v))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
-| NRM22 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ x = E) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (prj 0 v = E))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
+| NRM22 | H ⊢ ¬⊤ ⇒ Q | H ⊢ ♡x·¬(⊤ ∧ x = E) ⇒ Q | ``(E : τ ι) → π (¬ ⊤ ⇒ Q) → π ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E))) ⇒ Q)`` | proved · emitted | Replay shape (from `subset_singleton`/`subset_literal2`) is a *literal* ⊤ head fed by NRM14 — not the spec's abstract `P`, which only stranded a `?P (prj 0 v) ≡ ⊤` HO-unification. `dynamic:nrm22` supplies E (env-rendered); the child is VR1. |
 | NRM23 | x not free in E; H ⊢ ¬[x := E] P ⇒ Q | H ⊢ ♡x·¬(P ∧ E = x) ⇒ Q | ``(E : τ ι) → π (¬ (P E) ⇒ Q) → π ((`♡ v : Tuple 1, ¬ (P (prj 0 v) ∧ (E = prj 0 v))) ⇒ Q)`` | proved · partial-emit | Unsupported until a concrete trace shape is implemented. |
 | NRM24 | P is not of form A ∧ B; H ⊢ ♡x·¬(VRAI ∧ P) ⇒ Q | H ⊢ ♡x·¬P ⇒ Q | ``π ((`♡ v, ¬ (⊤ ∧ P v)) ⇒ Q) → π ((`♡ v, ¬ (P v)) ⇒ Q)`` | proved | |
 | NRM25 | x not free in P; H ⊢ P | H ⊢ forall2(x)·P | ``π P → π (`♡ _ : Tuple n, P)`` | proved | `pi_to_♡` over a constant body. |

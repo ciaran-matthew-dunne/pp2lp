@@ -44,11 +44,11 @@ here the per-rule justification is itself a checked object.
     {\footnotesize\bfseries \lp{} encoding \& soundness proof}\\[3pt]
 \begin{codeLP}
 opaque symbol AND2 [ps : 𝕃* o] [P : Prop]
-  : π (⋀ ps ⇒ ¬ P)
-  → π (¬ ⋀ (ps ∷ P)) ≔
+  : π ($\bigwedge$ ps ⇒ ¬ P)
+  → π (¬ $\bigwedge$ (ps ∷ P)) ≔
 begin
   assume ps P h1 hc;
-  refine h1 (⋀_init hc) (⋀_last hc)
+  refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
 end;
 \end{codeLP}
   \end{minipage}
@@ -58,8 +58,8 @@ end;
     sound. \pp's conjunction is binary but left-associative, so we encode
     an \(n\)-ary conjunction as \(\bigwedge ps\) over a snoc list
     \(ps : \mathbb{L}^{*}\,o\), whose last element \(P\) and initial
-    segment \(ps\) are exposed by \texttt{∷}; \texttt{⋀\_init} and
-    \texttt{⋀\_last} project them (\autoref{sec:infra}).}
+    segment \(ps\) are exposed by \texttt{∷}; \texttt{\bwand\_init} and
+    \texttt{\bwand\_last} project them (\autoref{sec:infra}).}
   \label{fig:and2}
 \end{figure}
 % --------------------------------------------------------------------
@@ -67,7 +67,7 @@ end;
 \autoref{fig:and2} shows the rule \rn{AND2}. Its body reads directly: from
 a proof \(h_1\) of \(\bigwedge ps \Rightarrow \lnot P\) and the full
 conjunction \(hc : \bigwedge(ps \mathbin{::} P)\), the term
-\(h_1\,(\texttt{⋀\_init}\,hc)\,(\texttt{⋀\_last}\,hc)\) derives a
+\(h_1\,(\texttt{\bwand\_init}\,hc)\,(\texttt{\bwand\_last}\,hc)\) derives a
 contradiction, which witnesses \(\lnot\bigwedge(ps \mathbin{::} P)\). The
 same \(\mathbin{::}\)-pattern handles every conjunction rule uniformly,
 whatever the arity \(n\), because \lp{} infers \(ps\) and \(P\) from the
@@ -102,8 +102,8 @@ into the conclusion.
 Two pieces of infrastructure support the rules above. \emph{(i)~Conjunction
 lists.} \pp's left-associative \(n\)-ary conjunction is represented as
 \(\bigwedge : \mathbb{L}^{*}\,o \to \Prop\) over a snoc list of
-propositions, with constructor \texttt{⋀\_intro} and projections
-\texttt{⋀\_init}/\texttt{⋀\_last}; a unification rule lets a goal
+propositions, with constructor \texttt{\bwand\_intro} and projections
+\texttt{\bwand\_init}/\texttt{\bwand\_last}; a unification rule lets a goal
 \(\bigwedge(ps \mathbin{::} P)\) split structurally, so one rule matches all
 arities. \emph{(ii)~Tuple quantifiers.} \pp's quantifiers range over lists
 of variables, which we encode uniformly over \(\Tuple\,n\) (an \(n\)-tuple

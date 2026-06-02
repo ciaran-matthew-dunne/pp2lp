@@ -1,1 +1,0 @@
-Flag(TypeOn("Proof_Rules_Validator_4.1.test4")) & Flag(FileOn("nrm20_direct.res")) & Set(Valid.1 | Rule(Implication | !(x,y).(x = a & y: b => x,y: c) & a = a => !(x,y).(x = a & y: b => x,y: c) | ? | ? | !(x,y).(x = a & y: b => x,y: c) | nn))

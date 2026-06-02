@@ -1,0 +1,1 @@
+Flag(FileOn("nrm_arith_nat_zero.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: NAT => x <= x)) | ? | ? | !x.(x: NAT => x <= x) | nn))

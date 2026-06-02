@@ -55,6 +55,18 @@ let scoped_hyps ctx f =
 
 let base = Rule_db.base_of
 
+(* PP primes most rules inside a first-normalisation chain (ALL7_1, ALL9_1,
+   STOP_1, IMP4_1…) but leaves NRM rules *unprimed* (it emits `[NRM14]`, not
+   `[NRM14_1]`).  In a Res chain those must be the Res-typed `_1` form, so prime
+   an unprimed NRM rule name when emitting it in `chain_tree`.  Metadata lookups
+   keep using the base name (`base_of "NRM14_1" = "NRM14"`).  Only NRM14_1 has an
+   LP symbol so far; other NRM-in-chain rules fail loud, surfacing the need. *)
+let chain_emit_name rule =
+  let b = base rule in
+  if String.length b >= 3 && String.sub b 0 3 = "NRM"
+     && not (Rule_db.is_primed rule)
+  then rule ^ "_1" else rule
+
 (* ---- Goal extraction from rule annotations ---- *)
 
 let goal_of_anno = function
@@ -318,12 +330,12 @@ let render_pred_term ctx prd =
   Buffer.add_char buf ')';
   L.Raw (Buffer.contents buf)
 
-let render_exp_term ctx e =
+let render_exp_str ctx e =
   let buf = Buffer.create 64 in
-  Buffer.add_char buf '(';
   Pp_lp.pp_exp ~env:(pp_env_of ctx) buf e;
-  Buffer.add_char buf ')';
-  L.Raw (Buffer.contents buf)
+  Buffer.contents buf
+
+let render_exp_term ctx e = L.Raw ("(" ^ render_exp_str ctx e ^ ")")
 
 let dynamic_value_args ctx rule arg =
   match Rule_db.emit_args rule, arg with
@@ -376,6 +388,20 @@ let find_conjunct_pos conjs target =
     | c :: rest -> if c = target then Some i else loop (i + 1) rest
   in
   loop 0 conjs
+
+(* NRM20/NRM22: recover the substituted expression E from a normalisation
+   goal `(♡ (x₁,…), ¬ (… ∧ (x₁ = E) ∧ …)) ⇒ R`.  E is the RHS of the equality
+   conjunct whose LHS is the leading binder var (the `prj 0` slot).  Per the
+   actual replays — not the spec — PP places this equality at the *head* of the
+   conjunction for NRM20 but at the *tail* (after a `⊤` from NRM14) for NRM22,
+   so we match it by the bound var rather than by position.  The reversed
+   `E = x` orientation belongs to NRM21/23, which no current replay exercises. *)
+let subst_eq_e = function
+  | Binary (Imp, Bind (Forall2, v0 :: _, Unary (Not, body)), _) ->
+    List.find_map (function
+      | Eq (Var lead, e) when lead = v0 -> Some e
+      | _ -> None) (conjuncts body)
+  | _ -> None
 
 let find_and5_pair conjs =
   let arr = Array.of_list conjs in
@@ -474,6 +500,45 @@ let tactic_for_rule ctx rule arg anno children =
      | Some (Pred q) ->
        L.Refine ("@AR10", [L.Hole; render_pred_term ctx q; L.Hole; L.Trust; L.Hole])
      | _ -> L.Refine (rule, [L.Trust; L.Hole]))
+  | Some "dynamic:nrm20" ->
+    (* NRM20 [n] [ps] [Q] (E) : (Π v, π (popl (ps v) = (prj 0 v = E)))
+                              → π (small ⇒ Q) → π (big ⇒ Q).
+       `ps` (the full conjunct list) is inferred by unification from the
+       goal.  Supply E — the substituted expression, env-rendered as it may
+       mention enclosing ALL7/ALL8 binders — and the head-equality witness:
+       for a concrete `ps`, `popl (ps v)` reduces to `prj 0 v = E`, so
+       `eq_refl` discharges it.  The trailing hole is the
+       `(♡ y, ¬ ⋀ dropl …) ⇒ Q` continuation child. *)
+    (match goal_of_anno anno with
+     | Some goal ->
+       (match subst_eq_e goal with
+        | Some e ->
+          let e_str = render_exp_str ctx e in
+          let v = fresh_x_local ctx in
+          L.Refine ("NRM20",
+            [ L.Raw ("(" ^ e_str ^ ")");
+              L.Lambda (v, None,
+                L.Raw (Printf.sprintf "eq_refl ((prj 0 %s) = (%s))" v e_str));
+              L.Hole ])
+        | None ->
+          failwith "translate: NRM20 annotation lacks an `x = E` equality \
+                    conjunct (LHS = the leading forall2 binder var)")
+     | None -> failwith "translate: NRM20 has no goal annotation")
+  | Some "dynamic:nrm22" ->
+    (* NRM22 [P] [Q] (E) : π (¬ (P E) ⇒ Q) → π ((♡ v : Tuple 1, ¬ ⋀ (∎ ∷ P
+       (prj 0 v) ∷ (prj 0 v = E))) ⇒ Q).  The replay shape (NRM14 feeds it a
+       ⊤-headed body) matches this with `P := λ_, ⊤`; the encoding is sound,
+       only E must be supplied — Lambdapi infers it nowhere else.  Like NRM20,
+       E may mention enclosing binders, so env-render it.  The trailing hole is
+       the `¬ (P E) ⇒ Q` continuation child. *)
+    (match goal_of_anno anno with
+     | Some goal ->
+       (match subst_eq_e goal with
+        | Some e -> L.Refine ("NRM22", [render_exp_term ctx e; L.Hole])
+        | None ->
+          failwith "translate: NRM22 annotation lacks an `x = E` equality \
+                    conjunct (LHS = the leading forall2 binder var)")
+     | None -> failwith "translate: NRM22 has no goal annotation")
   | _ -> L.Refine (rule, default_rule_args ctx rule arg)
 
 let rec tree ctx = function
@@ -596,7 +661,7 @@ and branching ctx rule anno chain_node cont =
 and chain_tree ctx = function
   | P.Apply { rule; children = []; arg; _ } ->
     let args = dynamic_value_args ctx rule arg @ slot_hole_args rule in
-    L.Step (L.Refine (rule, args))
+    L.Step (L.Refine (chain_emit_name rule, args))
   | P.Apply { rule; anno; children = [c]; _ } when base rule = "ALL8" ->
     let pp_vars =
       match goal_of_anno anno with
@@ -656,7 +721,8 @@ and chain_tree ctx = function
     L.Then (tactic, chain_tree ctx c)
   | P.Apply { rule; arg; children = [c]; _ } ->
     let tactic =
-      L.Refine (rule, dynamic_value_args ctx rule arg @ slot_hole_args rule)
+      L.Refine (chain_emit_name rule,
+                dynamic_value_args ctx rule arg @ slot_hole_args rule)
     in
     L.Then (tactic, chain_tree ctx c)
   | P.Apply { rule; anno; children = [c0; c1]; _ }
@@ -682,7 +748,8 @@ and chain_tree ctx = function
     L.Branches (tactic, rho, cont)
   | P.Apply { rule; arg; children = [c0; c1]; _ } ->
     let tactic =
-      L.Refine (rule, dynamic_value_args ctx rule arg @ slot_hole_args rule)
+      L.Refine (chain_emit_name rule,
+                dynamic_value_args ctx rule arg @ slot_hole_args rule)
     in
     let left = scoped_hyps ctx (fun () -> chain_tree ctx c0) in
     let right = scoped_hyps ctx (fun () -> chain_tree ctx c1) in

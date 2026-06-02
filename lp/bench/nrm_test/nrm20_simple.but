@@ -1,1 +1,0 @@
-Flag(TypeOn("Proof_Rules_Validator_4.1.test1")) & Flag(FileOn("nrm20_simple.res")) & Set(Valid.1 | Rule(Implication | ({a}*b <: c) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | {a}*b <: c | nn))

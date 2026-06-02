@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Generate synthetic PP .but files from goals.txt."""
+"""Generate synthetic PP .but files from a suite's goals.txt.
+
+Defaults to the `synth` suite (this file's own directory).  Pass
+`--suite nrm_test` (etc.) to drive any other `lp/bench/<suite>/goals.txt`
+— the nrm_test suite reuses this generator for NRM-rule coverage goals."""
 
 from __future__ import annotations
 
+import argparse
 import re
 from pathlib import Path
 
 
 HERE = Path(__file__).resolve().parent
-GOALS = HERE / "goals.txt"
+BENCH = HERE.parent  # lp/bench
 IDENT_RE = re.compile(r"\b[a-z][A-Za-z0-9_]*\b")
 # Bound-variable groups: the var(s) between a `!`/`#` binder and its `.`.
 BINDER_RE = re.compile(r"[!#]\s*\(?\s*([a-zA-Z0-9_,\s]+?)\s*\)?\s*\.")
@@ -33,9 +38,9 @@ KEYWORDS = {
 }
 
 
-def parse_goals() -> list[tuple[str, str, str, bool]]:
+def parse_goals(goals_path: Path) -> list[tuple[str, str, str, bool]]:
     goals: list[tuple[str, str, str, bool]] = []
-    for lineno, raw in enumerate(GOALS.read_text().splitlines(), start=1):
+    for lineno, raw in enumerate(goals_path.read_text().splitlines(), start=1):
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
@@ -45,18 +50,18 @@ def parse_goals() -> list[tuple[str, str, str, bool]]:
         fields = [field.strip() for field in line.split("|")]
         if len(fields) not in (3, 4):
             raise SystemExit(
-                f"{GOALS}:{lineno}: expected 'name | kind | goal [| xfail]'")
+                f"{goals_path}:{lineno}: expected 'name | kind | goal [| xfail]'")
         name, kind, goal = fields[0], fields[1], fields[2]
         xfail = len(fields) == 4
         if xfail and fields[3] != "xfail":
             raise SystemExit(
-                f"{GOALS}:{lineno}: 4th field must be 'xfail', got {fields[3]!r}")
+                f"{goals_path}:{lineno}: 4th field must be 'xfail', got {fields[3]!r}")
         if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
-            raise SystemExit(f"{GOALS}:{lineno}: invalid goal name {name!r}")
+            raise SystemExit(f"{goals_path}:{lineno}: invalid goal name {name!r}")
         if kind not in {"prop", "expr"}:
-            raise SystemExit(f"{GOALS}:{lineno}: kind must be prop or expr")
+            raise SystemExit(f"{goals_path}:{lineno}: kind must be prop or expr")
         if not goal:
-            raise SystemExit(f"{GOALS}:{lineno}: empty goal")
+            raise SystemExit(f"{goals_path}:{lineno}: empty goal")
         goals.append((name, kind, goal, xfail))
     return goals
 
@@ -104,22 +109,31 @@ def but_content(name: str, kind: str, goal: str) -> str:
 
 
 def main() -> None:
-    goals = parse_goals()
-    xfail_dir = HERE / "xfail"
-    for path in HERE.glob("*.but"):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--suite", default="synth",
+                        help="suite under lp/bench/ (default: synth)")
+    args = parser.parse_args()
+    work = (HERE if args.suite == "synth" else BENCH / args.suite)
+    goals_path = work / "goals.txt"
+    if not goals_path.exists():
+        raise SystemExit(f"no goals.txt for suite {args.suite!r} ({goals_path})")
+
+    goals = parse_goals(goals_path)
+    xfail_dir = work / "xfail"
+    for path in work.glob("*.but"):
         path.unlink()
     for path in xfail_dir.glob("*.but"):
         path.unlink()
     n_main = n_xfail = 0
     for name, kind, goal, xfail in goals:
-        out_dir = xfail_dir if xfail else HERE
+        out_dir = xfail_dir if xfail else work
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"{name}.but").write_text(but_content(name, kind, goal))
         if xfail:
             n_xfail += 1
         else:
             n_main += 1
-    rel = HERE.relative_to(HERE.parent.parent)
+    rel = work.relative_to(BENCH.parent.parent)
     suffix = f" (+{n_xfail} in {rel}/xfail/)" if n_xfail else ""
     print(f"generated {n_main} .but files under {rel}{suffix}")
 

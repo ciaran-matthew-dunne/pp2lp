@@ -1,0 +1,34 @@
+# expected_fail.txt — nrm_test goals that emit but don't `lambdapi check` yet.
+# Same deviation-gate semantics as synth's (see bench/check.py):
+#   • a listed goal that fails     → expected (xfail); gate-neutral
+#   • a goal NOT listed that fails  → unexpected; BREAKS the gate
+#   • a listed goal that now PASSES → stale; BREAKS the gate (prune it)
+#
+# This suite deliberately exercises every NRM rule (see COVERAGE.md); goals
+# that hit rules pp2lp can't fully discharge yet are baselined here.  As NRM
+# support improves, these flip to passing and get pruned — that's the point.
+
+# ── ConjList/Res `res_tm STOP_1` incompleteness (the ALL7 continuation chain) ──
+# Functional-uniqueness + cartesian/power/compound-binder goals leave an
+# unresolved `res_tm STOP_1` in the dropl/continuation body (same gap as synth's
+# remaining xfails). NRM20 itself is proven; this is the surrounding Res chain.
+nrm20_cart_singleton
+nrm20_cart_pair
+nrm_total_func
+nrm_injection
+nrm_bijection
+nrm9_subset_pow
+nrm8_nested_univ
+nrm25_two_binder
+
+# ── NRM21/NRM23 (reversed `E = x`) — encoding unverified vs replays ──
+# These are the only goals that trigger NRM21/NRM23. Their LP rules are
+# spec-derived and the emitter still emits a bare `refine NRM2{1,3} _` (no E),
+# so they fail loudly. Left until a real replay pins the shape (see Nrm.lp).
+nrm21_rev_eq
+nrm21_rev_pair
+
+# ── NRM11 / arithmetic side conditions ──
+nrm11_impl_false
+nrm_arith_antisym
+nrm_arith_succ
