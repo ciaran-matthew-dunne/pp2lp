@@ -1,5 +1,5 @@
 # expected_fail.txt — synth goals that emit and run but are known to FAIL
-# `lambdapi check`.  This is the gate BASELINE used by bench/check.py:
+# `lambdapi check`.  This is the gate BASELINE used by `pp2lp run`:
 #   • a listed goal that fails        → expected (xfail); does NOT break the gate
 #   • a goal NOT listed that fails     → unexpected; BREAKS the gate
 #   • a listed goal that now PASSES    → stale entry; BREAKS the gate (prune it)
@@ -12,11 +12,10 @@
 # ── ConjList / Res snoc-refactor incompleteness ───────────────────────────
 # An ALL7 continuation's res_tm over a simple STOP_1 chain doesn't resolve the
 # universal predicate via HO-unification, breaking NRM14/22 and the INS
-# contradiction (functional-uniqueness goals hit this hardest).
+# contradiction.  (The NRM20 fix in b7522b5 resolved rel_total_func and
+# rel_partial_inj, which were pruned from this list.)
 rel_partial_func
-rel_total_func
 rel_total_inj
-rel_partial_inj
 rel_total_surj
 rel_bijection
 subset_literal2

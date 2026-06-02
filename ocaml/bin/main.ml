@@ -13,13 +13,21 @@ let with_replay_open fp f =
   | Failure m -> die "%s: %s" fp m
   | exn -> die "%s: %s" fp (Printexc.to_string exn)
 
-let emit_replay fp =
+(* Side-channel provenance map: one TSV line per emitted primary tactic,
+   `lp_line \t rule \t replay_line \t goal`.  Keeps the generated .lp clean —
+   no comments — while the CLI can still map an error line back to its rule. *)
+let write_map path prov =
+  let oc = open_out path in
+  Fun.protect ~finally:(fun () -> close_out oc) (fun () ->
+    List.iter (fun (line, (p : Pp2lp.Lp_tree.prov)) ->
+      let g = String.map (fun c -> if c = '\t' || c = '\n' then ' ' else c) p.goal in
+      Printf.fprintf oc "%d\t%s\t%d\t%s\n" line p.rule p.replay_line g) prov)
+
+let emit_replay ?map_file fp =
   with_replay_open fp (fun fp ->
-    let proof = Pp2lp.Reconstruct.reconstruct_symbol fp in
-    print_string Pp2lp.Emit_lp.lp_header;
-    print_char '\n';
-    print_string proof;
-    print_char '\n')
+    let text, prov = Pp2lp.Reconstruct.reconstruct_symbol fp in
+    print_string text;
+    Option.iter (fun path -> write_map path prov) map_file)
 
 (* Like with_replay_open but renders the partial stack on a tree-build
    stack-residual error before exiting.  The partial residual is what
@@ -46,7 +54,7 @@ let tree_replay fp =
 let rules_replay fp =
   with_replay_open fp (fun fp ->
     let replay = Pp2lp.Parse_replay.parse_file fp in
-    List.iter (fun ((rule_name, arg), _anno) ->
+    List.iter (fun ((rule_name, arg), _anno, line) ->
       let arg_s = match arg with
         | None -> ""
         | Some (Pp2lp.Syntax_pp.Pred p) ->
@@ -62,12 +70,12 @@ let rules_replay fp =
           else Printf.sprintf "arity=%d" (Pp2lp.Rule_db.rule_arity rule_name)
         else "UNKNOWN"
       in
-      Printf.printf "%-12s %-10s %s\n" rule_name kind arg_s
+      Printf.printf "%4d  %-12s %-10s %s\n" line rule_name kind arg_s
     ) replay.rules)
 
 let usage () =
   prerr_endline "Usage:";
-  prerr_endline "  pp2lp emit REPLAY     emit Lambdapi proof to stdout";
+  prerr_endline "  pp2lp emit [--map F] REPLAY  clean Lambdapi to stdout (+ provenance TSV to F)";
   prerr_endline "  pp2lp tree REPLAY     print rebuilt proof tree (or residual stack)";
   prerr_endline "  pp2lp rules REPLAY    dump parsed (rule, arg, kind) lines";
   prerr_endline "  pp2lp REPLAY          alias for: pp2lp emit REPLAY";
@@ -76,6 +84,7 @@ let usage () =
 let () =
   match Array.to_list Sys.argv with
   | [_; ("--help" | "-help" | "-h")]      -> usage ()
+  | [_; "emit"; "--map"; path; fp]        -> emit_replay ~map_file:path fp
   | [_; "emit"; fp]                       -> emit_replay fp
   | [_; "tree"; fp]                       -> tree_replay fp
   | [_; "rules"; fp]                      -> rules_replay fp

@@ -3,8 +3,11 @@ open Syntax_pp
 let lp_header = "require open pp2lp.B pp2lp.Rules;\n"
 
 let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
-    : string =
+    : string * (int * Lp_tree.prov) list =
   let buf = Buffer.create 4096 in
+  (* Header in the same buffer so the sink's line numbers are file-absolute. *)
+  Buffer.add_string buf lp_header;
+  Buffer.add_char buf '\n';
   let fv = Free_vars.free_vars_of_prd goal in
   let prop_list = Free_vars.SS.elements fv.prop_vars in
   let exp_list = Free_vars.SS.elements fv.exp_vars in
@@ -40,6 +43,7 @@ let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
       Pp_lp.pp_ident buf v) !all_params;
     Buffer.add_string buf ";\n"
   end;
-  Lp_tree.pp ~pad:"  " buf lp_tree;
+  let sink = ref [] in
+  Lp_tree.pp ~pad:"  " ~sink buf lp_tree;
   Buffer.add_string buf "\nend;\n";
-  Buffer.contents buf
+  (Buffer.contents buf, List.rev !sink)

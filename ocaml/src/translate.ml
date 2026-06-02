@@ -476,10 +476,25 @@ let tactic_for_rule ctx rule arg anno children =
      | _ -> L.Refine (rule, [L.Trust; L.Hole]))
   | _ -> L.Refine (rule, default_rule_args ctx rule arg)
 
-let rec tree ctx = function
+(* Provenance for the node's primary tactic: rule + replay line + the
+   goal PP saw (its annotation), rendered as PP surface syntax. *)
+let prov_of rule src_line anno =
+  let goal = match anno with
+    | Some r -> Emit_pp.prd_to_pp (prd_of_rhs r)
+    | None -> "?"
+  in
+  { L.rule = rule; L.replay_line = src_line; L.goal = goal }
+
+let rec tree ctx node =
+  match node with
   | P.Apply { rule; children = [c]; _ }
     when Rule_db.is_hoas_identity (base rule) ->
+    (* HOAS identity: no tactic of its own; the child carries provenance. *)
     tree ctx c
+  | P.Apply { rule; src_line; anno; _ } ->
+    L.Commented (prov_of rule src_line anno, tree_dispatch ctx node)
+
+and tree_dispatch ctx = function
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "AND5" ->
     (match goal_of_anno anno with
@@ -593,7 +608,12 @@ and branching ctx rule anno chain_node cont =
    correct (Lambdapi-inferred) type, and each chain step is then a `refine`
    in sequence — just like the regular proof tree, but with the primed
    Res-typed rule forms. *)
-and chain_tree ctx = function
+and chain_tree ctx node =
+  match node with
+  | P.Apply { rule; src_line; anno; _ } ->
+    L.Commented (prov_of rule src_line anno, chain_dispatch ctx node)
+
+and chain_dispatch ctx = function
   | P.Apply { rule; children = []; arg; _ } ->
     let args = dynamic_value_args ctx rule arg @ slot_hole_args rule in
     L.Step (L.Refine (rule, args))

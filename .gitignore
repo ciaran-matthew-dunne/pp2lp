@@ -2,6 +2,9 @@
 ocaml/_build
 *.lpo
 
+# pp2lp run artifacts (per-run suite results)
+bench/results/
+
 # Per-suite inputs/outputs.
 # Tracked: lp/bench/og/*.trace + *.replay (og has no .but, traces are source)
 #          lp/bench/{prv,prv-no-arith,synth,nrm_test}/**/*.but

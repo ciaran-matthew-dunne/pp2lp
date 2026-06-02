@@ -22,7 +22,9 @@
 open Syntax_pp
 
 type replay = {
-  rules : (lhs * rhs) list;
+  (* Each rule line with its 1-indexed source line in the .replay file,
+     threaded through to the proof tree for provenance comments. *)
+  rules : (lhs * rhs * int) list;
 }
 
 exception Bad_replay of string
@@ -65,7 +67,8 @@ let parse_file (path : string) : replay =
       let t = trim line in
       if t = "" then ()
       else if is_replay_line t then
-        lines := parse_line t :: !lines
+        (let (l, r) = parse_line t in
+         lines := (l, r, !lineno) :: !lines)
       else
         bad "unrecognised line %d in %s: %S" !lineno path line
     done with End_of_file -> ());

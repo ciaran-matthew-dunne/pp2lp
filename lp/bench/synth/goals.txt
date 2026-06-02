@@ -8,12 +8,12 @@
 #   expr  identifiers in the goal are expression variables
 #
 # A trailing `| xfail` routes the goal to xfail/ (excluded from the bulk
-# `make check synth` run; still inspectable by name). Used for goals the
+# `pp2lp run synth` run; still inspectable by name). Used for goals the
 # Atelier B REPLAY tool truncates — see CLAUDE.md "Known broken".
 #
 # The generated .but file proves each goal from itself plus the inferred
 # delta hypotheses.  Keep this file as the source of truth; regenerate with:
-#   python3 lp/bench/synth/gen_buts.py
+#   pp2lp run synth --gen=buts
 
 prop_atom | prop | a
 prop_conj | prop | a & b
@@ -140,7 +140,7 @@ ar_add_zero | expr | x + 0 = x
 ar_sub_self | expr | x - x = 0
 ar_add_shape | expr | x + y = z
 ar_leq_trans_hyp | expr | x <= y & y <= z
-# `n: NAT` sends lambdapi into a memory blowup (caught by check.py's timeout /
+# `n: NAT` sends lambdapi into a memory blowup (caught by pp2lp's timeout /
 # RLIMIT_AS now, but excluded so the bulk run stays fast). NAT membership is
 # not yet supported.
 ar_in_nat | expr | n: NAT | xfail
