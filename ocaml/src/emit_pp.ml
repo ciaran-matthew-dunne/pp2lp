@@ -105,14 +105,13 @@ and prd_to_pp_buf ?(parens=true) buf p =
       | Exists -> "#"
     in
     Buffer.add_string buf qsym;
-    (match xs with
-     | [x] -> Buffer.add_string buf x
-     | _ ->
-       Buffer.add_char buf '(';
-       List.iteri (fun i x ->
-         if i > 0 then Buffer.add_char buf ',';
-         Buffer.add_string buf x) xs;
-       Buffer.add_char buf ')');
+    (* PP always parenthesises the bound vars — `forall(x)`, `!(x,y)`, `#(x)` —
+       even for a single variable, so render to match (no bare `forallx`). *)
+    Buffer.add_char buf '(';
+    List.iteri (fun i x ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf x) xs;
+    Buffer.add_char buf ')';
     Buffer.add_char buf '.';
     Buffer.add_char buf '(';
     prd_to_pp_buf ~parens:false buf body;

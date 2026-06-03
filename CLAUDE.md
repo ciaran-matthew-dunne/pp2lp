@@ -5,44 +5,47 @@ Maintainer notes for **pp2lp** — translates Atelier B Predicate Prover
 
 Round trip: `formula → PP → .trace → REPLAY → .replay → pp2lp → .lp → lambdapi check`.
 
-The pp2lp binary translates one replay; everything else (emit + check +
-format + loop over a suite) is wired together by the Makefile and a few
-small Python helpers under `bench/`.
+One command does everything: **`pp2lp run`** (the executable `./pp2lp` at the
+repo root). It builds the OCaml engine, emits Lambdapi, type-checks it, and
+reports — for a whole suite (a deviation gate) or one trace (a dossier). The
+OCaml binary under `ocaml/_build/` is an internal engine; you drive `./pp2lp`.
+
+The generated `.lp` is kept **clean** (no comments).  Alongside it the engine
+writes a side-channel `line → rule, replay-line, goal` map, so a Lambdapi error
+resolves straight back to its originating PP rule, its replay line, and the
+goal PP saw — the *provenance join*, shown in the failure panel together with
+code snippets from the related files (`.replay`, `.lp`, the `lp/rules/` lemma).
 
 ## Commands
 
 ```
-make                       # help
-make build                 # dune build for ocaml/
-make check                 # og suite (default)
-make check og              # og suite
-make check prv             # prv suite
-make check og/01           # one replay
-make tree  og/27           # rebuilt proof tree (residual on failure)
-make rules og/22           # parsed (rule, arg, kind) listing
-make check og V=1          # verbose output
-make check og Q=1          # summary only
-make gen-traces prv        # .but → .trace (runs PP)
-make gen-replays prv       # .trace → .replay (debug-only)
-make clean-bench           # lp/bench/ + lp/**/*.lpo
-make clean                 # also dune clean
-make repl                  # dune utop with project loaded
+pp2lp run                       # check the og suite (default gate)
+pp2lp run synth                 # check a suite (deviation gate vs expected_fail.txt)
+pp2lp run og/01                 # check one trace; a failure shows snippet panels
+pp2lp run synth/x               # failure → .lp + .replay + lp/rules-signature panels
+pp2lp run synth/x --debug       # …also add the scoped lambdapi unification trace
+pp2lp run og --json             # machine output (also bench/results/og.json)
+pp2lp run og -q                 # summary only
+
+pp2lp gen synth                 # (re)gen .but/.trace/.replay via krt (PP/REPLAY)
+pp2lp gen prv --only replays    # one stage only (buts,traces,replays)
 ```
 
-Suites: `og` (default), `prv`, `prv-no-arith`, `synth`, `nrm_test`. `PP2LP_ROOT`
-is exported so symlinked checkouts work.
+`run` auto-builds the engine first (`--no-build` to skip). Suites run in
+parallel; per-trace outcome is `✓` / `⚠` / `✗`, and exit status is non-zero
+iff a suite deviates from its baseline. Suites: `og` (default), `prv`,
+`prv-no-arith`, `synth`, `nrm_test`.
 
-### The pp2lp binary directly
+Child-process caps (env-tunable, 0 disables): `PP2LP_CHECK_TIMEOUT` (60s),
+`PP2LP_EMIT_TIMEOUT` (30s), `PP2LP_CHECK_MEM_GB` (4 GiB `RLIMIT_AS`).
 
-```
-pp2lp emit  REPLAY  # LP on stdout
-pp2lp tree  REPLAY  # rebuilt proof tree (on failure: residual stack)
-pp2lp rules REPLAY  # parsed (rule, arg, kind) lines, flags UNKNOWN rules
-pp2lp REPLAY        # alias for `emit`
-```
+### The engine (internal)
 
-Outcomes per replay: `✓` (pass), `⚠` (pass with warnings), `✗` (fail).
-Exit status is non-zero iff any fail.
+`pp2lp run` shells out to the OCaml engine at
+`ocaml/_build/default/bin/main.exe` (subcommands `emit | tree | rules`) and to
+`lambdapi`; `pp2lp gen` shells out to Atelier B's `krt`. You never call them
+directly — `pp2lp` handles package paths, the provenance scan, the deviation
+gate, and the safety caps for you.
 
 ## Mental model
 
@@ -103,17 +106,11 @@ lp/
                      Eq, Equiv, Impl, Neg, Nrm, Res, TrueFalse, Xst
   bench/<suite>/     emitted .lp files (gitignored)
 
+pp2lp                the single CLI (Python): `pp2lp run` — emit, check, gen,
+                     audit, and every debug lens. Wraps the engine + lambdapi
+                     + krt; replaces the former Makefile + bench/*.py helpers.
 bench/
-  _krt.py            shared helper module for krt-based generators
-  check.py           emit + lambdapi-check orchestrator
-  gen_traces.py      .but → .trace (PP runner)
-  gen_replays.py     .trace → .replay (REPLAY runner; debug only)
-  format_lambdapi_json.py    pretty-print `lambdapi check --json` output,
-                             ±3 lines of source context per error
-  og/                30 traces checked in (no .but files)
-  prv/               Atelier B PRV corpus. .but checked in; .trace and
-                     .replay gitignored. Currently all-fail — see
-                     "Known broken" below.
+  results/           per-run JSON result artifacts (gitignored)
 
 doc/
   spec_pp.md         PP specification (translated)
@@ -125,69 +122,61 @@ doc/
 
 ### Iterating on the emitter
 
-`make build` is fast. Run `make build` after editing OCaml source,
-then `make check` or `make check og/01` to test.
-
-Single-trace round trip: `make check og/01`. Output is `✓` / `✗`
-with detail on failure. The lambdapi diagnostic gets ±3 lines of
-source context pointing into `lp/bench/SUITE/NAME.lp`.
+After editing OCaml source, `pp2lp run og/01` (it rebuilds first). On failure
+the lambdapi diagnostic gets ±3 lines of source context pointing into the
+emitted `lp/bench/SUITE/NAME.lp`, with the provenance join under each error.
 
 ### Debugging a failing trace
 
-Order of escalation:
+`pp2lp run SUITE/NAME` on a single trace prints a failure panel — by default,
+the relevant **code snippets**: the lp error location, the PP **rule** whose
+tactic spans it (`replay:N`) and that rule's PP **goal**, lambdapi's stuck
+state (the goals — never just the hypotheses), and three file snippets — the
+emitted `.lp`, the `.replay` proof step, and the failing rule's `lp/rules/*.lp`
+type signature.  There is no `-v`; the panels are the default.
 
-1. `make check og/01` — see the lambdapi error in source context.
-2. `make tree  og/01` — see the rebuilt proof tree (or the residual
-   stack if the rebuild itself failed).
-3. `make rules og/01` — dump the parsed `(rule, arg, kind)` lines.
-   Look for `UNKNOWN`: that means `rule_db.ml` is missing an entry.
-4. `Read lp/bench/SUITE/NAME.lp` — the emitted file, at the reported
-   `offset`. Files can be large; use `offset` / `limit`.
-5. Emit-side OCaml exception → `translate.ml` / `proof_tree.ml` /
-   `parse_replay.ml`. Match the message against those.
+- `--debug` — *additionally* run a **scoped** lambdapi probe of the failing
+  tactic (`debug +u;`/`-u;`), distilled to the constraint that failed (`A ≡ B`,
+  `failed`, `no unif_rule`).  Categories `unif`/`rewrite`/`tactic`/`whnf`, or
+  `raw` for the full trace.  These are *our* curated flags — we never expose
+  lambdapi's `i` (type inference), which crashes its printer on our HO goals.
+
+An emit-side `Failure` → `translate.ml` / `proof_tree.ml` / `parse_replay.ml`;
+the dossier prints a stable error code (`E_UNKNOWN_RULE`, `E_ARITY`,
+`E_DISPATCH`, `E_TREE_BUILD`, `E_PARSE`, …) and a next-step hint. The replay→tree
+state machine is available via `PP2LP_DEBUG_REPLAY=1`.
 
 ### Inspecting LP goals / debugging LP rules
 
-No pp2lp subcommand for this — use the **sibling-probe** convention.
-Create `lp/rules/Foo_probe.lp` (or anywhere under `lp/`):
+Use the **sibling-probe** convention — create `lp/rules/Foo_probe.lp`:
 
 ```
 require open pp2lp.B pp2lp.rules.Foo;
 print FOO_LEMMA;
 compute SOME_TERM;
-
-// or inside a proof, before the failing tactic:
-opaque symbol _probe : π P ≔
-begin
-  print;       // dumps hypotheses + current goal
-  proofterm;   // dumps the partial proof term
-end;
 ```
 
-Run `lambdapi check lp/rules/Foo_probe.lp`. **Delete when done** —
-probe files must not be committed. `*.lpo` is gitignored; run
-`make clean-bench` if stale `.lpo` files cause compatibility errors.
-
-For scoped traces, wrap a region in `debug +u;` / `debug -u;` (or `+a`
-for all).
+and `lambdapi check` it. To inspect a proof's mid-state, copy the emitted
+`lp/bench/SUITE/NAME.lp` and insert `print; proofterm;` before a tactic — or
+just use `pp2lp run SUITE/NAME --debug`, which does the scoped `debug +u;` /
+`debug -u;` wrapping for you. **Delete probe files when done.** Clear stale
+emitted artifacts with `git clean -Xf lp/bench bench/results`.
 
 ### Adding a corpus trace
 
-1. Drop `name.but` in `lp/bench/SUITE/`.
-2. `make gen-traces SUITE` — runs PP, writes `name.trace`.
-3. `make check SUITE/name` — emit + lambdapi check.
+1. Drop `name.but` in `lp/bench/SUITE/` (or add a line to synth `goals.txt`).
+2. `pp2lp gen SUITE` — runs PP/REPLAY (krt) to build `.trace`/`.replay`.
+3. `pp2lp run SUITE/name` — emit + type-check.
 
 ### Pre-commit audit
 
-1. `make check` (og — all pass) and `make check synth` (matches its baseline).
-2. `Grep '≔ begin admit end' lp/` — only `lp/B.lp:17` (`trust`)
-   should match.
-3. `Grep 'refine trust;\s*$' lp/bench/og/` — no whole-goal `trust`
-   in any emitted file. Inline `trust` (as an argument to a refine)
-   is fine and documented; a bare `refine trust;` means the emitter
-   gave up.
-4. No probe files (`*_probe.lp`, `*_test.lp`, `*_experiment.lp`)
-   under `lp/`.
+1. `pp2lp run og` (all pass) and `pp2lp run synth` (matches its baseline) —
+   both exit non-zero on any deviation.
+2. `rg '≔ begin admit end' lp/` — only `lp/B.lp` (the `trust` axiom) may match.
+3. `rg 'refine trust;\s*$' lp/bench/og/` — no whole-goal `trust` in emitted og.
+   Inline `trust` as a refine *argument* is fine and documented; a bare
+   `refine trust;` means the emitter gave up.
+4. No stray probe files (`*_probe.lp`, `*_test.lp`, `*_dbg.lp`) under `lp/`.
 
 The prv suite is exempt — see below.
 
@@ -197,11 +186,11 @@ The prv suite is exempt — see below.
   - `INST_FINAL(pred | exp | FAUX)` — three-piece pipe argument,
     parser only knows the two-piece form (`parser.mly:106-110`).
   - Several traces (e.g. `eq_020`) leave many nodes on the stack —
-    `make tree prv/eq_020` shows the residual.
-  Don't run `make check prv` as a gate until these are fixed.
+    the engine's `tree` command dumps the residual.
+  Don't run `pp2lp run prv` as a gate until these are fixed.
 
-- **synth suite: 6 baselined failures + an `xfail/` set.** `make check synth`
-  is a real gate now: it exits 0 when the bulk run's failures exactly match the
+- **synth suite: 6 baselined failures + an `xfail/` set.** `pp2lp run synth`
+  is a real gate: it exits 0 when the bulk run's failures exactly match the
   baseline in `lp/bench/synth/expected_fail.txt`, and non-zero on any deviation
   — a *new* failure, or a baselined goal that starts *passing* (a stale entry to
   prune). Current baseline: 100 ✓ / 6 xfail (114 goals incl. the 8 in `xfail/`).
@@ -216,9 +205,9 @@ The prv suite is exempt — see below.
     - `ar_in_nat` (`n: NAT`): sends lambdapi into a memory blowup. Caught by
       check.py's caps now (see below) but excluded to keep the run fast.
     The bulk glob is non-recursive so `xfail/` is skipped, but
-    `make tree synth/<name>` / `make check synth/<name>` still find them.
+    `pp2lp run synth/<name>` still finds them by name.
   - 6 fail in the bulk run, baselined in `lp/bench/synth/expected_fail.txt`
-    (shown as `✗ … (expected)`; single-trace `make check synth/<name>` still
+    (shown as `✗ … (expected)`; single-trace `pp2lp run synth/<name>` still
     prints the full diagnostic):
     - ConjList/`Res` snoc-refactor incompleteness (`rel_partial_func`,
       `rel_total_inj`, `rel_total_surj`, `rel_bijection`, `subset_pow`): an
@@ -239,12 +228,11 @@ The prv suite is exempt — see below.
   `dynamic_value_args`), and `AR9`'s solver-confirmed `E = F` premise is
   supplied as `trust` (`metadata_extra_args`). This fixed `ar_leq_trans_hyp`.
 
-- **Benchmark safety caps.** `bench/check.py` bounds every child process so a
+- **Benchmark safety caps.** `pp2lp run` bounds every child process so a
   runaway goal can't take down the host: a wall-clock timeout and (POSIX) an
   `RLIMIT_AS` address-space + `RLIMIT_CPU` cap. Tunable via env —
   `PP2LP_CHECK_TIMEOUT` (lambdapi, default 60s), `PP2LP_EMIT_TIMEOUT` (pp2lp,
-  30s), `PP2LP_CHECK_MEM_GB` (default 4). The `.trace`/`.replay` generators
-  already time out via `_krt.run_krt`.
+  30s), `PP2LP_CHECK_MEM_GB` (default 4). The `gen` krt runs time out too.
 
 ## PP limitations
 
@@ -300,10 +288,10 @@ names raise.
 | `rule_db: unknown rule "X"`                            | `proof_tree.ml`/`rule_db.ml`       | Add `X` to `rule_db.ml` (arity / phantom / hoas_identity).        |
 | `rule_db: X unsupported arity N`                       | `proof_tree.ml`                    | Review the rule's slot kinds in `rule_db.ml`.                      |
 | `translate: X arity N unsupported`                     | `translate.ml`                     | New rule shape needs a dispatch arm.                               |
-| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | `make tree SUITE/NAME` shows the residual; an earlier rule has wrong arity. |
+| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | an earlier rule has the wrong arity; the engine `tree` command dumps the residual. |
 | `tree-build error: X expected a child but stack is empty` | `proof_tree.ml`                 | Wrong arity for an earlier rule.                                   |
 | `parse error in PATH: …`                               | `parser.mly` / `parse_replay.ml`   | Bad replay line; inspect the column reported.                      |
-| `File X.lpo is incompatible with current binary`       | lambdapi                           | `make clean-bench`.                                                |
+| `File X.lpo is incompatible with current binary`       | lambdapi                           | `git clean -Xf lp/bench`.                                          |
 | `package X cannot be mapped under the library root`    | lambdapi                           | Missing `lambdapi.pkg`. `lp/lambdapi.pkg` covers the whole package. |
 
 ## Suites
@@ -317,22 +305,21 @@ names raise.
   solver noise.
 - **synth** — Synthetic `.but` files for targeted feature testing, generated
   from `lp/bench/synth/goals.txt` (`name | kind | goal [| xfail]`) by
-  `python3 lp/bench/synth/gen_buts.py`. Each goal is proved from itself plus
-  inferred `_delta_{e,p}` hypotheses; the generator is binder-aware (bound
-  `!x`/`#x` vars get no delta). `goals.txt` is the source of truth — gen_buts
-  rewrites *every* top-level `.but`, so add goals there, not as loose files.
-  After editing: `gen_buts.py`, then `make gen-traces synth` +
-  `make gen-replays synth`, then `make check synth`. `xfail/` holds the
-  unrunnable goals (see Known broken); `expected_fail.txt` baselines the goals
-  that run but don't type-check yet, making the suite a deviation gate.
+  `pp2lp gen synth --only buts`. Each goal is proved from itself plus inferred
+  `_delta_{e,p}` hypotheses; the generator is binder-aware (bound `!x`/`#x`
+  vars get no delta). `goals.txt` is the source of truth — generation rewrites
+  *every* top-level `.but`, so add goals there, not as loose files. After
+  editing: `pp2lp gen synth` (regenerates `.but`/`.trace`/`.replay`), then
+  `pp2lp run synth`. `xfail/` holds the unrunnable goals (see Known broken);
+  `expected_fail.txt` baselines the goals that run but don't type-check yet,
+  making the suite a deviation gate.
 - **nrm_test** — NRM-rule coverage suite, same `goals.txt` mechanism as synth
-  (drive the shared generator with `python3 lp/bench/synth/gen_buts.py --suite
-  nrm_test`). Goals are chosen so promoting the goal-as-hypothesis fires a
-  target NRM rule; `COVERAGE.md` maps each rule → goal and tracks the 20/26
-  implemented rules currently reached. Also a deviation gate
-  (`expected_fail.txt`). **Caution:** never loop raw `lambdapi check` over its
-  `.lp` — the `x: NAT` goals (in `xfail/`) OOM the host; use `make check
-  nrm_test` (capped) and emit-only `pp2lp rules` for coverage.
+  (generate with `pp2lp gen nrm_test`). Goals are chosen so promoting the
+  goal-as-hypothesis fires a target NRM rule; `COVERAGE.md` maps each rule →
+  goal and tracks the 20/26 implemented rules currently reached. Also a
+  deviation gate (`expected_fail.txt`). **Caution:** never loop raw `lambdapi
+  check` over its `.lp` — the `x: NAT` goals (in `xfail/`) OOM the host; use
+  `pp2lp run nrm_test`, which applies the child-process caps.
 
 ## Commits
 
@@ -341,6 +328,8 @@ No `Co-Authored-By`. No Claude / Anthropic attribution.
 ## Where to start
 
 - New PP rule in a replay: `ocaml/src/rule_db.ml`.
-- Emit bug: `ocaml/src/translate.ml`.
+- Emit bug: `ocaml/src/translate.ml` (provenance is stamped per node in
+  `tree`/`chain_tree`; the `/* … */` comment is rendered by `Lp_tree.Commented`).
 - LP-side proof gap: `lp/rules/*.lp` + `doc/rules.md`.
 - Replay format itself: top of `parse_replay.ml` + `proof_tree.ml`.
+- The CLI / loop tooling: `./pp2lp` (one self-contained Python file).

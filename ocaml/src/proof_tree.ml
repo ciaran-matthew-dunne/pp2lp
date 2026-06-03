@@ -18,6 +18,9 @@ type pp_tree =
       arg: arg option;
       anno: rhs option;
       children: pp_tree list;
+      (* 1-indexed line in the .replay file this node's rule came from,
+         carried for provenance comments in the emitted Lambdapi. *)
+      src_line: int;
       (* For branching rules (ALL7/XST8): the FIN annotation that
          follows in the replay.  Records what `res_tm` the result
          chain produces — the term the continuation will see. *)
@@ -68,15 +71,15 @@ let debug_replayf fmt =
     (fun s -> if debug_replay then Printf.eprintf "%s\n%!" s)
     fmt
 
-let line_rule ((rule, _), _) = rule
+let line_rule ((rule, _), _, _) = rule
 
 let rec skip_phantoms = function
-  | (((rule, _), _) :: rest) when Rule_db.is_phantom rule ->
+  | (((rule, _), _, _) :: rest) when Rule_db.is_phantom rule ->
     skip_phantoms rest
   | lines -> lines
 
-let make_node ?(fin_hint=None) rule arg anno children =
-  Apply { rule; arg; anno = Some anno; children; fin_hint }
+let make_node ?(fin_hint=None) ~src_line rule arg anno children =
+  Apply { rule; arg; anno = Some anno; children; src_line; fin_hint }
 
 let pop_res rule stack =
   match stack with
@@ -102,7 +105,7 @@ let rec parse_prefix mode lines =
   match skip_phantoms lines with
   | [] -> bad "unexpected end of replay while reading a %s proof"
             (mode_name mode)
-  | ((rule, arg), anno) :: rest ->
+  | ((rule, arg), anno, line) :: rest ->
     debug_replayf "parse_prefix %s: %s" (mode_name mode) rule;
     if mode = Seq_mode && is_res_rule rule then
       parse_branch_seq lines
@@ -113,7 +116,7 @@ let rec parse_prefix mode lines =
     else
       let modes = child_modes mode rule in
       let children, rest = parse_prefix_children rest modes in
-      make_node rule arg anno children, rest
+      make_node ~src_line:line rule arg anno children, rest
 
 and parse_prefix_children lines = function
   | [] -> [], lines
@@ -126,7 +129,7 @@ and parse_branch_seq lines =
   debug_replayf "parse_branch_seq";
   let chain, lines = parse_res_until_base_branch [] lines in
   match skip_phantoms lines with
-  | (((rule, arg), anno) :: rest) when is_base_branch rule ->
+  | (((rule, arg), anno, line) :: rest) when is_base_branch rule ->
     if skip_phantoms rest = [] then
       bad "%s replay branch has no sequent continuation after its result-chain"
         rule;
@@ -134,11 +137,11 @@ and parse_branch_seq lines =
        chain supplies — the form the continuation will work with via
        the res_eq equality.  Capture for tree-display purposes. *)
     let fin_hint = match rest with
-      | (((r, _), fin_anno) :: _) when r = "FIN" -> Some fin_anno
+      | (((r, _), fin_anno, _) :: _) when r = "FIN" -> Some fin_anno
       | _ -> None
     in
     let cont, rest = parse_prefix Seq_mode rest in
-    make_node ~fin_hint rule arg anno [chain; cont], rest
+    make_node ~fin_hint ~src_line:line rule arg anno [chain; cont], rest
   | [] ->
     bad "result-chain proof was not followed by ALL7/XST8 in replay"
   | line :: _ ->
@@ -157,7 +160,7 @@ and parse_res_until_base_branch stack lines =
                    "result-chain replay ended with %d nodes on stack"
                    (List.length xs),
                  xs)))
-  | (((rule, _), _) :: _) as lines when is_base_branch rule ->
+  | (((rule, _), _, _) :: _) as lines when is_base_branch rule ->
     debug_replayf "parse_res stop at %s with %d stack nodes"
       rule (List.length stack);
     (match stack with
@@ -170,23 +173,23 @@ and parse_res_until_base_branch stack lines =
                    "%s reached with %d result-chain nodes on stack (expected 1)"
                    rule (List.length xs),
                  xs)))
-  | ((rule, arg), anno) :: rest when is_res_rule rule ->
+  | ((rule, arg), anno, line) :: rest when is_res_rule rule ->
     debug_replayf "parse_res postfix %s with %d stack nodes"
       rule (List.length stack);
     let modes = child_modes Res_mode rule in
     let children, stack = pop_res_children rule modes stack in
-    let node = make_node rule arg anno children in
+    let node = make_node ~src_line:line rule arg anno children in
     parse_res_until_base_branch (node :: stack) rest
   | lines ->
     (match lines with
-     | ((rule, _), _) :: _ ->
+     | ((rule, _), _, _) :: _ ->
        debug_replayf "parse_res prefix-as-res %s with %d stack nodes"
          rule (List.length stack)
      | [] -> ());
     let node, rest = parse_prefix Res_mode lines in
     parse_res_until_base_branch (node :: stack) rest
 
-let build_replay (rules : (lhs * rhs) list) : pp_tree =
+let build_replay (rules : (lhs * rhs * int) list) : pp_tree =
   let root, rest = parse_prefix Seq_mode rules in
   match skip_phantoms rest with
   | [] -> root

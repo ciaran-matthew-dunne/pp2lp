@@ -1,5 +1,5 @@
 # expected_fail.txt — synth goals that emit and run but are known to FAIL
-# `lambdapi check`.  This is the gate BASELINE used by bench/check.py:
+# `lambdapi check`.  This is the gate BASELINE used by `pp2lp run`:
 #   • a listed goal that fails        → expected (xfail); does NOT break the gate
 #   • a goal NOT listed that fails     → unexpected; BREAKS the gate
 #   • a listed goal that now PASSES    → stale entry; BREAKS the gate (prune it)

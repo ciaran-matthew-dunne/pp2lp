@@ -1,0 +1,918 @@
+#!/usr/bin/env python3
+"""pp2lp — translate Atelier B Predicate-Prover replays to Lambdapi and type-check them.
+
+Two commands:
+  pp2lp run [TARGET]   emit + type-check a SUITE (gate) or SUITE/NAME (dossier)
+  pp2lp gen [TARGET]   (re)generate a suite's .but/.trace/.replay via krt
+
+  TARGET   a SUITE (og, synth, prv, prv-no-arith, nrm_test), or SUITE/NAME for
+           run.  A failing trace prints code-snippet panels by default (the
+           emitted .lp, the .replay step, the failing lp/rules signature);
+           --debug additionally probes lambdapi for the exact unification failure.
+
+The emitted Lambdapi is kept clean (no comments).  Alongside it the engine
+writes a side-channel line→(rule, replay-line, goal) map, so any lambdapi error
+location resolves straight back to the originating PP rule, its replay line, and
+the goal — the "provenance join" surfaced below.
+
+Run `pp2lp run --help` / `pp2lp gen --help` for options.  The OCaml engine
+(ocaml/_build/default/bin/main.exe) is an internal detail; you never call it
+directly.
+"""
+from __future__ import annotations
+
+import argparse
+import concurrent.futures
+import difflib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+try:
+    import resource  # POSIX-only; caps child address space / CPU
+except ImportError:  # pragma: no cover
+    resource = None
+
+ROOT = Path(__file__).resolve().parent
+ENGINE = ROOT / "ocaml" / "_build" / "default" / "bin" / "main.exe"
+BENCH = ROOT / "lp" / "bench"
+RESULTS_DIR = ROOT / "bench" / "results"
+
+# ── Safety caps for child processes (env-tunable; 0 disables) ──────────────
+CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "60"))   # lambdapi, s
+EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "30"))     # engine emit, s
+CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
+
+# ── Colour ─────────────────────────────────────────────────────────────────
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def _c(code, t):
+    return f"\033[{code}m{t}\033[0m" if COLOR else str(t)
+
+
+def green(t):  return _c("32", t)
+def yellow(t): return _c("33", t)
+def red(t):    return _c("31", t)
+def dim(t):    return _c("2", t)
+def bold(t):   return _c("1", t)
+
+
+ICON = {"ok": green("✓"), "warn": yellow("⚠"), "emit_fail": red("✗"), "lp_fail": red("✗")}
+
+
+def fmt_ms(ms: float) -> str:
+    return f"{ms / 1000:.1f}s" if ms >= 1000 else f"{ms:.0f}ms"
+
+
+# ── Child-process limits ───────────────────────────────────────────────────
+def _child_limits(timeout: float):
+    if resource is None or os.name != "posix":
+        return None
+
+    def apply():
+        if CHILD_MEM_GB > 0:
+            n = int(CHILD_MEM_GB * 1024 ** 3)
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (n, n))
+            except (ValueError, OSError):
+                pass
+        if timeout > 0:
+            cpu = int(timeout) + 10
+            try:
+                resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
+            except (ValueError, OSError):
+                pass
+
+    return apply
+
+
+# ── Build the engine ───────────────────────────────────────────────────────
+def ensure_build() -> tuple[bool, str]:
+    try:
+        r = subprocess.run(["dune", "build"], cwd=ROOT / "ocaml",
+                           capture_output=True, text=True)
+    except FileNotFoundError:
+        return False, "dune not found on PATH"
+    return r.returncode == 0, r.stderr.strip()
+
+
+# ── Error classification: engine stderr text → (code, hint) ────────────────
+# The engine's messages are stable (we own them).  Map them to a machine code
+# and a concrete next step, mirroring CLAUDE.md's "Common errors" table.
+_ERROR_RULES = [
+    (re.compile(r"unknown rule"),               "E_UNKNOWN_RULE",
+     "add the rule to ocaml/src/rule_db.ml (arity / phantom / hoas_identity)"),
+    (re.compile(r"unsupported arity"),          "E_ARITY",
+     "review the rule's slot kinds in ocaml/src/rule_db.ml"),
+    (re.compile(r"arity \d+ unsupported"),      "E_DISPATCH",
+     "this rule shape needs a dispatch arm in ocaml/src/translate.ml"),
+    (re.compile(r"no sequent continuation"),    "E_REPLAY_TRUNCATED",
+     "REPLAY dropped the ALL7/XST8 continuation — unfixable in pp2lp (belongs in xfail/)"),
+    (re.compile(r"INS contradiction"),          "E_INS",
+     "INS leaf search failed — likely arithmetic-rewritten hypotheses"),
+    (re.compile(r"tree-build error|unconsumed|expected a .*child"), "E_TREE_BUILD",
+     "an earlier rule has the wrong arity in ocaml/src/rule_db.ml (the engine 'tree' command dumps the residual stack)"),
+    (re.compile(r"parse error|replay-line parse|unrecognised line"), "E_PARSE",
+     "inspect the .replay line/column reported (ocaml/src/parser.mly, parse_replay.ml)"),
+]
+
+
+def classify_error(text: str) -> tuple[str, str | None]:
+    for rx, code, hint in _ERROR_RULES:
+        if rx.search(text):
+            return code, hint
+    return "E_EMIT", None
+
+
+# ── Provenance: the engine writes a side-channel line→rule TSV (no comments
+#    in the generated .lp); we read it back and join errors to rules. ───────
+def read_map(path: Path) -> list[dict]:
+    """Parse the engine's provenance TSV: lp_line, rule, replay_line, goal."""
+    out = []
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            parts = line.split("\t", 3)
+            if len(parts) == 4:
+                out.append({"lp_line": int(parts[0]), "rule": parts[1],
+                            "replay_line": int(parts[2]), "goal": parts[3]})
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def join_prov(lp_line: int, smap: list[dict]) -> dict | None:
+    """Nearest-preceding provenance entry for a given .lp line — i.e. the rule
+    whose emitted block the error falls inside."""
+    best = None
+    for e in smap:
+        if e["lp_line"] <= lp_line and (best is None or e["lp_line"] > best["lp_line"]):
+            best = e
+    return best
+
+
+# ── Run the engine ─────────────────────────────────────────────────────────
+def engine(*engine_args, env=None, timeout=EMIT_TIMEOUT):
+    return subprocess.run(
+        [str(ENGINE), *engine_args], cwd=ROOT, capture_output=True, text=True,
+        timeout=timeout or None, preexec_fn=_child_limits(timeout),
+        start_new_session=True, env=env)
+
+
+def rel(p: Path) -> str:
+    return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)
+
+
+def emit(replay: Path, out: Path) -> dict:
+    """Emit the clean .lp (no comments) and read the side-channel provenance
+    map.  Returns {ok, warnings, error|None, smap}."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fd, mappath = tempfile.mkstemp(suffix=".provmap")
+    os.close(fd)
+    mapfile = Path(mappath)
+    try:
+        try:
+            r = engine("emit", "--map", str(mapfile), rel(replay), timeout=EMIT_TIMEOUT)
+        except FileNotFoundError:
+            return {"ok": False, "warnings": [],
+                    "error": {"code": "E_NO_ENGINE", "hint": "build failed?", "message": "engine binary missing"}}
+        except subprocess.TimeoutExpired:
+            return {"ok": False, "warnings": [],
+                    "error": {"code": "E_TIMEOUT", "hint": "raise PP2LP_EMIT_TIMEOUT",
+                              "message": f"emit timed out after {EMIT_TIMEOUT:.0f}s"}}
+        warnings = [l[len("WARNING: "):] for l in r.stderr.splitlines() if l.startswith("WARNING: ")]
+        errors = [l for l in r.stderr.splitlines() if l and not l.startswith("WARNING: ")]
+        if r.returncode != 0:
+            msg = "\n".join(errors) or r.stderr.strip()
+            code, hint = classify_error(msg)
+            return {"ok": False, "warnings": warnings,
+                    "error": {"code": code, "hint": hint, "message": msg}}
+        out.write_text(r.stdout, encoding="utf-8")
+        return {"ok": True, "warnings": warnings, "error": None, "smap": read_map(mapfile)}
+    finally:
+        mapfile.unlink(missing_ok=True)
+
+
+def lp_check(lp: Path) -> dict:
+    """Type-check with lambdapi --json.  Returns {ok, diagnostics, raw, timeout}."""
+    cmd = ["lambdapi", "check", "--json", "-c", str(lp)]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=CHECK_TIMEOUT or None,
+                           preexec_fn=_child_limits(CHECK_TIMEOUT),
+                           start_new_session=True)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "diagnostics": [], "raw": [], "timeout": True}
+    diagnostics, raw = [], []
+    for line in (r.stdout + "\n" + r.stderr).splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            raw.append(line)
+            continue
+        if ev.get("kind") == "diagnostic":
+            diagnostics.append(ev)
+    return {"ok": r.returncode == 0, "diagnostics": diagnostics,
+            "raw": raw, "timeout": False}
+
+
+def diag_loc(ev: dict) -> tuple[str, int | None, int | None]:
+    rng = ev.get("range") or {}
+    start = rng.get("start") or {}
+    return ev.get("file", "?"), start.get("line"), start.get("col")
+
+
+# ── Check one trace (emit + check + provenance join) ───────────────────────
+def check_one(replay: Path) -> dict:
+    out = replay.with_suffix(".lp")
+    t0 = time.monotonic()
+    em = emit(replay, out)
+    t_emit = (time.monotonic() - t0) * 1000
+    res = {"name": replay.stem, "lp": rel(out),
+           "emit_ms": t_emit, "check_ms": 0.0, "warnings": em["warnings"]}
+    if not em["ok"]:
+        res["status"] = "emit_fail"
+        res["error"] = em["error"]
+        return res
+
+    smap = em["smap"]                   # side-channel map; powers the join
+
+    t1 = time.monotonic()
+    chk = lp_check(out)
+    res["check_ms"] = (time.monotonic() - t1) * 1000
+    if chk["timeout"]:
+        res["status"] = "lp_fail"
+        res["error"] = {"code": "E_LP_TIMEOUT",
+                        "hint": "raise PP2LP_CHECK_TIMEOUT; likely a unification/memory blowup",
+                        "message": f"lambdapi timed out after {CHECK_TIMEOUT:.0f}s"}
+        return res
+    if not chk["ok"]:
+        errs = [e for e in chk["diagnostics"] if e.get("severity") != "warning"]
+        diags = []
+        for e in errs:
+            f, line, col = diag_loc(e)
+            prov = join_prov(line, smap) if line is not None else None
+            diags.append({"lp_loc": f"{Path(f).name}:{line}:{col}" if line else Path(f).name,
+                          "message": (e.get("message") or "").strip(),
+                          "provenance": prov})
+        res["status"] = "lp_fail"
+        head = (errs[0].get("message") or "").strip().splitlines() if errs else []
+        res["error"] = {"code": "E_LP_CHECK", "hint": None,
+                        # summary only; the full body lives in diagnostics[].message
+                        "message": head[0] if head else "type-check failed",
+                        "diagnostics": diags,
+                        "raw": chk["raw"] if not errs else []}
+        return res
+    res["status"] = "warn" if em["warnings"] else "ok"
+    res["error"] = None
+    return res
+
+
+# ── Target resolution ──────────────────────────────────────────────────────
+def _suite_names() -> list[str]:
+    """Bench subdirs that look like suites (skip dotfiles / __pycache__)."""
+    return [p.name for p in sorted(BENCH.iterdir())
+            if p.is_dir() and not p.name.startswith((".", "_"))]
+
+
+def resolve_target(target: str):
+    """Return ('suite', suite, [replays]) or ('single', suite, replay)."""
+    if "/" in target:
+        suite, name = target.split("/", 1)
+        sdir = BENCH / suite
+        if not sdir.is_dir():
+            sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
+        base, xf = sdir / f"{name}.replay", sdir / "xfail" / f"{name}.replay"
+        replay = base if base.exists() else xf
+        if not replay.exists():
+            names = [p.stem for p in sorted(sdir.glob("*.replay"))] + \
+                    [p.stem for p in sorted((sdir / "xfail").glob("*.replay"))]
+            guess = difflib.get_close_matches(name, names, n=1, cutoff=0.6)
+            if guess:
+                tail = f" — did you mean '{guess[0]}'?"
+            elif names:
+                tail = f" ({len(names)} available; `pp2lp run {suite}` lists them)"
+            else:
+                tail = " (no .replay files yet — run `pp2lp gen`)"
+            sys.exit(f"pp2lp: no replay '{name}' in suite '{suite}'{tail}")
+        return "single", suite, replay
+    suite = target
+    d = BENCH / suite
+    if not d.is_dir():
+        sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
+    replays = sorted(d.glob("*.replay"))  # non-recursive: xfail/ excluded
+    if not replays:
+        sys.exit(f"pp2lp: no .replay files under {rel(d)} (run `pp2lp gen {suite}`)")
+    return "suite", suite, replays
+
+
+def load_expected_fail(suite: str) -> set[str]:
+    path = BENCH / suite / "expected_fail.txt"
+    if not path.exists():
+        return set()
+    names = set()
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            names.add(line)
+    return names
+
+
+# ── Printing ───────────────────────────────────────────────────────────────
+# Curated debug categories → lambdapi `debug +<flags>` letters.  We probe a
+# *scoped* region (just the failing tactic), never the whole file, and never
+# expose `i` (type inference): it crashes lambdapi's printer on our HO goals.
+_DEBUG_FLAGS = {"unif": "u", "rewrite": "r", "tactic": "t", "whnf": "w"}
+# --debug only adds a scoped lambdapi trace (the code-snippet panels show by
+# default on any failure).  Categories: unif/rewrite/tactic/whnf, plus raw.
+_DEBUG_CATS = set(_DEBUG_FLAGS) | {"raw"}
+
+
+def _clip(s: str, n: int = 200) -> str:
+    return s if len(s) <= n else s[:n - 1] + "…"
+
+
+def print_failure(res: dict, replay: Path, indent: str = "   ", context: int = 2) -> None:
+    """The default failure panel: the lp error location, the PP rule whose
+    tactic spans it, that rule's PP goal, lambdapi's stuck state (with the
+    goals), and the relevant **code snippets** — the emitted .lp, the .replay
+    proof step, and the failing rule's lp/rules type signature."""
+    err = res.get("error") or {}
+    diags = err.get("diagnostics", [])
+    if not diags:                       # emit_fail / timeout / unstructured
+        first = (err.get("message") or "").splitlines()
+        if err.get("code"):
+            print(f"{indent}{red(err['code'])}  {first[0] if first else ''}")
+            first = first[1:]
+        for line in first:
+            print(f"{indent}  {_clip(line)}")
+        raw = err.get("raw") or []                  # unstructured lambdapi output
+        for line in raw[:20]:
+            print(f"{indent}  {dim(_clip(line))}")
+        if len(raw) > 20:
+            print(f"{indent}  {dim('… (+%d more lines)' % (len(raw) - 20))}")
+        if err.get("hint"):
+            print(f"{indent}{dim('→ ' + err['hint'])}")
+        return
+    for d in diags:
+        prov = d.get("provenance")
+        msg = (d.get("message") or "").splitlines()
+        print(f"{indent}{red('✗')} {d['lp_loc']}")
+        if prov:
+            print(f"{indent}  {dim('rule')}      [{bold(prov['rule'])}]  {dim('(replay:%d)' % prov['replay_line'])}")
+            print(f"{indent}  {dim('PP saw')}    {_clip(prov['goal'])}")
+        else:
+            print(f"{indent}  {dim('(no PP rule maps to this line)')}")
+        print(f"{indent}  {dim('lambdapi')}  {_clip(msg[0]) if msg else '(no message)'}")
+        _print_lp_goals(msg, indent + "    ")
+    # ── code-snippet panels for the primary failure (always shown) ──
+    d0 = diags[0]
+    prov0 = d0.get("provenance")
+    m = re.match(r".*:(\d+):", d0["lp_loc"])
+    if m:
+        _section("emitted lp")
+        _print_source_context(ROOT / res["lp"], int(m.group(1)), indent, context)
+    if prov0:
+        _section(f"replay  {replay.name}:{prov0['replay_line']}")
+        _print_source_context(replay, prov0["replay_line"], indent, 3)
+        _section(f"lp rule  {prov0['rule']}")
+        sig = _rule_signature(prov0["rule"])
+        if sig:
+            fname, decl = sig
+            print(f"{indent}{dim(fname)}  {_clip(decl, 280)}")
+        else:
+            print(f"{indent}{dim('(symbol %s not found under lp/rules/)' % prov0['rule'])}")
+    if err.get("hint"):
+        print(f"{indent}{dim('→ ' + err['hint'])}")
+
+
+def _print_lp_goals(msg: list, indent: str) -> None:
+    """Render a lambdapi error body.  "Missing subproofs" lists the hypotheses,
+    a `---` rule, then the subgoals — show a hyp *count* and the goals (capped),
+    so the goals (the actual point) are never what gets cut."""
+    if len(msg) <= 1:
+        return
+    sep = next((k for k, l in enumerate(msg) if l.strip() and set(l.strip()) == {"-"}), None)
+    if sep is not None:
+        hyps, goals = msg[1:sep], msg[sep + 1:]
+        if hyps:
+            print(f"{indent}{dim('%d hypotheses in context' % len(hyps))}")
+        for g in goals[:14]:
+            print(f"{indent}{_clip(g)}")
+        if len(goals) > 14:
+            print(f"{indent}{dim('… (+%d more goals)' % (len(goals) - 14))}")
+    else:
+        for line in msg[1:13]:
+            print(f"{indent}{_clip(line)}")
+        if len(msg) > 13:
+            print(f"{indent}{dim('… (+%d more lines)' % (len(msg) - 13))}")
+
+
+def _distill(out: list, raw_mode: bool) -> list[str]:
+    """Filter a scoped lambdapi debug trace to the lines worth reading: keep the
+    `[tag] …` debug entries, drop the giant `[tag] solve {…metas…}` state dump,
+    and surface (rather than spew) an internal lambdapi crash."""
+    if raw_mode:
+        return [l for l in out if not l.startswith(("Start checking", "End checking"))][:80]
+    cleaned = []
+    for l in out:
+        s = l.rstrip()
+        if "Assertion failed" in s or s.lstrip().startswith("Uncaught"):
+            cleaned.append("(lambdapi internal error on this flag — try --debug=raw)")
+            break
+        t = s.strip()
+        tag = re.match(r"\[[a-z]+\] ", t)
+        if tag and not t.startswith(tag.group(0) + "solve {"):
+            cleaned.append(t)
+    return cleaned[:40] or ["(no debug activity captured — try --debug=raw)"]
+
+
+def debug_probe(lp_path: Path, fail_line: int, cats: str) -> list[str]:
+    """Wrap the failing tactic in `debug +<flags>;` / `debug -<flags>;`, run
+    lambdapi, and return the distilled trace (scoped — never the whole file)."""
+    wanted = [c.strip() for c in cats.split(",") if c.strip()]
+    raw = "raw" in wanted
+    flags = "".join(dict.fromkeys(_DEBUG_FLAGS[c] for c in wanted if c in _DEBUG_FLAGS)) or "u"
+    lines = lp_path.read_text(encoding="utf-8").splitlines()
+    i = fail_line - 1
+    if not (0 <= i < len(lines)):
+        return []
+    probe_lines = lines[:i] + [f"debug +{flags};", lines[i], f"debug -{flags};"] + lines[i + 1:]
+    probe = lp_path.with_name(lp_path.stem + "_dbg.lp")
+    probe.write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
+    try:
+        r = subprocess.run(["lambdapi", "check", "--no-colors", "-w", str(probe)],
+                           capture_output=True, text=True, timeout=CHECK_TIMEOUT or None,
+                           preexec_fn=_child_limits(CHECK_TIMEOUT), start_new_session=True)
+        out = (r.stdout + r.stderr).splitlines()
+    except subprocess.TimeoutExpired:
+        out = ["(debug probe timed out)"]
+    finally:
+        for p in (probe, probe.with_suffix(".lpo")):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+    return _distill(out, raw)
+
+
+def _print_debug_probe(res: dict, cats: str) -> None:
+    diags = (res.get("error") or {}).get("diagnostics", [])
+    if not diags:
+        return
+    m = re.match(r".*:(\d+):", diags[0]["lp_loc"])
+    if not m:
+        return
+    _section(f"lambdapi debug ({cats})")
+    for line in debug_probe(ROOT / res["lp"], int(m.group(1)), cats):
+        if any(k in line for k in ("failed", "unsolved", "no unif_rule", "internal error")):
+            print(f"   {red(line)}")
+        elif "≡" in line:                # the unification constraint — keep prominent
+            print(f"   {line}")
+        else:
+            print(f"   {dim(line)}")
+
+
+def _print_source_context(src: Path, line: int, indent, context):
+    try:
+        lines = src.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    idx = line - 1
+    if not (0 <= idx < len(lines)):
+        return
+    lo, hi = max(0, idx - context), min(len(lines), idx + context + 1)
+    width = len(str(hi))
+    for i in range(lo, hi):
+        marker = red(">") if i == idx else " "
+        print(f"{indent}  {marker} {i + 1:>{width}} | {_clip(lines[i], 200)}")
+
+
+# ── Rule signature lookup (lp/rules/*.lp) ──────────────────────────────────
+def _rule_signature(rule: str):
+    """The failing rule's declared type signature from lp/rules/*.lp, as
+    (filename, declaration).  None if the symbol isn't found."""
+    name = rule.lstrip("@")
+    rx = re.compile(r"(?:opaque\s+|sequential\s+|injective\s+|constant\s+)*symbol\s+"
+                    + re.escape(name) + r"\b.*?(?=≔|;)", re.DOTALL)
+    for f in sorted((ROOT / "lp" / "rules").glob("*.lp")):
+        m = rx.search(f.read_text(encoding="utf-8"))
+        if m:
+            return f.name, re.sub(r"\s+", " ", m.group(0)).strip()
+    return None
+
+
+# ── Single-trace dossier ───────────────────────────────────────────────────
+def dossier(replay: Path, res: dict, debug: str | None = None):
+    """Everything an agent needs about one trace, in one call.  A failure shows
+    the code-snippet panels by default; --debug adds a scoped lambdapi trace."""
+    status = res["status"]
+    timing = "  " + dim("emit %s / check %s" % (fmt_ms(res["emit_ms"]), fmt_ms(res["check_ms"])))
+    print(f" {ICON[status]} {res['name']}{timing}")
+    for w in res["warnings"]:
+        print(f"   {dim(w)}")
+    if status in ("emit_fail", "lp_fail"):
+        print_failure(res, replay)
+        if debug and status == "lp_fail":
+            _print_debug_probe(res, debug)
+
+
+def _section(title):
+    print(f"   {dim('── ' + title + ' ' + '─' * max(0, 40 - len(title)))}")
+
+
+def _run_engine_show(mode, replay, env=None):
+    try:
+        r = engine(mode, rel(replay), env=env, timeout=EMIT_TIMEOUT)
+    except Exception as exc:  # noqa
+        print(f"   (engine {mode} failed: {exc})")
+        return
+    text = r.stdout if r.returncode == 0 else (r.stdout + r.stderr)
+    for line in text.rstrip().splitlines():
+        print(f"   {line}")
+
+
+# ── The `run` command ──────────────────────────────────────────────────────
+def cmd_run(args) -> int:
+    if not args.no_build:
+        ok, err = ensure_build()
+        if not ok:
+            if args.json:
+                print(json.dumps({"ok": False, "error": {"code": "E_BUILD", "message": err}}))
+            else:
+                print(red("build failed:"))
+                print(err)
+            return 1
+
+    if args.debug is not None:
+        unknown = [c.strip() for c in args.debug.split(",")
+                   if c.strip() and c.strip() not in _DEBUG_CATS]
+        if unknown:
+            sys.exit(f"pp2lp: unknown --debug category {unknown[0]!r} "
+                     f"(choose from {', '.join(sorted(_DEBUG_CATS))})")
+
+    kind, suite, target = resolve_target(args.target)
+    if args.debug is not None and kind != "single":
+        print(dim("note: --debug applies to a single SUITE/NAME trace; ignored for a suite"),
+              file=sys.stderr)
+    if kind == "single":
+        res = check_one(target)
+        if args.json:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            dossier(target, res, debug=args.debug)
+        return 0 if res["status"] in ("ok", "warn") else 1
+
+    # ── suite: parallel emit+check + deviation gate ──
+    return _run_suite(args, suite, target)
+
+
+def _run_suite(args, suite: str, replays: list[Path]) -> int:
+    expected_fail = load_expected_fail(suite)
+    t_start = time.monotonic()
+    results = _check_all(replays)
+    elapsed = (time.monotonic() - t_start) * 1000
+
+    ordered = [results[r.stem] for r in replays]
+    counts = {"ok": 0, "warn": 0, "emit_fail": 0, "lp_fail": 0}
+    total_emit = total_check = 0.0
+    xfail, xpass, unexpected = [], [], []
+    for res in ordered:
+        counts[res["status"]] += 1
+        total_emit += res["emit_ms"]
+        total_check += res["check_ms"]
+        failed = res["status"] in ("emit_fail", "lp_fail")
+        known = res["name"] in expected_fail
+        if failed and known:
+            xfail.append(res["name"])
+        elif failed:
+            unexpected.append(res["name"])
+        elif known:
+            xpass.append(res["name"])
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    artifact = {"suite": suite, "ok": counts["ok"], "warn": counts["warn"],
+                "fail": len(unexpected), "xfail": xfail, "xpass": xpass,
+                "unexpected": unexpected, "wall_ms": elapsed,
+                "emit_ms": total_emit, "check_ms": total_check, "goals": ordered}
+    (RESULTS_DIR / f"{suite}.json").write_text(
+        json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.json:
+        print(json.dumps(artifact, ensure_ascii=False, indent=2))
+    else:
+        _print_suite_human(args, suite, ordered, counts, expected_fail,
+                           xfail, xpass, unexpected, elapsed, total_emit, total_check,
+                           {r.stem: r for r in replays})
+
+    return 1 if (unexpected or xpass) else 0
+
+
+def _print_suite_human(args, suite, ordered, counts, expected_fail,
+                       xfail, xpass, unexpected, elapsed, total_emit, total_check, replay_of):
+    for res in ordered:
+        status, name = res["status"], res["name"]
+        failed = status in ("emit_fail", "lp_fail")
+        known = name in expected_fail
+        if not args.quiet:
+            if status == "ok":
+                continue
+            suffix = ""
+            if failed and known:
+                suffix = dim(" (expected)")
+            elif known and not failed:
+                suffix = yellow(" (UNEXPECTED PASS — prune expected_fail.txt)")
+            print(f" {ICON[status]} {name}{suffix}")
+            for w in res["warnings"]:
+                print(f"   {dim(w)}")
+            # panel for *unexpected* (gate-breaking) failures; inspect a
+            # baselined one with `pp2lp run SUITE/NAME` (panels are the default).
+            if failed and not known:
+                print_failure(res, replay_of[name])
+    parts = []
+    if counts["ok"]:
+        parts.append(f"{green(counts['ok'])} ✓")
+    if counts["warn"]:
+        parts.append(f"{yellow(counts['warn'])} ⚠")
+    if unexpected:
+        parts.append(f"{red(len(unexpected))} ✗")
+    if xfail:
+        parts.append(dim(f"{len(xfail)} xfail"))
+    if xpass:
+        parts.append(yellow(f"{len(xpass)} xpass"))
+    breakdown = dim(f"emit {fmt_ms(total_emit)} / check {fmt_ms(total_check)}")
+    if not args.quiet:
+        print()
+    print(f"{suite}  {'  '.join(parts)}  {dim(fmt_ms(elapsed))}  {breakdown}")
+    failing = unexpected + xfail
+    if failing:
+        print(dim(f"  inspect a failure:  pp2lp run {suite}/{failing[0]}   ·   --debug adds the lambdapi trace"))
+
+
+# ── shared suite evaluation ────────────────────────────────────────────────
+def _check_all(replays) -> dict[str, dict]:
+    """Emit+check every replay in parallel; keyed by stem."""
+    out: dict[str, dict] = {}
+    workers = min(len(replays), (os.cpu_count() or 2))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {ex.submit(check_one, r): r for r in replays}
+        for fut in concurrent.futures.as_completed(futs):
+            res = fut.result()
+            out[res["name"]] = res
+    return out
+
+
+# ── --gen: krt (Atelier B) generation, ports bench/_krt + gen_* scripts ────
+_SATURATION = [
+    ("saturation:objects",  r"OBJECTS OVERFLOW"),
+    ("saturation:goals",    r"GOAL(?:S)? STACK OVERFLOW"),
+    ("saturation:hyps",     r"TOO MANY HYPOTHESES"),
+    ("saturation:seq-ids",  r"SEQUENCE ID NUMBERS OVERFLOW"),
+    ("saturation:seq-mem",  r"SEQUENCE MEMORY OVERFLOW"),
+    ("saturation:symbols",  r"SYMBOLS OVERFLOW"),
+    ("saturation:theories", r"MAXIMUM NUMBER OF THEORIES .* REACHED"),
+    ("saturation:compiler", r"Compiler Memory Full"),
+    ("timer:exceeded",      r"TIMER (?:EXCEEDED|EXPIRED|REAL|VIRTUAL)"),
+]
+_REPLAY_EXTRA = [
+    ("parse:missing-atom", r"missing atomic symbol"),
+    ("parse:error",        r"(?m)^\s*line\s+\d+:.*(?:error|missing)"),
+]
+
+
+def _which(name):
+    r = subprocess.run(["which", name], capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def find_krt():
+    return _which("krt") or next(
+        (h for h in ["/opt/atelierb-free-24.04.2/bin/krt"] if os.path.exists(h)), None)
+
+
+def find_kin(name, hints):
+    return next((str(h) for h in hints if Path(h).exists()), None)
+
+
+def run_krt(krt, kin, goal_file, cwd, timeout=120.0, timer="R45", patterns=_SATURATION):
+    argv = [krt] + (["-i", timer] if timer else []) + ["-b", kin, goal_file]
+    try:
+        r = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False, "", "timeout"
+    text = (r.stdout or "") + "\n" + (r.stderr or "")
+    for reason, pat in patterns:
+        if re.search(pat, text):
+            return False, r.stdout, reason
+    if r.returncode != 0:
+        return False, r.stdout, f"rc={r.returncode}"
+    return True, r.stdout, ""
+
+
+_GEN_KEYWORDS = {"BOOL", "FALSE", "INTEGER", "NAT", "NATURAL", "NATURAL1", "POW",
+                 "TRUE", "bool", "card", "dom", "false", "id", "not", "or", "ran", "true"}
+_IDENT_RE = re.compile(r"\b[a-z][A-Za-z0-9_]*\b")
+_BINDER_RE = re.compile(r"[!#]\s*\(?\s*([a-zA-Z0-9_,\s]+?)\s*\)?\s*\.")
+
+
+def _free_idents(goal):
+    bound = set()
+    for m in _BINDER_RE.finditer(goal):
+        bound |= {v.strip() for v in m.group(1).split(",") if v.strip()}
+    seen, out = set(), []
+    for ident in _IDENT_RE.findall(goal):
+        if ident in _GEN_KEYWORDS or ident in bound or ident in seen:
+            continue
+        seen.add(ident); out.append(ident)
+    return out
+
+
+def gen_buts(suite, force=False):
+    """Generate .but files from goals.txt.  Content-aware: a .but is rewritten
+    only when its content changes (so unchanged goals keep their mtime and the
+    trace stage can skip them), and .but files whose goal left goals.txt are
+    removed.  Returns (written, total) or None if there's no goals.txt."""
+    goals = BENCH / suite / "goals.txt"
+    if not goals.exists():
+        return None
+    here = BENCH / suite
+    wanted: dict[str, tuple] = {}        # name -> (out_dir, content)
+    for lineno, raw in enumerate(goals.read_text().splitlines(), 1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        f = [x.strip() for x in line.split("|")]
+        if len(f) not in (3, 4):
+            sys.exit(f"{rel(goals)}:{lineno}: expected 'name | kind | goal [| xfail]'")
+        name, kind, goal = f[0], f[1], f[2]
+        xfail = len(f) == 4
+        prefix = "_delta_p" if kind == "prop" else "_delta_e"
+        deltas = " & ".join(f"{prefix}({i})" for i in _free_idents(goal))
+        hyp = f"({goal})" + (f" & {deltas}" if deltas else "")
+        content = (f'Flag(FileOn("{name}.res")) & '
+                   f"Set(Valid.1 | Rule(Implication | {hyp} | ? | ? | {goal} | nn))\n")
+        wanted[name] = ((here / "xfail") if xfail else here, content)
+    for p in list(here.glob("*.but")) + list((here / "xfail").glob("*.but")):
+        if p.stem not in wanted:         # goal removed from goals.txt
+            p.unlink()
+    written = 0
+    for name, (out_dir, content) in wanted.items():
+        out_dir.mkdir(parents=True, exist_ok=True)
+        p = out_dir / f"{name}.but"
+        if force or not p.exists() or p.read_text() != content:
+            p.write_text(content); written += 1
+    return written, len(wanted)
+
+
+def _strip_flags(content):
+    for pat in (r"Flag\(TypeOn\([^)]+\)\)\s*&\s*", r"Flag\(TraceOn\([^)]+\)\)\s*&\s*",
+                r"Flag\(FileOn\([^)]+\)\)\s*&\s*"):
+        content = re.sub(pat, "", content)
+    return content
+
+
+def gen_traces(suite, krt, force=False):
+    pp_kin = find_kin("PP.kin", ["/opt/atelierb-free-24.04.2/bin/PP.kin",
+                                 os.path.expanduser("~/atelierb/bin/PP.kin")])
+    if not pp_kin:
+        sys.exit("pp2lp: PP.kin not found")
+    here = BENCH / suite
+    buts = sorted(here.glob("*.but")) + sorted((here / "xfail").glob("*.but"))
+    ok = fail = skip = 0
+    for but in buts:
+        stem, d = but.stem, but.parent
+        trace = d / f"{stem}.trace"
+        if not force and trace.exists() and trace.stat().st_mtime >= but.stat().st_mtime:
+            skip += 1; continue
+        content = f'Flag(TraceOn("{stem}.trace")) & Flag(FileOn("{stem}.res")) & ' + _strip_flags(but.read_text())
+        goal = d / f"{stem}.goal"
+        goal.write_text(content)
+        okk, _o, _r = run_krt(krt, pp_kin, goal.name, str(d))
+        goal.unlink(missing_ok=True)
+        (d / f"{stem}.res").unlink(missing_ok=True)
+        if okk and trace.exists() and trace.read_bytes().strip():
+            ok += 1
+        else:
+            trace.unlink(missing_ok=True); fail += 1
+    return ok, fail, skip
+
+
+def gen_replays(suite, krt, force=False):
+    replay_kin = find_kin("REPLAY.kin", [ROOT / "atelierb/tools/linux_x64/REPLAY.kin",
+                                         "/opt/atelierb-free-24.04.2/bin/REPLAY.kin"])
+    if not replay_kin:
+        sys.exit("pp2lp: REPLAY.kin not found")
+    here = BENCH / suite
+    traces = sorted(here.glob("*.trace")) + sorted((here / "xfail").glob("*.trace"))
+    ok = fail = skip = 0
+    for tr in traces:
+        stem, d = tr.stem, tr.parent
+        replay = d / f"{stem}.replay"
+        if not force and replay.exists() and replay.stat().st_mtime >= tr.stat().st_mtime:
+            skip += 1; continue
+        goal = d / f"{stem}.replay.goal"
+        goal.write_text(f'Flag(FileOn("{stem}.replay.res")) & ("{tr}")')
+        okk, out, _r = run_krt(krt, replay_kin, goal.name, str(d),
+                               patterns=_SATURATION + _REPLAY_EXTRA)
+        goal.unlink(missing_ok=True)
+        (d / f"{stem}.replay.res").unlink(missing_ok=True)
+        misc = d / stem
+        if misc.is_file() and misc.suffix == "":
+            misc.unlink()
+        if okk and out and len(out) > 10:
+            replay.write_text(out); ok += 1
+        else:
+            fail += 1
+    return ok, fail, skip
+
+
+def cmd_gen(args) -> int:
+    """The `gen` verb: (re)generate a suite's inputs via krt.  Incremental by
+    default — a stage skips items whose output is newer than its input; pass
+    --force to regenerate everything."""
+    suite = args.target.split("/", 1)[0]
+    if not args.quiet:
+        print(dim(f"gen {suite}: {args.only}" + ("  (--force)" if args.force else "")))
+    _gen_stages(suite, args.only, force=args.force)
+    return 0
+
+
+def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
+    here = BENCH / suite
+    krt = None
+
+    def get_krt():
+        nonlocal krt
+        if krt is None:
+            krt = find_krt()
+            if not krt:
+                sys.exit("pp2lp: krt (Atelier B) not found — install it or set it on PATH")
+        return krt
+
+    for st in [s.strip() for s in stages_str.split(",") if s.strip()]:
+        if st == "buts":
+            r = gen_buts(suite, force=force)
+            print(dim("  buts:    no goals.txt — skipped") if r is None
+                  else dim(f"  buts:    {r[0]} written, {r[1] - r[0]} unchanged"))
+        elif st == "traces":
+            if not (list(here.glob("*.but")) or list((here / "xfail").glob("*.but"))):
+                print(dim("  traces:  no .but files — skipped")); continue
+            ok, fail, skip = gen_traces(suite, get_krt(), force=force)
+            print(dim(f"  traces:  {ok} ok, {fail} failed, {skip} up-to-date"))
+        elif st == "replays":
+            if not (list(here.glob("*.trace")) or list((here / "xfail").glob("*.trace"))):
+                print(dim("  replays: no .trace files — skipped")); continue
+            ok, fail, skip = gen_replays(suite, get_krt(), force=force)
+            print(dim(f"  replays: {ok} ok, {fail} failed, {skip} up-to-date"))
+        else:
+            sys.exit(f"pp2lp: unknown --gen stage {st!r} (buts|traces|replays)")
+
+
+# ── argparse ───────────────────────────────────────────────────────────────
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="pp2lp", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd")
+
+    r = sub.add_parser("run", help="emit + type-check a suite or one trace",
+                       description="emit + type-check a SUITE (gate) or SUITE/NAME (dossier)")
+    r.add_argument("target", nargs="?", default="og", help="SUITE or SUITE/NAME (default: og)")
+    r.add_argument("-q", "--quiet", action="store_true", help="summary only")
+    r.add_argument("--debug", nargs="?", const="unif", default=None, metavar="CATS",
+                   help="add a scoped lambdapi trace to the failure (unif/rewrite/tactic/whnf, "
+                        "or raw).  The code-snippet panels (.replay, .lp, lp/rules signature) "
+                        "already show by default on any failure")
+    r.add_argument("--json", action="store_true", help="machine-readable output")
+    r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
+
+    g = sub.add_parser("gen", help="(re)generate suite inputs via Atelier B krt",
+                       description="run PP/REPLAY (krt) to (re)build a suite's .but/.trace/.replay")
+    g.add_argument("target", nargs="?", default="synth", help="SUITE (default: synth)")
+    g.add_argument("--only", default="buts,traces,replays", metavar="STAGES",
+                   help="comma-separated subset of buts,traces,replays (default: all)")
+    g.add_argument("--force", action="store_true",
+                   help="regenerate even when an output is newer than its input")
+    g.add_argument("-q", "--quiet", action="store_true", help="suppress per-stage detail")
+    return p
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.cmd == "run":
+        return cmd_run(args)
+    if args.cmd == "gen":
+        return cmd_gen(args)
+    build_parser().print_help(sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
