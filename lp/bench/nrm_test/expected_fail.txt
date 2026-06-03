@@ -1,5 +1,5 @@
 # expected_fail.txt — nrm_test goals that emit but don't `lambdapi check` yet.
-# Same deviation-gate semantics as synth's (see bench/check.py):
+# Same deviation-gate semantics as synth's (enforced by `pp2lp run`):
 #   • a listed goal that fails     → expected (xfail); gate-neutral
 #   • a goal NOT listed that fails  → unexpected; BREAKS the gate
 #   • a listed goal that now PASSES → stale; BREAKS the gate (prune it)

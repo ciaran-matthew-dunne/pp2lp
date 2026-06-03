@@ -9,8 +9,7 @@ bench/results/
 # Tracked: lp/bench/og/*.trace + *.replay (og has no .but, traces are source)
 #          lp/bench/{prv,prv-no-arith,synth,nrm_test}/**/*.but
 # Generated artifacts (.trace/.replay) for any suite with .but inputs
-# are reproducible via `make gen-traces` / `make gen-replays`, so
-# they're ignored.
+# are reproducible via `pp2lp gen`, so they're ignored.
 lp/bench/prv/**/*.trace
 lp/bench/prv/**/*.replay
 lp/bench/prv-no-arith/**/*.trace

@@ -1,11 +1,12 @@
 # nrm_test — goals aiming to exercise every NRM normalisation rule.
 #
 # Each goal is proved from itself + inferred `_delta` hypotheses (shared
-# generator: ../synth/gen_buts.py, driven here via `--suite nrm_test`).
+# generator, driven here via `pp2lp gen nrm_test`).
 # Promoting the goal-as-hypothesis drives PP's ALL7 normalisation, which fires
 # the NRM rules on the body's structure (spec §8.13–8.16).  The `→ NRMnn` notes
-# are the *intended* targets; actual coverage is measured with `pp2lp rules`
-# (kept in sync in COVERAGE.md).  This suite is a NRM test/iteration harness:
+# are the *intended* targets; actual coverage is measured with the engine's
+# `rules` command (kept in sync in COVERAGE.md).  This suite is a NRM
+# test/iteration harness:
 # goals that don't type-check yet are expected and baselined in expected_fail.txt.
 #
 # Format (shared with synth): name | kind | goal [| xfail]

@@ -4,19 +4,19 @@ This suite deliberately exercises PP's normalisation rules (`NRM*`, spec
 §8.13–8.16).  Goals are PP-provable surface forms (set/relation expressions);
 each is proved from itself + `_delta` hypotheses, and **promoting the
 goal-as-hypothesis** drives ALL7 normalisation, firing NRM rules on the body's
-structure.  `goals.txt` is the source of truth (shared generator
-`../synth/gen_buts.py --suite nrm_test`).
+structure.  `goals.txt` is the source of truth, fed to the shared generator
+via `pp2lp gen nrm_test` (same path as synth).
 
 Regenerate + check:
 
 ```
-python3 lp/bench/synth/gen_buts.py --suite nrm_test
-make gen-traces nrm_test && make gen-replays nrm_test
-make check nrm_test          # capped via bench/check.py — deviation gate
+pp2lp gen nrm_test    # (re)build .but/.trace/.replay (PP/REPLAY via krt)
+pp2lp run nrm_test    # emit + check; capped deviation gate
 ```
 
-Coverage is measured with `pp2lp rules <replay>` (emit-side; never loop raw
-`lambdapi check` — it has no memory cap and the `x: NAT` goals OOM the host).
+Coverage is measured emit-side with the engine's `rules` command
+(`ocaml/_build/default/bin/main.exe rules <replay>`) — never loop raw
+`lambdapi check`, which has no memory cap and the `x: NAT` goals OOM the host.
 
 ## Status (20 / 26 implemented rules triggered)
 
