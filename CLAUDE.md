@@ -21,12 +21,11 @@ code snippets from the related files (`.replay`, `.lp`, the `lp/rules/` lemma).
 ```
 pp2lp run                       # check the og suite (default gate)
 pp2lp run synth                 # check a suite (deviation gate vs expected_fail.txt)
-pp2lp run og/01                 # check one trace (dossier + provenance join on failure)
-pp2lp run synth/x -v            # …failure dossier + proof tree + parsed rules
-pp2lp run synth/x --debug       # failure panels: .replay + lp/rules sig + unif trace
-pp2lp run synth/x --debug=rule  # one panel: the failing rule's lp/rules type signature
+pp2lp run og/01                 # check one trace; a failure shows snippet panels
+pp2lp run synth/x               # failure → .lp + .replay + lp/rules-signature panels
+pp2lp run synth/x --debug       # …also add the scoped lambdapi unification trace
 pp2lp run og --json             # machine output (also bench/results/og.json)
-pp2lp run og -q | -v | -vv      # quieter / more detail
+pp2lp run og -q                 # summary only
 
 pp2lp gen synth                 # (re)gen .but/.trace/.replay via krt (PP/REPLAY)
 pp2lp gen prv --only replays    # one stage only (buts,traces,replays)
@@ -129,22 +128,18 @@ emitted `lp/bench/SUITE/NAME.lp`, with the provenance join under each error.
 
 ### Debugging a failing trace
 
-`pp2lp run SUITE/NAME` on a single trace prints a failure panel: the lp error
-location, the PP **rule** whose tactic spans it (`replay:N`), that rule's PP
-**goal**, and lambdapi's stuck state (the goals — never just the hypotheses).
-Deeper:
+`pp2lp run SUITE/NAME` on a single trace prints a failure panel — by default,
+the relevant **code snippets**: the lp error location, the PP **rule** whose
+tactic spans it (`replay:N`) and that rule's PP **goal**, lambdapi's stuck
+state (the goals — never just the hypotheses), and three file snippets — the
+emitted `.lp`, the `.replay` proof step, and the failing rule's `lp/rules/*.lp`
+type signature.  There is no `-v`; the panels are the default.
 
-- `-v` — expand with the rebuilt proof tree + parsed rules (`UNKNOWN` ⇒ a
-  missing `rule_db.ml` entry; the residual stack shows on a tree-build error).
-- `--debug` — add **panels**, each a code snippet from a related file (bare
-  `--debug` = `replay,rule,unif`):
-  - `replay` — the `.replay` around the failing rule (the PP proof step).
-  - `rule` — the failing rule's type signature from `lp/rules/*.lp`.
-  - `unif`/`rewrite`/`tactic`/`whnf` — a *scoped* lambdapi `debug +u;`/`-u;`
-    trace of just the failing tactic, distilled to the constraint that failed
-    (`A ≡ B`, `failed`, `no unif_rule`); `raw` = the full trace. These are *our*
-    curated flags — we never expose lambdapi's `i` (type inference), which
-    crashes its printer on our higher-order goals.
+- `--debug` — *additionally* run a **scoped** lambdapi probe of the failing
+  tactic (`debug +u;`/`-u;`), distilled to the constraint that failed (`A ≡ B`,
+  `failed`, `no unif_rule`).  Categories `unif`/`rewrite`/`tactic`/`whnf`, or
+  `raw` for the full trace.  These are *our* curated flags — we never expose
+  lambdapi's `i` (type inference), which crashes its printer on our HO goals.
 
 An emit-side `Failure` → `translate.ml` / `proof_tree.ml` / `parse_replay.ml`;
 the dossier prints a stable error code (`E_UNKNOWN_RULE`, `E_ARITY`,
@@ -191,7 +186,7 @@ The prv suite is exempt — see below.
   - `INST_FINAL(pred | exp | FAUX)` — three-piece pipe argument,
     parser only knows the two-piece form (`parser.mly:106-110`).
   - Several traces (e.g. `eq_020`) leave many nodes on the stack —
-    `pp2lp run prv/eq_020 -v` shows the residual.
+    the engine's `tree` command dumps the residual.
   Don't run `pp2lp run prv` as a gate until these are fixed.
 
 - **synth suite: 8 baselined failures + an `xfail/` set.** `pp2lp run synth`
@@ -210,7 +205,7 @@ The prv suite is exempt — see below.
     - `ar_in_nat` (`n: NAT`): sends lambdapi into a memory blowup. Caught by
       check.py's caps now (see below) but excluded to keep the run fast.
     The bulk glob is non-recursive so `xfail/` is skipped, but
-    `pp2lp run synth/<name> -v` / `pp2lp run synth/<name>` still find them.
+    `pp2lp run synth/<name>` still finds them by name.
   - 8 fail in the bulk run, baselined in `lp/bench/synth/expected_fail.txt`
     (shown as `✗ … (expected)`; single-trace `pp2lp run synth/<name>` still
     prints the full diagnostic):
@@ -291,7 +286,7 @@ names raise.
 | `rule_db: unknown rule "X"`                            | `proof_tree.ml`/`rule_db.ml`       | Add `X` to `rule_db.ml` (arity / phantom / hoas_identity).        |
 | `rule_db: X unsupported arity N`                       | `proof_tree.ml`                    | Review the rule's slot kinds in `rule_db.ml`.                      |
 | `translate: X arity N unsupported`                     | `translate.ml`                     | New rule shape needs a dispatch arm.                               |
-| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | `pp2lp run SUITE/NAME -v` shows the residual; an earlier rule has wrong arity. |
+| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | an earlier rule has the wrong arity; the engine `tree` command dumps the residual. |
 | `tree-build error: X expected a child but stack is empty` | `proof_tree.ml`                 | Wrong arity for an earlier rule.                                   |
 | `parse error in PATH: …`                               | `parser.mly` / `parse_replay.ml`   | Bad replay line; inspect the column reported.                      |
 | `File X.lpo is incompatible with current binary`       | lambdapi                           | `git clean -Xf lp/bench`.                                          |

@@ -6,13 +6,14 @@ Two commands:
   pp2lp gen [TARGET]   (re)generate a suite's .but/.trace/.replay via krt
 
   TARGET   a SUITE (og, synth, prv, prv-no-arith, nrm_test), or SUITE/NAME for
-           run.  On a failing trace, --debug probes lambdapi for the exact
-           unification failure; -v adds the proof tree + parsed rules.
+           run.  A failing trace prints code-snippet panels by default (the
+           emitted .lp, the .replay step, the failing lp/rules signature);
+           --debug additionally probes lambdapi for the exact unification failure.
 
-The emitted Lambdapi carries a provenance comment on every tactic
-  refine RULE … /* [RULE] replay:N ⊢ <goal PP saw> */
-so any lambdapi error location resolves straight back to the originating PP
-rule, its replay line, and the goal — the "provenance join" surfaced below.
+The emitted Lambdapi is kept clean (no comments).  Alongside it the engine
+writes a side-channel line→(rule, replay-line, goal) map, so any lambdapi error
+location resolves straight back to the originating PP rule, its replay line, and
+the goal — the "provenance join" surfaced below.
 
 Run `pp2lp run --help` / `pp2lp gen --help` for options.  The OCaml engine
 (ocaml/_build/default/bin/main.exe) is an internal detail; you never call it
@@ -22,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import difflib
 import json
 import os
 import re
@@ -47,7 +49,7 @@ EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "30"))     # engine em
 CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
 
 # ── Colour ─────────────────────────────────────────────────────────────────
-COLOR = sys.stdout.isatty()
+COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 
 
 def _c(code, t):
@@ -115,7 +117,7 @@ _ERROR_RULES = [
     (re.compile(r"INS contradiction"),          "E_INS",
      "INS leaf search failed — likely arithmetic-rewritten hypotheses"),
     (re.compile(r"tree-build error|unconsumed|expected a .*child"), "E_TREE_BUILD",
-     "run with -v to see the residual stack; an earlier rule has the wrong arity"),
+     "an earlier rule has the wrong arity in ocaml/src/rule_db.ml (the engine 'tree' command dumps the residual stack)"),
     (re.compile(r"parse error|replay-line parse|unrecognised line"), "E_PARSE",
      "inspect the .replay line/column reported (ocaml/src/parser.mly, parse_replay.ml)"),
 ]
@@ -262,8 +264,10 @@ def check_one(replay: Path) -> dict:
                           "message": (e.get("message") or "").strip(),
                           "provenance": prov})
         res["status"] = "lp_fail"
+        head = (errs[0].get("message") or "").strip().splitlines() if errs else []
         res["error"] = {"code": "E_LP_CHECK", "hint": None,
-                        "message": (errs[0].get("message") or "").strip() if errs else "type-check failed",
+                        # summary only; the full body lives in diagnostics[].message
+                        "message": head[0] if head else "type-check failed",
                         "diagnostics": diags,
                         "raw": chk["raw"] if not errs else []}
         return res
@@ -273,23 +277,40 @@ def check_one(replay: Path) -> dict:
 
 
 # ── Target resolution ──────────────────────────────────────────────────────
+def _suite_names() -> list[str]:
+    """Bench subdirs that look like suites (skip dotfiles / __pycache__)."""
+    return [p.name for p in sorted(BENCH.iterdir())
+            if p.is_dir() and not p.name.startswith((".", "_"))]
+
+
 def resolve_target(target: str):
     """Return ('suite', suite, [replays]) or ('single', suite, replay)."""
     if "/" in target:
         suite, name = target.split("/", 1)
-        base = BENCH / suite / f"{name}.replay"
-        xf = BENCH / suite / "xfail" / f"{name}.replay"
+        sdir = BENCH / suite
+        if not sdir.is_dir():
+            sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
+        base, xf = sdir / f"{name}.replay", sdir / "xfail" / f"{name}.replay"
         replay = base if base.exists() else xf
         if not replay.exists():
-            sys.exit(f"pp2lp: replay not found: {rel(base)}")
+            names = [p.stem for p in sorted(sdir.glob("*.replay"))] + \
+                    [p.stem for p in sorted((sdir / "xfail").glob("*.replay"))]
+            guess = difflib.get_close_matches(name, names, n=1, cutoff=0.6)
+            if guess:
+                tail = f" — did you mean '{guess[0]}'?"
+            elif names:
+                tail = f" ({len(names)} available; `pp2lp run {suite}` lists them)"
+            else:
+                tail = " (no .replay files yet — run `pp2lp gen`)"
+            sys.exit(f"pp2lp: no replay '{name}' in suite '{suite}'{tail}")
         return "single", suite, replay
     suite = target
     d = BENCH / suite
     if not d.is_dir():
-        sys.exit(f"pp2lp: no such suite: {rel(d)}")
+        sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
     replays = sorted(d.glob("*.replay"))  # non-recursive: xfail/ excluded
     if not replays:
-        sys.exit(f"pp2lp: no .replay files under {rel(d)} (try --gen)")
+        sys.exit(f"pp2lp: no .replay files under {rel(d)} (run `pp2lp gen {suite}`)")
     return "suite", suite, replays
 
 
@@ -310,21 +331,20 @@ def load_expected_fail(suite: str) -> set[str]:
 # *scoped* region (just the failing tactic), never the whole file, and never
 # expose `i` (type inference): it crashes lambdapi's printer on our HO goals.
 _DEBUG_FLAGS = {"unif": "u", "rewrite": "r", "tactic": "t", "whnf": "w"}
-# --debug categories: file-snippet panels (replay, rule) + lambdapi-trace
-# flags (unif/rewrite/tactic/whnf) + raw.
-_DEBUG_CATS = {"replay", "rule", "raw"} | set(_DEBUG_FLAGS)
+# --debug only adds a scoped lambdapi trace (the code-snippet panels show by
+# default on any failure).  Categories: unif/rewrite/tactic/whnf, plus raw.
+_DEBUG_CATS = set(_DEBUG_FLAGS) | {"raw"}
 
 
 def _clip(s: str, n: int = 200) -> str:
     return s if len(s) <= n else s[:n - 1] + "…"
 
 
-def print_failure(res: dict, indent: str = "   ", context: int = 2) -> None:
-    """A failure panel.  Shows the lp error location; the PP **rule** whose
-    emitted tactic spans that line (where lambdapi pointed — the emission site,
-    not necessarily the culprit); that rule's PP goal; and lambdapi's stuck
-    state *including the goals* (for "Missing subproofs" they sit after a `---`
-    separator, so they are never the truncated part)."""
+def print_failure(res: dict, replay: Path, indent: str = "   ", context: int = 2) -> None:
+    """The default failure panel: the lp error location, the PP rule whose
+    tactic spans it, that rule's PP goal, lambdapi's stuck state (with the
+    goals), and the relevant **code snippets** — the emitted .lp, the .replay
+    proof step, and the failing rule's lp/rules type signature."""
     err = res.get("error") or {}
     diags = err.get("diagnostics", [])
     if not diags:                       # emit_fail / timeout / unstructured
@@ -334,6 +354,11 @@ def print_failure(res: dict, indent: str = "   ", context: int = 2) -> None:
             first = first[1:]
         for line in first:
             print(f"{indent}  {_clip(line)}")
+        raw = err.get("raw") or []                  # unstructured lambdapi output
+        for line in raw[:20]:
+            print(f"{indent}  {dim(_clip(line))}")
+        if len(raw) > 20:
+            print(f"{indent}  {dim('… (+%d more lines)' % (len(raw) - 20))}")
         if err.get("hint"):
             print(f"{indent}{dim('→ ' + err['hint'])}")
         return
@@ -348,9 +373,23 @@ def print_failure(res: dict, indent: str = "   ", context: int = 2) -> None:
             print(f"{indent}  {dim('(no PP rule maps to this line)')}")
         print(f"{indent}  {dim('lambdapi')}  {_clip(msg[0]) if msg else '(no message)'}")
         _print_lp_goals(msg, indent + "    ")
-        m = re.match(r".*:(\d+):", d["lp_loc"])
-        if m:
-            _print_source_context(ROOT / res["lp"], int(m.group(1)), indent + " ", context)
+    # ── code-snippet panels for the primary failure (always shown) ──
+    d0 = diags[0]
+    prov0 = d0.get("provenance")
+    m = re.match(r".*:(\d+):", d0["lp_loc"])
+    if m:
+        _section("emitted lp")
+        _print_source_context(ROOT / res["lp"], int(m.group(1)), indent, context)
+    if prov0:
+        _section(f"replay  {replay.name}:{prov0['replay_line']}")
+        _print_source_context(replay, prov0["replay_line"], indent, 3)
+        _section(f"lp rule  {prov0['rule']}")
+        sig = _rule_signature(prov0["rule"])
+        if sig:
+            fname, decl = sig
+            print(f"{indent}{dim(fname)}  {_clip(decl, 280)}")
+        else:
+            print(f"{indent}{dim('(symbol %s not found under lp/rules/)' % prov0['rule'])}")
     if err.get("hint"):
         print(f"{indent}{dim('→ ' + err['hint'])}")
 
@@ -454,7 +493,7 @@ def _print_source_context(src: Path, line: int, indent, context):
     width = len(str(hi))
     for i in range(lo, hi):
         marker = red(">") if i == idx else " "
-        print(f"{indent}  {marker} {i + 1:>{width}} | {lines[i]}")
+        print(f"{indent}  {marker} {i + 1:>{width}} | {_clip(lines[i], 200)}")
 
 
 # ── Rule signature lookup (lp/rules/*.lp) ──────────────────────────────────
@@ -471,47 +510,19 @@ def _rule_signature(rule: str):
     return None
 
 
-# ── Debug panels: code snippets from the files related to a failure ─────────
-def _print_debug_panels(res: dict, cats: str, replay: Path) -> None:
-    wanted = [c.strip() for c in cats.split(",") if c.strip()]
-    diags = (res.get("error") or {}).get("diagnostics", [])
-    prov = diags[0].get("provenance") if diags else None
-    if "replay" in wanted and prov:
-        _section(f"replay  {replay.name}:{prov['replay_line']}")
-        _print_source_context(replay, prov["replay_line"], "   ", 3)
-    if "rule" in wanted and prov:
-        _section(f"lp rule  {prov['rule']}")
-        sig = _rule_signature(prov["rule"])
-        if sig:
-            fname, decl = sig
-            print(f"   {dim(fname)}  {_clip(decl, 280)}")
-        else:
-            print(f"   {dim('(symbol %s not found under lp/rules/)' % prov['rule'])}")
-    trace = [c for c in wanted if c in _DEBUG_FLAGS or c == "raw"]
-    if trace:
-        _print_debug_probe(res, ",".join(trace))
-
-
-# ── Single-trace dossier (auto-expand on failure) ──────────────────────────
-def dossier(replay: Path, res: dict, verbose: int, debug: str | None = None):
-    """Everything an agent needs about one trace, in one call."""
+# ── Single-trace dossier ───────────────────────────────────────────────────
+def dossier(replay: Path, res: dict, debug: str | None = None):
+    """Everything an agent needs about one trace, in one call.  A failure shows
+    the code-snippet panels by default; --debug adds a scoped lambdapi trace."""
     status = res["status"]
     timing = "  " + dim("emit %s / check %s" % (fmt_ms(res["emit_ms"]), fmt_ms(res["check_ms"])))
     print(f" {ICON[status]} {res['name']}{timing}")
     for w in res["warnings"]:
         print(f"   {dim(w)}")
     if status in ("emit_fail", "lp_fail"):
-        print_failure(res)
+        print_failure(res, replay)
         if debug and status == "lp_fail":
-            _print_debug_panels(res, debug, replay)
-        elif debug and status == "emit_fail":
-            print(f"   {dim('note: --debug probes type-check failures; this is an emit-side failure')}")
-        # -v expands the failure with the proof tree + parsed rules
-        if verbose >= 1:
-            _section("proof tree")
-            _run_engine_show("tree", replay)
-            _section("parsed rules (UNKNOWN ⇒ missing rule_db entry)")
-            _run_engine_show("rules", replay)
+            _print_debug_probe(res, debug)
 
 
 def _section(title):
@@ -557,7 +568,7 @@ def cmd_run(args) -> int:
         if args.json:
             print(json.dumps(res, ensure_ascii=False, indent=2))
         else:
-            dossier(target, res, args.verbose, debug=args.debug)
+            dossier(target, res, debug=args.debug)
         return 0 if res["status"] in ("ok", "warn") else 1
 
     # ── suite: parallel emit+check + deviation gate ──
@@ -599,32 +610,33 @@ def _run_suite(args, suite: str, replays: list[Path]) -> int:
         print(json.dumps(artifact, ensure_ascii=False, indent=2))
     else:
         _print_suite_human(args, suite, ordered, counts, expected_fail,
-                           xfail, xpass, unexpected, elapsed, total_emit, total_check)
+                           xfail, xpass, unexpected, elapsed, total_emit, total_check,
+                           {r.stem: r for r in replays})
 
     return 1 if (unexpected or xpass) else 0
 
 
 def _print_suite_human(args, suite, ordered, counts, expected_fail,
-                       xfail, xpass, unexpected, elapsed, total_emit, total_check):
+                       xfail, xpass, unexpected, elapsed, total_emit, total_check, replay_of):
     for res in ordered:
         status, name = res["status"], res["name"]
         failed = status in ("emit_fail", "lp_fail")
         known = name in expected_fail
         if not args.quiet:
-            if status == "ok" and not args.verbose:
+            if status == "ok":
                 continue
             suffix = ""
             if failed and known:
                 suffix = dim(" (expected)")
             elif known and not failed:
                 suffix = yellow(" (UNEXPECTED PASS — prune expected_fail.txt)")
-            timing = dim(f"  emit {fmt_ms(res['emit_ms'])} / check {fmt_ms(res['check_ms'])}") if args.verbose else ""
-            print(f" {ICON[status]} {name}{suffix}{timing}")
+            print(f" {ICON[status]} {name}{suffix}")
             for w in res["warnings"]:
                 print(f"   {dim(w)}")
-            # show the failure panel for *unexpected* failures (or any, if -v)
-            if failed and (not known or args.verbose):
-                print_failure(res)
+            # panel for *unexpected* (gate-breaking) failures; inspect a
+            # baselined one with `pp2lp run SUITE/NAME` (panels are the default).
+            if failed and not known:
+                print_failure(res, replay_of[name])
     parts = []
     if counts["ok"]:
         parts.append(f"{green(counts['ok'])} ✓")
@@ -640,6 +652,9 @@ def _print_suite_human(args, suite, ordered, counts, expected_fail,
     if not args.quiet:
         print()
     print(f"{suite}  {'  '.join(parts)}  {dim(fmt_ms(elapsed))}  {breakdown}")
+    failing = unexpected + xfail
+    if failing:
+        print(dim(f"  inspect a failure:  pp2lp run {suite}/{failing[0]}   ·   --debug adds the lambdapi trace"))
 
 
 # ── shared suite evaluation ────────────────────────────────────────────────
@@ -871,12 +886,10 @@ def build_parser() -> argparse.ArgumentParser:
                        description="emit + type-check a SUITE (gate) or SUITE/NAME (dossier)")
     r.add_argument("target", nargs="?", default="og", help="SUITE or SUITE/NAME (default: og)")
     r.add_argument("-q", "--quiet", action="store_true", help="summary only")
-    r.add_argument("-v", "--verbose", action="count", default=0,
-                   help="more detail; on a failing trace -v adds the proof tree + parsed rules")
-    r.add_argument("--debug", nargs="?", const="replay,rule,unif", default=None, metavar="CATS",
-                   help="on a failing trace, add debug panels (code snippets from related "
-                        "files): replay, rule (lp/rules signature), unif/rewrite/tactic/whnf "
-                        "(scoped lambdapi trace), raw.  Bare --debug = replay,rule,unif")
+    r.add_argument("--debug", nargs="?", const="unif", default=None, metavar="CATS",
+                   help="add a scoped lambdapi trace to the failure (unif/rewrite/tactic/whnf, "
+                        "or raw).  The code-snippet panels (.replay, .lp, lp/rules signature) "
+                        "already show by default on any failure")
     r.add_argument("--json", action="store_true", help="machine-readable output")
     r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
 
@@ -888,7 +901,6 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--force", action="store_true",
                    help="regenerate even when an output is newer than its input")
     g.add_argument("-q", "--quiet", action="store_true", help="suppress per-stage detail")
-    g.add_argument("-v", "--verbose", action="count", default=0, help="per-file krt detail")
     return p
 
 

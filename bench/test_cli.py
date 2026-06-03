@@ -98,5 +98,10 @@ if eng.exists() and rep.exists():
 else:
     print("  skip  engine contract test (build the engine first)")
 
+# ── resolver: suite enumeration (powers the "available: …" recovery hint) ────
+suites = pp._suite_names()
+check("suite_names lists og + synth", "og" in suites and "synth" in suites)
+check("suite_names skips dotfiles/__pycache__", not any(s.startswith((".", "_")) for s in suites))
+
 print(f"\n{'ALL PASS' if not _fails else f'{len(_fails)} FAILED'}")
 sys.exit(1 if _fails else 0)
