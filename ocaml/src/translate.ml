@@ -88,6 +88,31 @@ and default ctx rule arg anno children =
     let h = fresh_h ctx eq_pred in
     L.Assume (h,
       L.Then (L.Rewrite { try_ = true; rtl; name = h }, tree ctx c))
+  | [c], Rule_db.Ar3 ->
+    (* Main-tree AR3.  PP's solver records the sub-premise `𝟏 - a` in a
+       neg-normalised order `r` (the PipeArg's 2nd component); the plain AR3
+       types its continuation at the literal `𝟏 - a`, so the introduced
+       hypothesis ends up shaped `𝟏 - a` while later steps (INS) expect `r`.
+       Emit the bridged AR3' with a *generated* `𝟏 - a = r` proof; the child
+       continuation then introduces the hyp shaped `r`.  Fall back to plain AR3
+       when the shape is unexpected or the equality can't be built. *)
+    let env = proj_env_of_ctx ctx in
+    let bridged =
+      match goal, arg with
+      | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (PipeArg (_, r_exp)) ->
+        Option.map
+          (fun eqpf ->
+            L.Refine (L.Name "AR3'",
+              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole]))
+          (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+      | _ -> None
+    in
+    let tactic =
+      match bridged with
+      | Some t -> t
+      | None -> tactic_for_rule ctx rule arg anno children
+    in
+    L.Then (tactic, tree ctx c)
   | _, _ ->
     let tactic = tactic_for_rule ctx rule arg anno children in
     match children with
@@ -194,10 +219,43 @@ and chain_dispatch ctx = function
       L.Refine (L.Expl (L.Name rule), [L.Hole; q_term; L.Hole; L.Trust; L.Hole])
     in
     L.Then (tactic, chain_tree ctx c)
+  | P.Apply { rule; arg; anno; children = [c]; _ }
+    when Rule_db.emit rule = Rule_db.Ar3 ->
+    (* AR3 in a Res chain.  PP's solver records the sub-premise `𝟏 - a` in a
+       different (neg-normalised) term order `r` (the arg), so the plain AR3_1
+       — which expects the continuation typed at `𝟏 - a` — leaves `a` unsolved.
+       Emit the bridged AR3'_1: `a` from the goal `¬(a≤𝟎) ⇒ R`, `r` from the
+       arg, and a *generated* proof `𝟏 - a = r` (no `trust`).  Fall back to the
+       generic AR3_1 path when the shape is unexpected. *)
+    let env = proj_env_of_ctx ctx in
+    let bridged =
+      match goal_of_anno anno, arg with
+      | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (Pred (Lift r_exp)) ->
+        Option.map
+          (fun eqpf ->
+            L.Refine (L.Name "AR3'_1",
+              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole]))
+          (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+      | _ -> None
+    in
+    let tactic =
+      match bridged with
+      | Some t -> t
+      | None ->
+        L.Refine (L.Name (chain_emit_name rule),
+                  dynamic_value_args ctx rule arg
+                  @ metadata_extra_args rule @ slot_hole_args rule)
+    in
+    L.Then (tactic, chain_tree ctx c)
   | P.Apply { rule; arg; children = [c]; _ } ->
+    (* Mirror the main-tree arg bundle: dynamic value args, then the solver
+       side-condition metadata (AR9's `trust` for `E = F`), then slot holes.
+       The chain path used to drop the metadata, so AR9_1 emitted without its
+       `trust` and left the `he` goal unfilled ("missing subproofs"). *)
     let tactic =
       L.Refine (L.Name (chain_emit_name rule),
-                dynamic_value_args ctx rule arg @ slot_hole_args rule)
+                dynamic_value_args ctx rule arg
+                @ metadata_extra_args rule @ slot_hole_args rule)
     in
     L.Then (tactic, chain_tree ctx c)
   | P.Apply { rule; anno; children = [c0; c1]; _ }

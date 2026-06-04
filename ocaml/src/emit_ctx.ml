@@ -308,6 +308,166 @@ let ins_hyp_shape = function
 
 let collect_conj_leaves = Pp_lp.conj_leaves
 
+(* ---- On-the-fly equality proofs for reordered arithmetic conjuncts ----
+
+   PP's solver records the hypotheses behind an INS leaf in its own term
+   order: the universal reads `x - g ≤ 𝟎`, the in-scope hyp reads
+   `(—g) + x ≤ 𝟎`.  Same value, but `find_hyp_by_equiv` is structural and
+   misses it.  Rather than `trust` the conjunct, we build a real proof that
+   the two sides are equal (a permutation of one signed sum) from `add_comm`
+   / `add_assoc` (and `opp_add`/`neg_neg` to push `—` to the leaves), and
+   transport the hypothesis along it with `leq_subst_l`. *)
+
+(* The projection env (witness tuple-var → `prj k x`) the printer needs, built
+   from the in-scope binders; mirrors [Rule_emit.pp_env_of]. *)
+let proj_env_of_ctx ctx : L.proj_env =
+  List.concat_map (fun (x_name, pp_vars) ->
+    List.mapi (fun i v -> (v, (i, x_name))) pp_vars) ctx.xs
+
+let is_atom_exp = function
+  | Var _ | Nat _ | App _ | SetImage _ | Inter _ | Union _ -> true
+  | AOp _ | Neg _ -> false
+
+(* Flatten a `+`/`−` expression to its ordered signed-atom list, pushing unary
+   `—` down to the atoms (— distributes over + and is involutive); None if a
+   non-arithmetic node blocks it.  Mirrors [normalize]'s recursion exactly, so
+   a match here is precisely what [normalize] can prove. *)
+let rec flatten_signed e : (exp * int) list option =
+  let negate = Option.map (List.map (fun (a, s) -> (a, -s))) in
+  let app o p = match o, p with Some a, Some b -> Some (a @ b) | _ -> None in
+  match e with
+  | _ when is_atom_exp e -> Some [ (e, 1) ]
+  | Neg a when is_atom_exp a -> Some [ (a, -1) ]
+  | AOp (Add, a, b) -> app (flatten_signed a) (flatten_signed b)
+  | AOp (Sub, a, b) -> app (flatten_signed a) (negate (flatten_signed b))
+  | Neg (AOp (Add, a, b)) -> app (negate (flatten_signed a)) (negate (flatten_signed b))
+  | Neg (AOp (Sub, a, b)) -> app (negate (flatten_signed a)) (flatten_signed b)
+  | Neg (Neg a) -> flatten_signed a
+  | _ -> None
+
+let signed_exp (a, s) = if s >= 0 then a else Neg a
+
+(* Left-nested sum of a (non-empty) signed-atom list, as a PP expression. *)
+let lfold_exp = function
+  | [] -> Nat 0
+  | s0 :: rest ->
+    List.fold_left (fun acc s -> AOp (Add, acc, signed_exp s)) (signed_exp s0) rest
+
+(* π (lfold l = lfold (sorted l)): bubble-sort the signed-atom list, each
+   adjacent swap an `add_comm`/`add_assoc` step lifted to its depth. *)
+let prove_eq_lnested env l_orig : L.term =
+  let ex e = L.Exp (env, e) in
+  let refl e = L.App (L.Name "eq_refl", [ ex e ]) in
+  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+  let sym p = L.App (L.Name "eq_sym", [ p ]) in
+  let comm a b = L.App (L.Name "add_comm", [ ex a; ex b ]) in
+  let assoc a b c = L.App (L.Name "add_assoc", [ ex a; ex b; ex c ]) in
+  let congL b p = L.App (L.Name "add_congL", [ ex b; p ]) in   (* fix right operand *)
+  let congR a p = L.App (L.Name "add_congR", [ ex a; p ]) in   (* fix left operand *)
+  let prove_swap l k =
+    let nth i = List.nth l i in
+    let pre = List.filteri (fun i _ -> i < k) l in
+    let suf = List.filteri (fun i _ -> i > k + 1) l in
+    let a = signed_exp (nth k) and b = signed_exp (nth (k + 1)) in
+    let core =
+      match pre with
+      | [] -> comm a b                                  (* a + b = b + a *)
+      | _ ->
+        let p = lfold_exp pre in                        (* (p+a)+b = (p+b)+a *)
+        trans (assoc p a b) (trans (congR p (comm a b)) (sym (assoc p b a)))
+    in
+    List.fold_left (fun acc s -> congL (signed_exp s) acc) core suf
+  in
+  let swap_list l k =
+    List.mapi (fun i x -> if i = k then List.nth l (k + 1)
+                          else if i = k + 1 then List.nth l k else x) l
+  in
+  let first_inversion l =
+    let rec go i = function
+      | x :: (y :: _ as tl) -> if compare x y > 0 then Some i else go (i + 1) tl
+      | _ -> None
+    in go 0 l
+  in
+  let rec go l =
+    match first_inversion l with
+    | None -> refl (lfold_exp l)
+    | Some k -> trans (prove_swap l k) (go (swap_list l k))
+  in
+  go l_orig
+
+(* π (lfold la + lfold lb = lfold (la @ lb)): peel lb's tail, reassociating
+   each element onto la with add_assoc (left-fold structure). *)
+let rec concat env la lb : L.term =
+  let ex t = L.Exp (env, t) in
+  match List.rev lb with
+  | [] | [ _ ] ->
+    L.App (L.Name "eq_refl", [ ex (AOp (Add, lfold_exp la, lfold_exp lb)) ])
+  | last :: front_rev ->
+    let front = List.rev front_rev in
+    L.App (L.Name "eq_trans",
+      [ L.App (L.Name "eq_sym",
+          [ L.App (L.Name "add_assoc",
+              [ ex (lfold_exp la); ex (lfold_exp front); ex (signed_exp last) ]) ]);
+        L.App (L.Name "add_congL", [ ex (signed_exp last); concat env la front ]) ])
+
+(* Normalise [e] to the left-nested sum of its signed atoms, returning the
+   atom list and a proof `e = lfold atoms`.  Pushes `—` to the leaves with
+   `opp_add`/`neg_neg`; `add_cong`/`concat` reassemble the recursive proofs. *)
+let rec normalize env e : ((exp * int) list * L.term) option =
+  let ex t = L.Exp (env, t) in
+  let refl t = L.App (L.Name "eq_refl", [ ex t ]) in
+  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+  let cong px py = L.App (L.Name "add_cong", [ px; py ]) in
+  let combine lx px ly py =
+    (lx @ ly, trans (cong px py) (concat env lx ly))
+  in
+  match e with
+  | _ when is_atom_exp e -> Some ([ (e, 1) ], refl e)
+  | Neg a when is_atom_exp a -> Some ([ (a, -1) ], refl (Neg a))
+  | AOp (Add, x, y) ->
+    (match normalize env x, normalize env y with
+     | Some (lx, px), Some (ly, py) -> Some (combine lx px ly py)
+     | _ -> None)
+  | AOp (Sub, x, y) -> normalize env (AOp (Add, x, Neg y))
+  | Neg (AOp (Add, x, y)) ->
+    (match normalize env (Neg x), normalize env (Neg y) with
+     | Some (lx, px), Some (ly, py) ->
+       let l, p = combine lx px ly py in
+       Some (l, trans (L.App (L.Name "opp_add", [ ex x; ex y ])) p)
+     | _ -> None)
+  | Neg (AOp (Sub, x, y)) -> normalize env (Neg (AOp (Add, x, Neg y)))
+  | Neg (Neg a) ->
+    (match normalize env a with
+     | Some (la, pa) -> Some (la, trans (L.App (L.Name "neg_neg", [ ex a ])) pa)
+     | None -> None)
+  | _ -> None
+
+(* `π (e1 = e2)` for two `+`/`−` expressions that denote the same signed-atom
+   multiset; None if either is unsupported or the multisets differ.  Routes
+   both through [normalize] (— to leaves) then a permutation, via lfold(sorted). *)
+let prove_sum_eq env e1 e2 : L.term option =
+  match normalize env e1, normalize env e2 with
+  | Some (l1, p1), Some (l2, p2) when List.sort compare l1 = List.sort compare l2 ->
+    let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+    let sym p = L.App (L.Name "eq_sym", [ p ]) in
+    (* e1 = lfold l1 = lfold(sorted) = lfold l2 = e2 *)
+    Some (trans p1 (trans (prove_eq_lnested env l1)
+                     (sym (trans p2 (prove_eq_lnested env l2)))))
+  | _ -> None
+
+(* A hyp `h_lhs ≤ 𝟎` that is a term-reordering of [lhs ≤ 𝟎]. *)
+let find_leq_reorder ctx lhs =
+  match flatten_signed lhs with
+  | None -> None
+  | Some fl ->
+    let key = List.sort compare fl in
+    List.find_map (fun (name, p) -> match p with
+      | Leq (h_lhs, Nat 0) ->
+        (match flatten_signed h_lhs with
+         | Some fh when List.sort compare fh = key -> Some (name, h_lhs)
+         | _ -> None)
+      | _ -> None) ctx.hyps
+
 let leaf_evidence ctx env leaf =
   if is_true_atom leaf then Some true_intro
   else
@@ -317,7 +477,19 @@ let leaf_evidence ctx env leaf =
        whose in-scope hyp uses a different binder/var but the same LP type. *)
     match find_hyp_by_equiv ctx needed with
     | Some h -> Some (L.Name h)
-    | None -> None
+    | None ->
+      (* arithmetic-reorder bridge: PP recorded the conjunct in a different
+         term order than the universal.  Prove `needed = hyp` and transport. *)
+      (match needed with
+       | Leq (lhs, Nat 0) ->
+         (match find_leq_reorder ctx lhs with
+          | Some (h, h_lhs) ->
+            (match prove_sum_eq (proj_env_of_ctx ctx) lhs h_lhs with
+             | Some eqpf ->
+               Some (L.App (L.Name "leq_subst_l", [ eqpf; L.Name h ]))
+             | None -> None)
+          | None -> None)
+       | _ -> None)
 
 let match_conj ctx env body =
   let leaves = collect_conj_leaves body in

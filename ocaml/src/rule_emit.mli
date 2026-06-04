@@ -17,6 +17,11 @@ val pred_term : Emit_ctx.ctx -> prd -> Lp_tree.term
 val dynamic_value_args : Emit_ctx.ctx -> string -> arg option -> Lp_tree.term list
 val slot_hole_args : string -> Lp_tree.term list
 
+(* Solver side-condition args the LP signature needs before its slot holes
+   (e.g. AR9's `trust` for `E = F`).  The main-tree path bundles this into
+   the rule's args; the Res-chain path must include it too. *)
+val metadata_extra_args : string -> Lp_tree.term list
+
 (* AND5: locate the implication conjunct [j] whose antecedent is matched by
    the conjunct(s) at the returned positions. *)
 val find_and5_pair : prd list -> (int list * int) option

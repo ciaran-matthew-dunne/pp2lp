@@ -124,6 +124,27 @@ symbol discrete (x : τ ι) : π (¬ (x ≤ 𝟎)) → π (𝟏 ≤ x);
 
 // ---- Derived lemmas (left-/right- variants of the axioms) ----
 
+// Congruences + ≤-transport used by the emitter's on-the-fly equality
+// proofs: an INS conjunct (or AR3 sub-premise) PP records in a different
+// term order than the rule/universal it feeds is bridged by a generated
+// `add_comm`/`add_assoc`/`opp_add`/`neg_neg` permutation proof (no `trust`).
+// Plain `rewrite` (not AC) so each step is predictable.
+opaque symbol add_congL (b : τ ι) [a a' : τ ι] :
+  π (a = a') → π (a + b = a' + b) ≔
+begin assume b a a' h; rewrite h; reflexivity end;
+
+opaque symbol add_congR (a : τ ι) [b b' : τ ι] :
+  π (b = b') → π (a + b = a + b') ≔
+begin assume a b b' h; rewrite h; reflexivity end;
+
+opaque symbol add_cong [a a' b b' : τ ι] :
+  π (a = a') → π (b = b') → π (a + b = a' + b') ≔
+begin assume a a' b b' ha hb; rewrite ha; rewrite hb; reflexivity end;
+
+opaque symbol leq_subst_l [a b : τ ι] :
+  π (a = b) → π (b ≤ 𝟎) → π (a ≤ 𝟎) ≔
+begin assume a b h hb; rewrite h; refine hb end;
+
 opaque symbol zero_add (x : τ ι) : π (𝟎 + x = x) ≔
 begin
   assume x; rewrite add_comm 𝟎 x; refine add_zero x

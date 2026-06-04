@@ -203,6 +203,17 @@ symbol AR3_1 (a : τ ι) [R : Prop]
   (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
   ≔ mk_1 (res_tm r) trust;
 
+// AR3'_1: bridged Res-chain AR3, for when PP's solver records the sub-premise
+// `𝟏 - a` in a different (neg-normalised) term order `r`.  The `¬(a≤𝟎) =
+// (𝟏-a≤𝟎)` step is the AR3 logical bridge (trusted, as in AR3_1); the
+// `(𝟏-a≤𝟎) = (r≤𝟎)` step is the real, emitter-supplied equality `eq : 𝟏-a=r`.
+symbol AR3'_1 (a r : τ ι) [R : Prop]
+  (eq : π (𝟏 - a = r))
+  (cont : Res ((r ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
+  ≔ mk_1 (res_tm cont)
+       (eq_trans trust
+          (eq_trans (imp_cong_l (leq_zero_eq eq)) (res_eq cont)));
+
 symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι) : Res ((E ≤ 𝟎) ⇒ R)
   ≔ mk_1 ⊤ trust;
 
