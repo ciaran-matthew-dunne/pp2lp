@@ -1,0 +1,1 @@
+Flag(FileOn("p31_impl_trans_3.res")) & Set(Valid.1 | Rule(Implication | ((p => q) & (q => r) & (r => s) => (p => s)) & _delta_p(p) & _delta_p(q) & _delta_p(r) & _delta_p(s) | ? | ? | (p => q) & (q => r) & (r => s) => (p => s) | nn))

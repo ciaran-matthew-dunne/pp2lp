@@ -1,0 +1,1 @@
+Flag(FileOn("sub9_inter_subset_dist.res")) & Set(Valid.1 | Rule(Implication | (u <: s & u <: t => u <: s /\ t) & _delta_e(u) & _delta_e(s) & _delta_e(t) | ? | ? | u <: s & u <: t => u <: s /\ t | nn))

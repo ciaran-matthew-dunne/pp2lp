@@ -1,0 +1,1 @@
+Flag(FileOn("a35_add_sub_cancel_l.res")) & Set(Valid.1 | Rule(Implication | ((y + x) - y = x) & _delta_e(y) & _delta_e(x) | ? | ? | (y + x) - y = x | nn))

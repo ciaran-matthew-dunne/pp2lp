@@ -1,0 +1,1 @@
+Flag(FileOn("p25_iff_to_impl.res")) & Set(Valid.1 | Rule(Implication | ((p <=> q) => (p => q) & (q => p)) & _delta_p(p) & _delta_p(q) | ? | ? | (p <=> q) => (p => q) & (q => p) | nn))

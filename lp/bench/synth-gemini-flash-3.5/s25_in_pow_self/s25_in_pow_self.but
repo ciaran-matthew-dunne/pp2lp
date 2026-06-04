@@ -1,0 +1,1 @@
+Flag(FileOn("s25_in_pow_self.res")) & Set(Valid.1 | Rule(Implication | (s: POW(s)) & _delta_e(s) | ? | ? | s: POW(s) | nn))

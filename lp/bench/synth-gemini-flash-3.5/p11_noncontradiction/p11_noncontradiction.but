@@ -1,0 +1,1 @@
+Flag(FileOn("p11_noncontradiction.res")) & Set(Valid.1 | Rule(Implication | (not(p & not(p))) & _delta_p(p) | ? | ? | not(p & not(p)) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("sub4_in_pow.res")) & Set(Valid.1 | Rule(Implication | (s: POW(t) <=> s <: t) & _delta_e(s) & _delta_e(t) | ? | ? | s: POW(t) <=> s <: t | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("s21_subset_trans_3.res")) & Set(Valid.1 | Rule(Implication | (s <: t & t <: u & u <: v => s <: v) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) | ? | ? | s <: t & t <: u & u <: v => s <: v | nn))

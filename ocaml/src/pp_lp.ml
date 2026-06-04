@@ -167,10 +167,20 @@ let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
   | Lift (Var "FAUX") | Lift (Var "FALSE") ->
     Buffer.add_string buf "\xe2\x8a\xa5" (* ⊥ *)
   | Lift (App (f, args)) ->
-    wrap buf (5 < min_bp) (fun () ->
-      pp_exp_args ~env buf args;
-      Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
-      pp_ident buf f)
+    if f = "_eql_set" || f = "eql_set" then
+      match args with
+      | [e1; e2] ->
+        wrap buf (5 < min_bp) (fun () ->
+          Buffer.add_string buf "eql_set ";
+          pp_exp ~min_bp:6 ~env buf e1;
+          Buffer.add_char buf ' ';
+          pp_exp ~min_bp:6 ~env buf e2)
+      | _ -> failwith "pp_lp: eql_set must have exactly 2 arguments"
+    else
+      wrap buf (5 < min_bp) (fun () ->
+        pp_exp_args ~env buf args;
+        Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
+        pp_ident buf f)
   | Lift (Var s) when List.mem_assoc s env ->
     pp_exp ~min_bp ~env buf (Var s)
   | Lift (Var s) ->

@@ -1,0 +1,1 @@
+Flag(FileOn("a19_double_neg_trans.res")) & Set(Valid.1 | Rule(Implication | (not(x <= y) => not(y <= z) => z <= x) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | not(x <= y) => not(y <= z) => z <= x | nn))

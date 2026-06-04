@@ -1,0 +1,1 @@
+Flag(FileOn("s20_subset_inter_r.res")) & Set(Valid.1 | Rule(Implication | (s /\ t <: t) & _delta_e(s) & _delta_e(t) | ? | ? | s /\ t <: t | nn))

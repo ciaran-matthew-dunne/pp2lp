@@ -1,0 +1,1 @@
+Flag(FileOn("p33_iff_sym.res")) & Set(Valid.1 | Rule(Implication | ((p <=> q) => (q <=> p)) & _delta_p(p) & _delta_p(q) | ? | ? | (p <=> q) => (q <=> p) | nn))

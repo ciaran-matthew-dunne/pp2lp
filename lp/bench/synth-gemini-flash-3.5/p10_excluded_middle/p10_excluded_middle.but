@@ -1,0 +1,1 @@
+Flag(FileOn("p10_excluded_middle.res")) & Set(Valid.1 | Rule(Implication | (p or not(p)) & _delta_p(p) | ? | ? | p or not(p) | nn))

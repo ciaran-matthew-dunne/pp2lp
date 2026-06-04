@@ -1,0 +1,1 @@
+Flag(FileOn("p38_and_or_dist.res")) & Set(Valid.1 | Rule(Implication | ((p & q) or r => (p or r) & (q or r)) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p & q) or r => (p or r) & (q or r) | nn))

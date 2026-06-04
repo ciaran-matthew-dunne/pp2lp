@@ -1,0 +1,1 @@
+Flag(FileOn("e11_eq_chain_5.res")) & Set(Valid.1 | Rule(Implication | (x1 = x2 & x2 = x3 & x3 = x4 & x4 = x5 => x1 = x5) & _delta_e(x1) & _delta_e(x2) & _delta_e(x3) & _delta_e(x4) & _delta_e(x5) | ? | ? | x1 = x2 & x2 = x3 & x3 = x4 & x4 = x5 => x1 = x5 | nn))

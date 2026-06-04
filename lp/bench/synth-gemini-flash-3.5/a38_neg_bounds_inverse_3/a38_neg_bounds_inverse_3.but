@@ -1,0 +1,1 @@
+Flag(FileOn("a38_neg_bounds_inverse_3.res")) & Set(Valid.1 | Rule(Implication | (0 <= x & 0 <= y & 0 <= z => 0 <= x + y + z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | 0 <= x & 0 <= y & 0 <= z => 0 <= x + y + z | nn))

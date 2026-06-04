@@ -1,0 +1,1 @@
+Flag(FileOn("p12_implication_conj.res")) & Set(Valid.1 | Rule(Implication | ((p => q & r) <=> ((p => q) & (p => r))) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p => q & r) <=> ((p => q) & (p => r)) | nn))

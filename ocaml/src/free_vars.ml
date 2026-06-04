@@ -6,7 +6,7 @@ type free_vars = { prop_vars: SS.t; exp_vars: SS.t }
 
 let empty_fv = { prop_vars = SS.empty; exp_vars = SS.empty }
 
-let reserved = SS.of_list ["VRAI"; "TRUE"; "FAUX"; "FALSE"]
+let reserved = SS.of_list ["VRAI"; "TRUE"; "FAUX"; "FALSE"; "_eql_set"; "eql_set"]
 
 let rec collect_exp_fv bound fv = function
   | Var s when SS.mem s bound || SS.mem s reserved -> fv

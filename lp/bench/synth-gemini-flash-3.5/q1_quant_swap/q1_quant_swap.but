@@ -1,0 +1,1 @@
+Flag(FileOn("q1_quant_swap.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: s & y: t => x,y: r) => !y.!x.(y: t & x: s => x,y: r)) & _delta_e(s) & _delta_e(t) & _delta_e(r) | ? | ? | !x.!y.(x: s & y: t => x,y: r) => !y.!x.(y: t & x: s => x,y: r) | nn))

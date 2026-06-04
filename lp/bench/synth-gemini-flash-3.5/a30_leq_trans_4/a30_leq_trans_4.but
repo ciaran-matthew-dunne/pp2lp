@@ -1,0 +1,1 @@
+Flag(FileOn("a30_leq_trans_4.res")) & Set(Valid.1 | Rule(Implication | (x <= y & y <= z & z <= w & w <= v => x <= v) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) & _delta_e(v) | ? | ? | x <= y & y <= z & z <= w & w <= v => x <= v | nn))

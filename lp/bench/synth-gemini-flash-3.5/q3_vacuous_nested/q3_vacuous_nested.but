@@ -1,0 +1,1 @@
+Flag(FileOn("q3_vacuous_nested.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => !y.(y: t => a: u))) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(u) | ? | ? | !x.(x: s => !y.(y: t => a: u)) | nn))

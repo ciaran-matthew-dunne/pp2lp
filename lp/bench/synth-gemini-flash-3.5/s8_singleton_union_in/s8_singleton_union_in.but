@@ -1,0 +1,1 @@
+Flag(FileOn("s8_singleton_union_in.res")) & Set(Valid.1 | Rule(Implication | (x: {x} \/ s) & _delta_e(x) & _delta_e(s) | ? | ? | x: {x} \/ s | nn))

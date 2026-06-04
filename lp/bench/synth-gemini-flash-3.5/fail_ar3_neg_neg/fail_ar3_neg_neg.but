@@ -1,0 +1,1 @@
+Flag(FileOn("fail_ar3_neg_neg.res")) & Set(Valid.1 | Rule(Implication | (!x.(not(1 - (-x) <= 0) => x <= 0)) | ? | ? | !x.(not(1 - (-x) <= 0) => x <= 0) | nn))

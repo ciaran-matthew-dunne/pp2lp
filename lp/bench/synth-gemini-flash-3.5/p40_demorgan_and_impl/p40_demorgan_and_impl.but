@@ -1,0 +1,1 @@
+Flag(FileOn("p40_demorgan_and_impl.res")) & Set(Valid.1 | Rule(Implication | (not(p & not(q)) <=> (p => q)) & _delta_p(p) & _delta_p(q) | ? | ? | not(p & not(q)) <=> (p => q) | nn))

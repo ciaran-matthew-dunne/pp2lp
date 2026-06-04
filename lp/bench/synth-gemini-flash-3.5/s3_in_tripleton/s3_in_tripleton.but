@@ -1,0 +1,1 @@
+Flag(FileOn("s3_in_tripleton.res")) & Set(Valid.1 | Rule(Implication | (z: {x,y,z}) & _delta_e(z) & _delta_e(x) & _delta_e(y) | ? | ? | z: {x,y,z} | nn))

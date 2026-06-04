@@ -1,0 +1,1 @@
+Flag(FileOn("e7_fun_nested_2.res")) & Set(Valid.1 | Rule(Implication | (f(g(h(x))) = y & h(x) = z & g(z) = w => f(w) = y) & _delta_e(f) & _delta_e(g) & _delta_e(h) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | f(g(h(x))) = y & h(x) = z & g(z) = w => f(w) = y | nn))

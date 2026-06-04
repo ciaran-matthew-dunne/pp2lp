@@ -1,0 +1,1 @@
+Flag(FileOn("p23_imply_to_or.res")) & Set(Valid.1 | Rule(Implication | ((p => q) => (not(p) or q)) & _delta_p(p) & _delta_p(q) | ? | ? | (p => q) => (not(p) or q) | nn))

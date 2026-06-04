@@ -1,0 +1,1 @@
+Flag(FileOn("p2_triple_neg.res")) & Set(Valid.1 | Rule(Implication | (not(not(not(p))) => not(p)) & _delta_p(p) | ? | ? | not(not(not(p))) => not(p) | nn))

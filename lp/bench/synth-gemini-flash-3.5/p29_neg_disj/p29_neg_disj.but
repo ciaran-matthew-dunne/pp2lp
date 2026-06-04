@@ -1,0 +1,1 @@
+Flag(FileOn("p29_neg_disj.res")) & Set(Valid.1 | Rule(Implication | (not(p) & not(q) => not(p or q)) & _delta_p(p) & _delta_p(q) | ? | ? | not(p) & not(q) => not(p or q) | nn))
