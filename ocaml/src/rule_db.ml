@@ -15,24 +15,43 @@ type kind = Con | Seq | Res
 (** [Arity slots]: the rule's argument-kind list. *)
 type arity = Arity of kind list
 
+(** How a rule's `refine` arguments are built.  This is the *single*
+    dispatch key the emitter ([Translate]) matches on, exhaustively — so
+    adding a constructor here forces a corresponding arm in the emitter
+    or the build fails (warning 8 is enabled).  Replaces the former
+    stringly-typed [emit_args] (e.g. ["dynamic:ar9"]), under which a
+    dangling tag silently fell through to a wrong default. *)
+type emit =
+  | Default        (* generic: one hole per derivation slot *)
+  | Trust_cons     (* every Con slot filled with `trust` (solver side-conditions) *)
+  | Hyp_search     (* find an in-scope hyp by goal-derived predicate (AXM1-6, EAXM1/2) *)
+  | Witness_hyp    (* find a (witness, hyp) pair, children dropped (AXM9, NRM19) *)
+  | Ins            (* universal-instantiation contradiction search *)
+  | And5
+  | Opr of bool    (* equality rewrite; [true] = right-to-left (OPR2) *)
+  | Axm8
+  | Nrm20 | Nrm21 | Nrm22 | Nrm23
+  | Ar3 | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
-  emit_args: string option;
+  emit: emit;                (* how to build the rule's refine arguments *)
   hoas_identity: bool;       (* rule is absorbed by LP's HOAS — skip in emit *)
   intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
+  binds_var: bool;           (* rule introduces a tuple binder via `assume` (ALL8) *)
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit_args=None) ?(hoas_identity=false)
-        ?(intro_antecedent=false) name arity =
+  let r ?(emit=Default) ?(hoas_identity=false)
+        ?(intro_antecedent=false) ?(binds_var=false) name arity =
     Hashtbl.replace t name
-      { arity = Some arity; emit_args; hoas_identity; intro_antecedent }
+      { arity = Some arity; emit; hoas_identity; intro_antecedent; binds_var }
   in
   let phantom name =
     Hashtbl.replace t name
-      { arity = None; emit_args = None;
-        hoas_identity = false; intro_antecedent = false }
+      { arity = None; emit = Default;
+        hoas_identity = false; intro_antecedent = false; binds_var = false }
   in
   let leaf   = Arity [] in
   let pass   = Arity [Seq] in
@@ -43,7 +62,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AND2" pass;
   r "AND3" pass;
   r "AND4" conj;
-  r "AND5" pass ~emit_args:(Some "dynamic:and5");
+  r "AND5" pass ~emit:And5;
   (* §A.2 Disjunction *)
   r "OR1" pass;
   r "OR2" conj;
@@ -64,16 +83,15 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NOT1" pass;
   r "NOT2" pass;
   (* §A.6 Axioms *)
-  let hyp = Some "dynamic:hyp" in
-  r "AXM1" leaf ~emit_args:hyp;
-  r "AXM2" leaf ~emit_args:hyp;
-  r "AXM3" leaf ~emit_args:hyp;
-  r "AXM4" leaf ~emit_args:hyp;
-  r "AXM5" leaf ~emit_args:hyp;
-  r "AXM6" leaf ~emit_args:hyp;
+  r "AXM1" leaf ~emit:Hyp_search;
+  r "AXM2" leaf ~emit:Hyp_search;
+  r "AXM3" leaf ~emit:Hyp_search;
+  r "AXM4" leaf ~emit:Hyp_search;
+  r "AXM5" leaf ~emit:Hyp_search;
+  r "AXM6" leaf ~emit:Hyp_search;
   r "AXM7" leaf;
-  r "AXM8" leaf ~emit_args:(Some "dynamic:axm8");
-  r "AXM9" leaf ~emit_args:(Some "dynamic:axm9");
+  r "AXM8" leaf ~emit:Axm8;
+  r "AXM9" leaf ~emit:Witness_hyp;
   (* §A.7 Universal quantification *)
   r "ALL1" pass ~hoas_identity:true;
   r "ALL2" pass ~hoas_identity:true;
@@ -81,8 +99,8 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ALL4" pass ~hoas_identity:true;
   r "ALL5" pass;
   r "ALL6" pass ~hoas_identity:true;
-  r "ALL7" branch ~emit_args:(Some "dynamic:all7");
-  r "ALL8" pass;
+  r "ALL7" branch;
+  r "ALL8" pass ~binds_var:true;
   r "ALL9" pass ~intro_antecedent:true;
   (* §A.8 Existential quantification *)
   r "XST1" pass ~hoas_identity:true;
@@ -94,7 +112,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "XST6" pass;
   r "XST61" pass;
   r "XST7" pass;
-  r "XST8" branch ~emit_args:(Some "dynamic:xst8");
+  r "XST8" branch;
   (* §A.9-11 VR/FX/STOP/INS *)
   r "VR1" leaf;
   r "VR2" pass;
@@ -104,7 +122,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "FX2" leaf;
   r "FX3" leaf;
   r "STOP" pass;
-  r "INS" pass;
+  r "INS" pass ~emit:Ins;
   (* §A.12 Normalisation *)
   r "NRM1" pass;
   r "NRM2" pass;
@@ -124,11 +142,11 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM16" leaf;
   r "NRM17" pass;
   r "NRM18" pass;
-  r "NRM19" pass ~emit_args:(Some "dynamic:nrm19");
-  r "NRM20" (Arity [Con; Seq]) ~emit_args:(Some "dynamic:nrm20");
-  r "NRM21" pass;
-  r "NRM22" pass ~emit_args:(Some "dynamic:nrm22");
-  r "NRM23" pass;
+  r "NRM19" pass ~emit:Witness_hyp;
+  r "NRM20" (Arity [Con; Seq]) ~emit:Nrm20;
+  r "NRM21" (Arity [Con; Seq]) ~emit:Nrm21;
+  r "NRM22" pass ~emit:Nrm22;
+  r "NRM23" pass ~emit:Nrm23;
   r "NRM24" pass;
   r "NRM25" pass;
   r "NRM26" pass;
@@ -138,16 +156,16 @@ let rules : (string, rule_info) Hashtbl.t =
   r "EVR3" pass;
   r "EVR4" leaf;
   r "EVR11" leaf;
-  r "EAXM1" leaf ~emit_args:hyp;
-  r "EAXM2" leaf ~emit_args:hyp;
+  r "EAXM1" leaf ~emit:Hyp_search;
+  r "EAXM2" leaf ~emit:Hyp_search;
   r "EAXM31" pass;
   r "EAXM32" pass;
   r "EIMP51" pass;
   r "EIMP52" pass;
   r "EAXM91" pass;
   r "EAXM92" pass;
-  r "OPR1" pass ~emit_args:(Some "dynamic:opr1");
-  r "OPR2" pass ~emit_args:(Some "dynamic:opr2");
+  r "OPR1" pass ~emit:(Opr false);
+  r "OPR2" pass ~emit:(Opr true);
   r "EQC1" pass;
   r "EQC2" pass;
   r "EQS1" pass;
@@ -160,28 +178,28 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ECTR6" leaf;
   (* §A.14 Arithmetic *)
   r "AR1" pass;
-  r "AR2" (Arity [Con]) ~emit_args:(Some "trust");
-  r "AR3" pass ~emit_args:(Some "dynamic:ar3");
+  r "AR2" (Arity [Con]) ~emit:Trust_cons;
+  r "AR3" pass ~emit:Ar3;
   r "AR3_F" pass ~hoas_identity:true;
-  r "AR4" leaf ~emit_args:(Some "dynamic:ar4");
-  r "AR5" pass ~emit_args:(Some "dynamic:ar56");
-  r "AR6" pass ~emit_args:(Some "dynamic:ar56");
-  r "AR7" pass ~emit_args:(Some "dynamic:ar78");
-  r "AR8" pass ~emit_args:(Some "dynamic:ar78");
-  r "AR9" pass ~emit_args:(Some "dynamic:ar9");
-  r "AR10" (Arity [Con; Seq]) ~emit_args:(Some "dynamic:ar10");
+  r "AR4" leaf ~emit:Ar4;
+  r "AR5" pass ~emit:Ar5_6;
+  r "AR6" pass ~emit:Ar5_6;
+  r "AR7" pass ~emit:Ar7_8;
+  r "AR8" pass ~emit:Ar7_8;
+  r "AR9" pass ~emit:Ar9;
+  r "AR10" (Arity [Con; Seq]) ~emit:Ar10;
   r "AR11" leaf;
   r "AR12" pass ~intro_antecedent:true;
-  r "AR13" (Arity [Con; Con; Seq]) ~emit_args:(Some "trust trust");
+  r "AR13" (Arity [Con; Con; Seq]) ~emit:Trust_cons;
   (* §A.15 Boolean *)
   r "BOOL11" pass;
   r "BOOL12" pass;
   r "BOOL21" pass;
   r "BOOL22" pass;
-  r "BOOL31" (Arity [Con; Seq]) ~emit_args:(Some "trust");
-  r "BOOL32" (Arity [Con; Seq]) ~emit_args:(Some "trust");
-  r "BOOL41" (Arity [Con; Seq]) ~emit_args:(Some "trust");
-  r "BOOL42" (Arity [Con; Seq]) ~emit_args:(Some "trust");
+  r "BOOL31" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "BOOL32" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "BOOL41" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "BOOL42" (Arity [Con; Seq]) ~emit:Trust_cons;
   r "BOOL51" leaf;
   r "BOOL52" leaf;
   (* Phantom entries *)
@@ -224,11 +242,17 @@ let base_of name =
   if is_primed_name s then String.sub s 0 (String.length s - 2)
   else s
 
+(* NRM family: the one rule group PP leaves *unprimed* inside a first-
+   normalisation chain, so the emitter must add the `_1` Res form itself
+   (see [Translate.chain_emit_name]).  Kept here so the name test lives
+   with the other suffix/family classifiers, not inlined in translate.ml. *)
+let is_nrm name =
+  let b = base_of name in
+  String.length b >= 3 && String.sub b 0 3 = "NRM"
+
 let lookup name = Hashtbl.find_opt rules (base_of name)
 
 (* --- Lookup helpers ------------------------------------------------ *)
-
-let is_known name = lookup name <> None
 
 let is_phantom name =
   match lookup name with
@@ -269,11 +293,14 @@ let slots name =
   | Some { arity = None; _ } -> []
   | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
 
-let emit_args name =
-  match lookup name with Some r -> r.emit_args | None -> None
+(** The rule's emit strategy (defaults to [Default] for unknown names,
+    which never reach the emitter — phantoms are filtered earlier). *)
+let emit name =
+  match lookup name with Some r -> r.emit | None -> Default
 
 let lookup_flag f name =
   match lookup name with Some r -> f r | None -> false
 
 let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
 let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
+let binds_var = lookup_flag (fun r -> r.binds_var)

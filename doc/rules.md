@@ -70,7 +70,7 @@ not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 
 | Rule | Antecedents | Consequent | Result | LP type | Status | Notes |
 |------|-------------|------------|--------|---------|--------|-------|
-| IMP4' | (H, P ⊢ Q) ⇝ R | H ⊢ P ⇒ Q | P ⇒ R | `Res Q → Res (P ⇒ Q)` | proved | `IMP4_1` in `lp/rules/Res.lp`. |
+| IMP4' | (H, P ⊢ Q) ⇝ R | H ⊢ P ⇒ Q | P ⇒ R | `Res Q → Res (P ⇒ Q)` | proved | `IMP4_1` in `lp/rules/Impl.lp`. |
 
 ## A.4 Equivalence — `lp/rules/Equiv.lp`
 
@@ -118,9 +118,9 @@ not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 
 | Rule | Antecedents | Consequent | Result | LP type | Status | Notes |
 |------|-------------|------------|--------|---------|--------|-------|
-| ALL7' † | x not free in H; (H ⊢ P) ⇝ R; (H ⊢ (♢x·R) ⇒ Q) ⇝ S | H ⊢ (∀x·P) ⇒ Q | S | ``(ρ : Π v : Tuple n, Res (P v)) → Res ((`♢ v, res_tm (ρ v)) ⇒ Q) → Res ((`!! v, P v) ⇒ Q)`` | proved | `ALL7_1` in `lp/rules/Res.lp`; depends on `!!_cong` and `♢_eq_!!`. |
-| ALL8' † | x not free in H; (H ⊢ P) ⇝ Q | H ⊢ ∀x·P | ∀x·Q | ``(ρ : Π v : Tuple n, Res (P v)) → Res (`!! v, P v)`` | proved | `ALL8_1` in `lp/rules/Res.lp`. |
-| ALL9' | (H, (∀x·P) ⊢ Q) ⇝ R | H ⊢ (♡x·P) ⇒ Q | (∀x·P) ⇒ R | `Res Q → Res (H ⇒ Q)` | proved | `ALL9_1` in `lp/rules/Res.lp`. |
+| ALL7' † | x not free in H; (H ⊢ P) ⇝ R; (H ⊢ (♢x·R) ⇒ Q) ⇝ S | H ⊢ (∀x·P) ⇒ Q | S | ``(ρ : Π v : Tuple n, Res (P v)) → Res ((`♢ v, res_tm (ρ v)) ⇒ Q) → Res ((`!! v, P v) ⇒ Q)`` | proved | `ALL7_1` in `lp/rules/All.lp`; depends on `!!_cong` and `♢_eq_!!`. |
+| ALL8' † | x not free in H; (H ⊢ P) ⇝ Q | H ⊢ ∀x·P | ∀x·Q | ``(ρ : Π v : Tuple n, Res (P v)) → Res (`!! v, P v)`` | proved | `ALL8_1` in `lp/rules/All.lp`. |
+| ALL9' | (H, (∀x·P) ⊢ Q) ⇝ R | H ⊢ (♡x·P) ⇒ Q | (∀x·P) ⇒ R | ``Res Q → Res ((`♡ v, P v) ⇒ Q)`` | proved | `ALL9_1` in `lp/rules/All.lp`. |
 
 ## A.8 Existential quantification — `lp/rules/Xst.lp`
 
@@ -135,7 +135,7 @@ not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 | XST6 | H ⊢ ∀x·¬P | H ⊢ ¬(∃x·P) | ``π (`!! v, ¬ (P v)) → π (¬ (`?? v, P v))`` | proved | |
 | XST61 | H ⊢ ∀x·P | H ⊢ ¬(∃x·¬P) | ``π (`!! v, P v) → π (¬ (`?? v, ¬ (P v)))`` | proved | |
 | XST7 † | x not free in R; H ⊢ ∀x·(P ⇒ R) | H ⊢ (∃x·P) ⇒ R | ``π (`!! v, P v ⇒ R) → π ((`?? v, P v) ⇒ R)`` | proved | |
-| XST8 † | x not free in H; (H ⊢ ¬P) ⇝ R; H ⊢ (∀x·R) ⇒ FAUX | H ⊢ ∃x·P | ``(ρ : Π v : Tuple n, Res (¬ (P v))) → π ((`!! v, res_tm (ρ v)) ⇒ ⊥) → π (`?? v, P v)`` | proved | Result-based form via `XST8_1` Res chain in `lp/rules/Res.lp`. The continuation uses `!!` (spec writes ∀, not ♢). |
+| XST8 † | x not free in H; (H ⊢ ¬P) ⇝ R; H ⊢ (∀x·R) ⇒ FAUX | H ⊢ ∃x·P | ``(ρ : Π v : Tuple n, Res (¬ (P v))) → π ((`!! v, res_tm (ρ v)) ⇒ ⊥) → π (`?? v, P v)`` | proved | Result-based form via `XST8_1` Res chain in `lp/rules/Xst.lp`. The continuation uses `!!` (spec writes ∀, not ♢). |
 
 ## A.9 True / False — `lp/rules/TrueFalse.lp`
 
@@ -157,7 +157,7 @@ not-impl               NRM27, NRM28, NRM29, NRM29_1, NRM30, NRM30_1
 
 | Rule | Antecedents | Consequent | Result | LP type | Status | Notes |
 |------|-------------|------------|--------|---------|--------|-------|
-| STOP' | *(none)* | H ⊢ P | P | `Res P` | proved | `STOP_1` in `lp/rules/Res.lp` — Res-leaf identity. |
+| STOP' | *(none)* | H ⊢ P | P | `Res P` | proved | `STOP_1` in `lp/rules/TrueFalse.lp` — Res-leaf identity. |
 
 ## A.11 INS — `lp/rules/TrueFalse.lp`
 

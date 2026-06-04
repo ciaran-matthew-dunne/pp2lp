@@ -123,8 +123,3 @@ let prd_to_pp p =
   let buf = Buffer.create 256 in
   prd_to_pp_buf buf p;
   Buffer.contents buf
-
-let exp_to_pp e =
-  let buf = Buffer.create 64 in
-  exp_to_pp_buf ~parent_prec:0 buf e;
-  Buffer.contents buf

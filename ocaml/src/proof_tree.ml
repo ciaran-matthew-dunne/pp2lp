@@ -21,14 +21,9 @@ type pp_tree =
       (* 1-indexed line in the .replay file this node's rule came from,
          carried for provenance comments in the emitted Lambdapi. *)
       src_line: int;
-      (* For branching rules (ALL7/XST8): the FIN annotation that
-         follows in the replay.  Records what `res_tm` the result
-         chain produces — the term the continuation will see. *)
-      fin_hint: rhs option;
     }
 
 exception Bad_replay of string
-exception Bad_replay_partial of string * pp_tree list
 
 let bad fmt = Printf.ksprintf (fun s -> raise (Bad_replay s)) fmt
 
@@ -78,16 +73,13 @@ let rec skip_phantoms = function
     skip_phantoms rest
   | lines -> lines
 
-let make_node ?(fin_hint=None) ~src_line rule arg anno children =
-  Apply { rule; arg; anno = Some anno; children; src_line; fin_hint }
+let make_node ~src_line rule arg anno children =
+  Apply { rule; arg; anno = Some anno; children; src_line }
 
 let pop_res rule stack =
   match stack with
   | [] ->
-    raise (Bad_replay_partial
-             (Printf.sprintf "%s expected a result-chain child but stack is empty"
-                rule,
-              []))
+    bad "%s expected a result-chain child but stack is empty" rule
   | x :: rest -> x, rest
 
 let pop_res_children rule modes stack =
@@ -121,9 +113,42 @@ let rec parse_prefix mode lines =
 and parse_prefix_children lines = function
   | [] -> [], lines
   | mode :: modes ->
-    let child, lines = parse_prefix mode lines in
+    let child, lines =
+      if mode = Res_mode then
+        parse_one_res_tree lines
+      else
+        parse_prefix mode lines
+    in
     let children, lines = parse_prefix_children lines modes in
     child :: children, lines
+
+and parse_one_res_tree lines =
+  parse_res_tree_stack [] lines
+
+and parse_res_tree_stack stack lines =
+  match skip_phantoms lines with
+  | [] ->
+    (match stack with
+     | [root] -> root, []
+     | _ -> bad "unexpected end of result-chain child proof")
+  | (((rule, _), _, _) :: _) as lines when is_base_branch rule ->
+    (match stack with
+     | [root] -> root, lines
+     | _ -> bad "base branch reached but result-chain child stack is invalid")
+  | ((rule, arg), anno, line) :: rest when is_res_rule rule ->
+    let arity = Rule_db.rule_arity rule in
+    if arity > List.length stack then
+      (match stack with
+       | [root] -> root, lines
+       | _ -> bad "postfix rule %s cannot be applied, stack size is %d" rule (List.length stack))
+    else
+      let modes = child_modes Res_mode rule in
+      let children, stack = pop_res_children rule modes stack in
+      let node = make_node ~src_line:line rule arg anno children in
+      parse_res_tree_stack (node :: stack) rest
+  | lines ->
+    let node, rest = parse_prefix Res_mode lines in
+    parse_res_tree_stack (node :: stack) rest
 
 and parse_branch_seq lines =
   debug_replayf "parse_branch_seq";
@@ -133,15 +158,8 @@ and parse_branch_seq lines =
     if skip_phantoms rest = [] then
       bad "%s replay branch has no sequent continuation after its result-chain"
         rule;
-    (* The first FIN after a branching rule describes the `res_tm` the
-       chain supplies — the form the continuation will work with via
-       the res_eq equality.  Capture for tree-display purposes. *)
-    let fin_hint = match rest with
-      | (((r, _), fin_anno, _) :: _) when r = "FIN" -> Some fin_anno
-      | _ -> None
-    in
     let cont, rest = parse_prefix Seq_mode rest in
-    make_node ~fin_hint ~src_line:line rule arg anno [chain; cont], rest
+    make_node ~src_line:line rule arg anno [chain; cont], rest
   | [] ->
     bad "result-chain proof was not followed by ALL7/XST8 in replay"
   | line :: _ ->
@@ -155,11 +173,7 @@ and parse_res_until_base_branch stack lines =
      | [root] -> root, []
      | [] -> bad "empty result-chain proof in replay"
      | xs ->
-       raise (Bad_replay_partial
-                (Printf.sprintf
-                   "result-chain replay ended with %d nodes on stack"
-                   (List.length xs),
-                 xs)))
+       bad "result-chain replay ended with %d nodes on stack" (List.length xs))
   | (((rule, _), _, _) :: _) as lines when is_base_branch rule ->
     debug_replayf "parse_res stop at %s with %d stack nodes"
       rule (List.length stack);
@@ -168,11 +182,8 @@ and parse_res_until_base_branch stack lines =
      | [] ->
        bad "%s expected a result-chain child but none was parsed" rule
      | xs ->
-       raise (Bad_replay_partial
-                (Printf.sprintf
-                   "%s reached with %d result-chain nodes on stack (expected 1)"
-                   rule (List.length xs),
-                 xs)))
+       bad "%s reached with %d result-chain nodes on stack (expected 1)"
+         rule (List.length xs))
   | ((rule, arg), anno, line) :: rest when is_res_rule rule ->
     debug_replayf "parse_res postfix %s with %d stack nodes"
       rule (List.length stack);
@@ -194,104 +205,8 @@ let build_replay (rules : (lhs * rhs * int) list) : pp_tree =
   match skip_phantoms rest with
   | [] -> root
   | xs ->
-    raise (Bad_replay_partial
-             (Printf.sprintf "replay left %d unconsumed rule lines"
-                (List.length xs),
-              []))
+    bad "replay left %d unconsumed rule lines" (List.length xs)
 
 let build = build_replay
 
-let rule_of     (Apply { rule; _ })     = rule
-let arg_of      (Apply { arg; _ })      = arg
-let anno_of     (Apply { anno; _ })     = anno
-let children_of (Apply { children; _ }) = children
-
-let debug = ref false
-
-(* Render an annotation: the goal at this point in the proof. *)
-let rhs_to_pp = function
-  | Simple p -> Emit_pp.prd_to_pp p
-  | Fin (norm, _, _, _) -> Printf.sprintf "FIN→ %s" (Emit_pp.prd_to_pp norm)
-
-(* Like rhs_to_pp but strips the "FIN→ " prefix from FIN annotations —
-   used when composing equalities from FIN-supplied terms. *)
-let rhs_to_term = function
-  | Simple p -> Emit_pp.prd_to_pp p
-  | Fin (norm, _, _, _) -> Emit_pp.prd_to_pp norm
-
-(* Label a child by its parent's slot kind.  Both labels use the same
-   trailing-parens style: `(equality)` for the result chain (its node
-   is the equality it derives), `(continuation)` for the sequent
-   subproof. *)
-let child_label_for parent_rule i =
-  let slots = Rule_db.slots parent_rule in
-  if not (Rule_db.is_branching parent_rule) then ""
-  else match List.nth_opt slots i with
-  | Some Rule_db.Res -> " (equality)"
-  | Some Rule_db.Seq -> " (continuation)"
-  | _ -> ""
-
-(* Extract a node's annotation as a printable goal. *)
-let node_goal = function
-  | Apply { anno = Some r; _ } -> rhs_to_term r
-  | Apply { anno = None; _ } -> "?"
-
-(* Render a node as a flat Lisp-style proof term — the whole result
-   chain collapsed into one expression.  Arguments are dropped. *)
-let rec render_term = function
-  | Apply { rule; children; _ } ->
-    if children = [] then rule
-    else
-      let children_s =
-        List.map render_term children |> String.concat " "
-      in
-      Printf.sprintf "(%s %s)" rule children_s
-
-(* Tree visualization: nodes are GOALS; rules label the arrows.
-   Each node prints:
-     <prefix> goal
-     <indent>  | rule(arg)        ← the rule applied to this goal
-   Children render below as subgoals.
-   For a result-chain child of a branching rule (ALL7/XST8), its
-   "goal" is the equality `<chain top> = <res_tm>` — the equality the
-   chain derives for use by the continuation. *)
-let rec pp_tree ?(indent="") ?(last=true) ?(child_label="") ch node =
-  let prefix = if last then "+-- " else "|-- " in
-  let child_indent = indent ^ (if last then "    " else "|   ") in
-  match node with
-  | Apply { rule; anno; children; fin_hint; _ } ->
-    let goal_s = match anno with
-      | None -> "(no annotation)"
-      | Some r -> rhs_to_pp r
-    in
-    (* Goal node: `+-- goal (label)`.
-       Edge (rule applied here, points down to children): `rule ↓`.
-       Proof term (for collapsed result chains, proves goal above): `(term) ⊢`. *)
-    Printf.fprintf ch "%s%s%s%s\n" indent prefix goal_s child_label;
-    Printf.fprintf ch "%s%s ↓\n" child_indent rule;
-    let n = List.length children in
-    List.iteri (fun i c ->
-      let is_result_chain = i = 0 && Rule_db.is_branching rule in
-      let label = child_label_for rule i in
-      if is_result_chain then begin
-        (* Result chain: one node for the equality, one node for the
-           proof term that derives it. *)
-        let last_child = i = n - 1 in
-        let inner_prefix = if last_child then "+-- " else "|-- " in
-        let inner_indent = child_indent ^ (if last_child then "    " else "|   ") in
-        let eq_goal = match fin_hint with
-          | Some fin_anno ->
-            Printf.sprintf "%s = %s" (node_goal c) (rhs_to_term fin_anno)
-          | None -> node_goal c
-        in
-        Printf.fprintf ch "%s%s%s%s\n" child_indent inner_prefix eq_goal label;
-        Printf.fprintf ch "%s+-- %s\n" inner_indent (render_term c)
-      end else
-        pp_tree ~indent:child_indent ~last:(i = n - 1) ~child_label:label ch c
-    ) children
-
-let debug_tree label node =
-  if !debug then begin
-    Printf.eprintf "=== %s ===\n" label;
-    pp_tree ~indent:"" ~last:true stderr node
-  end
+let anno_of (Apply { anno; _ }) = anno

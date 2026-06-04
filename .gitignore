@@ -21,6 +21,8 @@ lp/bench/nrm_test/**/*.replay
 
 # Emitted/generated Lambdapi/PP files under the pp2lp package.
 lp/bench/**/*.lp
+# auto-generated lambdapi debug traces (<name>.lp.unif, <name>.lp.rewrite, …)
+lp/bench/**/*.lp.*
 lp/bench/**/*.lpo
 lp/bench/**/*.tmp
 lp/bench/**/*.goal

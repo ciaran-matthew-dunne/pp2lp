@@ -50,7 +50,8 @@ with pushl $x ($ys ∷ $y) ↪ (pushl $x $ys) ∷ $y;
 // n-ary conjunction.
 injective symbol ⋀ : 𝕃* o → Prop;
 notation ⋀ prefix 30;
-rule ⋀ (∎ ∷ $p) ↪ $p;
+rule ⋀ (∎ ∷ $p) ↪ $p
+with ⋀ ($ps ∷ ⊤) ↪ ⋀ $ps;
 
 // TODO. make non-sequential.
 sequential symbol ⋀_snoc : Prop → Prop → Prop;

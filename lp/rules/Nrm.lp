@@ -55,9 +55,17 @@ begin
 end;
 
 // NRM5: H ⊢ ♢x · (P ∧ Q ⇒ R) ⇒ S → H ⊢ ♢x · (P ⇒ Q ⇒ R) ⇒ S
-symbol NRM5 [n] [P Q R : Tuple n → Prop] [S : Prop]
+// Uncurry: `⋀_snoc (P v) (Q v)` reduces to `⋀ (∎ ∷ P v ∷ Q v)`, so the
+// hypothesis splits with `⋀₂_hd`/`⋀₂_snd` to feed the curried body.
+opaque symbol NRM5 [n] [P Q R : Tuple n → Prop] [S : Prop]
   : π ((`♢ v, ⋀_snoc (P v) (Q v) ⇒ R v) ⇒ S)
-  → π ((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S);
+  → π ((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S) ≔
+begin
+  assume n P Q R S h1 h2;
+  refine h1 (pi_to_♢ (λ v, ⋀_snoc (P v) (Q v) ⇒ R v)
+    (λ v hpq, ♢_to_pi (λ v', P v' ⇒ Q v' ⇒ R v') h2 v
+                (⋀₂_hd hpq) (⋀₂_snd hpq)))
+end;
 
 // NRM6: H ⊢ ♢x · (R ⇒ P) ⇒ (♢x · (R ⇒ Q) ⇒ S) → H ⊢ ♢x · (R ⇒ P ∧ Q) ⇒ S
 // Generalised over a snoc list: the consequent `⋀ (qs v ∷ P v)` splits into
@@ -145,10 +153,9 @@ opaque symbol NRM10 [n] [Ps : Tuple n → 𝕃* o] [Q : Tuple n → Prop] [R : P
   : π ((`♡ v, ¬ ⋀ (Ps v ∷ Q v)) ⇒ R)
   → π ((`♢ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥) ⇒ R) ≔
 begin
-  admit;
-  //assume n P Q R h1 h2;
-  //refine h1 (pi_to_♡ (λ v, ¬ ⋀ (∎ ∷ P v ∷ Q v))
-  //  (λ v hpq, ♢_to_pi (λ v', ⋀ (∎ ∷ P v' ∷ Q v') ⇒ ⊥) h2 v hpq))
+  assume n Ps Q R h1 h2;
+  refine h1 (pi_to_♡ (λ v, ¬ ⋀ (Ps v ∷ Q v))
+    (λ v hpq, ♢_to_pi (λ v', ⋀ (Ps v' ∷ Q v') ⇒ ⊥) h2 v hpq))
 end;
 
 // NRM11: H ⊢ ♡x · ¬(⊤ ∧ P) ⇒ R → H ⊢ ♢x · (P ⇒ ⊥) ⇒ R
@@ -288,27 +295,21 @@ end;
 // same here.  Before relying on NRM21/23, obtain a triggering trace and re-derive
 // the shape from it; the emitter still emits a bare `refine NRM2{1,3} _` (no E),
 // which will fail loudly rather than silently mis-prove.
-opaque symbol NRM21 [n] [P : Tuple (+1 n) → Prop] [Q : Prop] (E : τ ι)
-  : π ((`♡ y : Tuple n, ¬ (P (y ⨾ E))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n),
-         ¬ ⋀ (∎ ∷ P v ∷ (E = prj 0 v))) ⇒ Q) ≔
+opaque symbol NRM21 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
+  (heq : Π v', π (popl (ps v') = (E = prj 0 v')))
+  : π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔
 begin
-  assume n P Q E h1 h2;
-  refine h1 (pi_to_♡ (λ y, ¬ (P (y ⨾ E)))
-    (λ y hpy,
-      ♡_to_pi (λ v, ¬ ⋀ (∎ ∷ P v ∷ (E = prj 0 v))) h2 (y ⨾ E)
-        (⋀₂_intro hpy (eq_refl E))))
+  assume n ps Q E heq hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E)))
+    (λ v' hp,
+      ♡_to_pi (λ v, ¬ ⋀ (ps v)) hbig (v' ⨾ E)
+        (⋀_pop_intro (ps (v' ⨾ E))
+          (=⇒ (eq_sym (heq (v' ⨾ E))) (eq_refl E))
+          hp)))
 end;
 
 // NRM22: simpler unary version of NRM20 (no extra y-binder).
-//
-// Per the *replays* (not the spec): NRM22 is always fed by NRM14, whose output
-// is `⋀_snoc ⊤ (x = E)` — a *literal* ⊤ head, not an abstract body P.  The
-// earlier `¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (prj 0 v = E))` form forced Lambdapi to solve
-// `?P (prj 0 v) ≡ ⊤` by higher-order unification, which it strands as a
-// deferred constraint (the metavar survives → "missing subproofs").  Pinning
-// the head to ⊤ makes the antecedent match first-order; the premise is then
-// exactly VR1's `¬ ⊤ ⇒ Q`.
 opaque symbol NRM22 [Q : Prop] (E : τ ι)
   : π (¬ ⊤ ⇒ Q)
   → π ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E))) ⇒ Q) ≔
@@ -321,16 +322,16 @@ begin
 end;
 
 // NRM23: NRM22 with reversed equality.
-opaque symbol NRM23 [P : τ ι → Prop] [Q : Prop] (E : τ ι)
-  : π (¬ (P E) ⇒ Q)
+opaque symbol NRM23 [Q : Prop] (E : τ ι)
+  : π (¬ ⊤ ⇒ Q)
   → π ((`♡ v : Tuple 1,
-         ¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (E = prj 0 v))) ⇒ Q) ≔
+         ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v))) ⇒ Q) ≔
 begin
-  assume P Q E h1 h2;
-  refine h1 (λ hpe,
-    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ P (prj 0 v) ∷ (E = prj 0 v)))
+  assume Q E h1 h2;
+  refine h1 (λ ht,
+    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v)))
             h2 (unit ⨾ E)
-            (⋀₂_intro hpe (eq_refl E)))
+            (⋀₂_intro ht (eq_refl E)))
 end;
 
 // ---- NRM24-26: Trivial structural rules ----
@@ -348,36 +349,27 @@ end;
 // NRM25: x not free in P; H ⊢ P → H ⊢ ♡(x) · P
 //   = forall2(x).P in PP notation. `pi_to_♡` with constant predicate
 //   (the body doesn't depend on the bound tuple).
-opaque symbol NRM25 [n] [P : Prop]
-  : π P → π (`♡ _ : Tuple n, P) ≔
+opaque symbol NRM25 [n] [P : Prop] [Q : Prop]
+  : π (P ⇒ Q)
+  → π ((`♡ _ : Tuple n, P) ⇒ Q) ≔
 begin
-  assume n P hp;
-  refine pi_to_♡ (λ _ : Tuple n, P) (λ _, hp)
+  assume n P Q hp h♡;
+  refine hp (♡_to_pi (λ _, P) h♡ (inh_tuple [n]))
 end;
 
 // NRM26: y not free in P; H ⊢ ♡(x,...) · P → H ⊢ ♡(x,y,...) · P
-//   = extend the binder with a y not appearing in P. The body
-//   ignores the new variable.
+// Helper: prepend an element to a Tuple n.
+symbol tuple_prepend [n] : τ ι → Tuple n → Tuple (+1 n);
+rule tuple_prepend [0] $x unit ↪ unit ⨾ $x
+with tuple_prepend [+1 $n] $x ($w ⨾ $y) ↪ tuple_prepend [$n] $x $w ⨾ $y;
 
-// Helper: drop the last element of a Tuple (+1 n).
-symbol nrm26_drop_last [n] : Tuple (+1 n) → Tuple n;
-rule nrm26_drop_last [$n] ($w ⨾ _) ↪ $w;
-
-// Helper: produce P (drop_last v) from a per-tuple-n proof of P.
-//   Stays !!-typed so the rewrite rule fires; rule body transports
-//   from ♡ via `♡_eq_!!`.
-symbol nrm26_drop_proof [n] (P : Tuple n → Prop)
-  : π (`!! w, P w)
-  → Π v : Tuple (+1 n), π (P (nrm26_drop_last v));
-rule nrm26_drop_proof [$n] $P $h ($w ⨾ _) ↪ !!_to_pi $P $h $w;
-
-opaque symbol NRM26 [n] [P : Tuple n → Prop]
-  : π (`♡ v, P v)
-  → π (`♡ v : Tuple (+1 n), P (nrm26_drop_last v)) ≔
+opaque symbol NRM26 [n] [P : Tuple (+1 n) → Prop] [Q : Prop]
+  : π ((`♡ v' : Tuple n, P (tuple_prepend 𝟎 v')) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔
 begin
-  assume n P h;
-  refine pi_to_♡ (λ v : Tuple (+1 n), P (nrm26_drop_last v))
-    (nrm26_drop_proof P (=⇒ (♡_eq_!! P) h))
+  assume n P Q hp h♡;
+  refine hp (pi_to_♡ (λ v', P (tuple_prepend 𝟎 v'))
+    (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_prepend 𝟎 v')))
 end;
 
 // ---- NRM27-30: Arithmetic solver dispatch ----

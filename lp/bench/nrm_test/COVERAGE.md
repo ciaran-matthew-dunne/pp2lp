@@ -11,7 +11,7 @@ Regenerate + check:
 
 ```
 pp2lp gen nrm_test    # (re)build .but/.trace/.replay (PP/REPLAY via krt)
-pp2lp run nrm_test    # emit + check; capped deviation gate
+pp2lp run nrm_test    # emit + check; strict gate (child-process capped)
 ```
 
 Coverage is measured emit-side with the engine's `rules` command
@@ -20,8 +20,8 @@ Coverage is measured emit-side with the engine's `rules` command
 
 ## Status (20 / 26 implemented rules triggered)
 
-`✓` a goal triggering it type-checks · `✗` triggered but baselined in
-expected_fail.txt · `—` no goal triggers it here.
+`✓` a goal triggering it type-checks · `✗` triggered but doesn't type-check yet
+· `—` no goal triggers it here.
 
 | Rule | Status | Representative goal | Note |
 |------|--------|---------------------|------|
@@ -51,7 +51,7 @@ expected_fail.txt · `—` no goal triggers it here.
 | NRM24 | — | — | TRUE-strip optimisation; PP keeps `¬(⊤ ∧ P)` instead |
 | NRM25 | — | — | vacuous `♡`-binder intro (self-proof drops it via NRM1) |
 | NRM26 | ✗ | `!x.!y.(x: s => y: t => x: s)` | binder extension; `res_tm` chain |
-| NRM27–30 | — | — | arithmetic solver; not in `rule_db` (not-impl). `x: NAT` goals are `xfail/` (OOM). |
+| NRM27–30 | — | — | arithmetic solver; not in `rule_db` (not-impl). `x: NAT` goals run but OOM (RLIMIT_AS-capped). |
 
 ## Not yet triggered — why
 
@@ -65,9 +65,9 @@ expected_fail.txt · `—` no goal triggers it here.
 - **NRM27–30** — arithmetic-solver normalisation; not implemented in `rule_db`
   and not reached by the `≤`/`NAT` goals tried.
 
-## Baselined failures (expected_fail.txt)
+## Failing rows
 
 The `✗` rows above fail `lambdapi check` for reasons *separate* from the NRM
 rule under test — chiefly the ConjList/Res `res_tm STOP_1` incompleteness shared
-with synth, and the unverified NRM21/23 emit. They're baselined so the suite is
-a green deviation gate that flips to red (prune-me) when a rule starts passing.
+with synth, and the unverified NRM21/23 emit. The gate is strict (no baseline):
+these count as real failures until the underlying rule support lands.

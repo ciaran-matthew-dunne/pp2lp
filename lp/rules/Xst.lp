@@ -217,7 +217,7 @@ symbol XST7_1 [n] [P : Tuple n → Prop] [R : Prop]
 // ((`!! v, res_tm (ρ v)) ⇒ ⊥).  The chain emitter supplies ρ under the
 // bound v, so ρ is non-trivial in general (not the identity the old
 // 1-argument form assumed).
-opaque symbol XST8_1 [n] [P : Tuple n → Prop]
+symbol XST8_1 [n] [P : Tuple n → Prop]
   (ρ : Π v : Tuple n, Res (¬ (P v)))
   (r : Res ((`!! v, res_tm (ρ v)) ⇒ ⊥)) : Res (`?? v, P v) ≔
 begin

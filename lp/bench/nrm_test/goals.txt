@@ -6,10 +6,9 @@
 # the NRM rules on the body's structure (spec §8.13–8.16).  The `→ NRMnn` notes
 # are the *intended* targets; actual coverage is measured with the engine's
 # `rules` command (kept in sync in COVERAGE.md).  This suite is a NRM
-# test/iteration harness:
-# goals that don't type-check yet are expected and baselined in expected_fail.txt.
+# test/iteration harness; goals that don't type-check yet just fail (strict gate).
 #
-# Format (shared with synth): name | kind | goal [| xfail]
+# Format (shared with synth): name | kind | goal
 
 # ── Vacuous predicates / set equality (NRM1) ──
 nrm1_subset_refl     | expr | s <: s
@@ -61,7 +60,7 @@ nrm2_const_ante      | expr | !x.(a: t => x: s)
 
 # ── Arithmetic (NRM27–30, not yet implemented) ──
 nrm_arith_leq        | expr | x <= x
-nrm_arith_nat        | expr | x: NAT | xfail
+nrm_arith_nat        | expr | x: NAT
 
 # ── Propositional sanity ──
 nrm_prop_impl        | prop | a => a
@@ -73,5 +72,5 @@ nrm24_neg_impl_atom  | expr | !x.not(x: s => x: t)
 nrm25_two_binder     | expr | !x.!y.(x: s => a: t)
 nrm11_disjoint       | expr | !x.(x: s => x: t => x: u => not(x: s))
 nrm_arith_antisym    | expr | !x.(x <= a => a <= x => x: s)
-nrm_arith_nat_zero   | expr | !x.(x: NAT => x <= x) | xfail
+nrm_arith_nat_zero   | expr | !x.(x: NAT => x <= x)
 nrm_arith_succ       | expr | !x.(x <= a => x <= a => x: s)

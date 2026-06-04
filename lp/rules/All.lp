@@ -174,7 +174,7 @@ symbol ALL6_1 [n] [P : Tuple n → Prop]
 // ALL7_1 (ALL7'): branching quantifier — per-tuple Res chain ρ +
 // continuation r. The continuation premise uses `♢`
 // (post-normalisation form per spec).
-opaque symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
+symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
   (ρ : Π v : Tuple n, Res (P v))
   (r : Res ((`♢ v, res_tm (ρ v)) ⇒ Q))
   : Res ((`!! v, P v) ⇒ Q) ≔
@@ -195,7 +195,8 @@ symbol ALL8_1 [n] [P : Tuple n → Prop]
   ≔ mk_1 (`!! v, res_tm (ρ v))
            (!!_cong (λ v, res_eq (ρ v)));
 
-// ALL9_1 (ALL9'): same shape as IMP4_1 — H ⇒ continuation.
-symbol ALL9_1 [H Q : Prop]
-  (r : Res Q) : Res (H ⇒ Q)
-  ≔ mk_1 (H ⇒ res_tm r) (imp_cong_r (res_eq r));
+// ALL9_1 (ALL9'): result-form ALL9 (♡-block removal), mapping to (∀x·P) ⇒ R.
+symbol ALL9_1 [n] [T : Tuple n → Prop] [Q : Prop]
+  (r : Res Q) : Res ((`♡ v, T v) ⇒ Q)
+  ≔ mk_1 ((`!! v, T v) ⇒ res_tm r)
+          (eq_trans (imp_cong_l (♡_eq_!! T)) (imp_cong_r (res_eq r)));

@@ -1,16 +1,25 @@
-open Syntax_pp
-
 type binder_ty = Tau_i
 
+(* A PP variable bound by an enclosing compound (n-ary) binder maps to its
+   (slot, tuple-var) so it renders as `prj slot tuple-var`.  Same shape
+   [Pp_lp] consumes as `~env`.  Carried on [Pred]/[Exp] so the formula is
+   rendered with the right projections at print time, not pre-rendered to a
+   string. *)
+type proj_env = (string * (int * string)) list
+
+(* A Lambdapi term argument.  Fully structured — there is no string escape
+   hatch.  A PP formula is carried as [Pred]/[Exp] with its [proj_env] and
+   handed to [Pp_lp] only when the printer runs. *)
 type term =
   | Hole
   | Trust
-  | Name of string
-  | Exp of exp
-  | Pred of prd
-  | App of string * term list
+  | Name of string                    (* an LP identifier *)
+  | App of term * term list           (* application (f a b …), parenthesised *)
+  | Expl of term                      (* @t — pass implicit arguments explicitly *)
   | Lambda of string * binder_ty option * term
-  | Raw of string
+  | Eq of term * term                 (* LP-level equality a = b *)
+  | Pred of proj_env * Syntax_pp.prd  (* a PP predicate, LP-encoded at print time *)
+  | Exp of proj_env * Syntax_pp.exp   (* a PP expression, LP-encoded at print time *)
 
 (* Provenance: where an emitted tactic came from in the replay.
    `rule` is the PP rule, `replay_line` its 1-indexed line in the
@@ -21,7 +30,7 @@ type term =
 type prov = { rule : string; replay_line : int; goal : string }
 
 type tactic =
-  | Refine of string * term list
+  | Refine of term * term list        (* refine head args — head is [Name]/[Expl] *)
   | Rewrite of { try_ : bool; rtl : bool; name : string }
 
 type t =
@@ -41,21 +50,16 @@ let rec pp_term buf = function
   | Hole -> Buffer.add_char buf '_'
   | Trust -> Buffer.add_string buf "trust"
   | Name name -> Buffer.add_string buf name
-  | Exp e ->
+  | App (head, args) ->
     Buffer.add_char buf '(';
-    Pp_lp.pp_exp buf e;
-    Buffer.add_char buf ')'
-  | Pred p ->
-    Buffer.add_char buf '(';
-    Pp_lp.pp_prd buf p;
-    Buffer.add_char buf ')'
-  | App (name, args) ->
-    Buffer.add_char buf '(';
-    Buffer.add_string buf name;
+    pp_term buf head;
     List.iter (fun arg ->
       Buffer.add_char buf ' ';
       pp_term buf arg) args;
     Buffer.add_char buf ')'
+  | Expl t ->
+    Buffer.add_char buf '@';
+    pp_term buf t
   | Lambda (name, ty, body) ->
     Buffer.add_string buf "(\xce\xbb "; (* λ *)
     Buffer.add_string buf name;
@@ -67,12 +71,25 @@ let rec pp_term buf = function
     Buffer.add_string buf ", ";
     pp_term buf body;
     Buffer.add_char buf ')'
-  | Raw s -> Buffer.add_string buf s
+  | Eq (a, b) ->
+    Buffer.add_char buf '(';
+    pp_term buf a;
+    Buffer.add_string buf " = ";
+    pp_term buf b;
+    Buffer.add_char buf ')'
+  | Pred (env, p) ->
+    Buffer.add_char buf '(';
+    Pp_lp.pp_prd ~env buf p;
+    Buffer.add_char buf ')'
+  | Exp (env, e) ->
+    Buffer.add_char buf '(';
+    Pp_lp.pp_exp ~env buf e;
+    Buffer.add_char buf ')'
 
 let pp_tactic buf = function
-  | Refine (rule, args) ->
+  | Refine (head, args) ->
     Buffer.add_string buf "refine ";
-    Buffer.add_string buf rule;
+    pp_term buf head;
     List.iter (fun arg ->
       Buffer.add_char buf ' ';
       pp_term buf arg) args

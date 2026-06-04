@@ -117,7 +117,7 @@ and pp_exp_args ?(env = []) buf = function
       Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
       pp_exp ~env buf e') rest;
     Buffer.add_char buf ')'
-  | [] -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 as fallback *)
+  | [] -> failwith "pp_exp_args: empty argument list (malformed App/Mem)"
 
 (* ---- Conjunction helpers ----
 
@@ -142,6 +142,23 @@ let rec conj_children_left = function
   | p -> [p]
 
 (* ---- Predicate pretty-printing (shallow encoding) ---- *)
+
+(* Shared header for an n-ary `Bind`: the quantifier symbol, the arity, the
+   LP tuple-variable name, and the env extended so each PP var maps to its
+   projection slot in that tuple.  Both the inline ([pp_prd]) and block
+   ([pp_prd_block]) printers wrap `(<qsym> <v_name> : Tuple <n>, <body>)`
+   around this — only the body layout differs. *)
+let binder_header binder xs env =
+  let qsym = match binder with
+    | Bang    -> "`!!"
+    | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
+    | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
+    | Exists  -> "`??"
+  in
+  let n = List.length xs in
+  let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
+  let env' = List.mapi (fun k x -> (x, (k, v_name))) xs @ env in
+  (qsym, n, v_name, env')
 
 let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
   match p with
@@ -204,17 +221,7 @@ let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
       pp_exp ~min_bp:6 ~env buf e)
   | Bind (binder, xs, body) ->
-    let qsym = match binder with
-      | Bang    -> "`!!"
-      | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
-      | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
-      | Exists  -> "`??"
-    in
-    let n = List.length xs in
-    let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
-    let env' =
-      List.mapi (fun k x -> (x, (k, v_name))) xs @ env
-    in
+    let qsym, n, v_name, env' = binder_header binder xs env in
     Buffer.add_char buf '(';
     Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';
@@ -239,76 +246,6 @@ and pp_conj_list ?(min_bp = bp_max) ?(env = []) buf elts =
     ) elts;
     Buffer.add_char buf ')';
     if need_wrap then Buffer.add_char buf ')'
-
-(* ---- ⋀ extraction/reconstruction ----
-   ⋀ (∎ ∷ P₀ ∷ P₁ ∷ … ∷ Pₙ₋₁)
-   Element k: peel (n-1-k) elements off the tail with ⋀_init, then take
-   the last with ⋀_last.  ⋀_init/⋀_last infer their list/elt implicits
-   from the argument's type.  Element 0 is special: ⋀_init^(n-1) bottoms at
-   ⋀ (∎ ∷ P₀), which the singleton-collapse rule reduces to P₀, so no
-   ⋀_last is applied. *)
-
-let rec emit_init_chain buf var j =
-  if j = 0 then Buffer.add_string buf var
-  else begin
-    Buffer.add_string buf "(\xe2\x8b\x80_init "; (* (⋀_init  *)
-    emit_init_chain buf var (j - 1);
-    Buffer.add_char buf ')'
-  end
-
-let emit_extract buf var conjs k =
-  let n = List.length conjs in
-  if k = 0 then
-    emit_init_chain buf var (n - 1)
-  else begin
-    Buffer.add_string buf "\xe2\x8b\x80_last "; (* ⋀_last  *)
-    emit_init_chain buf var (n - 1 - k)
-  end
-
-(* Build a proof of `π (⋀ (∎ ∷ e₀ ∷ … ∷ eₙ₋₁))` from element proofs.
-   Snoc left-fold bottoming in ⋀_nil_prf:
-   ⋀_intro (… (⋀_intro ⋀_nil_prf e₀) …) eₙ₋₁.  ⋀_intro's implicits are
-   inferred from the expected type.  A singleton needs no wrapping
-   (⋀ (∎ ∷ e) ≡ e). *)
-let rec emit_conj_rev buf = function
-  | [] -> Buffer.add_string buf "\xe2\x8b\x80_nil_prf" (* ⋀_nil_prf *)
-  | e :: rest ->
-    Buffer.add_string buf "(\xe2\x8b\x80_intro "; (* (⋀_intro  *)
-    emit_conj_rev buf rest;
-    Buffer.add_char buf ' ';
-    e buf;
-    Buffer.add_char buf ')'
-
-let emit_conj_from_elts buf (elts : (Buffer.t -> unit) list) =
-  match elts with
-  | [e] -> e buf
-  | _ -> emit_conj_rev buf (List.rev elts)
-
-let emit_and5_fwd buf var conjs ant_positions j =
-  let n = List.length conjs in
-  let elts = ref [] in
-  for k = 0 to n - 1 do
-    if k <> j then
-      elts := !elts @ [(fun buf ->
-        Buffer.add_char buf '(';
-        emit_extract buf var conjs k;
-        Buffer.add_char buf ')')]
-  done;
-  let ant_proof buf =
-    let ant_extractors = List.map (fun i buf ->
-      Buffer.add_char buf '(';
-      emit_extract buf var conjs i;
-      Buffer.add_char buf ')'
-    ) ant_positions in
-    emit_conj_from_elts buf ant_extractors
-  in
-  elts := !elts @ [(fun buf ->
-    Buffer.add_string buf "((";
-    emit_extract buf var conjs j;
-    Buffer.add_string buf ") ";
-    ant_proof buf;
-    Buffer.add_char buf ')')];
-  emit_conj_from_elts buf !elts
 
 (* ---- Block-formatted predicate printing ---- *)
 
@@ -348,17 +285,7 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
       Buffer.add_string buf "\xe2\x88\xa8 "; (* ∨ *)
       pp_prd_block ~min_bp:6 ~env ind buf p2)
   | Bind (binder, xs, body) ->
-    let qsym = match binder with
-      | Bang    -> "`!!"
-      | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
-      | Forall2 -> "`\xe2\x99\xa1" (* `♡ *)
-      | Exists  -> "`??"
-    in
-    let n = List.length xs in
-    let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
-    let env' =
-      List.mapi (fun k x -> (x, (k, v_name))) xs @ env
-    in
+    let qsym, n, v_name, env' = binder_header binder xs env in
     Buffer.add_char buf '(';
     Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';

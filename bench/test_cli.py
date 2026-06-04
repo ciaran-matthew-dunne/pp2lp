@@ -6,9 +6,7 @@ parseable provenance map.
 Run from the repo root:  python3 bench/test_cli.py
 Exit status is non-zero if any check fails.
 """
-import contextlib
 import importlib.machinery
-import io
 import subprocess
 import sys
 import tempfile
@@ -25,13 +23,6 @@ def check(name, cond):
     print(f"  {'ok  ' if cond else 'FAIL'}  {name}")
     if not cond:
         _fails.append(name)
-
-
-def capture(fn, *args):
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        fn(*args)
-    return buf.getvalue()
 
 
 def write_tmp(text, suffix):
@@ -59,36 +50,32 @@ check("join past the last → last", pp.join_prov(999, sm)["rule"] == "AXM4")
 # ── _distill: keep [tag] lines, drop the solve{} dump and crashes ───────────
 TRACE = ["debug +u", "[unif] solve {recompute=false;", "       metas={?1:...}",
          "[unif] solve A ≡ B", "[unif] failed", "Start checking foo.lp"]
-d = pp._distill(TRACE, raw_mode=False)
+d = pp._distill(TRACE)
 check("distill keeps the constraint", "[unif] solve A ≡ B" in d)
 check("distill keeps 'failed'", "[unif] failed" in d)
 check("distill drops the solve{} dump", not any("metas" in l or "recompute" in l for l in d))
 check("distill drops non-tag noise", not any("Start checking" in l for l in d))
-crash = pp._distill(["[infr] Uncaught [...Assertion failed]."], raw_mode=False)
+crash = pp._distill(["[infr] Uncaught [...Assertion failed]."])
 check("distill surfaces a lambdapi crash", any("internal error" in l for l in crash))
 
 # ── _clip ───────────────────────────────────────────────────────────────────
 check("clip leaves short strings", pp._clip("abc", 10) == "abc")
 check("clip truncates long strings", pp._clip("x" * 20, 10) == "x" * 9 + "…")
 
-# ── _print_lp_goals: panel shows GOALS, not just hypotheses ─────────────────
-MSG = ["Missing subproofs (0 for 2):", "h1: T", "h2: T", "-" * 40, "0. ?1 : A", "1. ?2 : B"]
-out = capture(pp._print_lp_goals, MSG, "")
-check("panel shows the goals", "0. ?1 : A" in out and "1. ?2 : B" in out)
-check("panel summarizes hypotheses", "2 hypotheses" in out)
-check("panel does not spew raw hyp lines", "h1: T" not in out)
-
 # ── _rule_signature: pull a rule's type from lp/rules/ ─────────────────────
+# _rule_signature returns (path, start_line, end_line) into lp/rules/*.lp.
 sig = pp._rule_signature("NRM14")
-check("rule_signature finds NRM14", sig is not None and "symbol NRM14" in sig[1] and sig[0].endswith(".lp"))
+check("rule_signature finds NRM14",
+      sig is not None and sig[0].suffix == ".lp"
+      and "symbol NRM14" in sig[0].read_text().splitlines()[sig[1] - 1])
 check("rule_signature strips a leading @", pp._rule_signature("@AR10") == pp._rule_signature("AR10"))
 
 # ── contract: the engine emits a CLEAN .lp + a parseable map ────────────────
 eng = ROOT / "ocaml" / "_build" / "default" / "bin" / "main.exe"
-rep = ROOT / "lp" / "bench" / "og" / "01.replay"
+rep = ROOT / "lp" / "bench" / "og" / "01" / "01.replay"
 if eng.exists() and rep.exists():
     mapfile = write_tmp("", ".provmap")
-    r = subprocess.run([str(eng), "emit", "--map", str(mapfile), "lp/bench/og/01.replay"],
+    r = subprocess.run([str(eng), "emit", "--map", str(mapfile), str(rep)],
                        cwd=ROOT, capture_output=True, text=True)
     m = pp.read_map(mapfile)
     mapfile.unlink()

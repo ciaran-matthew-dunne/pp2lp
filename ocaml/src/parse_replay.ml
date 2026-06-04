@@ -61,17 +61,31 @@ let parse_file (path : string) : replay =
   Fun.protect ~finally:(fun () -> close_in ic) (fun () ->
     let lines = ref [] in
     let lineno = ref 0 in
+    let current_line = ref "" in
+    let start_lineno = ref 0 in
     (try while true do
       incr lineno;
       let line = input_line ic in
       let t = trim line in
       if t = "" then ()
-      else if is_replay_line t then
-        (let (l, r) = parse_line t in
-         lines := (l, r, !lineno) :: !lines)
-      else
-        bad "unrecognised line %d in %s: %S" !lineno path line
+      else begin
+        if !current_line = "" then begin
+          if not (is_replay_line t) then
+            bad "unrecognised line %d in %s: %S" !lineno path line;
+          current_line := t;
+          start_lineno := !lineno
+        end else
+          current_line := !current_line ^ " " ^ t;
+        let curr = !current_line in
+        if String.length curr > 0 && curr.[String.length curr - 1] = '>' then begin
+          let (l, r) = parse_line curr in
+          lines := (l, r, !start_lineno) :: !lines;
+          current_line := ""
+        end
+      end
     done with End_of_file -> ());
+    if !current_line <> "" then
+      bad "unexpected end of file inside a replay line starting at line %d in %s" !start_lineno path;
     let rules = List.rev !lines in
     if rules = [] then bad "no rule lines in %s" path;
     { rules })

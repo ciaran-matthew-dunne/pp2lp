@@ -1,4 +1,3 @@
 (executable
- (public_name pp2lp)
  (name main)
  (libraries pp2lp))

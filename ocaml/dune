@@ -1,5 +1,8 @@
-; Project-wide compile flags: suppress warnings 8 (partial-match) and
-; 26 (unused-var) so the LSP isn't flooded while iterating. Applies
-; recursively to src/, bin/, test/.
+; Warnings.  Partial-match (8) is FATAL: the rule-dispatch match in
+; Translate must stay exhaustive — a missing case is exactly the bug
+; class the typed `Rule_db.emit` variant was introduced to prevent (a
+; dangling `dynamic:ar4` tag silently took a wrong default).  Unused-var
+; (26) stays a visible-but-non-fatal warning so iteration isn't blocked.
+; (The former blanket `-w -8-26` suppression hid both.)
 (env
- (_ (flags (:standard -w -8-26))))
+ (_ (flags (:standard -w +8+26 -warn-error +8))))

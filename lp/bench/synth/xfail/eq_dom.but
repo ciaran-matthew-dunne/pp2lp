@@ -1,1 +1,0 @@
-Flag(FileOn("eq_dom.res")) & Set(Valid.1 | Rule(Implication | (dom(f) = dom(f)) & _delta_e(f) | ? | ? | dom(f) = dom(f) | nn))
