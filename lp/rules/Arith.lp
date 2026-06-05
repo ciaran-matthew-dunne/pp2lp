@@ -50,6 +50,38 @@ begin
   assume x; simplify; rewrite neg_neg x; reflexivity
 end;
 
+// ---- AR3_F: PP's forward normalisation `¬(a ≤ 𝟎) ⟿ r ≤ 𝟎` (r = 𝟏−a) ----
+//
+// PP's solver rewrites `¬(a ≤ 𝟎)` to `r ≤ 𝟎` in place (the AR3_F replay
+// step), where `r` is its arithmetic-normalised form of `𝟏 − a`.  LP keeps
+// the literal `¬(a ≤ 𝟎)`, so the two views diverge at the consuming leaf.
+// These bridge the gap *ground* (after the binder is introduced — an
+// under-binder rewrite crashes Lambdapi's inference): `not_leq_of_sub1`
+// transports a hypothesis `𝟏 − a ≤ 𝟎` back to `¬(a ≤ 𝟎)` for an INS
+// witness; `ar3f_eq` is the propositional equality the goal-side consumer
+// (AXM7) transports along.  Both `1 − a ⟺ a > 𝟎 ⟺ ¬(a ≤ 𝟎)`, no `trust`.
+opaque symbol not_leq_of_sub1 (a : τ ι) : π (𝟏 - a ≤ 𝟎) → π (¬ (a ≤ 𝟎)) ≔
+begin
+  assume a h ha;
+  refine one_not_leq_zero (leq_trans 𝟏 a 𝟎 (leq_of_sub 𝟏 a h) ha)
+end;
+
+opaque symbol ar3f_eq (a r : τ ι) : π (𝟏 - a = r) → π ((¬ (a ≤ 𝟎)) = (r ≤ 𝟎)) ≔
+begin
+  assume a r eq;
+  rewrite left eq;
+  refine propExt _ _ _ _
+  { assume hna; refine sub_leq 𝟏 a (discrete a hna) }
+  { assume hsub; refine not_leq_of_sub1 a hsub }
+end;
+
+// AR3_F is *not* a single symbol: PP's forward normalisation rewrites a
+// `¬(a ≤ 𝟎)` occurrence in place, at an arbitrary binder-nested position.
+// The emitter (translate.ml `ar3f_cong`) builds the congruence proof for
+// that exact position by composing `imp_cong_l/r`, `not_cong`,
+// `conj_snoc_last_cong`, and `!!_cong` (recursing under the binder) down to
+// an `ar3f_eq` leaf, then transports the goal with `=⇒`.
+
 // AR4: F ≤ 0 in H; E + F > 0 (solver-confirmed) → H ⊢ E ≤ 0 ⇒ R
 // If E ≤ 0 and F ≤ 0 then E + F ≤ 0, contradicting E + F > 0.
 opaque symbol AR4 [E : τ ι] [R : Prop] (F : τ ι)

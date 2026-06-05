@@ -54,7 +54,7 @@ let metadata_extra_args rule =
      reach the generic path, so they need no metadata here. *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Hyp_search | Rule_db.Ins
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
-  | Rule_db.Ar3 | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10 -> []
+  | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10 -> []
 
 (* Holes for the rule's derivation slots; Con slots become `trust` for
    the [Trust_cons] strategy (solver-confirmed side conditions). *)
@@ -294,7 +294,7 @@ let tactic_for_rule ctx rule arg anno children =
     failwith "translate: AR7/AR8 unsupported — the solver witness (a in a + c = 𝟎) \
               is not recorded in the replay"
   | Rule_db.Hyp_search | Rule_db.Axm8   (* children <> [] — leaf rules, so unreached *)
-  | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar9
+  | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar9
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Ins ->
     (* And5/Opr/Ins expand to tree structure in the walker and never reach
        here as a plain tactic; the rest take generic slot args. *)

@@ -61,6 +61,16 @@ opaque symbol imp_cong_l [P P' Q : Prop]
   : π (P = P') → π ((P ⇒ Q) = (P' ⇒ Q)) ≔
 begin assume P P' Q h; rewrite h; reflexivity end;
 
+// Negation congruence.
+opaque symbol not_cong [A B : Prop]
+  : π (A = B) → π ((¬ A) = (¬ B)) ≔
+begin assume A B h; rewrite h; reflexivity end;
+
+// Snoc-list last-element congruence: rewrite the final conjunct of a `⋀`.
+opaque symbol conj_snoc_last_cong [ps : 𝕃* o] [P Q : Prop]
+  : π (P = Q) → π (⋀ (ps ∷ P) = ⋀ (ps ∷ Q)) ≔
+begin assume ps P Q h; rewrite h; reflexivity end;
+
 // Strip a known antecedent: π P → ((P ⇒ Q) = Q).
 opaque symbol imp_known_drop [P Q : Prop]
   : π P → π ((P ⇒ Q) = Q) ≔

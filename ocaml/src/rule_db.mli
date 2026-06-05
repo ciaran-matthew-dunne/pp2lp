@@ -23,7 +23,7 @@ type emit =
   | Opr of bool
   | Axm8
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
-  | Ar3 | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+  | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
 
 (** Metadata base name: strips primed/n-ary suffixes (FOO_1, FOO_3,
     FOO_1_3 ↦ FOO). *)

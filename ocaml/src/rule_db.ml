@@ -31,7 +31,7 @@ type emit =
   | Opr of bool    (* equality rewrite; [true] = right-to-left (OPR2) *)
   | Axm8
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
-  | Ar3 | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+  | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
 
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
@@ -190,7 +190,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AR1" pass;
   r "AR2" (Arity [Con]) ~emit:Trust_cons;
   r "AR3" pass ~emit:Ar3;
-  r "AR3_F" pass ~hoas_identity:true;
+  r "AR3_F" pass ~emit:Ar3_f;
   r "AR4" leaf ~emit:Ar4;
   r "AR5" pass ~emit:Ar5_6;
   r "AR6" pass ~emit:Ar5_6;

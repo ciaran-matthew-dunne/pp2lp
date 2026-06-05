@@ -25,6 +25,42 @@ let branch_binder_vars rule goal =
   | "XST8", Some g -> Option.value ~default:[] (binder_vars_of g)
   | _ -> []
 
+(* AR3_F congruence-path builder.  PP's forward normalisation rewrites a
+   `¬(a ≤ 𝟎)` occurrence to `r ≤ 𝟎` *in place*, wherever it sits in the
+   binder-nested goal.  Build the propositional-equality proof `goal = goal'`
+   for that exact position by recursing down to the occurrence, composing one
+   congruence lemma per connective on the path (`imp_cong_l/r`, `not_cong`,
+   `conj_snoc_last_cong`, `!!_cong` under a binder), terminating in `ar3f_eq`;
+   the caller transports the live goal with `=⇒`.  `env` renders binder-bound
+   vars as `prj k v` — compound NRM8/9 binders included, via the
+   `prj`-through-`take`/`drop` rules in Quant.lp.  None when the occurrence
+   isn't found on a supported path (caller then falls back to a no-op). *)
+let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
+  match prd with
+  | Unary (Not, Leq (a', Nat 0)) when a' = a_exp ->
+    Option.map
+      (fun eqpf -> L.App (L.Name "ar3f_eq",
+        [ L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf ]))
+      (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+  | Unary (Not, p) ->
+    Option.map (fun c -> L.App (L.Name "not_cong", [c]))
+      (ar3f_cong ctx env p a_exp r_exp)
+  | Binary (Imp, p, q) ->
+    (match ar3f_cong ctx env p a_exp r_exp with
+     | Some c -> Some (L.App (L.Name "imp_cong_l", [c]))
+     | None ->
+       Option.map (fun c -> L.App (L.Name "imp_cong_r", [c]))
+         (ar3f_cong ctx env q a_exp r_exp))
+  | Binary (And, _, last) ->
+    Option.map (fun c -> L.App (L.Name "conj_snoc_last_cong", [c]))
+      (ar3f_cong ctx env last a_exp r_exp)
+  | Bind (_, vars, body) ->
+    let v = fresh_x_local ctx in
+    let env' = List.mapi (fun k var -> (var, (k, v))) vars @ env in
+    Option.map (fun c -> L.App (L.Name "!!_cong", [L.Lambda (v, None, c)]))
+      (ar3f_cong ctx env' body a_exp r_exp)
+  | _ -> None
+
 let rec tree ctx node =
   match node with
   | P.Apply { rule; children = [c]; _ }
@@ -113,6 +149,25 @@ and default ctx rule arg anno children =
       | None -> tactic_for_rule ctx rule arg anno children
     in
     L.Then (tactic, tree ctx c)
+  | [c], Rule_db.Ar3_f ->
+    (* AR3_F: rewrite the `¬(a ≤ 𝟎)` occurrence to `r ≤ 𝟎` in place, at PP's
+       position.  Build the congruence proof `goal = goal'` for that exact
+       (binder-nested) occurrence and transport the live goal with `=⇒`; the
+       child then proves the normalised `goal'`.  `(a, r)` come from the
+       PipeArg.  Falls back to a no-op when the occurrence isn't on a
+       supported path or the `𝟏 − a = r` equality can't be built. *)
+    let tactic_opt =
+      match goal, arg with
+      | Some g, Some (PipeArg (a_exp, r_exp)) ->
+        Option.map
+          (fun cong ->
+            L.Refine (L.Name "=⇒", [L.App (L.Name "eq_sym", [cong]); L.Hole]))
+          (ar3f_cong ctx (proj_env_of_ctx ctx) (flatten_binds g) a_exp r_exp)
+      | _ -> None
+    in
+    (match tactic_opt with
+     | Some tactic -> L.Then (tactic, tree ctx c)
+     | None -> tree ctx c)
   | [c], Rule_db.Ar7_8 ->
     (* AR7/AR8.  The child IMP4 introduces the solver antisymmetry equality,
        recorded bare-variable-first (`b = a`); its sides give a (= rhs) and

@@ -70,6 +70,15 @@ with drop [+1 $n] [$m] ($v ⨾ _)   ↪ drop [$n] [$m] $v
 with take [0]      [_]  _         ↪ unit
 with take [+1 $n] [$m] ($v ⨾ $x)  ↪ take [$n] [$m] $v ⨾ $x;
 
+// `prj` commutes through `take`/`drop` even when `v` is abstract (the
+// rules above only fire on a concrete `_ ⨾ _`).  `take` keeps the low
+// (rightmost) indices unchanged; `drop` keeps the leftmost m, shifted up
+// by n.  This lets an NRM8/9-split compound binder's body project exactly
+// as a flat `Tuple (n ++ m)` would — `prj k v` — so emitter renderings
+// over the bound tuple need no take/drop awareness.
+rule prj $k (take [$n] [$m] $v) ↪ prj $k $v
+with prj $k (drop [$n] [$m] $v) ↪ prj ($n ++ $k) $v;
+
 // ---- `!!` n-ary universal --------------------------------------
 
 // Kept *rigid* (no reduction rules). If `!!` reduced eagerly to
