@@ -70,6 +70,9 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
     Buffer.add_string buf "\xf0\x9d\x9f\x8f";
     Buffer.add_char buf ')'
   | App (f, args) ->
+    (* PP writes the pair projections as `_pj1`/`_pj2`; the LP primitives (B.lp)
+       are `pj1`/`pj2` — map them, mirroring the `_eql_set` → `eql_set` case. *)
+    let f = match f with "_pj1" -> "pj1" | "_pj2" -> "pj2" | s -> s in
     Buffer.add_string buf "(eapp ";
     pp_ident buf f;
     Buffer.add_char buf ' ';

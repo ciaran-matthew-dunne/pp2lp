@@ -78,6 +78,12 @@ val proj_env_of_ctx : ctx -> Lp_tree.proj_env
    arithmetic-reorder/normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
+(* Proof of a single `≤ 𝟎` (or ⊤) leaf from the in-scope hyps: a direct
+   match (up to alpha / binder-kind) or, failing that, an arithmetic-reorder
+   bridge (`prove_sum_eq` + `leq_subst_l`).  [None] if no hyp covers it.
+   Used by the INS conjunct search and AR7/AR8's bound-inequality recovery. *)
+val leaf_evidence : ctx -> (string * exp) list -> prd -> Lp_tree.term option
+
 (* AXM9 / NRM19: a (witness term, hyp name) discharging the goal. *)
 val find_axm9_match : ctx -> prd -> (Lp_tree.term * string) option
 val find_nrm19_match : ctx -> prd -> (Lp_tree.term * string) option

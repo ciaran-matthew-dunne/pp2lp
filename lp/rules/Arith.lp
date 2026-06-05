@@ -89,10 +89,13 @@ end;
 // AR7: c+b ≤ 0 in H, a+c = 0, a−b ≤ 0 antecedent ⇒ a = b.
 // From a+c = 0: c = —a. So c+b ≤ 0 becomes —a+b = b−a ≤ 0, i.e. b ≤ a.
 // Combined with a−b ≤ 0 (i.e. a ≤ b), antisymmetry gives a = b.
+// hR's equality is stated `b = a` (not `a = b`): PP records the antisymmetry
+// equality bare-variable-first (e.g. `b = -1+a`), and the emitter feeds that
+// child directly into the `hR` slot, so the lemma must match that orientation.
 opaque symbol AR7 [a b : τ ι] (c : τ ι) [R : Prop]
   : π ((c + b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R))
+  → π ((b = a) ⇒ (((a - b) ≤ 𝟎) ⇒ R))
   → π (((a - b) ≤ 𝟎) ⇒ R) ≔
 begin
   assume a b c R hcb hac hR hab;
@@ -109,14 +112,15 @@ begin
     rewrite add_comm b c;
     refine hcb
   };
-  refine hR (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq)) hab
+  refine hR (eq_sym (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hab
 end;
 
 // AR8: dual to AR7 — a−b ≤ 0 in H, a+c = 0, c+b ≤ 0 antecedent ⇒ a = b.
+// `b = a` orientation, as for AR7 above.
 opaque symbol AR8 (a : τ ι) [b c : τ ι] [R : Prop]
   : π ((a - b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
-  → π ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
+  → π ((b = a) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
   → π (((c + b) ≤ 𝟎) ⇒ R) ≔
 begin
   assume a b c R hab hac hR hcb;
@@ -133,7 +137,7 @@ begin
     rewrite add_comm b c;
     refine hcb
   };
-  refine hR (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq)) hcb
+  refine hR (eq_sym (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hcb
 end;
 
 opaque symbol AR9 [E : τ ι] (F : τ ι) [R : Prop]

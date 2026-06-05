@@ -2,8 +2,11 @@
   open Parser
 }
 
+(* A leading '_' is significant: PP emits identifiers like `_eql_set`, `_pj1`
+   (handled by name in free_vars.ml / pp_lp.ml).  Without '_' in the start class
+   the lexer skipped it char-by-char (one "unexpected char '_'" warning each). *)
 let symbol =
-  ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '$']*
+  ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '0'-'9' '_' '$']*
 let digit = ['0'-'9']
 let natural = digit+
 

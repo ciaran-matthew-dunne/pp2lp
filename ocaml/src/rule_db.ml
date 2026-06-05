@@ -150,6 +150,16 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM24" pass;
   r "NRM25" pass;
   r "NRM26" pass;
+  (* Arithmetic-solver substitution: a conjunction holds [a + xᵢ ≤ 𝟎] and
+     [b − xᵢ ≤ 𝟎] with solveur(a + b) = 𝟎, forcing xᵢ = b; substitute
+     [xᵢ := b] and drop the binder.  NRM27/29 are the multi-binder (♡-block)
+     forms, NRM28/30 the unary (♡x) forms; 27/28 are the xᵢ = 𝟎 specialisation
+     (a = b = 𝟎).  PP leaves them unprimed in a first-normalisation chain, so
+     the emitter maps to the Res-typed `_N_1`/`_1` forms (see chain_emit_name). *)
+  r "NRM27" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "NRM28" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "NRM29" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "NRM30" (Arity [Con; Seq]) ~emit:Trust_cons;
   (* §A.13 Equality *)
   r "EVR1" leaf;
   r "EVR2" pass;

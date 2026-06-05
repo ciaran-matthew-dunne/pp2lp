@@ -58,6 +58,36 @@ check("distill drops non-tag noise", not any("Start checking" in l for l in d))
 crash = pp._distill(["[infr] Uncaught [...Assertion failed]."])
 check("distill surfaces a lambdapi crash", any("internal error" in l for l in crash))
 
+# ── _parse_goal_state: split a probe run into hyps + goal ────────────────────
+PROBE_OUT = ['Start checking "x.probe.lp"', "debug +u", "x: P", "hyp: Q",
+             "-" * 78, "0. ?4: Q", "[unif] solve P ≡ Q", "[unif] Unsolvable",
+             "[/tmp/x.probe.lp:7:0] ", "P", "is not unifiable with", "Q."]
+gs = pp._parse_goal_state(PROBE_OUT)
+check("goal_state pulls the hypotheses", gs["hyps"] == ["x: P", "hyp: Q"])
+check("goal_state strips the N. ?meta: goal prefix", gs["goals"] == ["Q"])
+check("goal_state skips the debug echo line", "debug +u" not in gs["hyps"])
+check("goal_state stops at the [tag]/[file] lines",
+      not any("unif" in h or "unifiable" in h for h in gs["hyps"] + gs["goals"]))
+# debug trace still distils from the same output
+check("distill coexists with the goal block",
+      pp._distill(PROBE_OUT) == ["[unif] solve P ≡ Q", "[unif] Unsolvable"])
+empty = pp._parse_goal_state(["nothing here", "no banner"])
+check("goal_state empty when no proof banner", empty == {"hyps": [], "goals": []})
+
+# ── _error_headline: drop the re-dumped goal state, flow the rest ────────────
+SUBPROOFS = "Missing subproofs (0 subproofs for 3 subgoals):\nx: τ ι\n" + "-" * 78 + "\n0. ?39: τ ι"
+check("error_headline keeps only the missing-subproofs head",
+      pp._error_headline(SUBPROOFS) == "Missing subproofs (0 subproofs for 3 subgoals):")
+check("error_headline flows a wrapped unification error",
+      pp._error_headline("A\nis not unifiable with\nB.") == "A is not unifiable with B.")
+check("error_headline leaves a colon-free message intact",
+      pp._error_headline("  unbound variable foo  ") == "unbound variable foo")
+
+# ── _collapse: fold identical lines into one with a (×N) count ──────────────
+col = pp._collapse(["w", "w", "w", "real error", "w"])
+check("collapse folds duplicates with a count", col == ["w  (×4)", "real error"])
+check("collapse leaves singletons untouched", pp._collapse(["a", "b"]) == ["a", "b"])
+
 # ── _clip ───────────────────────────────────────────────────────────────────
 check("clip leaves short strings", pp._clip("abc", 10) == "abc")
 check("clip truncates long strings", pp._clip("x" * 20, 10) == "x" * 9 + "…")

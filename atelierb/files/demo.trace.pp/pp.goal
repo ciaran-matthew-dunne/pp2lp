@@ -1,1 +1,0 @@
-﻿Flag(TraceOn("pp.trace")) & Flag(FileOn("pp.res")) & Set(foobar | (not(c = d) => a<+{b|->c}|>>{d} = a|>>{d}<+{b|->c}))

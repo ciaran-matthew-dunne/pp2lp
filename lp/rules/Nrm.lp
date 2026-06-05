@@ -374,14 +374,74 @@ end;
 
 // ---- NRM27-30: Arithmetic solver dispatch ----
 //
-// These rules encode arithmetic solver outputs. Their full encoding
-// requires arithmetic-solver infrastructure (see Arith.lp's solver
-// rules). Stubs for now.
+// PP's solver closes a universal hypothesis `♡(x₁,…,xₙ)·¬(P ∧ … ∧ Q)`
+// when the conjunction holds two bounding inequalities `a + xᵢ ≤ 𝟎` and
+// `b − xᵢ ≤ 𝟎` with `solveur(a + b) = 𝟎`: those force `xᵢ = b`, and the
+// substituted conjunction `[xᵢ := b](P ∧ … ∧ Q)` is satisfiable, so the
+// universal-of-negation is *false* and discharges the sequent.
 //
-// NRM27: (xᵢ ≤ 0) and (−xᵢ ≤ 0) in conjunction; R = [xᵢ := 0]…
-//   → ♢… · ¬R  ⊢  ♡(x₁,...,xₙ) · ¬(P ∧ ⋯ ∧ Q)
-// NRM28-30: variants with solver dispatch.
-// TODO: implement once Arith.lp solver rules are wired.
+// In LP this is an INS-style contradiction: the hypothesis is refuted at
+// the solver's witness point.  We instantiate the `♡`-binder at the
+// canonical zero tuple — the solver substitution evaluates there — and
+// take the witnessing conjunction proof `π (P 𝟎⃗)` as a solver-confirmed
+// side condition (`trust`, exactly as INS / AR2 arithmetic conjuncts do).
+// The continuation `h` is the (re-expanded `⊤`-normalised) child the
+// replay still records; the contradiction makes it vacuous.
+//
+//   NRM27 / NRM29 — multi-binder (♡-block) forms, drop one binder.
+//   NRM28 / NRM30 — unary (♡x) forms, drop the binder entirely.
+//   27/28 are the `xᵢ = 𝟎` specialisation (a = b = 𝟎) of 29/30.
+
+// Canonical all-zeros tuple — the solver witness point.  (`inh_tuple`
+// fills with the abstract `inh`; here we need the numeral 𝟎.)
+symbol zeros [n] : Tuple n;
+rule zeros [0]      ↪ unit
+with zeros [+1 $n]  ↪ zeros [$n] ⨾ 𝟎;
+
+// NRM29: multi-binder, general bounds.  Refute `♡v·¬(P v)` at 𝟎⃗.
+opaque symbol NRM29 [n] [P : Tuple (+1 n) → Prop] [G : Prop]
+  (hw : π (P (zeros [+1 n])))
+  (h  : π ((`♡ _ : Tuple n, ¬ ⊤) ⇒ G))
+  : π ((`♡ v : Tuple (+1 n), ¬ (P v)) ⇒ G) ≔
+begin
+  assume n P G hw h h♡;
+  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P v)) h♡ (zeros [+1 n]) hw)
+end;
+
+// NRM27: bare goal (no `⇒R`), `xᵢ = 𝟎` specialisation.  The goal
+// `♡v·¬(P v)` reduces to `♢v'·¬(R v')` where `R = [xᵢ := 𝟎]P` drops the
+// pinned binder.  `P v ⟹ R (drop v)` (the bounds force xᵢ = 𝟎) is the
+// solver-confirmed bridge; with it, `R` unsatisfiable ⟹ `P` unsatisfiable.
+// Untriggered in the corpus — stated to the spec shape, `bridge` `trust`ed.
+opaque symbol NRM27 [n] [P : Tuple (+1 n) → Prop] [R : Tuple n → Prop]
+  (bridge : Π v : Tuple (+1 n), π (P v) → π (R (drop [1] [n] v)))
+  (h : π (`♢ v' : Tuple n, ¬ (R v')))
+  : π (`♡ v : Tuple (+1 n), ¬ (P v)) ≔
+begin
+  assume n P R bridge h;
+  refine pi_to_♡ (λ v, ¬ (P v))
+    (λ v hp, ♢_to_pi (λ v', ¬ (R v')) h (drop [1] [n] v) (bridge v hp))
+end;
+
+// NRM30: unary binder, general bounds.  Drop the binder entirely.
+opaque symbol NRM30 [P : τ ι → Prop] [G : Prop]
+  (hw : π (P 𝟎))
+  (h  : π (¬ ⊤ ⇒ G))
+  : π ((`♡ v : Tuple 1, ¬ (P (prj 0 v))) ⇒ G) ≔
+begin
+  assume P G hw h h♡;
+  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P (prj 0 v))) h♡ (unit ⨾ 𝟎) hw)
+end;
+
+// NRM28: `x = 𝟎` specialisation of NRM30 (same shape, same proof).
+opaque symbol NRM28 [P : τ ι → Prop] [G : Prop]
+  (hw : π (P 𝟎))
+  (h  : π (¬ ⊤ ⇒ G))
+  : π ((`♡ v : Tuple 1, ¬ (P (prj 0 v))) ⇒ G) ≔
+begin
+  assume P G hw h h♡;
+  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P (prj 0 v))) h♡ (unit ⨾ 𝟎) hw)
+end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //

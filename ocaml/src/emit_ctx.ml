@@ -442,17 +442,73 @@ let rec normalize env e : ((exp * int) list * L.term) option =
      | None -> None)
   | _ -> None
 
-(* `π (e1 = e2)` for two `+`/`−` expressions that denote the same signed-atom
-   multiset; None if either is unsupported or the multisets differ.  Routes
-   both through [normalize] (— to leaves) then a permutation, via lfold(sorted). *)
+(* π (lfold l = lfold l') where l' is the SORTED list l with the adjacent
+   canceling pair at (k, k+1) — `(a,−1)` then `(a,+1)` — removed.  Cancels
+   `—a + a = 𝟎` (`neg_add`) in place, reassociating around the surrounding
+   `pre`/`suf`; mirrors [prove_eq_lnested]'s congL-the-suffix structure. *)
+let prove_cancel env l k : L.term =
+  let ex e = L.Exp (env, e) in
+  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+  let congL b p = L.App (L.Name "add_congL", [ ex b; p ]) in
+  let congR a p = L.App (L.Name "add_congR", [ ex a; p ]) in
+  let assoc a b c = L.App (L.Name "add_assoc", [ ex a; ex b; ex c ]) in
+  let a = fst (List.nth l k) in
+  let pre = List.filteri (fun i _ -> i < k) l in
+  let suf = List.filteri (fun i _ -> i > k + 1) l in
+  let neg_add_a = L.App (L.Name "neg_add", [ ex a ]) in          (* —a + a = 𝟎 *)
+  let fold_congL = List.fold_left (fun acc s -> congL (signed_exp s) acc) in
+  match pre with
+  | _ :: _ ->
+    (* (lfold pre + —a) + a = lfold pre, then congL the suffix back on. *)
+    let pf = lfold_exp pre in
+    let core = trans (assoc pf (Neg a) a)
+                 (trans (congR pf neg_add_a) (L.App (L.Name "add_zero", [ ex pf ]))) in
+    fold_congL core suf
+  | [] ->
+    (match suf with
+     | [] -> neg_add_a                                            (* —a + a = 𝟎 = lfold [] *)
+     | s0 :: rest ->
+       (* (—a + a) + s0 = s0, then congL the rest. *)
+       let s0e = signed_exp s0 in
+       let core = trans (congL s0e neg_add_a) (L.App (L.Name "zero_add", [ ex s0e ])) in
+       fold_congL core rest)
+
+(* Reduce a SORTED signed-atom list by cancelling adjacent `(a,−1),(a,+1)`
+   pairs (same-atom occurrences are contiguous once sorted, signs −1 before
+   +1), returning the reduced list and a proof `lfold l = lfold reduced`. *)
+let rec reduce_cancel env l : (exp * int) list * L.term =
+  let rec find i = function
+    | (x, sx) :: ((y, sy) :: _ as tl) ->
+      if x = y && sx + sy = 0 then Some i else find (i + 1) tl
+    | _ -> None
+  in
+  match find 0 l with
+  | None -> (l, L.App (L.Name "eq_refl", [ L.Exp (env, lfold_exp l) ]))
+  | Some k ->
+    let l' = List.filteri (fun i _ -> i <> k && i <> k + 1) l in
+    let p_step = prove_cancel env l k in
+    let r, p_rest = reduce_cancel env l' in
+    (r, L.App (L.Name "eq_trans", [ p_step; p_rest ]))
+
+(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
+   multiset *after additive cancellation* (`n + —n = 𝟎`); None if either is
+   unsupported or the reduced multisets differ.  Each side goes [normalize] (—
+   to leaves) → sort (a permutation) → [reduce_cancel] (drop ± pairs); the two
+   reduced+sorted lists are identical iff equal as multisets. *)
 let prove_sum_eq env e1 e2 : L.term option =
   match normalize env e1, normalize env e2 with
-  | Some (l1, p1), Some (l2, p2) when List.sort compare l1 = List.sort compare l2 ->
-    let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-    let sym p = L.App (L.Name "eq_sym", [ p ]) in
-    (* e1 = lfold l1 = lfold(sorted) = lfold l2 = e2 *)
-    Some (trans p1 (trans (prove_eq_lnested env l1)
-                     (sym (trans p2 (prove_eq_lnested env l2)))))
+  | Some (l1, p1), Some (l2, p2) ->
+    let r1, c1 = reduce_cancel env (List.sort compare l1) in
+    let r2, c2 = reduce_cancel env (List.sort compare l2) in
+    if r1 = r2 then
+      let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+      let sym p = L.App (L.Name "eq_sym", [ p ]) in
+      (* e1 = lfold l1 = lfold(sort l1) = lfold r1 = lfold r2
+            = lfold(sort l2) = lfold l2 = e2 *)
+      Some (trans p1 (trans (prove_eq_lnested env l1) (trans c1
+              (trans (sym c2)
+                (trans (sym (prove_eq_lnested env l2)) (sym p2))))))
+    else None
   | _ -> None
 
 (* A hyp `h_lhs ≤ 𝟎` that is a term-reordering of [lhs ≤ 𝟎]. *)
@@ -517,11 +573,52 @@ let find_ins_contradiction ctx =
        | None -> None)
     | _ -> None
   in
-  List.find_map (fun x ->
-    List.find_map (fun cand ->
-      List.find_map (try_candidate cand) ctx.hyps
-    ) (witness_candidates x)
-  ) ctx.xs
+  let single_attempt =
+    List.find_map (fun x ->
+      List.find_map (fun cand ->
+        List.find_map (try_candidate cand) ctx.hyps
+      ) (witness_candidates x)
+    ) ctx.xs
+  in
+  match single_attempt with
+  | Some _ as r -> r
+  | None ->
+    (* No single in-scope binder supplies a witness of the universal's arity.
+       PP's solver may have split the witness across binders — e.g. a
+       `forall2(x,y)` hyp discharged by a pair `(x$12, x$13)` drawn from two
+       separate 1-tuple binders.  Assemble composite N-tuples from the pool of
+       single-element witnesses (one `prj i x` per atom) and retry; [match_conj]
+       still demands a real hyp (or reorder proof) for every conjunct, so a
+       composite is only accepted when the contradiction genuinely holds. *)
+    let atoms =
+      List.concat_map (fun (x_name, x_pp_vars) ->
+        List.mapi (fun i pp -> (prj i (L.Name x_name), pp)) x_pp_vars) ctx.xs
+    in
+    let rec products n =
+      if n <= 0 then [ [] ]
+      else List.concat_map
+             (fun a -> List.map (fun rest -> a :: rest) (products (n - 1))) atoms
+    in
+    let build_witness atom_list =
+      (* The normalised body addresses PP binder var #i via the take/drop split
+         (NRM8/9): var #0 lands in the `take` slot, which `take`/`prj 0` resolve
+         to the *rightmost* tuple element (`prj 0 (… ⨾ x) ↪ x`), var #1 the
+         next-rightmost, etc.  So pp_vars[i] must sit at tuple position counted
+         from the right — i.e. fold the atoms in reversed order so pp_vars[0]
+         ends up rightmost.  [pp_vars] stays in PP-binder order for [match_conj]'s
+         env. *)
+      let tup = List.fold_left
+        (fun acc (e, _) -> L.App (L.Name "\xe2\xa8\xbe", [ acc; e ]))
+        (L.Name "unit") (List.rev atom_list) in
+      (tup, List.map snd atom_list)
+    in
+    List.find_map (fun (h_name, h_pred) ->
+      match ins_hyp_shape h_pred with
+      | Some (_, h_vars, _) when List.length h_vars >= 2 ->
+        List.find_map (fun atoms_n -> try_candidate (build_witness atoms_n) (h_name, h_pred))
+          (products (List.length h_vars))
+      | _ -> None
+    ) ctx.hyps
 
 (* Diagnostic for a failed [find_ins_contradiction], built from the same
    predicates the search uses so it reports exactly why no (hyp × witness)

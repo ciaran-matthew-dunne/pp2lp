@@ -1,4 +1,4 @@
-# synth-gemini-flash-3.5: Handcrafted, diverse verification goals
+# gemini: Handcrafted, diverse verification goals
 # Authored by Gemini 3.5 Flash to probe normalisation and translation.
 
 # ---- Propositional and Implication Chains ----

@@ -113,6 +113,38 @@ and default ctx rule arg anno children =
       | None -> tactic_for_rule ctx rule arg anno children
     in
     L.Then (tactic, tree ctx c)
+  | [c], Rule_db.Ar7_8 ->
+    (* AR7/AR8.  The child IMP4 introduces the solver antisymmetry equality,
+       recorded bare-variable-first (`b = a`); its sides give a (= rhs) and
+       b (= lhs).  AR7's bound hyp is `(c+b) = (b−a) ≤ 𝟎`, AR8's is `(a−b) ≤ 𝟎`
+       — recover it from scope (directly or term-reordered) as a real proof via
+       [leaf_evidence]; only the solver fact `a+c = 𝟎` is `trust`.  a/b/c are
+       inferred from that hyp proof and the goal, so the explicit value slot is
+       a hole, and the `hR` slot is filled by the child continuation.  If the
+       hyp isn't recoverable, fall through to the explicit AR7/AR8 failure. *)
+    (* AR7's bound hyp and explicit slot are `c`-shaped: `c + b ≤ 𝟎` with the
+       explicit value `c = —a`, so the proof must be in `(—a + b)` form to unify.
+       AR8's are `a`-shaped: `a − b ≤ 𝟎`, explicit `a` inferred from that proof. *)
+    let is_ar7 = base rule = "AR7" in
+    let hbound_and_val =
+      match goal_of_anno (P.anno_of c) with
+      | Some (Binary (Imp, Eq (lhs_e, rhs_e), _)) ->
+        let hyp_lhs, value =
+          if is_ar7 then AOp (Add, Neg rhs_e, lhs_e),
+                         L.Exp (proj_env_of_ctx ctx, Neg rhs_e)
+          else AOp (Sub, rhs_e, lhs_e), L.Hole
+        in
+        Option.map (fun hb -> (hb, value))
+          (leaf_evidence ctx [] (Leq (hyp_lhs, Nat 0)))
+      | _ -> None
+    in
+    (match hbound_and_val with
+     | Some (hb, value) ->
+       let tactic =
+         L.Refine (L.Name (base rule), [value; hb; L.Trust; L.Hole]) in
+       L.Then (tactic, tree ctx c)
+     | None ->
+       L.Then (tactic_for_rule ctx rule arg anno children, tree ctx c))
   | _, _ ->
     let tactic = tactic_for_rule ctx rule arg anno children in
     match children with

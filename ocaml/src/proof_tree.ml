@@ -184,6 +184,16 @@ and parse_res_until_base_branch stack lines =
      | xs ->
        bad "%s reached with %d result-chain nodes on stack (expected 1)"
          rule (List.length xs))
+  | ((rule, _), _, _) :: _ when stack = [] && is_res_rule rule
+                                && Rule_db.rule_arity rule > 0 ->
+    (* A well-formed result chain always begins with a leaf (STOP_1, a 0-ary
+       node, or a prefix subtree) to seed the stack.  If the very first node is
+       a postfix rule that needs children, the leaf subtree was dropped — this
+       is the REPLAY tool truncating the chain (it emits e.g. [AR12_1 AXM3_1
+       AXM3_1 AND4_1] before [IMP4_1 AR7_1 …] in the .trace but omits them from
+       the .replay).  Flag it as truncation so `pp2lp gen` drops the benchmark,
+       same as the dropped-continuation case — it can't be emitted. *)
+    bad "result-chain leaf missing before %s — REPLAY truncated the chain" rule
   | ((rule, arg), anno, line) :: rest when is_res_rule rule ->
     debug_replayf "parse_res postfix %s with %d stack nodes"
       rule (List.length stack);

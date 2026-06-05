@@ -37,7 +37,8 @@ EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "30"))     # engine em
 CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
 
 # ── Colour ─────────────────────────────────────────────────────────────────
-COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+IS_TTY = sys.stdout.isatty()
+COLOR = IS_TTY and not os.environ.get("NO_COLOR")
 
 
 def _c(code, t):
@@ -109,7 +110,7 @@ _ERROR_RULES = [
     (re.compile(r"unknown rule"),               "E_UNKNOWN_RULE"),
     (re.compile(r"unsupported arity"),          "E_ARITY"),
     (re.compile(r"arity \d+ unsupported"),      "E_DISPATCH"),
-    (re.compile(r"no sequent continuation"),    "E_REPLAY_TRUNCATED"),
+    (re.compile(r"no sequent continuation|REPLAY truncated"), "E_REPLAY_TRUNCATED"),
     (re.compile(r"INS contradiction"),          "E_INS"),
     (re.compile(r"tree-build error|unconsumed|expected a .*child"), "E_TREE_BUILD"),
     (re.compile(r"parse error|replay-line parse|unrecognised line"), "E_PARSE"),
@@ -161,6 +162,23 @@ def rel(p: Path) -> str:
     return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)
 
 
+def _collapse(lines: list[str]) -> list[str]:
+    """Fold runs of identical lines into one, annotated `… (×N)`, preserving
+    first-seen order — so a flood of identical lexer warnings reads as a single
+    line instead of burying the real message."""
+    counts: dict[str, int] = {}
+    for l in lines:
+        counts[l] = counts.get(l, 0) + 1
+    seen: set[str] = set()
+    out: list[str] = []
+    for l in lines:
+        if l in seen:
+            continue
+        seen.add(l)
+        out.append(f"{l}  (×{counts[l]})" if counts[l] > 1 else l)
+    return out
+
+
 def emit(replay: Path, out: Path) -> dict:
     """Emit the clean .lp (no comments) and read the side-channel provenance
     map.  Returns {ok, warnings, error|None, smap}."""
@@ -178,10 +196,19 @@ def emit(replay: Path, out: Path) -> dict:
             return {"ok": False, "warnings": [],
                     "error": {"code": "E_TIMEOUT",
                               "message": f"emit timed out after {EMIT_TIMEOUT:.0f}s"}}
-        warnings = [l[len("WARNING: "):] for l in r.stderr.splitlines() if l.startswith("WARNING: ")]
-        errors = [l for l in r.stderr.splitlines() if l and not l.startswith("WARNING: ")]
+        warns, errors = [], []
+        for l in r.stderr.splitlines():
+            if not l:
+                continue
+            if l.startswith("WARNING: "):
+                warns.append(l[len("WARNING: "):])
+            elif l[:8].lower() == "warning:":      # ocamllex lexer warnings (lowercase)
+                warns.append(l[8:].lstrip())
+            else:
+                errors.append(l)
+        warnings = _collapse(warns)
         if r.returncode != 0:
-            msg = "\n".join(errors) or r.stderr.strip()
+            msg = "\n".join(_collapse(errors)) or r.stderr.strip()
             code = classify_error(msg)
             return {"ok": False, "warnings": warnings,
                     "error": {"code": code, "message": msg}}
@@ -223,9 +250,10 @@ def diag_loc(ev: dict) -> tuple[str, int | None, int | None]:
 
 
 # ── Check one trace (emit + check + provenance join) ───────────────────────
-def check_one(replay: Path, lp_debug: str | None = None) -> dict:
+def check_one(replay: Path, lp_debug: str | None = None, want_probe: bool = True) -> dict:
     out = replay.with_suffix(".lp")
-    for stale in out.parent.glob(f"{out.stem}.lp.*"):   # clear last run's debug trace
+    for stale in (*out.parent.glob(f"{out.stem}.lp.*"),       # last run's debug trace
+                  *out.parent.glob(f"{out.stem}.probe.lp*")):  # and last run's probe
         stale.unlink(missing_ok=True)
     t0 = time.monotonic()
     em = emit(replay, out)
@@ -268,8 +296,10 @@ def check_one(replay: Path, lp_debug: str | None = None) -> dict:
                         "message": head[0] if head else "type-check failed",
                         "diagnostics": diags,
                         "raw": chk["raw"] if not errs else []}
-        if lp_debug:
-            _write_debug_trace(out, diags, lp_debug)
+        if want_probe and diags:
+            m = re.match(r".*:(\d+):", diags[0]["lp_loc"])
+            if m:
+                res["probe"] = build_probe(out, int(m.group(1)), lp_debug)
         return res
     res["status"] = "warn" if em["warnings"] else "ok"
     res["error"] = None
@@ -345,11 +375,23 @@ def _trace_style(t: str) -> str:
     return t if "≡" in t else dim(t)
 
 
+def _error_headline(msg: str) -> str:
+    """Condense a lambdapi diagnostic for the error panel.  `Missing subproofs (…):
+    <context> ──── 0. …` and kin re-print the goal state the window already shows —
+    keep only the headline up to the colon; otherwise flow the wrapped message to
+    one line."""
+    msg = (msg or "").strip()
+    head, sep, rest = msg.partition(":")
+    if sep and ("subproof" in head.lower() or re.search(r"-{4,}", rest)):
+        return f"{head.strip()}:"
+    return " ".join(msg.split())
+
+
 def print_failure(res: dict, replay: Path, indent: str = "   ", context: int = 2) -> None:
-    """The default failure window: a code snippet from each related file, headed
-    by its `filename:position` — the emitted .lp at the error line, the .replay
-    proof step that produced it, and the failing rule's lp/rules type signature.
-    `--lp-debug=CODE` adds a <name>.lp.debug lambdapi-trace snippet."""
+    """The default failure window: a code snippet from each related file, headed by
+    its `filename:position` — the <name>.probe.lp at the error line (with the goal
+    state lambdapi was in), the .replay step that produced it, and the failing
+    rule's lp/rules signature.  `--lp-debug=CODE` adds the cleaned lambdapi trace."""
     err = res.get("error") or {}
     diags = err.get("diagnostics", [])
     if not diags:                       # emit_fail / timeout / unstructured
@@ -368,10 +410,21 @@ def print_failure(res: dict, replay: Path, indent: str = "   ", context: int = 2
     # ── one snippet panel per related file, each headed by filename:position ──
     d0 = diags[0]
     prov0 = d0.get("provenance")
-    _section(d0["lp_loc"])                              # e.g. name.lp:23:4
-    m = re.match(r".*:(\d+):", d0["lp_loc"])
-    if m:
-        _print_source_context(ROOT / res["lp"], int(m.group(1)), indent, context)
+    probe = res.get("probe")
+    if probe:                                          # the .probe.lp snippet + goal state
+        _section(f"{Path(probe['path']).name}:{probe['fail_line']}")
+        _print_source_context(ROOT / probe["path"], probe["fail_line"], indent, context)
+        _section("goal state")
+        _print_goal_state(probe["goal_state"], indent)
+    else:                                              # no probe (e.g. -q): the bare .lp
+        _section(d0["lp_loc"])                          # e.g. name.lp:23:4
+        m = re.match(r".*:(\d+):", d0["lp_loc"])
+        if m:
+            _print_source_context(ROOT / res["lp"], int(m.group(1)), indent, context)
+    msg = _error_headline(d0.get("message"))           # what lambdapi said, minus any re-dumped state
+    if msg:
+        _section("lambdapi error")
+        print(f"{indent}  {red(_clip(msg, 300))}")
     if prov0:
         _section(f"{replay.name}:{prov0['replay_line']}")
         _print_source_context(replay, prov0["replay_line"], indent, 3)
@@ -386,11 +439,9 @@ def print_failure(res: dict, replay: Path, indent: str = "   ", context: int = 2
             print(f"{indent}  {dim('(symbol %s not found under lp/rules/)' % prov0['rule'])}")
     else:
         print(f"{indent}  {dim('(no PP rule maps to this line)')}")
-    lp = ROOT / res["lp"]
-    debug = lp.with_name(lp.name + ".debug")           # the --lp-debug probe trace
-    if debug.exists():
-        _section(debug.name)
-        _print_trace_file(debug, indent)
+    if probe and probe["debug_trace"]:                 # the --lp-debug trace, prettified
+        _section(f"debug +{probe['code']}")
+        _print_debug_trace(probe["debug_trace"], indent)
     if len(diags) > 1:
         more = len(diags) - 1
         print(f"{indent}  {dim('(+%d more lambdapi error%s)' % (more, '' if more == 1 else 's'))}")
@@ -412,55 +463,112 @@ def _distill(out: list) -> list[str]:
     return cleaned or ["(no debug activity captured for this code)"]
 
 
-def debug_probe(lp_path: Path, fail_line: int, code: str) -> list[str]:
-    """Turn lambdapi `debug +<code>;` on immediately before the failing tactic, run
-    lambdapi, and return the cleaned trace (scoped — only that tactic's activity,
-    since the proof errors there).  `code` is raw lambdapi flags (u/r/t/w/…)."""
+def _parse_goal_state(out: list[str]) -> dict:
+    """Pull the lambdapi proof state out of a probe run's output.  `print` emits the
+    context as `name: type` lines, a dashed separator, then goals `N. ?meta: type`;
+    with `debug +CODE` the `[tag] …` lines follow the goals.  Returns {hyps, goals}
+    (goals stripped of their `N. ?meta:` prefix)."""
+    hyps, goals, phase = [], [], None
+    for l in out:
+        t = l.strip()
+        if phase is None:                       # wait for the proof banner
+            if t.startswith("Start checking"):
+                phase = "hyps"
+            continue
+        if re.fullmatch(r"-{5,}", t):           # context │ goals separator
+            phase = "goals"
+            continue
+        if t.startswith("["):                   # [tag] debug or [file:…] error → done
+            break
+        if not t or re.fullmatch(r"debug [+-]\w+", t):
+            continue
+        (hyps if phase == "hyps" else goals).append(t)
+    goals = [re.sub(r"^\d+\.\s*(?:\?\w+\s*:\s*)?", "", g) for g in goals]
+    return {"hyps": hyps, "goals": goals}
+
+
+def build_probe(lp_path: Path, fail_line: int, code: str | None) -> dict | None:
+    """Copy the emitted `.lp` to a persisted, re-checkable `<stem>.probe.lp` with
+    `print;` (and `debug +<code>;` when given) spliced *into* the failing tactic
+    line, run lambdapi once, and capture both the proof state and — when a debug
+    code is set — the cleaned `[tag]` trace.  The splice keeps the line number
+    (so provenance still maps); print_failure surfaces the probe in place of the
+    bare `.lp`."""
     lines = lp_path.read_text(encoding="utf-8").splitlines()
     i = fail_line - 1
     if not (0 <= i < len(lines)):
-        return []
-    # Inject `debug +code;` *into* the failing line, after any leading whitespace
-    # and subgoal-opener `{`s, so it lands at a valid tactic position — a bare
-    # `debug …;` line before a `{`-opener is a lambdapi syntax error.  No matching
-    # `-code;` is needed: the proof errors at this tactic, nothing after it runs.
-    pre = re.match(r"\s*(?:\{\s*)*", lines[i]).group(0)
-    injected = f"{pre}debug +{code}; {lines[i][len(pre):]}"
-    probe_lines = lines[:i] + [injected] + lines[i + 1:]
-    probe = lp_path.with_name(lp_path.stem + "_dbg.lp")
-    probe.write_text("\n".join(probe_lines) + "\n", encoding="utf-8")
+        return None
+    tac = (f"debug +{code}; " if code else "") + "print;"
+    # A "proof is not finished" error is reported at the `end` terminator: the
+    # tactics all *succeeded*, but a goal is left open.  `print` there is a syntax
+    # error — step back to the last real tactic and splice `print` *after* it (the
+    # tactic isn't failing; we want the goals that remain once it has run).  For a
+    # genuine failing tactic, `print` goes *before* it, to show the goal it faces.
+    after = lines[i].lstrip().startswith(("end", "abort", "admitted")) or not lines[i].strip()
+    while i >= 0 and (not lines[i].strip()
+                      or lines[i].lstrip().startswith(("end", "abort", "admitted"))):
+        i -= 1
+    if i < 0:
+        return None
+    if after:                                  # ` … tactic; print; } }` (before the close-braces)
+        m = re.match(r"(.*?)(\s*(?:\}\s*)+)$", lines[i])
+        if m and m.group(1).strip():
+            lines[i] = f"{m.group(1).rstrip().rstrip(';')}; {tac}{m.group(2)}"
+        else:                                  # only braces on this line — fall back to before
+            after = False
+    if not after:                              # `{ … print; tactic …` (after openers, before tactic)
+        pre = re.match(r"\s*(?:\{\s*)*", lines[i]).group(0)
+        lines[i] = f"{pre}{tac} {lines[i][len(pre):]}"
+    fail_line = i + 1                          # the line we actually probed
+    probe = lp_path.with_name(lp_path.stem + ".probe.lp")
+    probe.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
         r = _run_lambdapi(["--no-colors", "-w", str(probe)])
         out = (r.stdout + r.stderr).splitlines()
     except subprocess.TimeoutExpired:
-        out = ["(debug probe timed out)"]
-    finally:
-        for p in (probe, probe.with_suffix(".lpo")):
-            try:
-                p.unlink()
-            except OSError:
-                pass
-    return _distill(out)
+        out = ["(probe timed out)"]
+    probe.with_suffix(".lpo").unlink(missing_ok=True)   # keep the .probe.lp source only
+    return {"path": rel(probe), "fail_line": fail_line, "code": code,
+            "goal_state": _parse_goal_state(out),
+            "debug_trace": _distill(out) if code else []}
 
 
-def _write_debug_trace(lp: Path, diags: list, code: str) -> None:
-    """Run the scoped `debug +<code>` probe at the located failure and write its
-    cleaned trace to `<name>.lp.debug` (gitignored); print_failure surfaces it."""
-    if not diags:
+def _print_goal_state(gs: dict, indent: str) -> None:
+    """Prettify the lambdapi proof state: the hypotheses as an aligned `name : type`
+    table, a turnstile rule separating them from the goals, then each goal — the
+    focused one (goal 0) flagged with a bold `▶`, the rest dim and numbered."""
+    hyps, goals = gs.get("hyps", []), gs.get("goals", [])
+    if not hyps and not goals:
+        print(f"{indent}  {dim('(goal state unavailable — see the .probe.lp)')}")
         return
-    m = re.match(r".*:(\d+):", diags[0]["lp_loc"])
-    if not m:                          # no line to scope a probe to
+    pairs = [(h.split(":", 1)[0].strip(), h.split(":", 1)[1].strip() if ":" in h else "")
+             for h in hyps]
+    w = max((len(n) for n, _ in pairs), default=0)
+    for n, typ in pairs:
+        print(f"{indent}  {bold(f'{n:<{w}}')} {dim(':')} {_clip(typ, 500)}")
+    print(f"{indent}  {dim('─' * min(48, max(12, _TERM_W - len(indent) - 4)))}")  # context │ goals
+    if not goals:
+        print(f"{indent}  {green('(no remaining goals)')}")
         return
-    trace = debug_probe(lp, int(m.group(1)), code)
-    lp.with_name(lp.name + ".debug").write_text("\n".join(trace) + "\n", encoding="utf-8")
+    if len(goals) == 1:                                  # the sole goal — no index needed
+        print(f"{indent}{bold('▶ ⊢')} {_clip(goals[0], 500)}")
+        return
+    for k, g in enumerate(goals):                        # several goals — number them all,
+        mark = bold("▶") if k == 0 else " "              # flag goal 0 (the focused one)
+        body = f"{k}. ⊢ {_clip(g, 500)}"
+        print(f"{indent}{mark} {body if k == 0 else dim(body)}")
 
 
-def _print_trace_file(path: Path, indent: str) -> None:
-    """Render the debug trace as a full, untruncated numbered snippet — the failure
-    line(s) marked with `>` and styled red, `≡` constraints plain, the rest dim."""
-    lines = path.read_text(encoding="utf-8").splitlines()
-    hot = {k + 1 for k, t in enumerate(lines) if any(h in t for h in _TRACE_HOT)}
-    _numbered(lines, 1, indent, mark=hot, color=_trace_style, clip=None)
+def _print_debug_trace(lines: list[str], indent: str) -> None:
+    """Prettify the distilled `debug` trace: drop the `[tag]` prefix into a dim
+    label, style the body (red for a failure, plain for an `≡` constraint, dim
+    otherwise).  Full width, untruncated."""
+    for l in lines:
+        m = re.match(r"\[([a-z]+)\]\s*(.*)", l)
+        if m:
+            print(f"{indent}  {dim(m.group(1) + ' │')} {_trace_style(m.group(2))}")
+        else:
+            print(f"{indent}  {_trace_style(l)}")
 
 
 def _print_source_context(src: Path, line: int, indent, context):
@@ -509,7 +617,7 @@ def _print_trace(res: dict, replay: Path, timing: bool = False) -> None:
 
 def dossier(replay: Path, res: dict):
     """Everything an agent needs about one trace, in one call — the failure window
-    of related-file snippets (plus a .lp.debug snippet when --lp-debug is given)."""
+    of related-file snippets, the goal state, and (with --lp-debug) the trace."""
     _print_trace(res, replay, timing=True)
 
 
@@ -547,9 +655,62 @@ def cmd_run(args) -> int:
     return _run_suite(args, suite, target)
 
 
+class _Stream:
+    """Live per-result printer.  On a TTY, passes only advance a single in-place
+    counter line (no scrollback flood at suite scale) and failures still unfold
+    their full `━━` window; redirected, passes become one compact line each so
+    CI/pipes stay greppable.  Warnings always surface."""
+
+    def __init__(self, suite: str, total: int):
+        self.suite, self.total, self.done, self.fail = suite, total, 0, 0
+
+    def _counter(self) -> str:
+        tail = red(f"  {self.fail} ✗") if self.fail else ""
+        return dim(f"  {self.suite}  {self.done}/{self.total}") + tail
+
+    def _unfold(self, res: dict, replay: Path) -> None:
+        if res["status"] in ("emit_fail", "lp_fail"):       # the heavy failure window
+            print()
+            _print_trace(res, replay, timing=True)
+        else:                                               # warn: compact + its warnings
+            print(f"{ICON['warn']} {res['name']}")
+            for w in res["warnings"]:
+                print(f"   {dim(w)}")
+
+    def _compact(self, res: dict) -> None:                  # a passing trace, one line
+        timing = dim(f"  emit {fmt_ms(res['emit_ms'])} / check {fmt_ms(res['check_ms'])}")
+        print(f"{ICON[res['status']]} {res['name']}{timing}")
+
+    def __call__(self, res: dict, replay: Path) -> None:
+        self.done += 1
+        notable = res["status"] != "ok"                     # failures + warnings get shown
+        self.fail += res["status"] in ("emit_fail", "lp_fail")
+        if IS_TTY:
+            sys.stdout.write("\r\033[K")                    # drop the counter line first
+            if notable:
+                self._unfold(res, replay)
+            sys.stdout.write("\r" + self._counter())
+            sys.stdout.flush()
+        elif notable:
+            self._unfold(res, replay)
+        else:
+            self._compact(res)
+
+    def finish(self) -> None:
+        if IS_TTY:
+            sys.stdout.write("\r\033[K")
+            sys.stdout.flush()
+
+
 def _run_suite(args, suite: str, replays: list[Path]) -> int:
     t_start = time.monotonic()
-    results = _check_all(replays, lp_debug=args.lp_debug)
+    # human run: stream each result live (completion order); -q and --json don't.
+    stream = _Stream(suite, len(replays)) if not (args.json or args.quiet) else None
+    want_probe = (not args.quiet) or args.json     # goal-state probe powers the window / JSON
+    results = _check_all(replays, lp_debug=args.lp_debug,
+                         want_probe=want_probe, on_result=stream)
+    if stream:
+        stream.finish()
     elapsed = (time.monotonic() - t_start) * 1000
 
     ordered = [results[r.stem] for r in replays]
@@ -568,20 +729,15 @@ def _run_suite(args, suite: str, replays: list[Path]) -> int:
     if args.json:
         print(json.dumps(artifact, ensure_ascii=False, indent=2))
     else:
-        _print_suite_human(args, artifact, {r.stem: r for r in replays})
+        _print_summary(artifact)
     return 1 if failures else 0
 
 
-def _print_suite_human(args, artifact: dict, replay_of: dict) -> None:
+def _print_summary(artifact: dict) -> None:
+    """The trailing one-line tally.  The per-trace output already streamed live
+    (unless `-q`, which shows only this line)."""
     suite, failures = artifact["suite"], artifact["failures"]
-    # the failure window (related-file snippets) shows for every failing trace by
-    # default; `-q` drops to just the summary line.
-    if not args.quiet:
-        for res in artifact["goals"]:
-            if res["status"] != "ok":
-                print()
-                _print_trace(res, replay_of[res["name"]])
-        print()
+    print()
     parts = []
     if artifact["ok"]:
         parts.append(f"{green(artifact['ok'])} ✓")
@@ -611,13 +767,15 @@ def _warm_shared_cache() -> None:
         pass        # a missing/slow lambdapi resurfaces per-trace in the workers below
 
 
-def _check_all(replays, lp_debug=None) -> dict[str, dict]:
-    """Emit+check every replay in parallel; keyed by stem."""
+def _check_all(replays, lp_debug=None, want_probe=True, on_result=None) -> dict[str, dict]:
+    """Emit+check every replay in parallel; keyed by stem.  `on_result(res, replay)`
+    fires on the main thread as each trace finishes (completion order) so callers
+    can stream live; `want_probe` builds the goal-state probe on failure."""
     out: dict[str, dict] = {}
     _warm_shared_cache()
     workers = min(len(replays), (os.cpu_count() or 2))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(check_one, r, lp_debug): r for r in replays}
+        futs = {ex.submit(check_one, r, lp_debug, want_probe): r for r in replays}
         for fut in concurrent.futures.as_completed(futs):
             replay = futs[fut]
             try:
@@ -628,6 +786,8 @@ def _check_all(replays, lp_debug=None) -> dict[str, dict]:
                        "error": {"code": "E_INTERNAL",
                                  "message": f"{type(e).__name__}: {e}"}}
             out[res["name"]] = res
+            if on_result:
+                on_result(res, replay)
     return out
 
 
@@ -767,7 +927,7 @@ def gen_traces(suite, krt, force=False):
 
 
 def gen_replays(suite, krt, force=False):
-    replay_kin = find_kin([ROOT / "atelierb/tools/linux_x64/REPLAY.kin",
+    replay_kin = find_kin([ROOT / "vendor/atelierb/linux_x64/REPLAY.kin",
                            "/opt/atelierb-free-24.04.2/bin/REPLAY.kin"])
     if not replay_kin:
         sys.exit("pp2lp: REPLAY.kin not found")
@@ -861,16 +1021,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     r = sub.add_parser("run", help="emit + type-check a suite or one trace",
                        description="emit + type-check a SUITE (strict gate) or SUITE/NAME "
-                                   "(dossier).  A failure shows code-snippet panels from the "
-                                   "related files — the .lp, the .replay step, and the "
-                                   "lp/rules signature; --lp-debug adds the lambdapi trace.")
+                                   "(dossier).  Results stream live; a failure shows panels "
+                                   "from the related files — the <name>.probe.lp with the "
+                                   "lambdapi goal state, the .replay step, and the lp/rules "
+                                   "signature; --lp-debug adds the cleaned lambdapi trace.")
     r.add_argument("target", nargs="?", default="og", help="SUITE or SUITE/NAME (default: og)")
-    r.add_argument("-q", "--quiet", action="store_true", help="summary only")
+    r.add_argument("-q", "--quiet", action="store_true", help="summary only (no live stream)")
     r.add_argument("--lp-debug", nargs="?", const="u", default=None, metavar="CODE",
-                   help="on failure, run lambdapi `debug +CODE` scoped to the failing tactic "
-                        "and surface the cleaned trace as a <name>.lp.debug snippet.  CODE is "
-                        "raw lambdapi flags (u=unification, r=rewrite, t=tactics, w=whnf; "
-                        "default u).  avoid i — it crashes lambdapi's printer on our HO goals")
+                   help="on failure, also run lambdapi `debug +CODE` in the goal-state probe "
+                        "and surface the cleaned trace.  CODE is raw lambdapi flags "
+                        "(u=unification, r=rewrite, t=tactics, w=whnf; default u).  "
+                        "avoid i — it crashes lambdapi's printer on our HO goals")
     r.add_argument("--json", action="store_true", help="machine-readable output")
     r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
 

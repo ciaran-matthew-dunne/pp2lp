@@ -6,7 +6,13 @@ type free_vars = { prop_vars: SS.t; exp_vars: SS.t }
 
 let empty_fv = { prop_vars = SS.empty; exp_vars = SS.empty }
 
-let reserved = SS.of_list ["VRAI"; "TRUE"; "FAUX"; "FALSE"; "_eql_set"; "eql_set"]
+(* Reserved = LP library symbols PP refers to by name, so they're never collected
+   as free vars to declare: the booleans, the set-equality predicate (`_eql_set` /
+   `eql_set`), and the pair projections (`_pj1` / `_pj2`, rendered to the B.lp
+   primitives `pj1` / `pj2` by pp_lp). *)
+let reserved =
+  SS.of_list ["VRAI"; "TRUE"; "FAUX"; "FALSE";
+              "_eql_set"; "eql_set"; "_pj1"; "_pj2"; "pj1"; "pj2"]
 
 let rec collect_exp_fv bound fv = function
   | Var s when SS.mem s bound || SS.mem s reserved -> fv
@@ -14,7 +20,10 @@ let rec collect_exp_fv bound fv = function
   | Nat _ -> fv
   | AOp (_, e1, e2) -> collect_exp_fv bound (collect_exp_fv bound fv e1) e2
   | Neg e -> collect_exp_fv bound fv e
-  | App (_, args) -> List.fold_left (collect_exp_fv bound) fv args
+  | App (f, args) ->            (* an applied function symbol is itself free (`τ ι`) *)
+    let fv = if SS.mem f bound || SS.mem f reserved then fv
+             else { fv with exp_vars = SS.add f fv.exp_vars } in
+    List.fold_left (collect_exp_fv bound) fv args
   | SetImage (e1, e2) | Inter (e1, e2) | Union (e1, e2) ->
     collect_exp_fv bound (collect_exp_fv bound fv e1) e2
 
