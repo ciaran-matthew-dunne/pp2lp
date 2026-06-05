@@ -1,0 +1,1 @@
+Flag(FileOn("eq_subst_mem.res")) & Set(Valid.1 | Rule(Implication | (x = y & x: s => y: s) & _delta_e(x) & _delta_e(y) & _delta_e(s) | ? | ? | x = y & x: s => y: s | nn))

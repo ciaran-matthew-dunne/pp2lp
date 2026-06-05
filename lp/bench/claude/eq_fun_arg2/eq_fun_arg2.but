@@ -1,0 +1,1 @@
+Flag(FileOn("eq_fun_arg2.res")) & Set(Valid.1 | Rule(Implication | (x = y => f(z, x) = f(z, y)) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(z) | ? | ? | x = y => f(z, x) = f(z, y) | nn))

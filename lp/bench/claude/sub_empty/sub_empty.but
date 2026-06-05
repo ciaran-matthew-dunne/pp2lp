@@ -1,0 +1,1 @@
+Flag(FileOn("sub_empty.res")) & Set(Valid.1 | Rule(Implication | ({} <: s) & _delta_e(s) | ? | ? | {} <: s | nn))

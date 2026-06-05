@@ -1,0 +1,1 @@
+Flag(FileOn("ctr_prop.res")) & Set(Valid.1 | Rule(Implication | (a & not(a) => bfalse) & _delta_p(a) & _delta_p(bfalse) | ? | ? | a & not(a) => bfalse | nn))

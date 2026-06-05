@@ -1,0 +1,1 @@
+Flag(FileOn("bool_subst.res")) & Set(Valid.1 | Rule(Implication | (x = TRUE & x = y => y = TRUE) & _delta_e(x) & _delta_e(y) | ? | ? | x = TRUE & x = y => y = TRUE | nn))

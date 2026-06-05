@@ -1,0 +1,1 @@
+Flag(FileOn("set_in_inter_l.res")) & Set(Valid.1 | Rule(Implication | (x: s /\ t => x: s) & _delta_e(x) & _delta_e(s) & _delta_e(t) | ? | ? | x: s /\ t => x: s | nn))

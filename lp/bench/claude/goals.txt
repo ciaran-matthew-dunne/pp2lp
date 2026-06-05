@@ -1,0 +1,378 @@
+# claude — a handwritten pipeline-stress / coverage suite.
+#
+# This suite is for *testing the pp2lp pipeline*, not for staying green.  It
+# deliberately spans the whole rule space (every PP family) and the whole
+# proof-size span (one-rule leaves → 200+-rule proofs), AND it probes the known
+# frontier: set-equality / equality-congruence, arithmetic antisymmetry and
+# double-negation (AR4/AR7/AR8), INS over rewritten hyps, NAT membership, and
+# existential/quantifier shapes REPLAY mishandles.  Goals expected to fail or be
+# dropped are KEPT and marked — a failure here is a signal about the pipeline,
+# not a defect in the suite.  Authored by hand, grouped by what each section
+# tests.
+#
+# Format (shared with synth/nrm_test): name | kind | goal
+#   prop  — bare identifiers are propositional variables
+#   expr  — bare identifiers are expression variables (sets / functions / ints)
+#
+# Each goal is proved from itself + inferred `_delta_{p,e}` hypotheses over its
+# free identifiers; promoting the goal-as-hypothesis drives PP normalisation.
+# Note: a self-proof lets PP discharge a propositional tautology in one AXM8
+# step (the promoted hypothesis matches the goal) — those are the trivial end of
+# the size span; the real multi-rule work is in the expr / quantifier / set /
+# arithmetic / contradiction goals, where hyp- and goal-normalisation diverge.
+#
+# `goals.txt` is the source of truth — regenerate with `pp2lp gen claude`,
+# check with `pp2lp run claude`.  Coverage notes (→ RULE) are intended targets;
+# measure actual firings from the generated `.replay` files.  Sections L–P below
+# are the failure-frontier probes (✗/⚠ expected).
+
+# ════════════════════════════════════════════════════════════════════════
+# A. Propositional connectives — AND / OR / NOT, tiny → medium  (AND*, OR*, NOT*)
+# ════════════════════════════════════════════════════════════════════════
+
+# leaves (1–3 rules)
+p_atom            | prop | a
+p_and             | prop | a & b
+p_or              | prop | a or b
+p_not             | prop | not(a)
+p_imp             | prop | a => b
+p_iff             | prop | a <=> b
+
+# identity / idempotence
+p_imp_self        | prop | a => a
+p_iff_self        | prop | a <=> a
+p_and_idem        | prop | a & a <=> a
+p_or_idem         | prop | a or a <=> a
+
+# commutativity
+p_and_comm        | prop | a & b <=> b & a
+p_or_comm         | prop | a or b <=> b or a
+p_iff_comm        | prop | (a <=> b) <=> (b <=> a)
+
+# associativity
+p_and_assoc       | prop | (a & b) & c <=> a & (b & c)
+p_or_assoc        | prop | (a or b) or c <=> a or (b or c)
+
+# distributivity (both directions)
+p_distrib_ao      | prop | a & (b or c) <=> (a & b) or (a & c)
+p_distrib_oa      | prop | a or (b & c) <=> (a or b) & (a or c)
+
+# absorption
+p_absorb_and      | prop | a & (a or b) <=> a
+p_absorb_or       | prop | a or (a & b) <=> a
+
+# De Morgan (2- and 3-ary)
+p_demorgan_and    | prop | not(a & b) <=> not(a) or not(b)
+p_demorgan_or     | prop | not(a or b) <=> not(a) & not(b)
+p_demorgan_and3   | prop | not(a & b & c) <=> not(a) or not(b) or not(c)
+p_demorgan_or3    | prop | not(a or b or c) <=> not(a) & not(b) & not(c)
+
+# negation laws
+p_dneg_elim       | prop | not(not(a)) => a
+p_dneg_intro      | prop | a => not(not(a))
+p_tneg            | prop | not(not(not(a))) => not(a)
+p_excluded_middle | prop | a or not(a)
+p_noncontra       | prop | not(a & not(a))
+
+# bigger conjunction / disjunction shapes
+p_conj4           | prop | a & b & c & d
+p_disj4           | prop | a or b or c or d
+p_conj_in_disj    | prop | (a & b) or c
+p_disj_in_conj    | prop | (a or b) & c
+
+# ════════════════════════════════════════════════════════════════════════
+# B. Implication structure — IMP family, medium → large
+# ════════════════════════════════════════════════════════════════════════
+
+imp_mp            | prop | a & (a => b) => b
+imp_mt            | prop | (a => b) & not(b) => not(a)
+imp_contrapos     | prop | (a => b) <=> (not(b) => not(a))
+imp_curry         | prop | (a & b => c) <=> (a => b => c)
+imp_permute       | prop | (a => b => c) => (b => a => c)
+imp_to_or         | prop | (a => b) => not(a) or b
+imp_from_or       | prop | not(a) or b => (a => b)
+imp_neg           | prop | not(a => b) => a & not(b)
+imp_peirce        | prop | ((a => b) => a) => a
+imp_dist          | prop | (a => b => c) => ((a => b) => (a => c))
+imp_cases         | prop | (a => c) & (b => c) => (a or b => c)
+imp_syll          | prop | (a => b) & (b => c) => (a => c)
+imp_syll4         | prop | (a => b) & (b => c) & (c => d) => (a => d)
+imp_syll5         | prop | (a => b) & (b => c) & (c => d) & (d => e) => (a => e)
+imp_chain_use     | prop | a & (a => b) & (b => c) & (c => d) => d
+
+# ════════════════════════════════════════════════════════════════════════
+# C. Equivalence — EQV family
+# ════════════════════════════════════════════════════════════════════════
+
+eqv_sym           | prop | (a <=> b) => (b <=> a)
+eqv_trans         | prop | (a <=> b) & (b <=> c) => (a <=> c)
+eqv_trans4        | prop | (a <=> b) & (b <=> c) & (c <=> d) => (a <=> d)
+eqv_to_imp        | prop | (a <=> b) => (a => b) & (b => a)
+eqv_from_imp      | prop | (a => b) & (b => a) => (a <=> b)
+eqv_neg_both      | prop | (a <=> b) <=> (not(a) <=> not(b))
+eqv_neg_shift     | prop | (not(a) <=> b) <=> (a <=> not(b))
+eqv_mp            | prop | a & (a <=> b) => b
+eqv_cong_and      | prop | (a <=> b) => (a & c <=> b & c)
+# non-trivial equiv work (these don't collapse to a hypothesis match → EQV1/EQV2)
+eqv_contra        | prop | not(p <=> p) => q
+eqv_self_neg      | prop | not(p <=> not(p))
+eqv_mutual        | prop | (a => b) & (b => a) <=> (a <=> b)
+eqv_iff_split     | prop | (a <=> b) <=> (a => b) & (b => a)
+
+# ════════════════════════════════════════════════════════════════════════
+# D. Equality — EVR / OPR / EQC / ECTR / EQS, tiny → large
+# ════════════════════════════════════════════════════════════════════════
+
+eq_refl           | expr | x = x
+eq_sym            | expr | x = y => y = x
+eq_trans          | expr | x = y & y = z => x = z
+eq_chain4         | expr | w = x & x = y & y = z => w = z
+eq_chain5         | expr | v = w & w = x & x = y & y = z => v = z
+eq_chain6         | expr | u = v & v = w & w = x & x = y & y = z => u = z
+eq_fun_cong       | expr | x = y => f(x) = f(y)
+eq_fun_cong2      | expr | x = y => f(g(x)) = f(g(y))
+eq_fun_arg2       | expr | x = y => f(z, x) = f(z, y)
+eq_fun_chain      | expr | f(x) = g(y) & g(y) = h(z) => f(x) = h(z)
+eq_fun_deep       | expr | f(g(h(x))) = w & h(x) = y & g(y) = z => f(z) = w
+eq_subst_mem      | expr | x = y & x: s => y: s
+eq_subst_mem_sym  | expr | x = y & y: s => x: s
+eq_subst_neg      | expr | x = y & not(x: s) => not(y: s)
+eq_subst_arith    | expr | x = y & x <= z => y <= z
+eq_subst_two      | expr | x = y & z = w & x: s & z: t => y: s & w: t
+# set equality (→ EQS / eql_set)
+eq_set_singleton  | expr | {x} = {x}
+eq_set_pair       | expr | {x, y} = {x, y}
+eq_set_union      | expr | s \/ t = s \/ t
+eq_set_inter      | expr | s /\ t = s /\ t
+eq_set_pair_swap  | expr | {x, y} = {y, x}
+# equality contradiction (→ ECTR / FX / STOP)
+eq_contra         | expr | x = y & not(x = y) => bfalse
+eq_contra_chain   | expr | x = y & y = z & not(x = z) => bfalse
+
+# ════════════════════════════════════════════════════════════════════════
+# E. Membership & sets — AXM family, tiny → medium
+# ════════════════════════════════════════════════════════════════════════
+
+set_in_singleton  | expr | x: {x}
+set_in_pair_l     | expr | x: {x, y}
+set_in_pair_r     | expr | y: {x, y}
+set_in_triple     | expr | z: {x, y, z}
+set_in_quad       | expr | w: {x, y, z, w}
+set_in_union_l    | expr | x: s => x: s \/ t
+set_in_union_r    | expr | x: t => x: s \/ t
+set_in_inter      | expr | x: s & x: t => x: s /\ t
+set_in_inter_l    | expr | x: s /\ t => x: s
+set_in_inter_r    | expr | x: s /\ t => x: t
+set_inter_to_union| expr | x: s /\ t => x: s \/ t
+set_in_pow        | expr | s: POW(s)
+set_empty_pow     | expr | {} : POW(s)
+
+# subset (→ AXM / NRM, small → medium)
+sub_refl          | expr | s <: s
+sub_trans         | expr | s <: t & t <: u => s <: u
+sub_trans4        | expr | s <: t & t <: u & u <: v => s <: v
+sub_inter_l       | expr | s /\ t <: s
+sub_inter_r       | expr | s /\ t <: t
+sub_union_l       | expr | s <: s \/ t
+sub_union_r       | expr | t <: s \/ t
+sub_inter_glb     | expr | u <: s & u <: t => u <: s /\ t
+sub_union_lub     | expr | s <: u & t <: u => s \/ t <: u
+sub_empty         | expr | {} <: s
+sub_singleton     | expr | x: s => {x} <: s
+sub_singleton_iff | expr | x: s <=> {x} <: s
+sub_pair          | expr | {x} <: s & {y} <: s => {x, y} <: s
+sub_in_pow        | expr | s: POW(t) <=> s <: t
+sub_union_mono    | expr | s <: t => s \/ u <: t \/ u
+sub_inter_mono    | expr | s <: t => s /\ u <: t /\ u
+sub_self_union    | expr | s \/ s <: s
+sub_self_inter    | expr | s <: s /\ s
+
+# ════════════════════════════════════════════════════════════════════════
+# F. Relations & functions — membership in relation/function sets (NRM chains)
+# ════════════════════════════════════════════════════════════════════════
+
+rel_relation      | expr | r: s <-> t
+rel_partial_fun   | expr | f: s +-> t
+rel_total_fun     | expr | f: s --> t
+rel_total_inj     | expr | f: s >-> t
+rel_partial_inj   | expr | f: s >+> t
+rel_total_surj    | expr | f: s -->> t
+rel_partial_surj  | expr | f: s +->> t
+rel_bijection     | expr | f: s >->> t
+rel_in_dom        | expr | x: dom(f)
+rel_in_ran        | expr | y: ran(f)
+rel_app_defined   | expr | x: dom(f) & f(x) = y
+
+# ════════════════════════════════════════════════════════════════════════
+# G. Universal quantifier — ALL / NRM family, medium → large
+# ════════════════════════════════════════════════════════════════════════
+
+all_vacuous       | expr | !x.(a: s)
+all_const_body    | expr | !x.(x: s => a: t)
+all_refl_body     | expr | !x.(x: s => x: s)
+all_split2        | expr | !x.(x: s => x: a & x: b)
+all_split3        | expr | !x.(x: s => x: a & x: b & x: c)
+all_split4        | expr | !x.(x: s => x: a & x: b & x: c & x: d)
+all_cascade       | expr | !x.(x: a => x: b => x: c)
+all_inter_intro   | expr | !x.(x: s => x: a) & !x.(x: s => x: b) => !x.(x: s => x: a & x: b)
+all_distrib_and   | expr | !x.(x: s => x: a & x: b) <=> !x.(x: s => x: a) & !x.(x: s => x: b)
+all_nested        | expr | !x.!y.(x: s => y: t => x: s)
+all_swap          | expr | !x.!y.(x: s & y: t => x, y: r) => !y.!x.(y: t & x: s => x, y: r)
+all_pair_binder   | expr | !(x, y).(x: s & y: t => x, y: r)
+all_triple_binder | expr | !(x, y, z).(x: s & y: t & z: u => x, y, z: r)
+all_point_mono    | expr | !x.(x: s => x: t) & a: s => a: t
+all_point_trans   | expr | !x.(x: s => x: t) & !x.(x: t => x: u) => !x.(x: s => x: u)
+all_neg           | expr | !x.not(x: s)
+all_neg_conj      | expr | !x.not(x: s & x: t)
+all_imp_neg       | expr | !x.(x: s => not(x: t))
+
+# ════════════════════════════════════════════════════════════════════════
+# H. Existential quantifier — XST family (deliberately broad; coverage gap)
+# ════════════════════════════════════════════════════════════════════════
+
+xst_eq            | expr | #x.(x = a)
+xst_mem           | expr | a: s => #x.(x: s)
+xst_witness       | expr | a: s & a: t => #x.(x: s & x: t)
+xst_weaken        | expr | a: s => #x.(x: s or x: t)
+xst_eq_mem        | expr | a: s => #x.(x = a & x: s)
+xst_from_all      | expr | !x.(x: s => x: t) & a: s => #x.(x: t)
+xst_pair          | expr | a: s & b: t => #x.#y.(x: s & y: t)
+xst_swap          | expr | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t)
+xst_in_dom        | expr | a: dom(f) => #x.(x: dom(f))
+xst_app           | expr | a: dom(f) & f(a) = b => #x.(f(x) = b)
+xst_refute        | expr | a: s & not(a: t) => #x.(x: s & not(x: t))
+# existential under a universal (witness is the ∀-bound var): HO-unification
+# frontier — AXM9_1 inh_tuple witness + ALL7/XST8 chain Res won't resolve (open).
+xst_under_all     | expr | !x.(x: s => x: t) => !x.(x: s => #y.(y: t))
+
+# ════════════════════════════════════════════════════════════════════════
+# I. Boolean — BOOL family (concrete btrue/bfalse only; PP can't do a: BOOL)
+# ════════════════════════════════════════════════════════════════════════
+
+bool_true         | expr | x = TRUE
+bool_false        | expr | x = FALSE
+bool_conj         | expr | x = TRUE & y = FALSE
+bool_eq_self      | expr | x = TRUE => x = TRUE
+bool_subst        | expr | x = TRUE & x = y => y = TRUE
+
+# ════════════════════════════════════════════════════════════════════════
+# J. Arithmetic — AR family, tiny → medium
+# ════════════════════════════════════════════════════════════════════════
+
+ar_leq_refl       | expr | x <= x
+ar_leq_trans      | expr | x <= y & y <= z => x <= z
+ar_leq_trans4     | expr | x <= y & y <= z & z <= w => x <= w
+ar_leq_antisym    | expr | x <= y & y <= x => x = y
+ar_lt_trans       | expr | x < y & y < z => x < z
+ar_lt_to_leq      | expr | x < y => x <= y
+ar_leq_to_lt      | expr | x <= y & not(x = y) => x < y
+ar_add_comm       | expr | x + y = y + x
+ar_add_assoc      | expr | (x + y) + z = x + (y + z)
+ar_add_zero_l     | expr | 0 + x = x
+ar_add_zero_r     | expr | x + 0 = x
+ar_sub_zero       | expr | x - 0 = x
+ar_sub_self       | expr | x - x = 0
+ar_sub_add        | expr | (x - y) + y = x
+ar_add_sub        | expr | (x + y) - y = x
+ar_add_mono_r     | expr | x <= y => x + z <= y + z
+ar_add_mono_l     | expr | x <= y => z + x <= z + y
+ar_add_mono2      | expr | x <= y & z <= w => x + z <= y + w
+ar_add_comm_leq   | expr | x + y <= z => y + x <= z
+ar_add_assoc_leq  | expr | (x + y) + z <= w => x + (y + z) <= w
+ar_bounds_neg     | expr | x <= 0 & y <= 0 => x + y <= 0
+ar_bounds_pos     | expr | 0 <= x & 0 <= y => 0 <= x + y
+ar_bounds_pos3    | expr | 0 <= x & 0 <= y & 0 <= z => 0 <= x + y + z
+ar_sub_leq        | expr | x - y <= 0 => x <= y
+ar_leq_sub        | expr | x + y <= z => x <= z - y
+ar_add_pos        | expr | 0 <= y => x <= x + y
+ar_sub_pos        | expr | 0 <= y => x - y <= x
+
+# ════════════════════════════════════════════════════════════════════════
+# K. Quantified arithmetic & contradiction — NRM-arith / INS / FX / STOP
+# ════════════════════════════════════════════════════════════════════════
+
+qar_leq_refl      | expr | !x.(x <= x)
+qar_antisym       | expr | !x.!y.(x <= y => y <= x => x = y)
+qar_trans         | expr | !x.!y.!z.(x <= y => y <= z => x <= z)
+qar_ins           | expr | !x.(x + 1 <= y => not(y <= x))
+ctr_prop          | prop | a & not(a) => bfalse
+ctr_mem           | expr | x: s & not(x: s) => bfalse
+ctr_subst         | expr | x = y & x: s & not(y: s) => bfalse
+ctr_all           | expr | !x.(x: s => not(x: t)) & a: s & a: t => bfalse
+ctr_all_pos       | expr | !x.(x: s => x: t) & a: s & not(a: t) => bfalse
+ctr_arith         | expr | x <= y & y <= x & not(x = y) => bfalse
+
+# ════════════════════════════════════════════════════════════════════════
+# L. FRONTIER: set equality & equality congruence  (EQS / ECTR / eql_set)
+#    These force structural set-equality reasoning, the documented LP gap —
+#    expected ✗.  Kept to exercise the EQS/ECTR emit + check path.
+# ════════════════════════════════════════════════════════════════════════
+
+eqc_subst_set     | expr | s = t & x: s => x: t
+eqc_union_cong    | expr | s = t => s \/ u = t \/ u
+eqc_inter_cong    | expr | s = t => s /\ u = t /\ u
+eqc_card_cong     | expr | s = t => card(s) = card(t)
+eqc_fn_both       | expr | x = y & f = g => f(x) = g(y)
+eqc_pair_swap     | expr | {x, y} = {y, x}
+eqc_subset_antisym| expr | s <: t & t <: s => s = t
+eqc_pow_mono      | expr | s <: t => POW(s) <: POW(t)
+eqc_app_cong_set  | expr | s = t => f(s) = f(t)
+
+# ════════════════════════════════════════════════════════════════════════
+# M. FRONTIER: arithmetic — antisymmetry, double-negation, cancellation, NAT
+#    Hits AR4/AR7/AR8 (need the solver's witness, never in the replay) and the
+#    NAT-membership blow-up (RLIMIT_AS / timeout capped).  Expected ✗/⚠.
+# ════════════════════════════════════════════════════════════════════════
+
+arf_antisym_neg   | expr | !x.!y.(-x + y <= 0 & x - y <= 0 => x = y)
+arf_antisym_neg2  | expr | !x.!y.(x - y <= 0 & -x + y <= 0 => y = x)
+arf_neg_neg       | expr | !x.(not(not(x <= y)) => x <= y)
+arf_neg_sub       | expr | !x.(not(1 - (-x) <= 0) => x <= 0)
+arf_cancel_r      | expr | x + z = y + z => x = y
+arf_sub_swap      | expr | (x - y) - z = (x - z) - y
+arf_in_nat        | expr | n: NAT
+arf_nat_closed    | expr | x: NAT & y: NAT => x + y: NAT
+
+# ════════════════════════════════════════════════════════════════════════
+# N. FRONTIER: INS contradiction over arithmetic-rewritten hypotheses
+#    PP rewrites hyps before the INS leaf; find_ins_contradiction may miss the
+#    structural match or pick the wrong compound witness (→ NRM24/27-30).
+# ════════════════════════════════════════════════════════════════════════
+
+nar_ins1          | expr | !x.(x + 1 <= y => not(y <= x))
+nar_ins2          | expr | !x.!y.(x + y <= 0 => not(0 <= x + y))
+nar_ins_succ      | expr | !x.(not(x + 1 <= x))
+nar_nat_quant     | expr | !x.(x: NAT => 0 <= x)
+# x + x normalises to the coefficient form 2*x — the `*` parser gap (now fixed,
+# desugared to x+x); this goal now reaches the next gap, PP's `[ARITH] <FAUX>`
+# solver terminal (not in rule_db).
+nar_leq_zero      | expr | !x.(x <= 0 => x + x <= 0)
+
+# ════════════════════════════════════════════════════════════════════════
+# O. FRONTIER: existential / compound-binder shapes REPLAY mishandles (XST2/6)
+# ════════════════════════════════════════════════════════════════════════
+
+xstf_triple       | expr | a: s & b: t & c: u => #x.#y.#z.(x: s & y: t & z: u)
+xstf_pair_binder  | expr | a, b: r => #(x, y).(x, y: r)
+# type-checks through the new NRM3_1/NRM23_1 lemmas; remaining blocker is the
+# existential-under-universal HO-unification frontier (shared with xst_under_all):
+# AXM9_1 hardcodes the inh_tuple witness AND the ALL7/XST8 chain Res won't resolve.
+xstf_all_exists   | expr | !x.(x: s => x: t) => !x.(x: s => #y.(x = y & y: t))
+xstf_dom_witness  | expr | a: dom(f) & f(a) = b => #x.(x: dom(f) & f(x) = b)
+xstf_swap_compound| expr | #(x, y).(x, y: r) => #(y, x).(y, x: r)
+
+# ════════════════════════════════════════════════════════════════════════
+# P. Deep / large proofs — push the high end of the size span (NRM/Res chains)
+# ════════════════════════════════════════════════════════════════════════
+
+big_eq_chain8     | expr | a1 = a2 & a2 = a3 & a3 = a4 & a4 = a5 & a5 = a6 & a6 = a7 & a7 = a8 => a1 = a8
+big_sub_chain6    | expr | s <: t & t <: u & u <: v & v <: w & w <: r => s <: r
+big_leq_chain6    | expr | x <= y & y <= z & z <= w & w <= v & v <= r => x <= r
+big_all_split6    | expr | !x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g)
+# cascade ≥3 conjuncts: was right-assoc A∧(B∧C) vs NRM7's left-assoc peel — fixed
+# by making IMP1_1 list-preserving (mk_res, not mk_1) so the ⋀-list stays flat.
+big_all_cascade5  | expr | !x.(x: a => x: b => x: c => x: d => x: e)
+big_conj_nested   | expr | !x.(x: s => (x: a & x: b) & (x: c & x: d))
+big_two_univ      | expr | !x.(x: s => x: a & x: b & x: c) & !y.(y: u => y: p & y: q & y: r)
+big_imp_cascade8  | prop | a => b => c => d => e => g => h => i
+big_mixed         | expr | !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => !x.(x: s => x: v)

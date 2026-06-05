@@ -1,0 +1,1 @@
+Flag(FileOn("eqc_card_cong.res")) & Set(Valid.1 | Rule(Implication | (s = t => card(s) = card(t)) & _delta_e(s) & _delta_e(t) | ? | ? | s = t => card(s) = card(t) | nn))

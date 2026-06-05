@@ -1,0 +1,1 @@
+Flag(FileOn("p_demorgan_and3.res")) & Set(Valid.1 | Rule(Implication | (not(a & b & c) <=> not(a) or not(b) or not(c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | not(a & b & c) <=> not(a) or not(b) or not(c) | nn))

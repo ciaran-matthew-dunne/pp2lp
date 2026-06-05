@@ -1,0 +1,1 @@
+Flag(FileOn("p_absorb_or.res")) & Set(Valid.1 | Rule(Implication | (a or (a & b) <=> a) & _delta_p(a) & _delta_p(b) | ? | ? | a or (a & b) <=> a | nn))

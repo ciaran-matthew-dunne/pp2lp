@@ -40,6 +40,7 @@ rule token = parse
   (* arithmetic *)
   | '+'   { PLUS }
   | '-'   { MINUS }
+  | '*'   { TIMES }   (* PP renders a folded sum n·x as `n*x` (coefficient form) *)
   (* set operators *)
   | "/\\" { INTER }
   | "\\/" { UNION }

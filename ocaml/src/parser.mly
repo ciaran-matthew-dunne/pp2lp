@@ -13,7 +13,7 @@
 
 %token HYP TURNSTILE PIPE FIN
 %token NOT AND OR IMP IFF EQ LEQ
-%token PLUS MINUS
+%token PLUS MINUS TIMES
 %token INTER UNION
 %token FORALL0 FORALL1 FORALL2 EXISTS
 
@@ -26,6 +26,7 @@
 %left UNION
 %left INTER
 %left PLUS MINUS
+%left TIMES          (* coefficient binds tighter than +/- : 2*x + y = (2*x) + y *)
 %nonassoc UMINUS
 %nonassoc LSQ
 
@@ -49,6 +50,8 @@ exp:
   { AOp (Add, e1, e2) }
   | e1 = exp; MINUS; e2 = exp
   { AOp (Sub, e1, e2) }
+  | e1 = exp; TIMES; e2 = exp
+  { mul_expand e1 e2 }
   | MINUS; e = exp %prec UMINUS
   { Neg e }
   | e1 = exp; LSQ; e2 = exp; RSQ

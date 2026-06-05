@@ -42,6 +42,24 @@ and rhs =
 and line =
   lhs * rhs
 
+(* PP folds a repeated sum into a literal product: `x + x` is rendered `2*x`.
+   B-arithmetic (B.lp) has no multiplication — a numeral is itself a repeated
+   `𝟏 +` — so we desugar a literal coefficient straight back into the sum it
+   denotes (`2*x` ↦ `x + x`), left-nested to match `+`'s left associativity.
+   Every later stage then sees an ordinary sum, so the existing +/INS/AR
+   machinery applies unchanged.  Genuine variable·variable products do not
+   occur in PP arithmetic replays; we fail loudly rather than invent a term. *)
+let mul_expand e1 e2 =
+  let expand n e =
+    if n <= 0 then Nat 0
+    else
+      let rec build k = if k = 1 then e else AOp (Add, build (k - 1), e) in
+      build n
+  in
+  match e1, e2 with
+  | Nat n, e | e, Nat n -> expand n e
+  | _ -> failwith "syntax_pp.mul_expand: non-literal multiplication (n*e expected)"
+
 (* Collapse consecutive same-binder Binds into one compound Bind.
    `!x. !y. P` parses as nested; PP's ALL2/ALL3 normalize that to a
    single compound `!(x,y). P`. We do the same at the goal level so

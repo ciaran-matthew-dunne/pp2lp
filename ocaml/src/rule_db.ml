@@ -31,6 +31,9 @@ type emit =
   | Opr of bool    (* equality rewrite; [true] = right-to-left (OPR2) *)
   | Axm8
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
+  | Nrm2730        (* NRM27-30: trust-free solver dispatch — peel the pinned
+                      binder at the witness `b`, ⊤-normalise the substituted
+                      conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
 
 type rule_info = {
@@ -154,12 +157,13 @@ let rules : (string, rule_info) Hashtbl.t =
      [b − xᵢ ≤ 𝟎] with solveur(a + b) = 𝟎, forcing xᵢ = b; substitute
      [xᵢ := b] and drop the binder.  NRM27/29 are the multi-binder (♡-block)
      forms, NRM28/30 the unary (♡x) forms; 27/28 are the xᵢ = 𝟎 specialisation
-     (a = b = 𝟎).  PP leaves them unprimed in a first-normalisation chain, so
-     the emitter maps to the Res-typed `_N_1`/`_1` forms (see chain_emit_name). *)
-  r "NRM27" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "NRM28" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "NRM29" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "NRM30" (Arity [Con; Seq]) ~emit:Trust_cons;
+     (a = b = 𝟎).  Trust-free: the [Nrm2730] dispatch peels the binder at the
+     reconstructed witness and ⊤-normalises the substituted conjunction
+     ([Emit_ctx.nrm29_witness_bridge]).  Only NRM29 is corpus-triggered. *)
+  r "NRM27" (Arity [Con; Seq]) ~emit:Nrm2730;
+  r "NRM28" (Arity [Con; Seq]) ~emit:Nrm2730;
+  r "NRM29" (Arity [Con; Seq]) ~emit:Nrm2730;
+  r "NRM30" (Arity [Con; Seq]) ~emit:Nrm2730;
   (* §A.13 Equality *)
   r "EVR1" leaf;
   r "EVR2" pass;

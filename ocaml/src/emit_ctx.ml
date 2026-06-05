@@ -511,6 +511,99 @@ let prove_sum_eq env e1 e2 : L.term option =
     else None
   | _ -> None
 
+(* `π (e = 𝟎)` when [e]'s signed atoms cancel to the empty multiset (e.g.
+   `—a + a`, `—(—a) − a`).  [prove_sum_eq … (Nat 0)] can't prove this — `𝟎`
+   normalises to the *atom* `0`, not the empty list, so the multisets differ —
+   so chain the normalise / sort / cancel proofs directly: the cancelled list
+   folds to `lfold [] ≡ 𝟎`. *)
+let prove_sum_zero env e : L.term option =
+  match normalize env e with
+  | Some (l, p) ->
+    let r, c = reduce_cancel env (List.sort compare l) in
+    if r = [] then
+      let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+      Some (trans p (trans (prove_eq_lnested env l) c))
+    else None
+  | None -> None
+
+(* ---- NRM29 trust-free dispatch: witness + ⊤-normalisation bridge ----
+
+   The (post-AR3_F) NRM29 goal is `(♡(d,rest…)·¬⋀(bounds)) ⇒ R` where the
+   solver pins the leading binder `d` (the `prj 0` slot) so the two cancelling
+   bounds `d + r ≤ 𝟎`, `—d − r ≤ 𝟎` both vanish.  `NRM29` (Nrm.lp) peels `d`
+   by instantiating at the witness `b`, leaving the premise
+   `♢v'·¬⋀(ps (v' ⨾ b v')) ⇒ R` with the substituted bounds *literal*.  PP
+   instead ⊤-normalises them, so the replay continuation proves `♢v'·¬⊤ ⇒ R`.
+   We bridge the two: a congruence proof `⋀(substituted) = ⊤` (each cancelling
+   bound `= ⊤` via `eq_true` + `leq_zero_of_sum_zero` + `prove_sum_zero`).
+
+   Returns `(b, cong)`: the witness `λ v', <w>` and the congruence proof
+   `((♢v'·¬⋀ subst) ⇒ R) = ((♢v'·¬⊤) ⇒ R)` (the caller transports with
+   `=⇒ (eq_sym cong)`).  None if the goal isn't this cancelling-bounds shape. *)
+let nrm29_witness_bridge ctx goal : (L.term * L.term) option =
+  let opt_all xs =
+    if List.for_all Option.is_some xs then Some (List.map Option.get xs) else None
+  in
+  match flatten_binds goal with
+  | Binary (Imp, Bind (Forall2, d :: rest, Unary (Not, conj)), _) ->
+    let bounds = Pp_lp.conj_children_left conj in
+    let bound_lhss =
+      List.filter_map (function Leq (e, Nat 0) -> Some e | _ -> None) bounds in
+    if List.length bound_lhss <> List.length bounds then None
+    else
+      (* witness pins `d`: take a bound `d + r ≤ 𝟎` (d with coeff +1), drop the
+         `d` monomial, negate the rest → `w` (an expr over the remaining vars). *)
+      let witness_of e =
+        match flatten_signed e with
+        | Some atoms when List.mem (Var d, 1) atoms ->
+          let rec drop_d = function
+            | (Var x, 1) :: tl when x = d -> tl
+            | a :: tl -> a :: drop_d tl
+            | [] -> []
+          in
+          let rest_neg = List.map (fun (a, s) -> (a, -s)) (drop_d atoms) in
+          Some (lfold_exp rest_neg)
+        | _ -> None
+      in
+      (match List.find_map witness_of bound_lhss with
+       | None -> None
+       | Some w ->
+         (* remaining binder vars → `prj k` of a tuple var (after dropping d). *)
+         let env_of v = List.mapi (fun k x -> (x, (k, v))) rest in
+         let vb = fresh_x_local ctx in
+         let b_term = L.Lambda (vb, None, L.Exp (env_of vb, w)) in
+         (* per-bound `(lhs[d:=w] ≤ 𝟎) = ⊤`, rendered over a fresh bridge var. *)
+         let vc = fresh_x_local ctx in
+         let env_c = env_of vc in
+         let eqtrue_of lhs =
+           let lhs_sub = subst_exp [ (d, w) ] lhs in
+           Option.map
+             (fun eqzero ->
+                L.App (L.Name "eq_true",
+                  [ L.Hole;
+                    L.App (L.Name "leq_zero_of_sum_zero", [ L.Hole; eqzero ]) ]))
+             (prove_sum_zero env_c lhs_sub)
+         in
+         (match opt_all (List.map eqtrue_of bound_lhss) with
+          | None -> None
+          | Some [] -> None
+          | Some eqtrues ->
+            (* `⋀(∎ ∷ c1 ∷ … ∷ ck) = ⊤`: peel the last conjunct (reduces the
+               `⋀ (_ ∷ ⊤)` away), recurse on the prefix.  Singleton ≡ c1. *)
+            let rec list_eq = function
+              | [] -> assert false
+              | [ et ] -> et
+              | ets ->
+                let last = List.nth ets (List.length ets - 1) in
+                let init = List.filteri (fun i _ -> i < List.length ets - 1) ets in
+                L.App (L.Name "eq_trans",
+                  [ L.App (L.Name "conj_snoc_last_cong", [ last ]); list_eq init ])
+            in
+            let body = L.Lambda (vc, None, L.App (L.Name "not_cong", [ list_eq eqtrues ])) in
+            let cong = L.App (L.Name "imp_cong_l", [ L.App (L.Name "!!_cong", [ body ]) ]) in
+            Some (b_term, cong)))
+  | _ -> None
+
 (* A hyp `h_lhs ≤ 𝟎` that is a term-reordering of [lhs ≤ 𝟎]. *)
 let find_leq_reorder ctx lhs =
   match flatten_signed lhs with

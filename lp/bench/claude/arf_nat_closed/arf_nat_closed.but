@@ -1,0 +1,1 @@
+Flag(FileOn("arf_nat_closed.res")) & Set(Valid.1 | Rule(Implication | (x: NAT & y: NAT => x + y: NAT) & _delta_e(x) & _delta_e(y) | ? | ? | x: NAT & y: NAT => x + y: NAT | nn))

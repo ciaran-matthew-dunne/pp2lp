@@ -1,0 +1,1 @@
+Flag(FileOn("all_refl_body.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: s)) & _delta_e(s) | ? | ? | !x.(x: s => x: s) | nn))

@@ -78,11 +78,25 @@ val proj_env_of_ctx : ctx -> Lp_tree.proj_env
    arithmetic-reorder/normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
+(* `π (e = 𝟎)` when [e]'s signed atoms cancel to the empty multiset (e.g.
+   `—a + a`).  [prove_sum_eq … (Nat 0)] can't — `𝟎` is the atom `0`, not the
+   empty list — so this chains normalise/sort/cancel straight to `lfold [] ≡ 𝟎`.
+   Used by the trust-free NRM29 dispatch for the substituted cancelling bounds. *)
+val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
+
 (* Proof of a single `≤ 𝟎` (or ⊤) leaf from the in-scope hyps: a direct
    match (up to alpha / binder-kind) or, failing that, an arithmetic-reorder
    bridge (`prove_sum_eq` + `leq_subst_l`).  [None] if no hyp covers it.
    Used by the INS conjunct search and AR7/AR8's bound-inequality recovery. *)
 val leaf_evidence : ctx -> (string * exp) list -> prd -> Lp_tree.term option
+
+(* NRM29 trust-free dispatch.  Given the (post-AR3_F) goal
+   `(♡(d,rest…)·¬⋀(cancelling-bounds)) ⇒ R`, returns `(b, cong)`: the witness
+   `λ v', <w>` pinning the leading binder and the congruence proof
+   `((♢v'·¬⋀ subst) ⇒ R) = ((♢v'·¬⊤) ⇒ R)` that ⊤-normalises the literal
+   substituted conjunction (the caller transports with `=⇒ (eq_sym cong)`).
+   None if the goal isn't the cancelling-bounds shape. *)
+val nrm29_witness_bridge : ctx -> prd -> (Lp_tree.term * Lp_tree.term) option
 
 (* AXM9 / NRM19: a (witness term, hyp name) discharging the goal. *)
 val find_axm9_match : ctx -> prd -> (Lp_tree.term * string) option

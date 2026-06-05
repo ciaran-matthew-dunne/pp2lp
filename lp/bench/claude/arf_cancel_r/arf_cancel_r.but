@@ -1,0 +1,1 @@
+Flag(FileOn("arf_cancel_r.res")) & Set(Valid.1 | Rule(Implication | (x + z = y + z => x = y) & _delta_e(x) & _delta_e(z) & _delta_e(y) | ? | ? | x + z = y + z => x = y | nn))

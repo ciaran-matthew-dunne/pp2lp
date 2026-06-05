@@ -111,6 +111,13 @@ symbol AXM4_1 [P R : Prop] : Res (P ⇒ R) ≔ mk_1 ⊤ trust;
 symbol AXM5_1 [P Q R : Prop] : Res (P ⇒ (Q ⇒ R)) ≔ mk_1 ⊤ trust;
 symbol AXM6_1 [P Q R : Prop] : Res (P ⇒ (¬ Q ⇒ R)) ≔ mk_1 ⊤ trust;
 symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_1 ⊤ trust;
+// AXM9_1: NOTE — `@inh_tuple n` hardcodes the witness, which is wrong when the
+// existential is witnessed by a ∀-bound variable (`P inh_tuple ≡ P _x` is then
+// unsolvable).  Fixing it (explicit witness + a v-dependent consequent so the
+// ALL7 chain `λ v, AXM9_1 v` generalises) is necessary but NOT sufficient — the
+// existential-under-universal goals (xst_under_all, xstf_all_exists) also leave
+// the outer XST8 negation chain's Res unresolved by HO-unification.  Deferred as
+// one item: the ALL7/XST8 continuation HO-unification frontier (Known broken).
 symbol AXM9_1 [n] [P : Tuple n → Prop] [Q : Prop]
   : Res (P (@inh_tuple n) ⇒ Q)
   ≔ mk_1 ⊤ trust;

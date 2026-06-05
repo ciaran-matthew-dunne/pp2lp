@@ -168,6 +168,32 @@ and default ctx rule arg anno children =
     (match tactic_opt with
      | Some tactic -> L.Then (tactic, tree ctx c)
      | None -> tree ctx c)
+  | [c], Rule_db.Nrm2730 ->
+    (* NRM27-30: trust-free arithmetic-solver dispatch.  Peel the pinned
+       binder at the witness `b`, then bridge the literal substituted
+       conjunction `⋀ (ps (v' ⨾ b v'))` to ⊤ (matching PP's ⊤-normalisation)
+       with a generated congruence proof, and the continuation child proves
+       the ⊤-form `♢v'·¬⊤ ⇒ R`.  Only NRM29 (the multi-binder ⇒R form) is
+       exercised by the corpus; the unary 28/30 and bare 27 fail loudly. *)
+    (match base rule with
+     | "NRM29" ->
+       (match goal with
+        | Some g ->
+          (match Emit_ctx.nrm29_witness_bridge ctx g with
+           | Some (b, cong) ->
+             L.Then (L.Refine (L.Name "NRM29", [b; L.Hole]),
+               L.Then (L.Refine (L.Name "=⇒",
+                         [L.App (L.Name "eq_sym", [cong]); L.Hole]),
+                 tree ctx c))
+           | None ->
+             failwith "translate: NRM29 goal is not the cancelling-bounds shape \
+                       (♡(d,…)·¬⋀(d+r≤𝟎 ∧ —d−r≤𝟎) ⇒ R); the solver witness \
+                       can't be reconstructed")
+        | None -> failwith "translate: NRM29 has no goal annotation")
+     | other ->
+       failwith (Printf.sprintf
+         "translate: %s trust-free dispatch unsupported — no corpus trace \
+          exercises it (only NRM29 is wired)" other))
   | [c], Rule_db.Ar7_8 ->
     (* AR7/AR8.  The child IMP4 introduces the solver antisymmetry equality,
        recorded bare-variable-first (`b = a`); its sides give a (= rhs) and

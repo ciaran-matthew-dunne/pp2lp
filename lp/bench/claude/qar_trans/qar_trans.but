@@ -1,0 +1,1 @@
+Flag(FileOn("qar_trans.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.(x <= y => y <= z => x <= z)) | ? | ? | !x.!y.!z.(x <= y => y <= z => x <= z) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("xst_refute.res")) & Set(Valid.1 | Rule(Implication | (a: s & not(a: t) => #x.(x: s & not(x: t))) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s & not(a: t) => #x.(x: s & not(x: t)) | nn))

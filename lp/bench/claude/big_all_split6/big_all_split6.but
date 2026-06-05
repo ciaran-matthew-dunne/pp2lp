@@ -1,0 +1,1 @@
+Flag(FileOn("big_all_split6.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g)) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) & _delta_e(g) | ? | ? | !x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g) | nn))

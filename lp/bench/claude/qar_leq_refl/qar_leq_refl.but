@@ -1,0 +1,1 @@
+Flag(FileOn("qar_leq_refl.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= x)) | ? | ? | !x.(x <= x) | nn))

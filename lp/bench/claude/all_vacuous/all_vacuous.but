@@ -1,0 +1,1 @@
+Flag(FileOn("all_vacuous.res")) & Set(Valid.1 | Rule(Implication | (!x.(a: s)) & _delta_e(a) & _delta_e(s) | ? | ? | !x.(a: s) | nn))

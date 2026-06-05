@@ -1,0 +1,1 @@
+Flag(FileOn("big_mixed.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => !x.(x: s => x: v)) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => !x.(x: s => x: v) | nn))

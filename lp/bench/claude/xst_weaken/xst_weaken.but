@@ -1,0 +1,1 @@
+Flag(FileOn("xst_weaken.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.(x: s or x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s => #x.(x: s or x: t) | nn))

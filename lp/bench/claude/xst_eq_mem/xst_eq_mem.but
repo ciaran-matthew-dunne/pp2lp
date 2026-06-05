@@ -1,0 +1,1 @@
+Flag(FileOn("xst_eq_mem.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.(x = a & x: s)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.(x = a & x: s) | nn))

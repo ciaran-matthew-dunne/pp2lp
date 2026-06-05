@@ -1,0 +1,1 @@
+Flag(FileOn("eq_contra_chain.res")) & Set(Valid.1 | Rule(Implication | (x = y & y = z & not(x = z) => bfalse) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(bfalse) | ? | ? | x = y & y = z & not(x = z) => bfalse | nn))

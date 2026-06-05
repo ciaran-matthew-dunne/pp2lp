@@ -1,0 +1,1 @@
+Flag(FileOn("eq_contra.res")) & Set(Valid.1 | Rule(Implication | (x = y & not(x = y) => bfalse) & _delta_e(x) & _delta_e(y) & _delta_e(bfalse) | ? | ? | x = y & not(x = y) => bfalse | nn))

@@ -47,13 +47,21 @@ and rhs =
 and line =
   lhs * rhs
 
+(** Desugar a literal product [n*e] (PP's rendering of a folded sum, e.g.
+    [x + x] ↦ [2*x]) back into the repeated sum [e + e + …].  B-arithmetic has
+    no multiplication, so the rest of the pipeline only ever sees sums.  Raises
+    on a non-literal product, which PP arithmetic replays never contain. *)
+val mul_expand : exp -> exp -> exp
+
 (** Collapse consecutive same-binder [Bind]s into one compound [Bind]
     (`!x. !y. P` ↦ `!(x,y). P`), mirroring PP's ALL2/ALL3 normalisation so
     the LP side sees a single Tuple-n binder. *)
 val flatten_binds : prd -> prd
 
 (** Capture-permissive substitution over the PP AST, used to instantiate
-    hypothesis-search patterns at chosen witness variables (AXM9, NRM19). *)
+    hypothesis-search patterns at chosen witness variables (AXM9, NRM19) and
+    to substitute the solver witness for the pinned binder (NRM29). *)
+val subst_exp : (string * exp) list -> exp -> exp
 val subst_prd : (string * exp) list -> prd -> prd
 
 (** The predicate carried by a rule annotation ([Simple] / [Fin]). *)

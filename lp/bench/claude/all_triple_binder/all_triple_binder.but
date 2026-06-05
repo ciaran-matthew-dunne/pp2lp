@@ -1,0 +1,1 @@
+Flag(FileOn("all_triple_binder.res")) & Set(Valid.1 | Rule(Implication | (!(x, y, z).(x: s & y: t & z: u => x, y, z: r)) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(r) | ? | ? | !(x, y, z).(x: s & y: t & z: u => x, y, z: r) | nn))

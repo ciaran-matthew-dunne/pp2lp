@@ -856,6 +856,18 @@ def _rm_benchmark(d: Path) -> None:
     shutil.rmtree(d, ignore_errors=True)
 
 
+def _strip_goal_comment(raw: str) -> str:
+    """Drop a `#` comment without eating PP's `#` existential binder.
+
+    A full-line comment starts with `#`; a trailing comment is a `#` preceded by
+    whitespace and followed by whitespace or end-of-line (`# note`).  PP writes
+    existentials as `#x` (no space after `#`), so `=> #x.(P)` is left intact."""
+    if raw.lstrip().startswith("#"):
+        return ""
+    m = re.search(r"\s#(?:\s|$)", raw)
+    return raw[:m.start()] if m else raw
+
+
 def gen_buts(suite, force=False):
     """Generate .but files from goals.txt, one per-benchmark dir (SUITE/NAME/NAME.but).
     Content-aware: a .but is rewritten only when its content changes (so unchanged
@@ -867,7 +879,7 @@ def gen_buts(suite, force=False):
     here = BENCH / suite
     wanted: dict[str, str] = {}          # name -> .but content
     for lineno, raw in enumerate(goals.read_text().splitlines(), 1):
-        line = raw.split("#", 1)[0].strip()
+        line = _strip_goal_comment(raw).strip()
         if not line:
             continue
         f = [x.strip() for x in line.split("|")]

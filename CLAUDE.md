@@ -63,24 +63,16 @@ Three rule shapes, decoded by `Rule_db.strip_suffix` / `is_primed`:
 - **base** — `[AND2]`. Plain LP refine.
 - **`_1` primed** — `[AND2_1]`. Inside a Res-typed equality chain preceding a
   branching quantifier.
-- **`_N` n-ary** — `[ALL7_2]`, `[NRM1_3]`. Binder count = N.
 
 Branching rules (`ALL7`, `XST8`) are two-child: a Res-typed chain plus a
 continuation under the bound variable.
-
-`rule_db.ml` is the **single source of truth** for rule metadata — arity, suffix
-decoding, phantom-rule predicate, and the **emit strategy** (a typed `emit`
-variant). `rule_emit.ml` matches that variant **exhaustively**, with warning 8
-fatal — so a new rule that adds a constructor *must* get a dispatch arm or the
-build breaks. Don't reimplement substring/`base rule = "…"` dispatch elsewhere.
-Unknown rule names are *errors*: `is_phantom` raises `rule_db: unknown rule …`.
 
 ## Source layout
 
 The OCaml pipeline (`ocaml/src/`, core modules carry `.mli`):
 `parse_replay.ml` (.replay → rules) → `rule_db.ml` (rule metadata + the typed
 `emit` dispatch key) → `proof_tree.ml` (rules → tree) → `translate.ml` (tree →
-lp_tree walker: sequence/assume/branch, main + Res-chain, provenance via
+lp_tree walker: sequence/assume/branch, main + Res-chain, 
 `prov_of`) → `rule_emit.ml` (per-rule `refine`, exhaustive emit match) →
 `pp_lp.ml` (PP AST → LP source). Supporting: `lexer.mll`/`parser.mly`,
 `syntax_pp.ml`/`emit_pp.ml` (PP AST), `free_vars.ml`, `emit_ctx.ml`
@@ -106,13 +98,6 @@ doc/                 pp-spec-full.pdf (PP spec, ch. 1–10) +
 ```
 
 ## Workflows
-
-### Iterating on the emitter
-
-After editing OCaml source, `pp2lp run og/01` (it rebuilds first). On failure
-the lambdapi diagnostic gets ±3 lines of source context pointing into the
-emitted `lp/bench/SUITE/NAME/NAME.lp`, with the originating PP rule and replay
-step shown under each error.
 
 ### Debugging a failing trace
 
@@ -185,6 +170,16 @@ they exit non-zero while any goal fails, so don't gate on them. Run the suite
   continuation's `res_tm` over a simple `STOP_1` chain doesn't resolve the
   universal via HO-unification (`--lp-debug=u` shows the unsolvable `Res … ≡ ⊥`
   constraint).
+- **Existential under a universal** (`#y` inside `!x.(… ⇒ #y.…)`; e.g. the
+  `claude` suite's `xst_under_all`, `xstf_all_exists`, `xstf_dom_witness`). Plain
+  existentials and compound binders pass; only an existential whose witness is the
+  ∀-bound variable fails. Two compounding causes: (1) `AXM9_1` (`Axm.lp`) hardcodes
+  its witness at `@inh_tuple n`, so the ALL7-chain element gives the unsolvable
+  `P inh_tuple ≡ P _x` — passing the real witness fixes that, but (2) the chain
+  `ρ : Π v, Res (P v)` won't generalise to `λ v, AXM9_1 v` from the `{assume v; …}`
+  block, and the outer `XST8` negation chain's `Res` stays a metavariable. Needs
+  the `ALL7`/`XST8` continuation resolved by *explicit* `Res` terms rather than
+  block + HO-unification — a structural change to the branching emission.
 
 PP emits a few identifiers with a leading `_` (`_eql_set`, `_pj1`, `_pj2`); the
 lexer treats `_` as a valid identifier-start and the emitter maps them to their
@@ -260,6 +255,12 @@ replay-natively. Unknown rule names raise.
   of truth** — generation rewrites *every* benchmark dir, so add goals there, not
   as loose files; removing a goal removes its dir. nrm_test's `COVERAGE.md` maps
   each NRM rule → goal. Any failing goal ⇒ exit 1.
+- **claude** — a hand-authored *pipeline stress / coverage* suite (same
+  `goals.txt` mechanism), not a green gate: it spans every rule family + proof
+  sizes 1→416 replay lines and probes the failure frontier on purpose (sections
+  L–P are expected ✗/⚠). 233 goals → 85/93 rules exercised. Used to find bugs;
+  inline notes flag each frontier blocker. **`#` existentials are allowed** in
+  goals.txt (the comment splitter no longer eats `#x`).
 
 ## Commits
 

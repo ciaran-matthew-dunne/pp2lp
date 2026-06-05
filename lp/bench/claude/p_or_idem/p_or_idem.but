@@ -1,0 +1,1 @@
+Flag(FileOn("p_or_idem.res")) & Set(Valid.1 | Rule(Implication | (a or a <=> a) & _delta_p(a) | ? | ? | a or a <=> a | nn))

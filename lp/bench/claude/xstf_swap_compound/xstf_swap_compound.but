@@ -1,0 +1,1 @@
+Flag(FileOn("xstf_swap_compound.res")) & Set(Valid.1 | Rule(Implication | (#(x, y).(x, y: r) => #(y, x).(y, x: r)) & _delta_e(r) | ? | ? | #(x, y).(x, y: r) => #(y, x).(y, x: r) | nn))

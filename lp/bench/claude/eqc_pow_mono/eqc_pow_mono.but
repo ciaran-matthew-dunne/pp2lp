@@ -1,0 +1,1 @@
+Flag(FileOn("eqc_pow_mono.res")) & Set(Valid.1 | Rule(Implication | (s <: t => POW(s) <: POW(t)) & _delta_e(s) & _delta_e(t) | ? | ? | s <: t => POW(s) <: POW(t) | nn))

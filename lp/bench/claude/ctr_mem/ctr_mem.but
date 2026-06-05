@@ -1,0 +1,1 @@
+Flag(FileOn("ctr_mem.res")) & Set(Valid.1 | Rule(Implication | (x: s & not(x: s) => bfalse) & _delta_e(x) & _delta_e(s) & _delta_e(bfalse) | ? | ? | x: s & not(x: s) => bfalse | nn))

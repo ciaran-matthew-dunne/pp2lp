@@ -1,0 +1,1 @@
+Flag(FileOn("arf_sub_swap.res")) & Set(Valid.1 | Rule(Implication | ((x - y) - z = (x - z) - y) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | (x - y) - z = (x - z) - y | nn))

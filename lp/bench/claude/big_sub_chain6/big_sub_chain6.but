@@ -1,0 +1,1 @@
+Flag(FileOn("big_sub_chain6.res")) & Set(Valid.1 | Rule(Implication | (s <: t & t <: u & u <: v & v <: w & w <: r => s <: r) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) & _delta_e(w) & _delta_e(r) | ? | ? | s <: t & t <: u & u <: v & v <: w & w <: r => s <: r | nn))

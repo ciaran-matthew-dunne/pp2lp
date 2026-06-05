@@ -1,0 +1,1 @@
+Flag(FileOn("xst_in_dom.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) => #x.(x: dom(f))) & _delta_e(a) & _delta_e(f) | ? | ? | a: dom(f) => #x.(x: dom(f)) | nn))

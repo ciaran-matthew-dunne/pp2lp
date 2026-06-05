@@ -1,0 +1,1 @@
+Flag(FileOn("imp_chain_use.res")) & Set(Valid.1 | Rule(Implication | (a & (a => b) & (b => c) & (c => d) => d) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | a & (a => b) & (b => c) & (c => d) => d | nn))

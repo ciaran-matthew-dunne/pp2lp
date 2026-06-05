@@ -1,0 +1,1 @@
+Flag(FileOn("xst_app.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) & f(a) = b => #x.(f(x) = b)) & _delta_e(a) & _delta_e(f) & _delta_e(b) | ? | ? | a: dom(f) & f(a) = b => #x.(f(x) = b) | nn))

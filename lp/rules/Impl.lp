@@ -63,10 +63,15 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 
-// IMP1_1: Schema 1 — passthrough.
+// IMP1_1: Schema 1 — passthrough.  Preserve the child's ⋀-list (`mk_res (res_ts r)`
+// rather than collapsing to the singleton `mk_1 (res_tm r)`): when this result
+// feeds an outer IMP3_1/IMP2_1 `concat`, the list must stay flat so a ≥3-conjunct
+// cascade body becomes `⋀(∎∷A∷B∷C)`, not `⋀(∎∷A∷(B∧C))` — the latter mis-associates
+// the continuation's NRM7 snoc-peel.  `res_tm` is unchanged (singleton-collapse),
+// so the proof term and every res_tm-consuming use site are identical.
 symbol IMP1_1 [P Q R : Prop]
   (r : Res (P ⇒ ¬ Q ⇒ R)) : Res (¬ (P ⇒ Q) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans imp1_eq (res_eq r));
+  ≔ mk_res (res_ts r) (eq_trans imp1_eq (res_eq r));
 
 // IMP2_1: Schema 2 — combine.
 symbol IMP2_1 [P Q : Prop]

@@ -1,0 +1,1 @@
+Flag(FileOn("big_conj_nested.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => (x: a & x: b) & (x: c & x: d))) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) | ? | ? | !x.(x: s => (x: a & x: b) & (x: c & x: d)) | nn))

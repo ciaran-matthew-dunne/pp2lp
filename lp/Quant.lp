@@ -79,6 +79,37 @@ with take [+1 $n] [$m] ($v ⨾ $x)  ↪ take [$n] [$m] $v ⨾ $x;
 rule prj $k (take [$n] [$m] $v) ↪ prj $k $v
 with prj $k (drop [$n] [$m] $v) ↪ prj ($n ++ $k) $v;
 
+// ---- Tuple value destructor + η --------------------------------
+//
+// A `Set`-code for `Tuple`, mirroring `list*` for `𝕃*`, so the
+// polymorphic Leibniz `=` (typed over `τ a`) applies to tuple values —
+// equality is otherwise inexpressible on the bare `Tuple n : TYPE`.
+symbol Tup : ℕ → Set;
+rule τ (Tup $n) ↪ Tuple $n;
+
+// `init v` : all but the last (`prj 0`) element of a non-empty tuple.
+symbol init [n] : Tuple (+1 n) → Tuple n;
+rule init ($v ⨾ _) ↪ $v;
+
+// η for tuples: `(init v) ⨾ (prj 0 v) = v` for an *abstract* `v : Tuple
+// (+1 n)`.  Direct `induction` on `Tuple (+1 n)` fails (the index is a
+// non-variable `+1 n`); instead drive `ind_Tuple` with a total motive
+// that reduces to ⊤ at index 0 and to the η statement at a successor —
+// so `init`/`prj 0` are only ever applied where they are well-typed.
+symbol eta_motive : Π m, Tuple m → Prop;
+rule eta_motive 0      _   ↪ ⊤
+with eta_motive (+1 _) $v  ↪ ((init $v) ⨾ (prj 0 $v)) = $v;
+
+opaque symbol tuple_eta_gen : Π m (v : Tuple m), π (eta_motive m v) ≔
+begin
+  refine ind_Tuple (λ m v, eta_motive m v) _ _
+  { refine ⊤ᵢ }
+  { assume m t ih x; refine eq_refl _ }
+end;
+
+opaque symbol tuple_eta [n] (v : Tuple (+1 n)) : π (((init v) ⨾ (prj 0 v)) = v) ≔
+begin assume n v; refine tuple_eta_gen (+1 n) v end;
+
 // ---- `!!` n-ary universal --------------------------------------
 
 // Kept *rigid* (no reduction rules). If `!!` reduced eagerly to

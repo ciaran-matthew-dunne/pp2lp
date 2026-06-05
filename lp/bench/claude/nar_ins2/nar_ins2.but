@@ -1,0 +1,1 @@
+Flag(FileOn("nar_ins2.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x + y <= 0 => not(0 <= x + y))) | ? | ? | !x.!y.(x + y <= 0 => not(0 <= x + y)) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("sub_singleton.res")) & Set(Valid.1 | Rule(Implication | (x: s => {x} <: s) & _delta_e(x) & _delta_e(s) | ? | ? | x: s => {x} <: s | nn))

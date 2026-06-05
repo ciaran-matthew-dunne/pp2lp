@@ -1,0 +1,1 @@
+Flag(FileOn("ar_add_comm_leq.res")) & Set(Valid.1 | Rule(Implication | (x + y <= z => y + x <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x + y <= z => y + x <= z | nn))

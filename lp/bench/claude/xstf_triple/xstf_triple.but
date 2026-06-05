@@ -1,0 +1,1 @@
+Flag(FileOn("xstf_triple.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: t & c: u => #x.#y.#z.(x: s & y: t & z: u)) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) & _delta_e(c) & _delta_e(u) | ? | ? | a: s & b: t & c: u => #x.#y.#z.(x: s & y: t & z: u) | nn))

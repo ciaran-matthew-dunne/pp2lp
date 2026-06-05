@@ -408,3 +408,38 @@ begin
                   (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc ⊤ (P v))))) };
   rewrite hpred; reflexivity
 end;
+
+// NRM13 bridge: ((♢v·(P v ⇒ Q v)) ⇒ R) = ((♡v·¬(P v ∧ ¬Q v)) ⇒ R).  The body
+// equivalence (P⇒Q) ⟺ ¬(P ∧ ¬Q) is classical (needs `em` on Q v); ♢/♡ both
+// reduce to !!, so !!_cong lifts it.  Used by NRM13_1 (the chain-form NRM13).
+opaque symbol nrm13_eq [n] [P Q : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, P v ⇒ Q v) ⇒ R) = ((`♡ v, ¬ ⋀_snoc (P v) (¬ Q v)) ⇒ R)) ≔
+begin
+  assume n P Q R;
+  have hbody : Π v, π ((P v ⇒ Q v) = (¬ ⋀_snoc (P v) (¬ Q v)))
+    { assume v;
+      refine propExt _ _
+        (λ hpq hcon, (⋀₂_snd hcon) (hpq (⋀₂_hd hcon)))
+        (λ hncon hp, ∨ₑ (em (Q v)) (λ hq, hq)
+                       (λ hnq, ⊥ₑ (hncon (⋀₂_intro hp hnq)))) };
+  have hpred : π ((`♢ v, P v ⇒ Q v) = (`♡ v, ¬ ⋀_snoc (P v) (¬ Q v)))
+    { refine eq_trans (♢_eq_!! (λ v, P v ⇒ Q v))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc (P v) (¬ Q v))))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM23 bridge: ((♡v:Tuple1·¬(⊤ ∧ (E = prj 0 v))) ⇒ Q) = (¬⊤ ⇒ Q).  The ♡ body
+// is ¬(E = prj 0 v); over Tuple 1 the witness v = unit⨾E makes it absurd, so the
+// quantified head collapses to ¬⊤.  Used by NRM23_1 (the chain-form NRM23).
+opaque symbol nrm23_eq [Q : Prop] (E : τ ι)
+  : π (((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v))) ⇒ Q) = (¬ ⊤ ⇒ Q)) ≔
+begin
+  assume Q E;
+  have hpred : π ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v))) = ¬ ⊤)
+    { refine propExt _ _
+        (λ h♡ ht, ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v)))
+                          h♡ (unit ⨾ E) (⋀₂_intro ht (eq_refl E)))
+        (λ hn⊤, ⊥ₑ (hn⊤ ⊤ᵢ)) };
+  rewrite hpred; reflexivity
+end;

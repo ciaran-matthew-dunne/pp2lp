@@ -372,7 +372,7 @@ begin
     (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_prepend 𝟎 v')))
 end;
 
-// ---- NRM27-30: Arithmetic solver dispatch ----
+// ---- NRM27-30: Arithmetic solver dispatch (trust-free) ----
 //
 // PP's solver closes a universal hypothesis `♡(x₁,…,xₙ)·¬(P ∧ … ∧ Q)`
 // when the conjunction holds two bounding inequalities `a + xᵢ ≤ 𝟎` and
@@ -380,67 +380,116 @@ end;
 // substituted conjunction `[xᵢ := b](P ∧ … ∧ Q)` is satisfiable, so the
 // universal-of-negation is *false* and discharges the sequent.
 //
-// In LP this is an INS-style contradiction: the hypothesis is refuted at
-// the solver's witness point.  We instantiate the `♡`-binder at the
-// canonical zero tuple — the solver substitution evaluates there — and
-// take the witnessing conjunction proof `π (P 𝟎⃗)` as a solver-confirmed
-// side condition (`trust`, exactly as INS / AR2 arithmetic conjuncts do).
-// The continuation `h` is the (re-expanded `⊤`-normalised) child the
-// replay still records; the contradiction makes it vacuous.
+// Trust-free realisation: peel the pinned binder by *instantiating* the
+// `♡`-hypothesis at the solver witness `b` (the membership premises the
+// spec carries are solver bookkeeping — unused here).  This leaves the
+// continuation premise `♢v'·¬⋀(ps (v' ⨾ b v')) ⇒ R`; the emitter bridges
+// the literal substituted conjunction `⋀ (ps (v' ⨾ b v'))` to ⊤ with a
+// generated congruence proof (each cancelling bound = ⊤ via `eq_true` +
+// `leq_zero_of_sum_zero` + `prove_sum_eq`), matching PP's ⊤-normalisation.
 //
 //   NRM27 / NRM29 — multi-binder (♡-block) forms, drop one binder.
 //   NRM28 / NRM30 — unary (♡x) forms, drop the binder entirely.
 //   27/28 are the `xᵢ = 𝟎` specialisation (a = b = 𝟎) of 29/30.
 
-// Canonical all-zeros tuple — the solver witness point.  (`inh_tuple`
-// fills with the abstract `inh`; here we need the numeral 𝟎.)
-symbol zeros [n] : Tuple n;
-rule zeros [0]      ↪ unit
-with zeros [+1 $n]  ↪ zeros [$n] ⨾ 𝟎;
+// ---- helper lemmas for the trust-free solver dispatch ----
 
-// NRM29: multi-binder, general bounds.  Refute `♡v·¬(P v)` at 𝟎⃗.
-opaque symbol NRM29 [n] [P : Tuple (+1 n) → Prop] [G : Prop]
-  (hw : π (P (zeros [+1 n])))
-  (h  : π ((`♡ _ : Tuple n, ¬ ⊤) ⇒ G))
-  : π ((`♡ v : Tuple (+1 n), ¬ (P v)) ⇒ G) ≔
+// `P` provably true ⟹ `P = ⊤`, so a ⋀-conjunct the solver discharges can
+// be rewritten to ⊤ and absorbed by `⋀ (_ ∷ ⊤) ↪ ⋀ _`.
+opaque symbol eq_true (P : Prop) : π P → π (P = ⊤) ≔
 begin
-  assume n P G hw h h♡;
-  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P v)) h♡ (zeros [+1 n]) hw)
+  assume P h;
+  refine propExt _ _ _ _
+  { assume hp; refine ⊤ᵢ }
+  { assume ht; refine h }
 end;
 
-// NRM27: bare goal (no `⇒R`), `xᵢ = 𝟎` specialisation.  The goal
-// `♡v·¬(P v)` reduces to `♢v'·¬(R v')` where `R = [xᵢ := 𝟎]P` drops the
-// pinned binder.  `P v ⟹ R (drop v)` (the bounds force xᵢ = 𝟎) is the
-// solver-confirmed bridge; with it, `R` unsatisfiable ⟹ `P` unsatisfiable.
-// Untriggered in the corpus — stated to the spec shape, `bridge` `trust`ed.
-opaque symbol NRM27 [n] [P : Tuple (+1 n) → Prop] [R : Tuple n → Prop]
-  (bridge : Π v : Tuple (+1 n), π (P v) → π (R (drop [1] [n] v)))
-  (h : π (`♢ v' : Tuple n, ¬ (R v')))
-  : π (`♡ v : Tuple (+1 n), ¬ (P v)) ≔
+// A sum that arithmetic-normalises to 𝟎 is ≤ 𝟎.  The emitter builds the
+// `E = 𝟎` proof with `prove_sum_eq` (add_comm/assoc/opp cancellation).
+opaque symbol leq_zero_of_sum_zero (E : τ ι) : π (E = 𝟎) → π (E ≤ 𝟎) ≔
 begin
-  assume n P R bridge h;
-  refine pi_to_♡ (λ v, ¬ (P v))
-    (λ v hp, ♢_to_pi (λ v', ¬ (R v')) h (drop [1] [n] v) (bridge v hp))
+  assume E h;
+  rewrite h;
+  refine leq_refl 𝟎
 end;
 
-// NRM30: unary binder, general bounds.  Drop the binder entirely.
-opaque symbol NRM30 [P : τ ι → Prop] [G : Prop]
-  (hw : π (P 𝟎))
-  (h  : π (¬ ⊤ ⇒ G))
-  : π ((`♡ v : Tuple 1, ¬ (P (prj 0 v))) ⇒ G) ≔
+// `mem P ps` : `P` occurs (up to propositional equality) in the conjunct
+// list `ps`.  The solver's "(x ≤ 𝟎) est dans (P ∧ … ∧ Q)" side-conditions.
+symbol mem : Prop → 𝕃* o → Prop;
+rule mem _  ∎          ↪ ⊥
+with mem $P ($ps ∷ $Q) ↪ (mem $P $ps) ∨ ($P = $Q);
+
+// If `P ∈ ps` and `⋀ ps` holds, then `P` holds — the membership premises
+// are sound, so NRM27 needs no `trust` to use them.
+opaque symbol mem_sound (P : Prop)
+  : Π ps : 𝕃* o, π (mem P ps) → π (⋀ ps) → π P ≔
 begin
-  assume P G hw h h♡;
-  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P (prj 0 v))) h♡ (unit ⨾ 𝟎) hw)
+  assume P;
+  induction
+  { assume hmem hconj; refine ⊥ₑ hmem }
+  { assume ps ih Q hmem hconj;
+    refine ∨ₑ hmem _ _
+    { assume hin; refine ih hin (⋀_init hconj) }
+    { assume heq; refine =⇒ (eq_sym heq) (⋀_last hconj) } }
 end;
 
-// NRM28: `x = 𝟎` specialisation of NRM30 (same shape, same proof).
-opaque symbol NRM28 [P : τ ι → Prop] [G : Prop]
-  (hw : π (P 𝟎))
-  (h  : π (¬ ⊤ ⇒ G))
-  : π ((`♡ v : Tuple 1, ¬ (P (prj 0 v))) ⇒ G) ≔
+// NRM27: bare goal (no `⇒R`), the `xᵢ = 𝟎` case.  The bounds `prj 0 v ≤ 𝟎`
+// and `— prj 0 v ≤ 𝟎` (members of the conjunction) pin `prj 0 v = 𝟎` by
+// antisymmetry; tuple-η (`(init v) ⨾ 𝟎 = v`, via Quant.lp) then transports
+// `⋀ (ps v)` to `⋀ (ps ((init v) ⨾ 𝟎))`, contradicting the premise.  Fully
+// trust-free; untriggered in the corpus (the only NRM2x trace is NRM29).
+opaque symbol NRM27 [n] [ps : Tuple (+1 n) → 𝕃* o]
+  (hpos : Π v, π (mem (prj 0 v ≤ 𝟎) (ps v)))
+  (hneg : Π v, π (mem (— prj 0 v ≤ 𝟎) (ps v)))
+  : π (`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎)))
+  → π (`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ≔
 begin
-  assume P G hw h h♡;
-  refine ⊥ₑ (♡_to_pi (λ v, ¬ (P (prj 0 v))) h♡ (unit ⨾ 𝟎) hw)
+  assume n ps hpos hneg h_prem;
+  refine pi_to_♡ (λ v, ¬ ⋀ (ps v)) (λ v hpv, _);
+  have hle : π (prj 0 v ≤ 𝟎)
+    { refine mem_sound _ (ps v) (hpos v) hpv };
+  have hge : π (𝟎 ≤ prj 0 v)
+    { refine neg_leq_zero (prj 0 v) (mem_sound _ (ps v) (hneg v) hpv) };
+  have hz : π (prj 0 v = 𝟎)
+    { refine leq_antisym (prj 0 v) 𝟎 hle hge };
+  have heq : π (((init v) ⨾ 𝟎) = v)
+    { rewrite left hz; refine tuple_eta v };
+  have hcontra : π (¬ ⋀ (ps ((init v) ⨾ 𝟎)))
+    { refine ♢_to_pi (λ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎))) h_prem (init v) };
+  have hgood : π (⋀ (ps ((init v) ⨾ 𝟎)))
+    { rewrite heq; refine hpv };
+  refine hcontra hgood
+end;
+
+// NRM30: unary ♡x, general witness b.  Instantiate at b, feed the premise.
+opaque symbol NRM30 [ps : τ ι → 𝕃* o] [R : Prop] (b : τ ι)
+  : π (¬ ⋀ (ps b) ⇒ R)
+  → π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔
+begin
+  assume ps R b h_prem h♡;
+  refine h_prem (♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) h♡ (unit ⨾ b))
+end;
+
+// NRM28: x := 𝟎 specialisation of NRM30.
+opaque symbol NRM28 [ps : τ ι → 𝕃* o] [R : Prop]
+  : π (¬ ⋀ (ps 𝟎) ⇒ R)
+  → π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔
+begin
+  assume ps R h_prem h♡;
+  refine h_prem (♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) h♡ (unit ⨾ 𝟎))
+end;
+
+// NRM29: multi-binder, pin the prj0 slot to `b v'` (witness a function of
+// the remaining binders — e.g. b v' = — prj 0 v' for the sum-zero /
+// cancelling case).  The emitter supplies `b` and the ⊤-normalisation
+// bridge for the substituted conjunction `⋀ (ps (v' ⨾ b v'))`.
+opaque symbol NRM29 [n] [ps : Tuple (+1 n) → 𝕃* o] [R : Prop] (b : Tuple n → τ ι)
+  : π ((`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ b v'))) ⇒ R)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ R) ≔
+begin
+  assume n ps R b h_prem h♡;
+  refine h_prem (pi_to_♢ (λ v', ¬ ⋀ (ps (v' ⨾ b v')))
+    (λ v', ♡_to_pi (λ v, ¬ ⋀ (ps v)) h♡ (v' ⨾ b v')))
 end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
@@ -459,3 +508,36 @@ symbol NRM1_1 [n] [P Q : Prop]
 symbol NRM14_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R)) : Res ((`♢ v, ¬ (P v)) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm14_eq n P R) (res_eq r));
+
+// NRM13_1 — chain (Res) form of NRM13, via the `nrm13_eq` bridge (Res.lp).
+symbol NRM13_1 [n] [P Q : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀_snoc (P v) (¬ Q v)) ⇒ R)) : Res ((`♢ v, P v ⇒ Q v) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm13_eq n P Q R) (res_eq r));
+
+// NRM3 bridge: ((♢v·(P v ⇒ Q)) ⇒ S) = ((Q ⇒ S) ∧ ((∀v·¬P v) ⇒ S)), Q is v-free.
+// (Lives here, not Res.lp, because the ⇐ direction reuses NRM3 itself; the ⇒
+// direction builds the ♢ witness from Q, or vacuously from ¬P v.)
+opaque symbol nrm3_eq [n] [P : Tuple n → Prop] [Q S : Prop]
+  : π (((`♢ v, P v ⇒ Q) ⇒ S) = ⋀_snoc (Q ⇒ S) ((`!! v, ¬ (P v)) ⇒ S)) ≔
+begin
+  assume n P Q S;
+  refine propExt _ _
+    (λ hres, ⋀₂_intro
+       (λ hq, hres (pi_to_♢ (λ v, P v ⇒ Q) (λ v hpv, hq)))
+       (λ hnp, hres (pi_to_♢ (λ v, P v ⇒ Q)
+                       (λ v hpv, ⊥ₑ (!!_to_pi (λ v, ¬ (P v)) hnp v hpv)))))
+    (λ hprem, @NRM3 n P Q S hprem)
+end;
+
+// NRM3_1 — chain (Res) form of NRM3, via the `nrm3_eq` bridge above.  The
+// premise is the snoc-conjunction the emitter discharges with AND4_1.
+symbol NRM3_1 [n] [P : Tuple n → Prop] [Q S : Prop]
+  (r : Res (⋀_snoc (Q ⇒ S) ((`!! v, ¬ (P v)) ⇒ S))) : Res ((`♢ v, P v ⇒ Q) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm3_eq n P Q S) (res_eq r));
+
+// NRM23_1 — chain (Res) form of NRM23, via the `nrm23_eq` bridge (Res.lp).  E is
+// implicit here (the emitter emits `NRM23_1 _`, inferring E from the Res target).
+symbol NRM23_1 [Q : Prop] [E : τ ι]
+  (r : Res (¬ ⊤ ⇒ Q))
+  : Res ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v))) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm23_eq Q E) (res_eq r));

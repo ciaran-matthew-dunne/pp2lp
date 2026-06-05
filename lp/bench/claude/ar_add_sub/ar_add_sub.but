@@ -1,0 +1,1 @@
+Flag(FileOn("ar_add_sub.res")) & Set(Valid.1 | Rule(Implication | ((x + y) - y = x) & _delta_e(x) & _delta_e(y) | ? | ? | (x + y) - y = x | nn))

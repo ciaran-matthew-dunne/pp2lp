@@ -20,6 +20,8 @@ lp/bench/nrm_test/**/*.trace
 lp/bench/nrm_test/**/*.replay
 lp/bench/gemini/**/*.trace
 lp/bench/gemini/**/*.replay
+lp/bench/claude/**/*.trace
+lp/bench/claude/**/*.replay
 
 # Emitted/generated Lambdapi/PP files under the pp2lp package.
 lp/bench/**/*.lp

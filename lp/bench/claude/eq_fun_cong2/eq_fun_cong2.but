@@ -1,0 +1,1 @@
+Flag(FileOn("eq_fun_cong2.res")) & Set(Valid.1 | Rule(Implication | (x = y => f(g(x)) = f(g(y))) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(g) | ? | ? | x = y => f(g(x)) = f(g(y)) | nn))
