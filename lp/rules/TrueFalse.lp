@@ -77,7 +77,7 @@ end;
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
 // Schema 0 (rules without genuine antecedents, except STOP): Result is
-// TRUE — encoded as `mk_1 ⊤ (eq lemma)` where the lemma is propositional.
+// TRUE — encoded as `mk_0 (eq lemma)` where the lemma is propositional.
 // Schema 1 (passthrough): res_tm = child's res_tm.
 // STOP_1 (Schema 0 special — STOP'): Result is P (the goal itself).
 
@@ -86,13 +86,13 @@ symbol STOP_1 [P : Prop] : Res P
   ≔ mk_res (∎ ∷ P) (eq_refl P);
 
 // VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤.
-symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_1 ⊤ trust;
+symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_0 trust;
 
 // VR2_1: Schema 1 — child's Res ⊥ becomes Res (¬⊤). Uses stdlib's
 // `¬⊥ : π (¬⊥ = ⊤)` after swapping the direction.
 symbol VR2_1
   (r : Res ⊥) : Res (¬ ⊤)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 // VR3_1: Schema 1 — passthrough. Uses stdlib's `⊤⇒ P : π ((⊤ ⇒ P) = P)`.
 symbol VR3_1 [P : Prop]
@@ -100,7 +100,7 @@ symbol VR3_1 [P : Prop]
   ≔ mk_1 (res_tm r) (eq_trans (⊤⇒ P) (res_eq r));
 
 // VR4_1: Schema 0 — trivially `⊤ = ⊤`.
-symbol VR4_1 : Res ⊤ ≔ mk_1 ⊤ (eq_refl ⊤);
+symbol VR4_1 : Res ⊤ ≔ mk_0 (eq_refl ⊤);
 
 // FX1_1: Schema 1 — passthrough through `¬⊥ ⇒ R = R`.
 symbol FX1_1 [R : Prop]
@@ -108,13 +108,13 @@ symbol FX1_1 [R : Prop]
   ≔ mk_1 (res_tm r) trust;
 
 // FX2_1: Schema 0 — `¬⊥ = ⊤` from stdlib.
-symbol FX2_1 : Res (¬ ⊥) ≔ mk_1 ⊤ ¬⊥;
+symbol FX2_1 : Res (¬ ⊥) ≔ mk_0 ¬⊥;
 
 // FX3_1: Schema 0 — `⊥ ⇒ R = ⊤` from stdlib.
-symbol FX3_1 [R : Prop] : Res (⊥ ⇒ R) ≔ mk_1 ⊤ (⊥⇒ R);
+symbol FX3_1 [R : Prop] : Res (⊥ ⇒ R) ≔ mk_0 (⊥⇒ R);
 
 // INS_1: Schema 1 — passthrough. The chain leaf is supplied by PP's
 // instantiation phase; LP-side carries res_tm through.
 symbol INS_1 [P : Prop]
   (r : Res ⊥) : Res P
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;

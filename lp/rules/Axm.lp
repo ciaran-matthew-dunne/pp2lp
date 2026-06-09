@@ -102,15 +102,15 @@ end;
 
 // AXM7_1: the only AXM_N_1 whose proof is unconditional — `P ⇒ P` is
 // always propositionally `⊤` (stdlib `⇒_idem`).
-symbol AXM7_1 [P : Prop] : Res (P ⇒ P) ≔ mk_1 ⊤ (⇒_idem P);
+symbol AXM7_1 [P : Prop] : Res (P ⇒ P) ≔ mk_0 (⇒_idem P);
 
-symbol AXM1_1 [P Q : Prop] : Res (P ⇒ Q) ≔ mk_1 ⊤ trust;
-symbol AXM2_1 [P Q : Prop] : Res (¬ P ⇒ Q) ≔ mk_1 ⊤ trust;
-symbol AXM3_1 [P : Prop] : Res P ≔ mk_1 ⊤ trust;
-symbol AXM4_1 [P R : Prop] : Res (P ⇒ R) ≔ mk_1 ⊤ trust;
-symbol AXM5_1 [P Q R : Prop] : Res (P ⇒ (Q ⇒ R)) ≔ mk_1 ⊤ trust;
-symbol AXM6_1 [P Q R : Prop] : Res (P ⇒ (¬ Q ⇒ R)) ≔ mk_1 ⊤ trust;
-symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_1 ⊤ trust;
+symbol AXM1_1 [P Q : Prop] : Res (P ⇒ Q) ≔ mk_0 trust;
+symbol AXM2_1 [P Q : Prop] : Res (¬ P ⇒ Q) ≔ mk_0 trust;
+symbol AXM3_1 [P : Prop] : Res P ≔ mk_0 trust;
+symbol AXM4_1 [P R : Prop] : Res (P ⇒ R) ≔ mk_0 trust;
+symbol AXM5_1 [P Q R : Prop] : Res (P ⇒ (Q ⇒ R)) ≔ mk_0 trust;
+symbol AXM6_1 [P Q R : Prop] : Res (P ⇒ (¬ Q ⇒ R)) ≔ mk_0 trust;
+symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_0 trust;
 // AXM9_1: NOTE — `@inh_tuple n` hardcodes the witness, which is wrong when the
 // existential is witnessed by a ∀-bound variable (`P inh_tuple ≡ P _x` is then
 // unsolvable).  Fixing it (explicit witness + a v-dependent consequent so the
@@ -120,5 +120,4 @@ symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_1 ⊤ trust;
 // one item: the ALL7/XST8 continuation HO-unification frontier (Known broken).
 symbol AXM9_1 [n] [P : Tuple n → Prop] [Q : Prop]
   : Res (P (@inh_tuple n) ⇒ Q)
-  ≔ mk_1 ⊤ trust;
-
+  ≔ mk_0 trust;

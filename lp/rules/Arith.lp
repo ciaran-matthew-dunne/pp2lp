@@ -233,7 +233,7 @@ symbol AR1_1 [E : τ ι] [R : Prop]
   (r : Res R) : Res ((E ≤ E) ⇒ R)
   ≔ mk_1 (res_tm r) trust;
 
-symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_1 ⊤ trust;
+symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_0 trust;
 
 symbol AR3_1 (a : τ ι) [R : Prop]
   (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
@@ -251,7 +251,7 @@ symbol AR3'_1 (a r : τ ι) [R : Prop]
           (eq_trans (imp_cong_l (leq_zero_eq eq)) (res_eq cont)));
 
 symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι) : Res ((E ≤ 𝟎) ⇒ R)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol AR5_1 [a : τ ι] [R : Prop]
   (r : Res ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))) : Res ((— a ≤ 𝟎) ⇒ R)
@@ -286,10 +286,10 @@ symbol AR10_1 [P Q R : Prop]
   (heq : π (P = Q)) (r : Res (Q ⇒ R)) : Res (P ⇒ R)
   ≔ mk_1 (res_tm r) trust;
 
-symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P) ≔ mk_0 trust;
 
 symbol AR12_1 [a b : τ ι] [P : Prop]
   (r : Res P) : Res ((a ≤ b) ⇒ P)
   ≔ mk_1 (res_tm r) trust;
 
-symbol AR13_1 [a b : τ ι] : Res (¬ (a ≤ 𝟎)) ≔ mk_1 ⊤ trust;
+symbol AR13_1 [a b : τ ι] : Res (¬ (a ≤ 𝟎)) ≔ mk_0 trust;

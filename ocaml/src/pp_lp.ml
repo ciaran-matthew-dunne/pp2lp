@@ -62,6 +62,16 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
   | Var s -> pp_ident buf s
   | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 *)
   | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 *)
+  | Nat n when n > 64 ->
+    (* Bare decimal literal: parsed positionally (O(digits)) via
+       Stdlib.Nat's builtins, coerced ℕ → τ ι by B.lp's `int_lit`
+       coercion.  The unary render below is ~n text nodes — 2³¹ for
+       NAT-membership's MAXINT.  Constraint: identical occurrences
+       compare syntactically, but whnf of a big `int_lit` diverges
+       (the int_lit rules are unary) — no proof may force it. *)
+    Buffer.add_char buf '(';
+    Buffer.add_string buf (string_of_int n);
+    Buffer.add_char buf ')'
   | Nat n ->
     Buffer.add_char buf '(';
     for _ = 1 to n - 1 do

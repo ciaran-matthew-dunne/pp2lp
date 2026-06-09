@@ -429,6 +429,42 @@ begin
   rewrite hpred; reflexivity
 end;
 
+// NRM12 bridge: ((♢v·(P v ⇒ ¬Q v)) ⇒ R) = ((♡v·¬(P v ∧ Q v)) ⇒ R).  The body
+// equivalence (P ⇒ ¬Q) ⟺ ¬(P ∧ Q) is constructive.  Used by NRM12_1.
+opaque symbol nrm12_eq [n] [P Q : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, P v ⇒ ¬ (Q v)) ⇒ R) = ((`♡ v, ¬ ⋀_snoc (P v) (Q v)) ⇒ R)) ≔
+begin
+  assume n P Q R;
+  have hbody : Π v, π ((P v ⇒ ¬ (Q v)) = (¬ ⋀_snoc (P v) (Q v)))
+    { assume v;
+      refine propExt _ _
+        (λ hpnq hcon, (hpnq (⋀₂_hd hcon)) (⋀₂_snd hcon))
+        (λ hncon hp hq, hncon (⋀₂_intro hp hq)) };
+  have hpred : π ((`♢ v, P v ⇒ ¬ (Q v)) = (`♡ v, ¬ ⋀_snoc (P v) (Q v)))
+    { refine eq_trans (♢_eq_!! (λ v, P v ⇒ ¬ (Q v)))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc (P v) (Q v))))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM15 bridge: ((♢v·P v) ⇒ R) = ((♡v·¬(⊤ ∧ ¬P v)) ⇒ R).  The body
+// equivalence P ⟺ ¬(⊤ ∧ ¬P) is classical (¬¬ₑ).  Used by NRM15_1.
+opaque symbol nrm15_eq [n] [P : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, P v) ⇒ R) = ((`♡ v, ¬ ⋀_snoc ⊤ (¬ (P v))) ⇒ R)) ≔
+begin
+  assume n P R;
+  have hbody : Π v, π ((P v) = (¬ ⋀_snoc ⊤ (¬ (P v))))
+    { assume v;
+      refine propExt _ _
+        (λ hp hcon, (⋀₂_snd hcon) hp)
+        (λ hncon, ¬¬ₑ (P v) (λ hnp, hncon (⋀₂_intro ⊤ᵢ hnp))) };
+  have hpred : π ((`♢ v, P v) = (`♡ v, ¬ ⋀_snoc ⊤ (¬ (P v))))
+    { refine eq_trans (♢_eq_!! (λ v, P v))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc ⊤ (¬ (P v)))))) };
+  rewrite hpred; reflexivity
+end;
+
 // NRM23 bridge: ((♡v:Tuple1·¬(⊤ ∧ (E = prj 0 v))) ⇒ Q) = (¬⊤ ⇒ Q).  The ♡ body
 // is ¬(E = prj 0 v); over Tuple 1 the witness v = unit⨾E makes it absurd, so the
 // quantified head collapses to ¬⊤.  Used by NRM23_1 (the chain-form NRM23).
@@ -441,5 +477,36 @@ begin
         (λ h♡ ht, ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v)))
                           h♡ (unit ⨾ E) (⋀₂_intro ht (eq_refl E)))
         (λ hn⊤, ⊥ₑ (hn⊤ ⊤ᵢ)) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM22 bridge, general form: the ♡-body's *tail* equality pins the
+// binder (`¬(⋀(ps v) ∧ (prj 0 v = E))` ⟺ the body refuted at v := E), so
+// the quantified head collapses to `¬ ⋀ (ps (unit ⨾ E))`.  The body is a
+// *list* `ps v ∷ (prj 0 v = E)` so the cons pattern unifies with any
+// conjunct count; the ⊤-headed shape is the instance ps := λ _, (∎ ∷ ⊤).
+// The ⇐ direction needs the per-constructor case split, so it goes
+// through a helper with a rewrite rule on `(unit ⨾ a)` (the
+// nested_to_compound pattern).
+symbol nrm22_pin (ps : Tuple 1 → 𝕃* o) (E : τ ι)
+  (hnp : π (¬ ⋀ (ps (unit ⨾ E))))
+  : Π v : Tuple 1, π (¬ ⋀ (ps v ∷ (prj 0 v = E)));
+rule nrm22_pin $ps $E $hnp (unit ⨾ $a) ↪
+  λ hcon, $hnp (ind_eq (eq_sym (⋀_last hcon))
+                       (λ z, ⋀ ($ps (unit ⨾ z)))
+                       (⋀_init hcon));
+
+opaque symbol nrm22_eq [Q : Prop] [ps : Tuple 1 → 𝕃* o] (E : τ ι)
+  : π (((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q)
+       = ((¬ ⋀ (ps (unit ⨾ E))) ⇒ Q)) ≔
+begin
+  assume Q ps E;
+  have hpred : π ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E)))
+                  = (¬ ⋀ (ps (unit ⨾ E))))
+    { refine propExt _ _
+        (λ h♡ hps, ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E)))
+                           h♡ (unit ⨾ E) (⋀_intro hps (eq_refl E)))
+        (λ hnp, pi_to_♡ (λ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E)))
+                        (nrm22_pin ps E hnp)) };
   rewrite hpred; reflexivity
 end;

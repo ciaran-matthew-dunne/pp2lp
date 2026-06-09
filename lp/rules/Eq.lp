@@ -191,14 +191,40 @@ begin
 end;
 
 
-// EQS2: H ⊢ ¬ (E = F) ⇒ R → H ⊢ ¬eql_set(E,F) ⇒ R
-// NOTE: spec incorrectly has (H ⊢ FAUX ⇒ R) as antecedent.
+// EQS2: H ⊢ FAUX ⇒ R → H ⊢ ¬eql_set(E,F) ⇒ R
+// The spec (§10.4.3, p.98) really does take FAUX ⇒ R as the premise: PP
+// deliberately skips the marker's proof ("ne pas tenir compte de la
+// preuve d'un tel prédicat"), sound because the marker — or the equality
+// it stands for — is still in PP's hypothesis store.  The emitter
+// recovers that store fact and passes it as the explicit first argument.
 opaque symbol EQS2 [E F : τ ι] [R]
-  : π (¬ (E = F) ⇒ R)
+  : π (eql_set E F)
+  → π (⊥ ⇒ R)
   → π (¬ eql_set E F ⇒ R) ≔
 begin
-  assume E F R h1 h2;
-  refine h1 (λ heq, ⊥ₑ (h2 (∧ₑ₁ (set_ext E F) heq)))
+  assume E F R hev hbot hneg;
+  refine hbot (hneg hev)
+end;
+
+// EQS2 store evidence when only the *inclusions* are in scope (the
+// equality hyp itself was split into another branch): rebuild
+// `eql_set E F` from the two refuted-inclusion universals PP's
+// normalisation leaves in H (`forall2(x).not(x:E and not(x:F))`).
+opaque symbol eql_set_intro [E F : τ ι]
+  (h1 : π (`!! v : Tuple 1, ¬ (⋀ ((∎ ∷ (prj 0 v ϵ E)) ∷ (¬ (prj 0 v ϵ F))))))
+  (h2 : π (`!! v : Tuple 1, ¬ (⋀ ((∎ ∷ (prj 0 v ϵ F)) ∷ (¬ (prj 0 v ϵ E))))))
+  : π (eql_set E F) ≔
+begin
+  assume E F h1 h2 a;
+  refine ∧ᵢ _ _
+  { assume ha;
+    refine ¬¬ₑ (a ϵ F) _;
+    assume hnf;
+    refine !!_to_pi _ h1 (unit ⨾ a) (⋀₂_intro ha hnf) }
+  { assume hf;
+    refine ¬¬ₑ (a ϵ E) _;
+    assume hne;
+    refine !!_to_pi _ h2 (unit ⨾ a) (⋀₂_intro hf hne) }
 end;
 
 // ---- ECTR (contradiction due to equalities) ----
@@ -285,7 +311,7 @@ end;
 // OPR1, OPR2: Schema 1 via the opr1_eq / opr2_eq bridges.
 
 // EVR1: ¬(E=E) ⇒ P ≡ ⊥ ⇒ P ≡ ⊤ via stdlib's `=_idem` + `⊥⇒`.
-symbol EVR1_1 [E : τ ι] [P : Prop] : Res (¬ (E = E) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol EVR1_1 [E : τ ι] [P : Prop] : Res (¬ (E = E) ⇒ P) ≔ mk_0 trust;
 
 // EVR2: Schema 1 — passthrough through stdlib's `¬=_idem`.
 symbol EVR2_1 [E : τ ι]
@@ -298,14 +324,14 @@ symbol EVR3_1 [E : τ ι] [P : Prop]
   ≔ mk_1 (res_tm r) (eq_trans evr3_eq (res_eq r));
 
 // EVR4: trivial — `E = E = ⊤` via stdlib's `=_idem`.
-symbol EVR4_1 [E : τ ι] : Res (E = E) ≔ mk_1 ⊤ (=_idem ι E);
+symbol EVR4_1 [E : τ ι] : Res (E = E) ≔ mk_0 (=_idem ι E);
 
 // EVR11: numeric ≠ — trusted.
-symbol EVR11_1 [n m : τ ι] [P : Prop] : Res ((n = m) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol EVR11_1 [n m : τ ι] [P : Prop] : Res ((n = m) ⇒ P) ≔ mk_0 trust;
 
 // EAXM1/EAXM2: hyp-driven contradictions, leaf form.
-symbol EAXM1_1 [E F : τ ι] [P : Prop] : Res ((E = F) ⇒ P) ≔ mk_1 ⊤ trust;
-symbol EAXM2_1 [E F : τ ι] [P : Prop] : Res (¬ (E = F) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol EAXM1_1 [E F : τ ι] [P : Prop] : Res ((E = F) ⇒ P) ≔ mk_0 trust;
+symbol EAXM2_1 [E F : τ ι] [P : Prop] : Res (¬ (E = F) ⇒ P) ≔ mk_0 trust;
 
 // EAXM31/EAXM32: Schema 1 passthrough.
 symbol EAXM31_1 [E F : τ ι]
@@ -367,24 +393,24 @@ symbol EQS2_1 [E F : τ ι] [R : Prop]
 // ECTR1–6: hyp-driven contradictions, Schema 0 leaves.
 symbol ECTR1_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
   : Res ((E = F) ⇒ P)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol ECTR2_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
   : Res ((F = E) ⇒ P)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol ECTR3_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
   : Res (¬ (P E) ⇒ Q)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol ECTR4_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
   : Res (¬ (P E) ⇒ Q)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol ECTR5_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
   : Res ((P E) ⇒ Q)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;
 
 symbol ECTR6_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
   : Res ((P E) ⇒ Q)
-  ≔ mk_1 ⊤ trust;
+  ≔ mk_0 trust;

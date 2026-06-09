@@ -150,36 +150,32 @@ files when done.** Clear stale artifacts with `git clean -Xf lp/bench bench/resu
    the emitter gave up.
 4. No stray probe files (`*_probe.lp`, `*_test.lp`, `*_dbg.lp`) under `lp/`.
 
-The prv/synth/gemini suites are not yet clean gates — see Known broken.
+All suites except `claude` are clean gates (`claude` keeps one known ✗ —
+see Known broken).
 
 ## Known broken
 
-`og` is green (30 ✓). `prv`, `synth`, and `gemini` have known residual failures —
-they exit non-zero while any goal fails, so don't gate on them. Run the suite
-(`pp2lp run SUITE`) for the current per-trace specifics; the dominant causes are:
+`og` (30), `prv` (70), `synth` (107), `nrm_test` (42), and `gemini` (422) are
+green. `claude` is 222/223 — it probes the frontier on purpose. Residuals:
 
-- **INS contradiction over arithmetic-rewritten hyps.** PP's solver rewrites
-  hypotheses before the INS leaf, so `find_ins_contradiction` (`emit_ctx.ml`)
-  finds no structural match (`E_INS`), or picks the wrong compound witness for an
-  NRM20-normalised universal.
-- **AR7/AR8.** Need the solver's witness (the `a` in `a + c = 𝟎`), which the
-  replay never records — `rule_emit.ml` `failwith`s explicitly here.
-- **AR4 deeper cases.** A `neg_neg` gap: PP normalises `𝟏 - (—a)` to `1+a` while
-  LP's AR3 keeps it literal.
-- **ConjList/`Res` snoc-refactor incompleteness** (`subset_pow` and kin). An `ALL7`
-  continuation's `res_tm` over a simple `STOP_1` chain doesn't resolve the
-  universal via HO-unification (`--lp-debug=u` shows the unsolvable `Res … ≡ ⊥`
-  constraint).
-- **Existential under a universal** (`#y` inside `!x.(… ⇒ #y.…)`; e.g. the
-  `claude` suite's `xst_under_all`, `xstf_all_exists`, `xstf_dom_witness`). Plain
-  existentials and compound binders pass; only an existential whose witness is the
-  ∀-bound variable fails. Two compounding causes: (1) `AXM9_1` (`Axm.lp`) hardcodes
-  its witness at `@inh_tuple n`, so the ALL7-chain element gives the unsolvable
-  `P inh_tuple ≡ P _x` — passing the real witness fixes that, but (2) the chain
-  `ρ : Π v, Res (P v)` won't generalise to `λ v, AXM9_1 v` from the `{assume v; …}`
-  block, and the outer `XST8` negation chain's `Res` stays a metavariable. Needs
-  the `ALL7`/`XST8` continuation resolved by *explicit* `Res` terms rather than
-  block + HO-unification — a structural change to the branching emission.
+- **`[ARITH] <FAUX>` solver terminal** (`claude/nar_leq_zero`, the one ✗).
+  PP's linear solver closes a leaf (⊥ from the assumed `… ≤ 𝟎` hyps) without
+  recording a certificate; `rule_db` raises `E_UNKNOWN_RULE`. Needs a small
+  Farkas-style combination search over the ≤-hyps emitting a generated
+  add-mono proof (same no-trust approach as the reorder bridges).
+- **Chain AR7_1/AR8_1.** Not exercised by any current suite (the gemini goals
+  were dropped); would still fail at tree-build — the result-chain has no
+  STOP_1 leaf seed and an AR9_1/AR7_1 same-formula pair the one-node-per-line
+  postfix model can't place. Replay-format work in `proof_tree.ml`.
+
+Fixed 2026-06-09 (see git log): unary numeral OOM (big literals now emit as
+decimal, parsed via Stdlib.Nat's builtins + B.lp's `int_lit` coercion — never
+force whnf of a big `int_lit`); EQS2 reshaped to the spec's `FAUX ⇒ R` premise
+with emitter-supplied `eql_set` store evidence; ECTR1–6 argument synthesis;
+mid-list `⊤` erasure (`mk_0` discharged leaves + `concat` ⊤-rules); explicit
+`Res`-term branching emission (chains passed as `refine ALL7 (λ v, …) _`);
+ALL3R for chain-side nested-binder merges; explicit `@AXM9_1`/`IMP5_1`
+arguments.
 
 PP emits a few identifiers with a leading `_` (`_eql_set`, `_pj1`, `_pj2`); the
 lexer treats `_` as a valid identifier-start and the emitter maps them to their
@@ -245,7 +241,7 @@ replay-natively. Unknown rule names raise.
 - **og** — 30 traces checked in, the baseline smoke test. No `.but` files (the
   traces are the source of truth).
 - **prv** — Atelier B PRV corpus. `.but` checked in; `.trace`/`.replay`
-  gitignored. Residual failures, see Known broken.
+  gitignored. Green (70 ✓).
 - **prv-no-arith** — non-arithmetic subset of prv, to isolate translation/proof
   failures without arithmetic-solver noise.
 - **synth** / **nrm_test** / **gemini** — synthetic suites generated from a

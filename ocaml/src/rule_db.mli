@@ -25,6 +25,8 @@ type emit =
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
   | Nrm2730
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+  | Eqs2
+  | Ectr
 
 (** Metadata base name: strips primed/n-ary suffixes (FOO_1, FOO_3,
     FOO_1_3 ↦ FOO). *)

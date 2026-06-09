@@ -54,7 +54,7 @@ let metadata_extra_args rule =
      reach the generic path, so they need no metadata here. *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Hyp_search | Rule_db.Ins
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
-  | Rule_db.Nrm2730
+  | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr
   | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10 -> []
 
 (* Holes for the rule's derivation slots; Con slots become `trust` for
@@ -185,6 +185,48 @@ let tactic_for_axm8 ctx rule anno =
      | None -> fallback)
   | _ -> fallback
 
+(* ECTR1-6: equality-substitution contradiction leaves.  Both premises
+   live in PP's store; the conclusion (the annotation's antecedent) gives
+   the shape:
+     (a = b) ⇒ P — ECTR1/2: ¬(Q E) and Q F in H; the conclusion IS the eq
+     ¬G ⇒ Q      — ECTR3/4: E = F (resp. F = E) and P F in H
+     G ⇒ Q       — ECTR5/6: E = F (resp. F = E) and ¬(P F) in H
+   The direction found selects the lemma.  The substituted side must be a
+   variable (PP's set translator builds these over simple variables). *)
+let tactic_for_ectr ctx rule anno =
+  let fail reason =
+    failwith (Printf.sprintf "translate: %s — %s" rule reason)
+  in
+  let abstract x g =
+    let z = fresh_x_local ctx in
+    L.Lambda (z, Some L.Tau_i, pred_term ctx (subst_prd [(x, Var z)] g))
+  in
+  match goal_of_anno anno with
+  | Some (Binary (Imp, Eq (a, b), _)) ->
+    (match find_ectr12 ctx a b with
+     | Some (x, q, hn, hh, swapped) ->
+       L.Refine (L.Name (if swapped then "ECTR2" else "ECTR1"),
+                 [abstract x q; L.Name hn; L.Name hh])
+     | None ->
+       fail "no ¬(Q E) / Q F hyp pair matches the equality antecedent")
+  | Some (Binary (Imp, Unary (Not, g), _)) ->
+    (match find_ectr34 ctx g with
+     | Some (x, heq, swapped, hh) ->
+       L.Refine (L.Name (if swapped then "ECTR4" else "ECTR3"),
+                 [abstract x g; L.Name heq; L.Name hh])
+     | None ->
+       fail "no (equality hyp × substituted hyp) pair matches the negated \
+             goal atom")
+  | Some (Binary (Imp, g, _)) ->
+    (match find_ectr56 ctx g with
+     | Some (x, heq, hn, swapped) ->
+       L.Refine (L.Name (if swapped then "ECTR6" else "ECTR5"),
+                 [abstract x g; L.Name heq; L.Name hn])
+     | None ->
+       fail "no (equality hyp × negated substituted hyp) pair matches the \
+             goal antecedent")
+  | _ -> fail "expected an implication annotation"
+
 (* Build the single `refine` tactic for a rule.  Exhaustive over
    [Rule_db.emit]: the walker handles the constructors that expand to
    *tree structure* (And5/Opr/Ins/branching) before reaching here, so
@@ -192,6 +234,7 @@ let tactic_for_axm8 ctx rule anno =
    strategy. *)
 let tactic_for_rule ctx rule arg anno children =
   match Rule_db.emit rule with
+  | Rule_db.Ectr when children = [] -> tactic_for_ectr ctx rule anno
   | Rule_db.Hyp_search when children = [] -> tactic_for_hyp ctx rule arg anno
   | Rule_db.Axm8 when children = [] -> tactic_for_axm8 ctx rule anno
   | Rule_db.Witness_hyp -> tactic_for_witness_hyp ctx rule anno
@@ -294,9 +337,10 @@ let tactic_for_rule ctx rule arg anno children =
        rather than emit an ill-typed `refine`. *)
     failwith "translate: AR7/AR8 unsupported — the solver witness (a in a + c = 𝟎) \
               is not recorded in the replay"
-  | Rule_db.Hyp_search | Rule_db.Axm8   (* children <> [] — leaf rules, so unreached *)
+  | Rule_db.Hyp_search | Rule_db.Axm8 | Rule_db.Ectr  (* children <> [] — leaf rules, so unreached *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar9
   | Rule_db.Nrm2730   (* expands to tree structure in [Translate.default] *)
+  | Rule_db.Eqs2      (* handled in [Translate.tree_dispatch] (needs child access) *)
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Ins ->
     (* And5/Opr/Ins expand to tree structure in the walker and never reach
        here as a plain tactic; the rest take generic slot args. *)

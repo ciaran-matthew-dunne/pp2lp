@@ -54,6 +54,10 @@ exp:
   { mul_expand e1 e2 }
   | MINUS; e = exp %prec UMINUS
   { Neg e }
+  (* PP parenthesises compound operands of unary minus (`-(-x)`, `-(2*x)`);
+     accept a parenthesised expression in any exp position. *)
+  | LPAREN; e = exp; RPAREN
+  { e }
   | e1 = exp; LSQ; e2 = exp; RSQ
   { SetImage (e1, e2) }
   | e1 = exp; INTER; e2 = exp

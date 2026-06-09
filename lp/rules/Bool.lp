@@ -164,5 +164,5 @@ symbol BOOL42_1 [V : τ ι] [P : Prop]
   : Res (¬ (BFALSE = V) ⇒ P)
   ≔ mk_1 (res_tm r) trust;
 
-symbol BOOL51_1 [P : Prop] : Res ((BTRUE = BFALSE) ⇒ P) ≔ mk_1 ⊤ trust;
-symbol BOOL52_1 [P : Prop] : Res ((BFALSE = BTRUE) ⇒ P) ≔ mk_1 ⊤ trust;
+symbol BOOL51_1 [P : Prop] : Res ((BTRUE = BFALSE) ⇒ P) ≔ mk_0 trust;
+symbol BOOL52_1 [P : Prop] : Res ((BFALSE = BTRUE) ⇒ P) ≔ mk_0 trust;

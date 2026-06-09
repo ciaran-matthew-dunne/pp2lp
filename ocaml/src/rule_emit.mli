@@ -6,10 +6,11 @@
 
 open Syntax_pp
 
-(* A PP predicate as an [Lp_tree] term, carrying the tuple-projection env
-   derived from [ctx] so enclosing-binder vars render as `prj k x` when the
-   printer runs. *)
+(* A PP predicate/expression as an [Lp_tree] term, carrying the
+   tuple-projection env derived from [ctx] so enclosing-binder vars render
+   as `prj k x` when the printer runs. *)
 val pred_term : Emit_ctx.ctx -> prd -> Lp_tree.term
+val exp_term : Emit_ctx.ctx -> exp -> Lp_tree.term
 
 (* Value/hole arguments the generic (non-tree-expanding) rules take: the
    rule's PP-side value arg ([dynamic_value_args]) and the holes/`trust` for

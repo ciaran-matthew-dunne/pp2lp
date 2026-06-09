@@ -103,6 +103,74 @@ and tree_dispatch ctx = function
          "INS contradiction search failed — no (universal hyp \xc3\x97 witness) \
           discharges every conjunct\n  goal: %s\n%s"
          goal (ins_diagnostic ctx)))
+  | P.Apply { rule; anno; children = [c]; _ }
+    when Rule_db.emit rule = Rule_db.Eqs2 ->
+    (* PP's EQS2 (spec p.98) discharges ¬eql_set(E,F) with a FAUX ⇒ R
+       child: the marker's content is still in PP's hypothesis store.  An
+       assumed `E = F` (via set_ext) or marker hyp feeds the EQS2 lemma's
+       evidence slot, and the child proves ⊥ ⇒ R.  When the marker is
+       instead still an antecedent *inside R*, close the implication with
+       a generated intro+projection term and drop the placeholder child
+       (precedent: Witness_hyp). *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, Unary (Not, Lift (App (g, [e; f]))), r))
+       when g = "_eql_set" || g = "eql_set" ->
+       (match find_eqs2_hyp ctx e f with
+        | Some (h, is_eq) ->
+          let ev =
+            if is_eq then
+              L.App (L.Name "\xe2\x88\xa7\xe2\x82\x91\xe2\x82\x81", (* ∧ₑ₁ *)
+                [L.App (L.Name "set_ext", [exp_term ctx e; exp_term ctx f]);
+                 L.Name h])
+            else L.Name h
+          in
+          L.Then (L.Refine (L.Name "EQS2", [ev; L.Hole]), tree ctx c)
+        | None ->
+          match find_eqs2_incl_pair ctx e f with
+          | Some (h1, h2) ->
+            let ev =
+              L.App (L.Name "eql_set_intro", [L.Name h1; L.Name h2]) in
+            L.Then (L.Refine (L.Name "EQS2", [ev; L.Hole]), tree ctx c)
+          | None ->
+          (match find_eqs2_spine e f r with
+           | Some (n_before, path) ->
+             let hneg = fresh_x_local ctx in
+             let hc = fresh_x_local ctx in
+             let rec inits t m =
+               if m = 0 then t
+               else inits (L.App (L.Name "\xe2\x8b\x80_init", [t])) (m - 1)
+             in
+             let peel =
+               List.fold_left
+                 (fun t (n_conjs, k) ->
+                    L.App (L.Name "\xe2\x8b\x80_last",
+                           [inits t (n_conjs - 1 - k)]))
+                 (L.Name hc) path
+             in
+             let body =
+               L.App (L.Name "\xe2\x8a\xa5\xe2\x82\x91", (* ⊥ₑ *)
+                      [L.App (L.Name hneg, [peel])])
+             in
+             let rec wrap m t =
+               if m = 0 then t
+               else wrap (m - 1) (L.Lambda (fresh_x_local ctx, None, t))
+             in
+             let term =
+               L.Lambda (hneg, None, wrap n_before (L.Lambda (hc, None, body)))
+             in
+             L.Step (L.Refine (term, []))
+           | None ->
+             let hyps =
+               String.concat "\n"
+                 (List.map (fun (n, p) ->
+                    Printf.sprintf "    %s : %s" n (Emit_pp.prd_to_pp p))
+                    ctx.hyps)
+             in
+             failwith (Printf.sprintf
+               "translate: EQS2 — no eql_set evidence found (neither an \
+                assumed `E = F`/marker hyp nor a marker antecedent in R's \
+                spine)\n  hyps in scope:\n%s" hyps)))
+     | _ -> default ctx rule None anno [c])
   | P.Apply { rule; anno; children = [c0; c1]; _ }
     when Rule_db.is_branching (base rule) ->
     branching ctx rule anno c0 c1
@@ -260,34 +328,98 @@ and default ctx rule arg anno children =
         rule (List.length children))
 
 and branching ctx rule anno chain_node cont =
+  (* Pass the Res chain as an *explicit term* (`refine ALL7 (λ v, …) _`)
+     rather than a `{assume v; …}` subproof.  The block form leaves the
+     chain ρ as a metavariable while its block elaborates; under *nested*
+     branchings the enclosing goal still contains `res_tm ?ρ`, and
+     unifying the inner branching's conclusion against that flex term
+     picks garbage solutions (e.g. a constant `?P := λ _, res_tm CHAIN`).
+     An explicit ρ fully determines the conclusion type up front. *)
   let pp_vars = branch_binder_vars rule (goal_of_anno anno) in
-  let tactic = L.Refine (L.Name (base rule), [L.Hole; L.Hole]) in
-  (* The chain's bound v is in lambdapi scope inside the chain block
-     only — the cont's `(`♢ v, …)` keeps v internal to the quantifier.
-     Allocate v without registering, then register only inside the
-     chain's scoped block. *)
   let v = fresh_x_local ctx in
-  let chain_proof = scoped_hyps ctx (fun () ->
+  let rho = scoped_hyps ctx (fun () ->
     with_x ctx v pp_vars (fun () ->
-      L.Assume (v, chain_tree ctx chain_node)))
+      L.Lambda (v, None, chain_term ctx chain_node)))
   in
-  let cont_proof = scoped_hyps ctx (fun () -> tree ctx cont) in
-  L.Branches (tactic, chain_proof, cont_proof)
+  let tactic = L.Refine (L.Name (base rule), [rho; L.Hole]) in
+  let cont_proof = scoped_hyps ctx (fun () -> branch_cont ctx cont) in
+  L.Then (tactic, cont_proof)
 
-(* The Res-chain handed to ALL7/XST8 has type `Π v : Tuple n, Res (P v)`,
-   so it must be entered as a subproof: `assume v` binds the tuple at its
-   correct (Lambdapi-inferred) type, and each chain step is then a `refine`
-   in sequence — just like the regular proof tree, but with the primed
-   Res-typed rule forms. *)
-and chain_tree ctx node =
+(* A branching continuation's goal is `(!! v, res_tm (ρ v)) ⇒ R`.  When the
+   chain result is itself a universal, that antecedent is *structurally
+   nested* (`!! v, !! y, …`) — unlike everywhere else, where the renderer
+   already merges nested PP binders into one compound tuple (which is why
+   ALL3 is a HOAS identity by default).  Here PP's ALL3 merge must be
+   emitted for real, as ALL3R: its compound premise appends the *outer*
+   element last, matching the renderer's slot order (first PP binder ↦
+   prj 0), so downstream hyp searches stay consistent.  P sits applied at
+   a tuple constructor — a non-pattern position lambdapi cannot invert —
+   so it is passed explicitly, built from the child's merged annotation. *)
+and branch_cont ctx cont =
+  match cont with
+  | P.Apply { rule; children = [c]; src_line; anno; _ }
+    when base rule = "ALL3" ->
+    let merged =
+      match c with
+      | P.Apply { anno = canno; _ } ->
+        (match goal_of_anno canno with
+         | Some (Binary (Imp, Bind (_, vars, body), _)) -> Some (vars, body)
+         | _ -> None)
+    in
+    (match merged with
+     | Some (vars, body) ->
+       let u = fresh_x_local ctx in
+       let p_lambda =
+         with_x ctx u vars (fun () -> L.Lambda (u, None, pred_term ctx body))
+       in
+       let tactic = L.Refine (L.Expl (L.Name "ALL3R"),
+         [L.Hole; p_lambda; L.Hole; L.Hole]) in
+       L.Commented (prov_of rule src_line anno, L.Then (tactic, tree ctx c))
+     | None -> tree ctx cont)
+  | _ -> tree ctx cont
+
+(* The Res-chain handed to ALL7/XST8 has type `Π v : Tuple n, Res (P v)`.
+   Build it as an explicit *term*: chains are purely applicative (each step
+   is a rule symbol applied to value args and child sub-chains), and an
+   explicit ρ keeps a nested branching's conclusion fully determined (see
+   `branching`).  Child sub-chains plug into the *trailing* argument slots
+   (`slot_hole_args` puts child slots last). *)
+and chain_term ctx node : L.term =
+  let app name = function [] -> L.Name name | args -> L.App (L.Name name, args) in
+  let plug rule args children =
+    let n = List.length args - List.length children in
+    if n < 0 then
+      failwith (Printf.sprintf
+        "translate: chain %s has fewer arg slots than children" rule);
+    let prefix = List.filteri (fun i _ -> i < n) args in
+    let slots = List.filteri (fun i _ -> i >= n) args in
+    List.iter (function
+      | L.Hole -> ()
+      | _ -> failwith (Printf.sprintf
+               "translate: chain %s child slot is not a hole" rule)) slots;
+    prefix @ children
+  in
   match node with
-  | P.Apply { rule; src_line; anno; _ } ->
-    L.Commented (prov_of rule src_line anno, chain_dispatch ctx node)
-
-and chain_dispatch ctx = function
+  | P.Apply { rule; anno; children = []; _ }
+    when base rule = "AXM9" && (match goal_of_anno anno with
+                                | Some (Binary (Imp, _, _)) -> true
+                                | _ -> false) ->
+    (* AXM9_1's inh_tuple-indexed type makes `P (@inh_tuple n) ≡ A` a
+       non-pattern HO problem (P has both constant and projecting
+       solutions), so lambdapi leaves it unsolved.  The rule is
+       trust-backed; pass the constant P explicitly:
+       `@AXM9_1 1 (λ _, A) B` β-reduces to `Res (A ⇒ B)`. *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, a, b)) ->
+       let v = fresh_x_local ctx in
+       L.App (L.Expl (L.Name (chain_emit_name rule)),
+         [ L.Name "1";
+           L.Lambda (v, None, pred_term ctx a);
+           pred_term ctx b ])
+     | _ -> assert false)
   | P.Apply { rule; children = []; arg; _ } ->
-    let args = dynamic_value_args ctx rule arg @ slot_hole_args rule in
-    L.Step (L.Refine (L.Name (chain_emit_name rule), args))
+    app (chain_emit_name rule)
+      (dynamic_value_args ctx rule arg @ slot_hole_args rule)
   | P.Apply { rule; anno; children = [c]; _ } when Rule_db.binds_var rule ->
     let pp_vars =
       match goal_of_anno anno with
@@ -295,8 +427,7 @@ and chain_dispatch ctx = function
       | None -> []
     in
     let x = fresh_x ctx pp_vars in
-    let tactic = L.Refine (L.Name rule, [L.Hole]) in
-    L.Assume_then (tactic, x, chain_tree ctx c)
+    app rule [L.Lambda (x, None, chain_term ctx c)]
   | P.Apply { rule; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Opr false
          || Rule_db.emit rule = Rule_db.Opr true ->
@@ -315,23 +446,20 @@ and chain_dispatch ctx = function
          | _ -> L.Hole)
       | _ -> L.Hole
     in
-    let tactic = L.Refine (L.Name rule, [p_lambda] @ slot_hole_args rule) in
-    L.Then (tactic, chain_tree ctx c)
+    app rule
+      (plug rule ([p_lambda] @ slot_hole_args rule) [chain_term ctx c])
   | P.Apply { rule; arg; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar10 ->
     (* AR10_1 [P Q R] (heq : P = Q) (r : Res (Q ⇒ R)) : Res (P ⇒ R).
        Q is the solver result and can't be inferred from P ⇒ R alone, so
-       supply it explicitly (env-carried) with `trust` for the equality;
-       the chain continuation fills the Res hole.  Mirrors the main-tree
-       AR10 dispatch. *)
+       supply it explicitly (env-carried) with `trust` for the equality.
+       Mirrors the main-tree AR10 dispatch. *)
     let q_term = match arg with
       | Some (Pred q) -> pred_term ctx q
       | _ -> L.Hole
     in
-    let tactic =
-      L.Refine (L.Expl (L.Name rule), [L.Hole; q_term; L.Hole; L.Trust; L.Hole])
-    in
-    L.Then (tactic, chain_tree ctx c)
+    L.App (L.Expl (L.Name rule),
+      [L.Hole; q_term; L.Hole; L.Trust; chain_term ctx c])
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar3 ->
     (* AR3 in a Res chain.  PP's solver records the sub-premise `𝟏 - a` in a
@@ -346,53 +474,82 @@ and chain_dispatch ctx = function
       | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (Pred (Lift r_exp)) ->
         Option.map
           (fun eqpf ->
-            L.Refine (L.Name "AR3'_1",
-              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole]))
+            L.App (L.Name "AR3'_1",
+              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; chain_term ctx c]))
           (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
       | _ -> None
     in
-    let tactic =
-      match bridged with
-      | Some t -> t
-      | None ->
-        L.Refine (L.Name (chain_emit_name rule),
-                  dynamic_value_args ctx rule arg
-                  @ metadata_extra_args rule @ slot_hole_args rule)
-    in
-    L.Then (tactic, chain_tree ctx c)
+    (match bridged with
+     | Some t -> t
+     | None ->
+       app (chain_emit_name rule)
+         (plug rule
+            (dynamic_value_args ctx rule arg
+             @ metadata_extra_args rule @ slot_hole_args rule)
+            [chain_term ctx c]))
+  | P.Apply { rule; anno; children = [c]; _ }
+    when base rule = "IMP5" ->
+    (* IMP5_1 (hp : π P) (r : Res Q) : Res (P ⇒ Q) — strips a *known*
+       antecedent, so its result list collapses the ⇒; the proof hp lives
+       in the store.  Find it by the annotation's antecedent. *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, p, _)) ->
+       (match find_hyp_by_pred ctx p with
+        | Some h ->
+          L.App (L.Name (chain_emit_name rule), [L.Name h; chain_term ctx c])
+        | None ->
+          failwith "translate: IMP5_1 — the known-antecedent hyp is not in \
+                    scope")
+     | _ ->
+       failwith "translate: IMP5_1 expected an implication annotation")
+  | P.Apply { rule; children = [c]; _ }
+    when base rule = "ALL3"
+         && (match c with
+             | P.Apply { anno = canno; _ } ->
+               (match goal_of_anno canno with
+                | Some (Binary (Imp, Bind (_, _, _), _)) -> true
+                | _ -> false)) ->
+    (* Chain form of the explicit-P ALL3R emission (see `branch_cont`). *)
+    (match c with
+     | P.Apply { anno = canno; _ } ->
+       (match goal_of_anno canno with
+        | Some (Binary (Imp, Bind (_, vars, body), _)) ->
+          let u = fresh_x_local ctx in
+          let p_lambda =
+            with_x ctx u vars (fun () -> L.Lambda (u, None, pred_term ctx body))
+          in
+          L.App (L.Expl (L.Name "ALL3R_1"),
+            [L.Hole; p_lambda; L.Hole; chain_term ctx c])
+        | _ -> assert false))
   | P.Apply { rule; arg; children = [c]; _ } ->
     (* Mirror the main-tree arg bundle: dynamic value args, then the solver
        side-condition metadata (AR9's `trust` for `E = F`), then slot holes.
        The chain path used to drop the metadata, so AR9_1 emitted without its
        `trust` and left the `he` goal unfilled ("missing subproofs"). *)
-    let tactic =
-      L.Refine (L.Name (chain_emit_name rule),
-                dynamic_value_args ctx rule arg
-                @ metadata_extra_args rule @ slot_hole_args rule)
-    in
-    L.Then (tactic, chain_tree ctx c)
+    app (chain_emit_name rule)
+      (plug rule
+         (dynamic_value_args ctx rule arg
+          @ metadata_extra_args rule @ slot_hole_args rule)
+         [chain_term ctx c])
   | P.Apply { rule; anno; children = [c0; c1]; _ }
     when Rule_db.is_branching (base rule) ->
     (* ALL7_1 / XST8_1 inside a Res chain: a per-tuple Res chain ρ (under
-       the bound v) plus the continuation r.  Mirrors `branching` but stays
-       in Res mode — the ρ child must bind v, exactly like the main-tree
-       form, otherwise its `Π v, Res …` goal is left unproven. *)
+       the bound v) plus the continuation r — both explicit terms. *)
     let pp_vars = branch_binder_vars rule (goal_of_anno anno) in
-    let tactic = L.Refine (L.Name rule, [L.Hole; L.Hole]) in
     let v = fresh_x_local ctx in
     let rho = scoped_hyps ctx (fun () ->
-      with_x ctx v pp_vars (fun () -> L.Assume (v, chain_tree ctx c0)))
+      with_x ctx v pp_vars (fun () ->
+        L.Lambda (v, None, chain_term ctx c0)))
     in
-    let cont = scoped_hyps ctx (fun () -> chain_tree ctx c1) in
-    L.Branches (tactic, rho, cont)
+    let cont = scoped_hyps ctx (fun () -> chain_term ctx c1) in
+    app rule [rho; cont]
   | P.Apply { rule; arg; children = [c0; c1]; _ } ->
-    let tactic =
-      L.Refine (L.Name (chain_emit_name rule),
-                dynamic_value_args ctx rule arg @ slot_hole_args rule)
-    in
-    let left = scoped_hyps ctx (fun () -> chain_tree ctx c0) in
-    let right = scoped_hyps ctx (fun () -> chain_tree ctx c1) in
-    L.Branches (tactic, left, right)
+    let left = scoped_hyps ctx (fun () -> chain_term ctx c0) in
+    let right = scoped_hyps ctx (fun () -> chain_term ctx c1) in
+    app (chain_emit_name rule)
+      (plug rule
+         (dynamic_value_args ctx rule arg @ slot_hole_args rule)
+         [left; right])
   | P.Apply { rule; children; _ } ->
     failwith (Printf.sprintf
       "translate: chain %s arity %d unsupported"

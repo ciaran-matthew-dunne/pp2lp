@@ -309,16 +309,17 @@ begin
           hp)))
 end;
 
-// NRM22: simpler unary version of NRM20 (no extra y-binder).
-opaque symbol NRM22 [Q : Prop] (E : τ ι)
-  : π (¬ ⊤ ⇒ Q)
-  → π ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E))) ⇒ Q) ≔
+// NRM22: the ♡-body's tail equality pins the binder at E (general list
+// form; the ⊤-headed NRM14-fed shape is the instance ps := λ _, (∎ ∷ ⊤)).
+opaque symbol NRM22 [Q : Prop] [ps : Tuple 1 → 𝕃* o] (E : τ ι)
+  : π (¬ ⋀ (ps (unit ⨾ E)) ⇒ Q)
+  → π ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q) ≔
 begin
-  assume Q E h1 h2;
-  refine h1 (λ ht,
-    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (prj 0 v = E)))
+  assume Q ps E h1 h2;
+  refine h1 (λ hps,
+    ♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E)))
             h2 (unit ⨾ E)
-            (⋀₂_intro ht (eq_refl E)))
+            (⋀_intro hps (eq_refl E)))
 end;
 
 // NRM23: NRM22 with reversed equality.
@@ -514,6 +515,16 @@ symbol NRM13_1 [n] [P Q : Tuple n → Prop] [R : Prop]
   (r : Res ((`♡ v, ¬ ⋀_snoc (P v) (¬ Q v)) ⇒ R)) : Res ((`♢ v, P v ⇒ Q v) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm13_eq n P Q R) (res_eq r));
 
+// NRM12_1 — chain (Res) form of NRM12, via the `nrm12_eq` bridge (Res.lp).
+symbol NRM12_1 [n] [P Q : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀_snoc (P v) (Q v)) ⇒ R)) : Res ((`♢ v, P v ⇒ ¬ (Q v)) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm12_eq n P Q R) (res_eq r));
+
+// NRM15_1 — chain (Res) form of NRM15, via the `nrm15_eq` bridge (Res.lp).
+symbol NRM15_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀_snoc ⊤ (¬ (P v))) ⇒ R)) : Res ((`♢ v, P v) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm15_eq n P R) (res_eq r));
+
 // NRM3 bridge: ((♢v·(P v ⇒ Q)) ⇒ S) = ((Q ⇒ S) ∧ ((∀v·¬P v) ⇒ S)), Q is v-free.
 // (Lives here, not Res.lp, because the ⇐ direction reuses NRM3 itself; the ⇒
 // direction builds the ♢ witness from Q, or vacuously from ¬P v.)
@@ -541,3 +552,10 @@ symbol NRM23_1 [Q : Prop] [E : τ ι]
   (r : Res (¬ ⊤ ⇒ Q))
   : Res ((`♡ v : Tuple 1, ¬ ⋀ (∎ ∷ ⊤ ∷ (E = prj 0 v))) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm23_eq Q E) (res_eq r));
+
+// NRM22_1 — chain (Res) form of NRM22, via the general `nrm22_eq` bridge
+// (Res.lp): the body's tail equality pins the binder at E.
+symbol NRM22_1 [Q : Prop] [ps : Tuple 1 → 𝕃* o] [E : τ ι]
+  (r : Res (¬ ⋀ (ps (unit ⨾ E)) ⇒ Q))
+  : Res ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm22_eq Q ps E) (res_eq r));

@@ -31,9 +31,20 @@ symbol is_nil [a] : 𝕃* a → 𝔹;
 rule is_nil ∎       ↪ true
 with is_nil (_ ∷ _) ↪ false;
 
-symbol concat [a] : 𝕃* a → 𝕃* a → 𝕃* a;
+// ⊤-valued elements are discharged conjuncts: PP drops them from its
+// formulas, so result lists must drop them too or combined `res_tm`s
+// diverge from PP's annotations (`⋀ (∎ ∷ ⊤ ∷ G)` has no erasure rule once
+// the ⊤ is buried mid-list).  `mk_0` keeps ⊤ out of *leaf* lists; the two
+// ⊤-rules catch ⊤s entering a *combine* (a sub-chain that discharged to
+// ⊤, wrapped as a singleton element).  Every list is a leaf or a concat
+// of two, so inductively no interior ⊤ survives.  Sound: conj of both
+// sides stays propositionally equal (⊤ ∧ X ⟺ X).  Sequential: the
+// ⊤-rules must take priority over the general cons rule.
+sequential symbol concat [a] : 𝕃* a → 𝕃* a → 𝕃* a;
 rule concat $xs ∎ ↪ $xs
 with concat ∎ $ys ↪ $ys
+with concat ($xs ∷ ⊤) $ys ↪ concat $xs $ys
+with concat $xs ($ys ∷ ⊤) ↪ concat $xs $ys
 with concat $xs ($ys ∷ $y) ↪ (concat $xs $ys) ∷ $y;
 
 symbol dropl [a] : 𝕃* a → 𝕃* a;
@@ -78,6 +89,15 @@ symbol res_tm [t] (r : Res t) : τ o ≔ conj (res_ts r);
 // working verbatim: `conj (∎ ∷ x) ≡ x`, so `prf : π (t = x)` still fits.
 // Only schema-2 combines build a real list (via `concat` + `mk_res`).
 symbol mk_1 [t] (x : τ o) (prf : π (t = x)) : Res t ≔ mk_res (∎ ∷ x) prf;
+
+// Empty-list constructor for *discharged* results (t = ⊤).  A discharged
+// leaf contributes NOTHING to a combined result list: `concat`'s ∎ rules
+// then erase it in any position, so a combined `res_tm` reduces to exactly
+// PP's surviving conjuncts (PP drops discharged conjuncts).  The old
+// `mk_1 ⊤` encoding put the ⊤ mid-list (`⋀ (∎ ∷ ⊤ ∷ G)`) where no ⋀ rule
+// can erase it, so chain forms diverged from PP's formulas.
+// `conj ∎ ↪ ⊤`, so the proof obligation is unchanged: π (t = ⊤).
+symbol mk_0 [t] (prf : π (t = ⊤)) : Res t ≔ mk_res ∎ prf;
 
 
 // ---- Axiomatisation: structural intro / eliminators ----

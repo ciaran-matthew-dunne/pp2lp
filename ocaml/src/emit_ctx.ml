@@ -165,6 +165,161 @@ let find_hyp_by_pred ctx pred =
   List.find_map
     (fun (name, p) -> if p = pred then Some name else None) ctx.hyps
 
+(* ---- EQS2 / ECTR3 store-evidence searches ---- *)
+
+let is_eql_set_app e f p =
+  match p with
+  | Lift (App (g, [e'; f'])) ->
+    (g = "_eql_set" || g = "eql_set") && e' = e && f' = f
+  | _ -> false
+
+(* PP's EQS2 discharges `¬ _eql_set(E,F)` outright (spec p.98: its premise
+   is FAUX ⇒ R) — sound because the marker, or the `E = F` it stands for,
+   is still in PP's hypothesis store.  Find that store fact among the
+   assumed hyps. *)
+let find_eqs2_hyp ctx e f =
+  List.find_map
+    (fun (name, p) ->
+       if p = Eq (e, f) then Some (name, true)
+       else if is_eql_set_app e f p then Some (name, false)
+       else None)
+    ctx.hyps
+
+(* EQS2 evidence from the inclusion pair: the refuted-inclusion universal
+   `forall2(x).not(x:E and not(x:F))` for both directions (the form PP's
+   normalisation leaves in the store when the equality itself was split
+   into another branch). *)
+let is_refuted_incl e f p =
+  match p with
+  | Bind (_, [v], Unary (Not, Binary (And,
+      Mem ([Var v1], e'), Unary (Not, Mem ([Var v2], f'))))) ->
+    v1 = v && v2 = v && e' = e && f' = f
+  | _ -> false
+
+let find_eqs2_incl_pair ctx e f =
+  let find pred =
+    List.find_map (fun (n, p) -> if pred p then Some n else None) ctx.hyps
+  in
+  match find (is_refuted_incl e f), find (is_refuted_incl f e) with
+  | Some h1, Some h2 -> Some (h1, h2)
+  | _ -> None
+
+(* EQS2 fallback: the marker is still an *antecedent of R* (the original
+   hypothesis conjunction has not been introduced yet) — possibly nested
+   inside a right-nested conjunct (`x = y and (incls and marker)`).  Walk
+   R's implication spine; within each antecedent, find a ⋀-projection
+   path to the marker: one (conjunct count, index) step per nesting
+   level, following the renderer's left-assoc flattening.  Returns
+   (antecedents before it, the path). *)
+let find_eqs2_spine e f r =
+  let rec marker_path p =
+    if is_eql_set_app e f p then Some []
+    else
+      match p with
+      | Binary (And, _, _) ->
+        let conjs = Pp_lp.conj_children_left p in
+        let n = List.length conjs in
+        let rec try_at k = function
+          | [] -> None
+          | c :: tl ->
+            (match marker_path c with
+             | Some path -> Some ((n, k) :: path)
+             | None -> try_at (k + 1) tl)
+        in
+        try_at 0 conjs
+      | _ -> None
+  in
+  let rec walk n r =
+    match r with
+    | Binary (Imp, a, rest) ->
+      (match marker_path a with
+       | Some path -> Some (n, path)
+       | None -> walk (n + 1) rest)
+    | _ -> None
+  in
+  walk 0 r
+
+(* ECTR3/4 discharge `¬(P E) ⇒ Q` from store hyps `E = F` (ECTR3) or
+   `F = E` (ECTR4) and `P F`.  From the negated goal atom [g], find an
+   equality hyp one side of which is a variable whose substitution in [g]
+   yields another hyp.  Returns the substituted variable, the equality
+   hyp, whether it is recorded as F = E (→ ECTR4), and the matching
+   hyp. *)
+let find_ectr34 ctx g =
+  let try_dir x y_exp heq swapped =
+    let g' = subst_prd [(x, y_exp)] g in
+    if g' = g then None
+    else
+      List.find_map
+        (fun (h_name, q) ->
+           if q = g' then Some (x, heq, swapped, h_name) else None)
+        ctx.hyps
+  in
+  List.find_map
+    (fun (he, p) ->
+       match p with
+       | Eq (Var x, Var y) ->
+         (match try_dir x (Var y) he false with
+          | Some r -> Some r
+          | None -> try_dir y (Var x) he true)
+       | Eq (Var x, e2) -> try_dir x e2 he false
+       | Eq (e1, Var y) -> try_dir y e1 he true
+       | _ -> None)
+    ctx.hyps
+
+(* ECTR1/2: conclusion `(a = b) ⇒ P` (ECTR2: read as (F = E)).  Store
+   premises ¬(Q E) and Q F.  Returns (E-var, Q's body from the ¬-hyp,
+   the ¬-hyp, the F-hyp, swapped = ECTR2). *)
+let find_ectr12 ctx a b =
+  let try_dir e f swapped =
+    match e with
+    | Var x ->
+      List.find_map
+        (fun (hn, p) ->
+           match p with
+           | Unary (Not, q) ->
+             let q' = subst_prd [(x, f)] q in
+             if q' = q then None
+             else
+               List.find_map
+                 (fun (hh, p') ->
+                    if p' = q' then Some (x, q, hn, hh, swapped) else None)
+                 ctx.hyps
+           | _ -> None)
+        ctx.hyps
+    | _ -> None
+  in
+  (match try_dir a b false with
+   | Some r -> Some r
+   | None -> try_dir b a true)
+
+(* ECTR5/6: conclusion `G ⇒ Q` with store `E = F` (ECTR5) / `F = E`
+   (ECTR6) and ¬(P F) where P F = G[E:=F].  Returns (E-var, the equality
+   hyp, the ¬-hyp, swapped = ECTR6). *)
+let find_ectr56 ctx g =
+  let try_dir x y_exp heq swapped =
+    let g' = subst_prd [(x, y_exp)] g in
+    if g' = g then None
+    else
+      List.find_map
+        (fun (hn, p) ->
+           match p with
+           | Unary (Not, q) when q = g' -> Some (x, heq, hn, swapped)
+           | _ -> None)
+        ctx.hyps
+  in
+  List.find_map
+    (fun (he, p) ->
+       match p with
+       | Eq (Var x, Var y) ->
+         (match try_dir x (Var y) he false with
+          | Some r -> Some r
+          | None -> try_dir y (Var x) he true)
+       | Eq (Var x, e2) -> try_dir x e2 he false
+       | Eq (e1, Var y) -> try_dir y e1 he true
+       | _ -> None)
+    ctx.hyps
+
 (* AR4 needs an explicit F with `F ≤ 𝟎` provable in scope.  The replay
    doesn't record F, but `F ≤ 𝟎` is one of the hypotheses PP introduced
    on the way to the leaf — find it and return (F, its hyp name). *)

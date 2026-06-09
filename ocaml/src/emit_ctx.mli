@@ -68,6 +68,32 @@ val find_hyp_by_pred : ctx -> prd -> string option
 (* AR4: an in-scope `F ≤ 𝟎` hypothesis, returned as (F, its hyp name). *)
 val find_leq_zero_hyp : ctx -> (exp * string) option
 
+(* EQS2 store evidence for the `eql_set E F` marker: an assumed hyp that
+   is `E = F` (returned with [true]; use via set_ext) or the marker
+   itself (returned with [false]). *)
+val find_eqs2_hyp : ctx -> exp -> exp -> (string * bool) option
+
+(* EQS2 evidence from the refuted-inclusion universal pair
+   (`forall2(x).not(x:E and not(x:F))` both ways). *)
+val find_eqs2_incl_pair : ctx -> exp -> exp -> (string * string) option
+
+(* EQS2 fallback: the marker as a (possibly nested) conjunct of an
+   antecedent in R's implication spine — (antecedents before it, the
+   ⋀-projection path: one (conjunct count, index) step per level). *)
+val find_eqs2_spine : exp -> exp -> prd -> (int * (int * int) list) option
+
+(* ECTR3/4: from the negated goal atom, an (equality hyp × substituted
+   hyp) pair — (substituted var, equality hyp, swapped = ECTR4, hyp). *)
+val find_ectr34 : ctx -> prd -> (string * string * bool * string) option
+
+(* ECTR1/2: from the equality antecedent (a, b), a (¬-hyp × substituted
+   hyp) pair — (E-var, Q's body, ¬-hyp, F-hyp, swapped = ECTR2). *)
+val find_ectr12 : ctx -> exp -> exp -> (string * prd * string * string * bool) option
+
+(* ECTR5/6: from the positive antecedent, an (equality hyp × ¬-hyp) pair
+   — (E-var, equality hyp, ¬-hyp, swapped = ECTR6). *)
+val find_ectr56 : ctx -> prd -> (string * string * string * bool) option
+
 (* The tuple-projection env (witness var → `prj k x`) for rendering PP
    expressions; built from the in-scope binders.  Mirrors [Rule_emit.pp_env_of]. *)
 val proj_env_of_ctx : ctx -> Lp_tree.proj_env

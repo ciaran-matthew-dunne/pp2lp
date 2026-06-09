@@ -35,6 +35,8 @@ type emit =
                       binder at the witness `b`, ⊤-normalise the substituted
                       conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+  | Eqs2           (* EQS2: negated eql_set marker discharged via store evidence *)
+  | Ectr           (* ECTR1-6: equality-substitution contradiction leaves *)
 
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
@@ -183,13 +185,13 @@ let rules : (string, rule_info) Hashtbl.t =
   r "EQC1" pass;
   r "EQC2" pass;
   r "EQS1" pass;
-  r "EQS2" pass;
-  r "ECTR1" leaf;
-  r "ECTR2" leaf;
-  r "ECTR3" leaf;
-  r "ECTR4" leaf;
-  r "ECTR5" leaf;
-  r "ECTR6" leaf;
+  r "EQS2" pass ~emit:Eqs2;
+  r "ECTR1" leaf ~emit:Ectr;
+  r "ECTR2" leaf ~emit:Ectr;
+  r "ECTR3" leaf ~emit:Ectr;
+  r "ECTR4" leaf ~emit:Ectr;
+  r "ECTR5" leaf ~emit:Ectr;
+  r "ECTR6" leaf ~emit:Ectr;
   (* §A.14 Arithmetic *)
   r "AR1" pass;
   r "AR2" (Arity [Con]) ~emit:Trust_cons;

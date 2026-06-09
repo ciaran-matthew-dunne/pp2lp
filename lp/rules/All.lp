@@ -60,6 +60,29 @@ begin
   refine h (pi_to_!! P (nested_to_compound P hnested))
 end;
 
+// ALL3R: ALL3 with the *outer* binder appended last.  A branching
+// continuation's goal `(!! v, res_tm (ρ v)) ⇒ R` is structurally nested
+// when the chain result is itself a universal; merging it with ALL3 would
+// put the inner binder at `prj 0`, the opposite of the renderer's
+// slot order (first PP binder ↦ prj 0).  ALL3R appends the outer
+// element instead (`y ⨾ prj 0 w`), so its compound premise matches the
+// renderer's convention and downstream hyp searches stay consistent.
+symbol nested_to_compoundR [n] (P : Tuple (+1 n) → Prop)
+  (h : π (`!! w : Tuple 1, `!! y : Tuple n, P (y ⨾ prj 0 w)))
+  : Π v : Tuple (+1 n), π (P v);
+rule nested_to_compoundR [$n] $P $h ($y ⨾ $a) ↪
+  !!_to_pi (λ y, $P (y ⨾ $a))
+           (!!_to_pi (λ w, `!! y : Tuple $n, $P (y ⨾ prj 0 w)) $h (unit ⨾ $a))
+           $y;
+
+opaque symbol ALL3R [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  : π ((`!! v : Tuple (+1 n), P v) ⇒ R)
+  → π ((`!! w : Tuple 1, `!! y : Tuple n, P (y ⨾ prj 0 w)) ⇒ R) ≔
+begin
+  assume n P R h hnested;
+  refine h (pi_to_!! P (nested_to_compoundR P hnested))
+end;
+
 // ALL4: H ⊢ ∀(x,y)·P → H ⊢ ∀x·∀y·P
 opaque symbol ALL4 [n] [P : Tuple (+1 n) → Prop]
   : π (`!! v : Tuple (+1 n), P v)
@@ -154,6 +177,12 @@ symbol ALL2_1 [n] [P : Tuple (+1 n) → Prop]
 symbol ALL3_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
   (r : Res ((`!! v : Tuple (+1 n), P v) ⇒ R))
   : Res ((`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
+  ≔ mk_1 (res_tm r) trust;
+
+// Chain form of ALL3R (outer binder appended last; see ALL3R above).
+symbol ALL3R_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
+  (r : Res ((`!! v : Tuple (+1 n), P v) ⇒ R))
+  : Res ((`!! w : Tuple 1, `!! y : Tuple n, P (y ⨾ prj 0 w)) ⇒ R)
   ≔ mk_1 (res_tm r) trust;
 
 symbol ALL4_1 [n] [P : Tuple (+1 n) → Prop]

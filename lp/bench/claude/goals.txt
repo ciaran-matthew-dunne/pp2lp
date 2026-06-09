@@ -376,3 +376,374 @@ big_conj_nested   | expr | !x.(x: s => (x: a & x: b) & (x: c & x: d))
 big_two_univ      | expr | !x.(x: s => x: a & x: b & x: c) & !y.(y: u => y: p & y: q & y: r)
 big_imp_cascade8  | prop | a => b => c => d => e => g => h => i
 big_mixed         | expr | !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => !x.(x: s => x: v)
+
+# ════════════════════════════════════════════════════════════════════════
+# 2026-06-09 expansion: sections Q–Z take the suite to ~500 goals.
+# Same charter — pipeline stress + bug hunting, not a guaranteed-green gate.
+# Sections X (ARITH solver terminal) and Y (AXM*-discharged chain elements)
+# are the test beds for the ARITH certificate and the trust-free AXM*_1 work.
+# ════════════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════════════════════════════════════
+# Q. Propositional, deeper and wider — classical shapes, ⇔ algebra
+# ════════════════════════════════════════════════════════════════════════
+
+q2_imp_join       | prop | (a => c) & (b => c) & (a or b) => c
+q2_case_split     | prop | (a => b) & (not(a) => b) => b
+q2_peirce         | prop | ((a => b) => a) => a
+q2_contrapos      | prop | (a => b) => (not(b) => not(a))
+q2_contrapos_rev  | prop | (not(b) => not(a)) => (a => b)
+q2_modus_tollens  | prop | (a => b) & not(b) => not(a)
+q2_imp_trans3     | prop | (a => b) & (b => c) & (c => d) => (a => d)
+q2_or4_comm       | prop | a or b or c or d => d or c or b or a
+q2_and4_comm      | prop | a & b & c & d => d & c & b & a
+q2_or_idem3       | prop | a or a or a => a
+q2_and_over_or    | prop | a & (b or c) => (a & b) or (a & c)
+q2_or_over_and    | prop | (a or b) & (a or c) => a or (b & c)
+q2_demorgan4      | prop | not(a or b or c or d) => not(a) & not(b) & not(c) & not(d)
+q2_demorgan_mix   | prop | not(a & b) or not(c & d) => not(a & b & c & d)
+q2_neg3           | prop | not(not(not(a))) => not(a)
+q2_neg4           | prop | not(not(not(not(a)))) => a
+q2_imp_weaken     | prop | a => (b => a)
+q2_imp_swap_args  | prop | (a => (b => c)) => (b => (a => c))
+q2_imp_dup        | prop | (a => (a => b)) => (a => b)
+q2_curry          | prop | (a & b => c) => (a => (b => c))
+q2_uncurry        | prop | (a => (b => c)) => (a & b => c)
+q2_absorb_chain   | prop | a & (a or b) & (a or c) => a
+q2_or_absorb_deep | prop | a or (a & b & c) => a
+q2_xorish         | prop | (a or b) & not(a & b) & a => not(b)
+q2_iff_or_cong    | prop | (a <=> b) => (a or c <=> b or c)
+q2_iff_not_flip   | prop | (a <=> b) <=> (not(b) <=> not(a))
+q2_iff_chain5     | prop | (a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) => (a <=> e)
+q2_iff_and_proj   | prop | ((a & b) <=> a) <=> (a => b)
+q2_cond_join      | prop | (a => b) or (b => a)
+q2_dn_imp         | prop | not(not(a => b)) => (not(not(a)) => not(not(b)))
+q2_neg_imp_and    | prop | not(a => b) => a & not(b)
+q2_and_neg_imp    | prop | a & not(b) => not(a => b)
+q2_or_as_imp      | prop | (not(a) or b) <=> (a => b)
+q2_parallel_cases | prop | (a => b) & (c => d) & (a or c) => b or d
+q2_em             | prop | a or not(a)
+q2_noncontra      | prop | not(a & not(a))
+q2_imp_refl_deep  | prop | ((a => a) => b) => b
+q2_weak_const     | prop | a & b => (c => a)
+q2_or_intro_deep  | prop | a => ((a or b) or c) or d
+q2_triple_mix     | prop | (a & b) or (a & c) or (a & d) => a
+q2_wide_or8       | prop | a => a or b or c or d or e or g or h or i
+q2_wide_and8      | prop | a & b & c & d & e & g & h & i => e
+q2_release        | prop | (a => b & c) & a => c
+
+# ════════════════════════════════════════════════════════════════════════
+# R. Universals, deeper — wide binder blocks, instantiation, monotone bodies
+# ════════════════════════════════════════════════════════════════════════
+
+u2_all4_chain     | expr | !x.(x: a => x: b) & !x.(x: b => x: c) & !x.(x: c => x: d) & !x.(x: d => x: e) => !x.(x: a => x: e)
+u2_all_and_or     | expr | !x.(x: s => x: a & x: b) => !x.(x: s => x: a or x: c)
+u2_all_pair_proj  | expr | !x.!y.(x,y: r => x: s & y: t) => !x.!y.(x,y: r => y: t)
+u2_all_swap3      | expr | !x.!y.!z.(x: a => y: b => z: c) => !z.!y.!x.(x: a => y: b => z: c)
+u2_all5_wide      | expr | !x.!y.!z.!v.!w.(x: a & y: b & z: c & v: d & w: e => x: a & w: e)
+u2_all_const_body | expr | p => !x.!y.(x: s => p)
+u2_all_inst2      | expr | !x.(x: s => x: t) & a: s & b: s => a: t & b: t
+u2_all_pair_inst  | expr | !x.!y.(x,y: r => y,x: q) & a,b: r => b,a: q
+u2_mono_union     | expr | !x.(x: s => x: t) => !x.(x: s \/ u => x: t \/ u)
+u2_mono_inter     | expr | !x.(x: s => x: t) => !x.(x: s /\ u => x: t /\ u)
+u2_all_neg_body   | expr | !x.(x: s => not(x: t)) & a: s & a: t => bfalse
+u2_all_iff_fwd    | expr | !x.(x: s <=> x: t) => !x.(x: s => x: t)
+u2_all_iff_sym    | expr | !x.(x: s <=> x: t) => !x.(x: t <=> x: s)
+u2_sub_then_all   | expr | s <: t & !x.(x: t => x: u) => !x.(x: s => x: u)
+u2_deep_imp_inst  | expr | !x.(x: a => x: b => x: c => x: d) & a1: a & a1: b & a1: c => a1: d
+u2_all_conj_wide  | expr | !x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g & x: h) => !x.(x: s => x: d)
+u2_or_cases_all   | expr | !x.(x: s => x: a or x: b) & !x.(x: a => x: c) & !x.(x: b => x: c) => !x.(x: s => x: c)
+u2_vacuous2       | expr | !x.!y.(x: s & not(x: s) => y: t)
+u2_all_and_keep   | expr | p & !x.(x: s => x: t) => !x.(x: s => x: t) & p
+u2_all_dom_inst   | expr | !x.(x: dom(f) => x: s) & a: dom(f) => a: s
+u2_all_app_mem    | expr | !x.(x: dom(f) => f(x): t) & a: dom(f) => f(a): t
+u2_all_app_eq     | expr | !x.(x: s => f(x) = g(x)) & a: s => f(a) = g(a)
+u2_all_arith_body | expr | !x.(x: s => 0 <= x) & a: s => 0 <= a
+u2_all_leq_bound  | expr | !x.(x: s => x <= y) & a: s => a <= y
+u2_pair_sym_inst  | expr | !x.!y.(x,y: r => y,x: r) & a,b: r => b,a: r
+u2_two_alls_inst  | expr | !x.(x: a => x: b) & !y.(y: b => y: c) & a1: a => a1: c
+u2_rel_chain      | expr | !x.!y.(x,y: r => x,y: q) & !x.!y.(x,y: q => x,y: w) => !x.!y.(x,y: r => x,y: w)
+u2_all_eq_body    | expr | !x.(x: s => x = a) & b: s => b = a
+u2_all_fun_ext    | expr | !x.(f(x) = g(x)) => f(c) = g(c)
+u2_all_pow_mem    | expr | s <: t => !x.(x: POW(s) => x: POW(t))
+u2_all_notnot     | expr | !x.(x: s => not(not(x: t))) => !x.(x: s => x: t)
+u2_split_nested   | expr | !x.(x: s => (x: a & x: b) & x: c) => !x.(x: s => x: b)
+u2_or_antecedent  | expr | !x.(x: s or x: t => x: u) => !x.(x: s => x: u)
+
+# ════════════════════════════════════════════════════════════════════════
+# S. Existentials, deeper — alternations, witnesses from hyps, classical duals
+# ════════════════════════════════════════════════════════════════════════
+
+x2_pair_witness   | expr | a,b: r => #x.#y.(x,y: r)
+x2_compound_pair  | expr | a,b: r => #(x, y).(x,y: r)
+x2_proj_left      | expr | #x.(x: s & x: t) => #x.(x: s)
+x2_weaken_or      | expr | #x.(x: s) => #x.(x: s or x: t)
+x2_proj_middle    | expr | #x.(x: s & x: t & x: u) => #x.(x: t & x: u)
+x2_eq_collapse    | expr | #x.(x = a & x: s) => a: s
+x2_app_value      | expr | a: dom(f) => #x.(x = f(a))
+x2_from_all_and   | expr | a: s & !x.(x: s => x: t) => #x.(x: t & x: s)
+x2_two_insts      | expr | !x.(x: s => #y.(x,y: r)) & a: s & b: s => #y.(a,y: r) & #y.(b,y: r)
+x2_under_all_eq   | expr | !x.(x: s => x: t) => !x.(x: s => #y.(y: t & y = x))
+x2_triple_rev     | expr | a: s & b: t & c: u => #z.#y.#x.(x: s & y: t & z: u)
+x2_app_pair_wit   | expr | a: dom(f) & f(a): t => #x.(x: dom(f) & f(x): t)
+x2_union_wit      | expr | #x.(x: s) => #x.(x: s \/ t)
+x2_inter_split    | expr | #x.(x: s /\ t) => #x.(x: s) & #x.(x: t)
+x2_and_swap       | expr | #x.(x: s & x: t) => #x.(x: t & x: s)
+x2_dom_transfer   | expr | #x.(x: dom(f)) & !y.(y: dom(f) => y: s) => #x.(x: s)
+x2_counterexample | expr | #x.(x: s & not(x: t)) => not(!y.(y: s => y: t))
+x2_not_all        | expr | not(!x.(x: s => x: t)) => #x.(x: s & not(x: t))
+x2_const_keep     | expr | p & a: s => #x.(p & x: s)
+x2_eq_self        | expr | #x.(x = a)
+x2_two_eq_wits    | expr | #x.#y.(x = y)
+x2_app_graph      | expr | a: s & f(a) = b => #x.#y.(x: s & f(x) = y)
+x2_under_all_app  | expr | !x.(x: s => f(x) = g(x)) => !x.(x: s => #y.(f(x) = y & g(x) = y))
+x2_sub_transfer   | expr | #x.(x: s) & s <: t => #x.(x: t)
+x2_swap_quants    | expr | #x.!y.(x,y: r) => !y.#x.(x,y: r)
+x2_dn_exists      | expr | not(not(#x.(x: s))) => #x.(x: s)
+x2_drinker_use    | expr | #x.(x: s => p) & !x.(x: s) => p
+x2_empty_contra   | expr | #x.(x: s) & !y.(not(y: s)) => bfalse
+x2_pair_fst       | expr | #(x, y).(x,y: r & x: s) => #x.(x: s)
+x2_nested_two     | expr | #x.(x: s & #y.(y: t)) => #y.(y: t) & #x.(x: s)
+x2_wit_from_eq    | expr | f(a) = b => #x.(f(x) = b)
+x2_all_to_some    | expr | !x.(x: s => x: t) & #x.(x: s) => #x.(x: t)
+x2_or_witness     | expr | a: s or a: t => #x.(x: s or x: t)
+
+# ════════════════════════════════════════════════════════════════════════
+# T. Set operations — ∪ ∩ ⊆ POW, enumerated sets, set equality (EQS/ECTR)
+# ════════════════════════════════════════════════════════════════════════
+
+st_inter_sub_l    | expr | s /\ t <: s
+st_inter_sub_r    | expr | s /\ t <: t
+st_sub_union_l    | expr | s <: s \/ t
+st_sub_union_r    | expr | t <: s \/ t
+st_union_comm_mem | expr | x: s \/ t => x: t \/ s
+st_inter_comm_mem | expr | x: s /\ t => x: t /\ s
+st_union_assoc    | expr | x: (s \/ t) \/ u => x: s \/ (t \/ u)
+st_inter_assoc    | expr | x: (s /\ t) /\ u => x: s /\ (t /\ u)
+st_distrib_mem    | expr | x: s /\ (t \/ u) => x: (s /\ t) \/ (s /\ u)
+st_distrib_mem2   | expr | x: (s \/ t) /\ (s \/ u) => x: s \/ (t /\ u)
+st_union_mono2    | expr | s <: t & u <: v => s \/ u <: t \/ v
+st_inter_mono2    | expr | s <: t & u <: v => s /\ u <: t /\ v
+st_sub_inter_in   | expr | s <: t & s <: u => s <: t /\ u
+st_union_sub_out  | expr | s <: u & t <: u => s \/ t <: u
+st_absorb_union   | expr | s \/ (s /\ t) <: s
+st_absorb_inter   | expr | s /\ (s \/ t) <: s
+st_pow_mem_sub    | expr | s: POW(t) => s <: t
+st_sub_pow_mem    | expr | s <: t => s: POW(t)
+st_pow_mem_trans  | expr | s: POW(t) & t <: u => s: POW(u)
+st_pair_mem_l     | expr | a: {a, b}
+st_pair_mem_r     | expr | b: {a, b}
+st_singleton_mem  | expr | a: {a}
+st_singleton_dest | expr | x: {a} => x = a
+st_pair_cases     | expr | x: {a, b} => x = a or x = b
+st_pair_sub       | expr | a: s & b: s => {a, b} <: s
+st_eq_trans_sets  | expr | s = t & t = u => s = u
+st_eq_sym_sets    | expr | s = t => t = s
+st_eq_union_both  | expr | s = t & u = v => s \/ u = t \/ v
+st_eq_inter_both  | expr | s = t & u = v => s /\ u = t /\ v
+st_eq_mem_both    | expr | s = t & x: s & y: t => x: t & y: s
+st_eq_pow         | expr | s = t => POW(s) = POW(t)
+st_eq_card_chain  | expr | s = t & t = u => card(s) = card(u)
+st_card_self      | expr | card(s) = card(s)
+st_antisym_use    | expr | s <: t & t <: s & x: s => x: t
+st_pow_union_sub  | expr | POW(s) <: POW(s \/ t)
+st_mem_sub_chain  | expr | x: m & m <: n & n <: o & o <: q => x: q
+st_union_self_sub | expr | s \/ s <: s
+st_sub_union_self | expr | s <: s \/ s
+st_inter_self_sub | expr | s <: s /\ s
+
+# ════════════════════════════════════════════════════════════════════════
+# U. Functions and relations — app, dom/ran, arrows, maplets
+# ════════════════════════════════════════════════════════════════════════
+
+fn_app_self       | expr | x: dom(f) => f(x) = f(x)
+fn_app_cong       | expr | x = y & x: dom(f) => f(x) = f(y)
+fn_app_two_eq     | expr | a: dom(f) & b: dom(f) & f(a) = c & f(b) = c => f(a) = f(b)
+fn_pair_keep      | expr | a,b: f & c,d: f => a,b: f
+fn_dom_intro      | expr | a,b: f => a: dom(f)
+fn_ran_intro      | expr | a,b: f => b: ran(f)
+fn_total_app_pair | expr | f: s --> t & a: s => a,f(a): f
+fn_total_dom      | expr | f: s --> t & a: s => a: dom(f)
+fn_total_app_mem  | expr | f: s --> t & a: s => f(a): t
+fn_partial_app    | expr | f: s +-> t & a: dom(f) => f(a): t
+fn_inj_eq         | expr | f: s >-> t & a: s & b: s & f(a) = f(b) => a = b
+fn_maplet_subst   | expr | a,b: f & a = c => c,b: f
+fn_app_subst      | expr | u = v & f(u) = w => f(v) = w
+fn_app_chain      | expr | f(a) = b & g(b) = c => g(f(a)) = c
+fn_nested_self    | expr | g(f(x)) = g(f(x))
+fn_app_in_sub     | expr | f(a): s & s <: t => f(a): t
+fn_dom_sub_use    | expr | dom(f) <: s & a: dom(f) => a: s
+fn_ran_sub_use    | expr | ran(f) <: t & b: ran(f) => b: t
+fn_app_eq_sym     | expr | f(a) = b => b = f(a)
+fn_app_eq_trans   | expr | f(a) = b & b = c => f(a) = c
+fn_two_apps       | expr | f(a) = g(b) & g(b) = c => f(a) = c
+fn_rel_exists     | expr | a,b: r & b,c: q => #x.(a,x: r)
+fn_rel_subset     | expr | r <: q & a,b: r => a,b: q
+fn_bij_app        | expr | f: s >->> t & a: s => f(a): t
+
+# ════════════════════════════════════════════════════════════════════════
+# V. Equality chains and substitution — ECTR / OPR stress
+# ════════════════════════════════════════════════════════════════════════
+
+ec_chain10        | expr | a1 = a2 & a2 = a3 & a3 = a4 & a4 = a5 & a5 = a6 & a6 = a7 & a7 = a8 & a8 = a9 & a9 = b1 => a1 = b1
+ec_sym_join       | expr | a = b & c = b => a = c
+ec_mixed_dirs     | expr | b = a & b = c & d = c => a = d
+ec_subst_mem2     | expr | x = y & y = z & x: s => z: s
+ec_neg_subst      | expr | x = y & not(y = z) => not(x = z)
+ec_neg_subst_mem  | expr | x = y & not(y: s) => not(x: s)
+ec_or_elim_eq     | expr | (x = a or x = b) & not(x = a) => x = b
+ec_cases_mem      | expr | (x = a or x = b) & a: s & b: s => x: s
+ec_fun_cong       | expr | x = y => f(x) = f(y)
+ec_plus_cong      | expr | x = y => x + z = y + z
+ec_plus_cong2     | expr | x = y & z = w => x + z = y + w
+ec_minus_cong     | expr | x = y => x - z = y - z
+ec_leq_subst_l    | expr | x = y & y <= z => x <= z
+ec_leq_subst_r    | expr | x = y & z <= y => z <= x
+ec_eq_to_leq2     | expr | x = y => x <= y & y <= x
+ec_arith_chain    | expr | x + 1 = y & y = z => x + 1 = z
+ec_card_subst     | expr | card(s) = n & n = m => card(s) = m
+ec_set_elem_mix   | expr | s = t & x = y & x: s => y: t
+ec_app_subst_lhs  | expr | x = y & f(y) = z => f(x) = z
+ec_triangle       | expr | a = b & b = c => a = c & c = a & b = a
+ec_neq_sym        | expr | not(a = b) => not(b = a)
+ec_eq_iff_mem     | expr | x = y => (x: s <=> y: s)
+ec_join_at_target | expr | s = t & u = t => s = u
+ec_long_neg       | expr | a = b & b = c & c = d & not(a = e) => not(d = e)
+
+# ════════════════════════════════════════════════════════════════════════
+# W. Arithmetic, broader — chains, literals, normalisation stress
+# ════════════════════════════════════════════════════════════════════════
+
+a2_leq_chain8     | expr | x1 <= x2 & x2 <= x3 & x3 <= x4 & x4 <= x5 & x5 <= x6 & x6 <= x7 & x7 <= x8 => x1 <= x8
+a2_leq_plus_step  | expr | x <= y & y + 1 <= z => x <= z
+a2_lt_leq_mix     | expr | x < y & y <= z => x < z
+a2_leq_lt_mix     | expr | x <= y & y < z => x < z
+a2_lt_chain3      | expr | x < y & y < z & z < w => x < w
+a2_plus_zero2     | expr | x + 0 + 0 = x
+a2_zero_nest      | expr | 0 + (0 + x) = x
+a2_neg_cancel_l   | expr | (-x) + x = 0
+a2_neg_neg_eq     | expr | -(-x) = x
+a2_neg_distrib    | expr | -(x + y) = -x - y
+a2_sub_of_sub     | expr | x - (y - z) = x - y + z
+a2_reorder5       | expr | x + y + z + w + v = v + w + z + y + x
+a2_reorder_sub    | expr | x - y + z = z - y + x
+a2_sign_bridge    | expr | x <= 0 & 0 <= y => x <= y
+a2_pos_chain      | expr | 0 <= x & x <= y & y <= z => 0 <= z
+a2_neg_chain      | expr | x <= y & y <= 0 => x <= 0
+a2_shift_left     | expr | x + 1 <= y => x <= y - 1
+a2_shift_right    | expr | x <= y - 1 => x + 1 <= y
+a2_lt_to_succ     | expr | x < y => x + 1 <= y
+a2_succ_to_lt     | expr | x + 1 <= y => x < y
+a2_lt_irrefl      | expr | not(x < x)
+a2_lt_asym        | expr | x < y => not(y < x)
+a2_lt_neq         | expr | x < y => not(x = y)
+a2_leq_total      | expr | x <= y or y <= x
+a2_lit_eq         | expr | 1 + 1 = 2
+a2_lit_leq        | expr | 1 <= 1 + 1
+a2_lit_eleven     | expr | 10 + 1 = 11
+a2_lit_sub        | expr | 3 - 1 = 2
+a2_tighten        | expr | x + 2 <= y => x + 1 <= y
+a2_drop_one       | expr | x + 1 <= y => x <= y
+a2_sandwich_eq    | expr | x <= y & y <= x + 0 => x = y
+a2_zero_sum_eq    | expr | x <= 0 & y <= 0 & 0 <= x + y => x + y = 0
+a2_sum_mono3      | expr | x <= a & y <= b & z <= c => x + y + z <= a + b + c
+a2_between        | expr | x <= y & y <= z & x = z => x = y
+a2_const_shift    | expr | x <= y => x + 3 <= y + 3
+
+# ════════════════════════════════════════════════════════════════════════
+# X. ARITH solver terminal — coefficient reasoning (the certificate test bed;
+#    these fail with E_UNKNOWN_RULE "ARITH" until the Farkas emission lands)
+# ════════════════════════════════════════════════════════════════════════
+
+at_double         | expr | x <= 0 => x + x <= 0
+at_triple         | expr | x <= 0 => x + x + x <= 0
+at_double_pair    | expr | x <= y => x + x <= y + y
+at_double_pos     | expr | 0 <= x => 0 <= x + x
+at_mix_scale      | expr | x <= 0 & y <= 0 => x + x + y <= 0
+at_scale_bound    | expr | x <= 1 => x + x <= 2
+at_two_sided      | expr | x <= y & y <= x => x + x <= y + y
+at_with_const     | expr | x + 1 <= 0 => x + x + 1 <= 0
+at_via_chain      | expr | x <= y & y <= 0 => x + x <= 0
+at_halve          | expr | x + x <= 0 => x <= 0
+at_third          | expr | x + x + x <= 0 => x <= 0
+at_combo          | expr | x <= y & x <= z & 0 <= x => x + x <= y + z
+at_quant_double   | expr | !x.(0 <= x => 0 <= x + x)
+
+# ════════════════════════════════════════════════════════════════════════
+# Y. AXM-discharged chain elements — hypothesis facts inside ALL7/XST8 chains
+#    (the test bed for trust-free AXM*_1: each chain conjunct is discharged
+#    from a store hypothesis, not proven structurally)
+# ════════════════════════════════════════════════════════════════════════
+
+axc_hyp_in_all    | expr | p & !x.(x: s => p & x: s)
+axc_neg_in_all    | expr | not(p) & !x.(p => x: t)
+axc_eq_in_all     | expr | a = b & !x.(x: s => a = b)
+axc_leq_in_all    | expr | y <= z & !x.(x: s => y <= z & x: s)
+axc_mem_in_all    | expr | c: t & !x.(x: s => c: t)
+axc_two_hyps      | expr | p & q & !x.(x: s => p & q)
+axc_mp_body       | expr | (p => q) & p & !x.(x: s => q)
+axc_or_body       | expr | p & !x.(x: s => p or x: t)
+axc_two_binders   | expr | p & !x.!y.(x: s & y: t => p)
+axc_exists_const  | expr | p & a: s => #x.(x: s & p)
+axc_all_exists    | expr | p & !x.(x: s => #y.(y: s & p))
+axc_vacuous_neg   | expr | not(p) & !x.(x: s & p => x: t)
+axc_dn_hyp        | expr | not(not(p)) & !x.(x: s => p)
+axc_subset_const  | expr | s <: t & !x.(x: u => s <: t)
+axc_bool_const    | expr | v = TRUE & !x.(x: s => v = TRUE)
+axc_arith_const   | expr | 0 <= y & !x.(x <= 0 => 0 <= y)
+axc_fn_const      | expr | f(a) = b & !x.(x: s => f(a) = b)
+axc_mixed_two     | expr | p & c: t & !x.(x: s => p & c: t)
+axc_in_exists     | expr | p & #x.(x: s) => #x.(x: s & p)
+axc_card_const    | expr | card(s) = n & !x.(x: t => card(s) = n)
+
+# ════════════════════════════════════════════════════════════════════════
+# Z. Deep and large — push proof size and mixed-family integration
+# ════════════════════════════════════════════════════════════════════════
+
+dz_eq_chain12     | expr | b1 = b2 & b2 = b3 & b3 = b4 & b4 = b5 & b5 = b6 & b6 = b7 & b7 = b8 & b8 = b9 & b9 = c1 & c1 = c2 & c2 = c3 => b1 = c3
+dz_sub_chain8     | expr | m1 <: m2 & m2 <: m3 & m3 <: m4 & m4 <: m5 & m5 <: m6 & m6 <: m7 & m7 <: m8 => m1 <: m8
+dz_leq_chain10    | expr | y1 <= y2 & y2 <= y3 & y3 <= y4 & y4 <= y5 & y5 <= y6 & y6 <= y7 & y7 <= y8 & y8 <= y9 & y9 <= z1 => y1 <= z1
+dz_imp_cascade12  | prop | a => b => c => d => e => g => h => i => j => k => l => m
+dz_and_split10    | expr | !x.(x: s => x: e1 & x: e2 & x: e3 & x: e4 & x: e5 & x: e6 & x: e7 & x: e8 & x: e9 & x: f1)
+dz_cascade8       | expr | !x.(x: c1 => x: c2 => x: c3 => x: c4 => x: c5 => x: c6 => x: c7 => x: c8)
+dz_mixed_monster  | expr | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & b: s & #y.(y: u) => a: u & b: u & #y.(y: u)
+dz_two_u_two_x    | expr | !x.(x: s => #y.(x,y: r)) & !x.(x: t => #y.(x,y: q)) & a: s & b: t => #y.(a,y: r) & #y.(b,y: q)
+dz_quant_arith    | expr | !x.(x: s => 0 <= x) & !x.(x: s => x <= 9) & a: s => 0 <= a & a <= 9
+dz_sets_monster   | expr | s <: t & t <: u & x: s /\ v => x: u
+dz_eqv_ladder     | prop | (a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) & (e <=> g) => (a <=> g)
+dz_wide_cases     | prop | (a or b or c or d) & (a => z) & (b => z) & (c => z) & (d => z) => z
+dz_exists_chain   | expr | a: s & !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => #x.(x: v)
+dz_conj_eq_mix    | expr | a = b & c = d & e = g & h = i & a: s => b: s & c = d
+dz_pair_monster   | expr | !x.!y.(x,y: r => y,x: r) & !x.!y.(x,y: r & y,x: r => x: s) & a,b: r => a: s
+
+# Top-up: variants in reliably-generating families (REPLAY-truncation-safe).
+q3_chain5         | prop | (a => b) & (b => c) & (c => d) & (d => e) => (a => e)
+q3_or_distrib3    | prop | a & (b or c or d) => (a & b) or (a & c) or (a & d)
+q3_neg_or         | prop | not(a or b) & not(c) => not(a or c)
+q3_iff_refl       | prop | (a <=> a)
+q3_iff_em         | prop | (a <=> b) or (a <=> not(b))
+q3_and_rotate     | prop | a & b & c => c & a & b
+q3_or_rotate      | prop | a or b or c => c or a or b
+q3_dn_and         | prop | not(not(a)) & not(not(b)) => a & b
+u3_inst_three     | expr | !x.(x: s => x: t) & a: s & b: s & c: s => a: t & b: t & c: t
+u3_two_layer      | expr | !x.(x: a => x: b) & !x.(x: b => x: c) & d1: a & d2: a => d1: c & d2: c
+u3_body_and4      | expr | !x.(x: s => x: a & x: b & x: c & x: d) & e1: s => e1: c
+u3_neg_inst       | expr | !x.(not(x: s) or x: t) & a: s => a: t
+x3_wit_and_eq     | expr | a: s & a = b => #x.(x: s & x = b)
+x3_wit_app        | expr | f(a) = c => #x.#y.(f(x) = y)
+x3_wit_chain      | expr | a: s & !x.(x: s => x: t) => #x.(x: s) & #x.(x: t)
+ec2_chain6        | expr | c1 = c2 & c2 = c3 & c3 = c4 & c4 = c5 & c5 = c6 => c1 = c6
+ec2_star_join     | expr | a = z & b = z & c = z => a = b & b = c
+ec2_app_both      | expr | x = y & f(x) = g(y) & f(x) = w => g(y) = w
+ec2_mem_two       | expr | x = y & x: s & x: t => y: s & y: t
+a3_leq_plus2      | expr | x <= y & 0 <= z => x <= y + z
+a3_minus_mono     | expr | x <= y => x - z <= y - z
+a3_chain_mixed    | expr | x <= y & y < z & z <= w => x < w
+a3_zero_middle    | expr | x <= 0 & 0 <= z => x - 1 <= z
+a3_lit_spread     | expr | x <= 1 & 1 <= y => x <= y
+a3_plus_swap_leq  | expr | x + y + z <= w => z + y + x <= w
+st2_mem_inter3    | expr | x: s /\ t /\ u => x: t
+st2_mem_union3    | expr | x: s => x: u \/ t \/ s
+st2_eq_singleton  | expr | a = b => {a} = {b}
+st2_pair_both     | expr | x: {a, b} & not(x = a) => x = b
+fn2_app_four      | expr | f(a) = b & f(c) = d & a: dom(f) & c: dom(f) => f(a) = b & f(c) = d
