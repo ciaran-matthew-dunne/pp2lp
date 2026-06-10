@@ -890,9 +890,19 @@ def gen_buts(suite, force=False):
         if len(f) != 3:
             sys.exit(f"{rel(goals)}:{lineno}: expected 'name | kind | goal'")
         name, kind, goal = f[0], f[1], f[2]
-        prefix = "_delta_p" if kind == "prop" else "_delta_e"
+        if kind not in {"prop", "expr", "bprop", "bexpr"}:
+            sys.exit(f"{rel(goals)}:{lineno}: unknown kind {kind!r} "
+                     f"(prop, expr, bprop, bexpr)")
+        prefix = "_delta_p" if kind.endswith("prop") else "_delta_e"
         deltas = " & ".join(f"{prefix}({i})" for i in _free_idents(goal))
-        hyp = f"({goal})" + (f" & {deltas}" if deltas else "")
+        if kind.startswith("b"):
+            # bare kind: no goal-as-hypothesis self-promotion — PP must prove
+            # the formula from the identifier deltas alone, so the special
+            # rule families (BOOL*, EAXM*, EQC, …) actually fire instead of
+            # an immediate AXM8 hypothesis match.
+            hyp = deltas if deltas else "1 = 1"
+        else:
+            hyp = f"({goal})" + (f" & {deltas}" if deltas else "")
         content = (f'Flag(FileOn("{name}.res")) & '
                    f"Set(Valid.1 | Rule(Implication | {hyp} | ? | ? | {goal} | nn))\n")
         wanted[name] = content

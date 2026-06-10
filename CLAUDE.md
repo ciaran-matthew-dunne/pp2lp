@@ -150,13 +150,13 @@ files when done.** Clear stale artifacts with `git clean -Xf lp/bench bench/resu
    the emitter gave up.
 4. No stray probe files (`*_probe.lp`, `*_test.lp`, `*_dbg.lp`) under `lp/`.
 
-All suites except `claude` are clean gates (`claude` keeps one known ✗ —
-see Known broken).
+All suites are clean gates (any ✗ ⇒ exit 1; goals the upstream tools cannot
+replay are dropped at gen time — see Known broken).
 
 ## Known broken
 
 All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
-`gemini` (422), `claude` (1058). Residuals:
+`gemini` (422), `claude` (1114). Residuals:
 
 - **Chain AR7_1/AR8_1.** Not exercised by any current suite (the gemini goals
   were dropped); would still fail at tree-build — the result-chain has no
@@ -172,9 +172,14 @@ All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
 - **NRM20/21 pin slot ≥ 3.** The substitution lemmas cover pin slots 0/1/2
   (after tail rotation); a trace pinning the fourth-or-later binder fails
   loudly. Same for NRM26 drops at slot ≥ 3 that aren't the last-listed.
-- **BOOL/EAXM/EQC/EIMP5/ECTR5-6 unreachable.** Under the suite's self-proof
-  harness these prove in one AXM8 step (the promoted hypothesis matches the
-  goal before the special rules fire), so no replay exercises them.
+- **BOOL11-52 unreachable end-to-end.** Under the self-proof harness they
+  prove in one AXM8 step, and under the bare kinds (`bprop`/`bexpr`, no
+  goal-as-hypothesis) PP cannot prove `bool()` round-trips at all — a PP
+  limitation, not a harness artifact.  The bare kinds did unlock EGALITE
+  (generated replays now cover it), EAXM1/31/32, AR5 and EQV2; still
+  unfired: BOOL*, EAXM2/91/92, EQC1/2, EIMP5*, ECTR5/6, EVR11, NRM16-18,
+  NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61 (103/138 rule_db names
+  fire).
 
 Fixed 2026-06-10, second wave (see git log): suite extended 525 → 1058
 checked proofs (1120-line goals.txt; rule firings 91 → 98 base names).  The
@@ -287,12 +292,16 @@ replay-natively. Unknown rule names raise.
   each NRM rule → goal. Any failing goal ⇒ exit 1.
 - **claude** — a hand-authored *pipeline stress / coverage* suite (same
   `goals.txt` mechanism): it spans every rule family + proof sizes 1→416
-  replay lines and probes the failure frontier on purpose. Currently 1058
+  replay lines and probes the failure frontier on purpose. Currently 1114
   checked proofs, all ✓ (frontier sections L–P cleared; section W probes the
   solver terminals and positional substitution; sections X/Y are the
   coverage push — unfired-rule probes, Farkas/literal/slot stress, scale
-  series, and reliable-family breadth). ~50 more goals in goals.txt can't be
-  replayed — REPLAY truncates or corrupts them and gen drops them, loudly.
+  series, and reliable-family breadth; section Z are bare-kind probes).
+  Goal kinds: `prop`/`expr` self-promote the goal as a hypothesis;
+  `bprop`/`bexpr` (bare) don't — PP must genuinely prove the formula, which
+  is what makes the equality-prover rules (EGALITE, EAXM*) fire. ~75 more
+  goals in goals.txt can't be replayed — PP can't prove some bare forms,
+  and REPLAY truncates or corrupts others; gen drops them, loudly.
   Used to find bugs; inline notes flag each known blocker and finding.
   **`#` existentials are allowed** in goals.txt (the comment splitter no
   longer eats `#x`).

@@ -1,0 +1,1 @@
+Flag(FileOn("za_squeeze.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) | ? | ? | 2 <= x & x <= 2 => x = 2 | nn))

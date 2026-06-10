@@ -1,0 +1,1 @@
+Flag(FileOn("za_zero_sum.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) | ? | ? | x <= 0 & 0 <= x => x + x <= 0 | nn))

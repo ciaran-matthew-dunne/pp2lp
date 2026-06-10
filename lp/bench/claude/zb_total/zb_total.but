@@ -1,0 +1,1 @@
+Flag(FileOn("zb_total.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(btrue) & _delta_e(bfalse) | ? | ? | bool(x = y) = btrue or bool(x = y) = bfalse | nn))

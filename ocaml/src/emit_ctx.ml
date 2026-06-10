@@ -159,6 +159,9 @@ let expected_hyp_pred rule goal =
     Some (Unary (Not, Eq (f, e)))
   | "EAXM2", Binary (Imp, Unary (Not, Eq (e, f)), _) ->
     Some (Eq (f, e))
+  (* EAXM31/32 close the goal itself from its commuted-equality hyp. *)
+  | "EAXM31", Eq (e, f) -> Some (Eq (f, e))
+  | "EAXM32", Unary (Not, Eq (e, f)) -> Some (Unary (Not, Eq (f, e)))
   | _ -> None
 
 let find_hyp_by_pred ctx pred =
@@ -832,9 +835,22 @@ let eq_rewrite_evidence ctx needed =
       let try_var_side v other ~sym =
         List.find_map (fun (h, hp) ->
           if h = heq_name || prd_equiv hp needed then None
-          else if prd_equiv (subst_prd [ (v, other) ] hp) needed
-          then Some (transport heq_name ~sym v h hp)
-          else None) ctx.hyps
+          else
+            let hp' = subst_prd [ (v, other) ] hp in
+            if prd_equiv hp' needed
+            then Some (transport heq_name ~sym v h hp)
+            else
+              (* literal-fold bridge: the substitution leaves a foldable sum
+                 (`1 − (0+0)` where PP recorded `1`) — transport, then close
+                 the gap with a generated sum equality. *)
+              match needed, hp' with
+              | Leq (nl, Nat 0), Leq (hl, Nat 0) ->
+                Option.map
+                  (fun eqpf ->
+                     L.App (L.Name "leq_subst_l",
+                            [ eqpf; transport heq_name ~sym v h hp ]))
+                  (prove_sum_eq render_env nl hl)
+              | _ -> None) ctx.hyps
       in
       let a = match lhs with
         | Var v -> try_var_side v rhs ~sym:true

@@ -1,0 +1,1 @@
+Flag(FileOn("ze_comm_neg.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) | ? | ? | not(x = y) => not(y = x) | nn))

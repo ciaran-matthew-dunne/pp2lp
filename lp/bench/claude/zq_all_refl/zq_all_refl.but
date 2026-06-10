@@ -1,0 +1,1 @@
+Flag(FileOn("zq_all_refl.res")) & Set(Valid.1 | Rule(Implication | 1 = 1 | ? | ? | !x.(x = x) | nn))

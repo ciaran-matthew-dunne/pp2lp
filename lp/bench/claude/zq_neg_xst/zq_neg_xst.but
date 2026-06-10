@@ -1,0 +1,1 @@
+Flag(FileOn("zq_neg_xst.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) | ? | ? | !x.(not(x: s)) => not(#x.(x: s)) | nn))

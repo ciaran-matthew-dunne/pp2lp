@@ -1,0 +1,1 @@
+Flag(FileOn("zb_not_both.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(btrue) & _delta_e(bfalse) | ? | ? | not(bool(x = y) = btrue & bool(x = y) = bfalse) | nn))

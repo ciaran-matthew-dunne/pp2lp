@@ -1,0 +1,1 @@
+Flag(FileOn("zq_all_and_split.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s & x: t) => !x.(x: s) | nn))

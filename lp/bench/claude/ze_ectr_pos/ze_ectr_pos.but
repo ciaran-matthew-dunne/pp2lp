@@ -1,0 +1,1 @@
+Flag(FileOn("ze_ectr_pos.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(s) & _delta_e(bfalse) | ? | ? | x = y & x: s & not(y: s) => bfalse | nn))

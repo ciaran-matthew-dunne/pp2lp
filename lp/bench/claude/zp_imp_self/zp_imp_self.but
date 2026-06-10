@@ -1,0 +1,1 @@
+Flag(FileOn("zp_imp_self.res")) & Set(Valid.1 | Rule(Implication | _delta_p(a) | ? | ? | a => a | nn))

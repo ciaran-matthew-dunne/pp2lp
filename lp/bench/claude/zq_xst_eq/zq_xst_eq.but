@@ -1,0 +1,1 @@
+Flag(FileOn("zq_xst_eq.res")) & Set(Valid.1 | Rule(Implication | _delta_e(a) | ? | ? | #x.(x = a) | nn))

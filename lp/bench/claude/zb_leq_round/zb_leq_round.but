@@ -1,0 +1,1 @@
+Flag(FileOn("zb_leq_round.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(btrue) | ? | ? | bool(x <= y) = btrue => x <= y | nn))

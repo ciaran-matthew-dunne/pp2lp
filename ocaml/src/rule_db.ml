@@ -189,8 +189,10 @@ let rules : (string, rule_info) Hashtbl.t =
   r "EVR11" leaf;
   r "EAXM1" leaf ~emit:Hyp_search;
   r "EAXM2" leaf ~emit:Hyp_search;
-  r "EAXM31" pass;
-  r "EAXM32" pass;
+  (* EAXM31/32: goal-closing leaves — the hyp is the goal's equality
+     (resp. negated equality) commuted. *)
+  r "EAXM31" leaf ~emit:Hyp_search;
+  r "EAXM32" leaf ~emit:Hyp_search;
   r "EIMP51" pass;
   r "EIMP52" pass;
   r "EAXM91" pass;

@@ -1,0 +1,1 @@
+Flag(FileOn("za_lit.res")) & Set(Valid.1 | Rule(Implication | 1 = 1 | ? | ? | 1 <= 2 | nn))

@@ -1423,3 +1423,108 @@ v3_eqv_expr       | expr | (x: s <=> x: t) & x: s => x: t
 v3_eqv_expr_neg   | expr | (x: s <=> x: t) & not(x: t) => not(x: s)
 v3_eqv_arith      | expr | (x <= y <=> y <= x) & x <= y => y <= x
 v3_eq_under_all   | expr | !x.(x: s => x = c) & a: s & b: s => a = b
+
+# ════════════════════════════════════════════════════════════════════════
+# Z. BARE-KIND PROBES (added 2026-06-10, third wave).  `bprop`/`bexpr` drop
+#    the goal-as-hypothesis self-promotion, so PP must genuinely PROVE the
+#    formula — the special rule families the harness could never reach
+#    (BOOL11-52, EAXM*, EQC, EIMP5*, EVR11, ECTR5/6, AR5/6/7/13, VR2, FX2,
+#    EQV2, XST2/61, NRM16-18) get their first real shot at firing.  PP may
+#    fail outright on some (no hypothesis to lean on) — gen drops those.
+# ════════════════════════════════════════════════════════════════════════
+
+# Z.a — bool(P) under a real proof obligation (→ BOOL11-52)
+zb_eq_to_pred     | bexpr | bool(x = y) = btrue => x = y
+zb_pred_to_eq     | bexpr | x = y => bool(x = y) = btrue
+zb_false_to_neg   | bexpr | bool(x = y) = bfalse => not(x = y)
+zb_neg_to_false   | bexpr | not(x = y) => bool(x = y) = bfalse
+zb_leq_round      | bexpr | bool(x <= y) = btrue => x <= y
+zb_leq_intro      | bexpr | x <= y => bool(x <= y) = btrue
+zb_mem_round      | bexpr | bool(x: s) = btrue => x: s
+zb_mem_intro      | bexpr | x: s => bool(x: s) = btrue
+zb_total          | bexpr | bool(x = y) = btrue or bool(x = y) = bfalse
+zb_not_both       | bexpr | not(bool(x = y) = btrue & bool(x = y) = bfalse)
+zb_refl_true      | bexpr | bool(x = x) = btrue
+zb_chain          | bexpr | bool(x = y) = btrue & bool(y = z) = btrue => x = z
+zb_neq_consts     | bexpr | not(btrue = bfalse)
+
+# Z.b — equality-special rules bare (→ EAXM*, EQC1/2, EIMP51/52, EVR11, ECTR5/6)
+ze_comm           | bexpr | y = x => x = y
+ze_comm_neg       | bexpr | not(x = y) => not(y = x)
+ze_comm_mem       | bexpr | y = x & y: s => x: s
+ze_refl           | bexpr | x = x
+ze_refl_or        | bexpr | x = x or x: s
+ze_neg_refl       | bexpr | not(x = x) => x: s
+ze_imp_comm       | bexpr | (x = y => a: s) & y = x => a: s
+ze_imp_comm2      | bexpr | (y = x => a: s) & x = y => a: s
+ze_trans          | bexpr | x = y & y = z => x = z
+ze_subst          | bexpr | x = y & x: s => y: s
+ze_subst_neg      | bexpr | x = y & not(y: s) => not(x: s)
+ze_ectr_pos       | bexpr | x = y & x: s & not(y: s) => bfalse
+ze_ectr_arith     | bexpr | x = y & x <= z & not(y <= z) => bfalse
+ze_fun_cong       | bexpr | x = y => f(x) = f(y)
+ze_app_eq         | bexpr | f(x) = y & y = z => f(x) = z
+
+# Z.c — propositional tautologies bare (→ VR2, FX2, EQV1/2; the NOT/IMP/EQV
+# machinery under genuine proving instead of hypothesis matching)
+zp_em             | bprop | a or not(a)
+zp_noncontra      | bprop | not(a & not(a))
+zp_dneg           | bprop | not(not(a)) => a
+zp_dneg_intro     | bprop | a => not(not(a))
+zp_imp_self       | bprop | a => a
+zp_peirce         | bprop | ((a => b) => a) => a
+zp_demorgan       | bprop | not(a & b) <=> not(a) or not(b)
+zp_neg_eqv        | bprop | not(a <=> not(a))
+zp_neg_eqv_use    | bprop | not(a <=> b) & a => not(b)
+zp_neg_eqv_use2   | bprop | not(a <=> b) & not(a) => b
+zp_contrapos      | bprop | (a => b) => (not(b) => not(a))
+zp_or_comm        | bprop | a or b => b or a
+zp_and_comm       | bprop | a & b => b & a
+zp_iff_refl       | bprop | a <=> a
+zp_absurd         | bprop | a & not(a) => b
+zp_taut_or        | bprop | (a => a) or b
+zp_imp_or         | bprop | (a => b) => not(a) or b
+zp_or_imp         | bprop | not(a) or b => (a => b)
+zp_mt             | bprop | (a => b) & not(b) => not(a)
+zp_mp             | bprop | a & (a => b) => b
+
+# Z.d — quantifier & arithmetic bare (→ NRM16-18, ALL2, XST2/61, AR5/6/7/13)
+zq_all_inst       | bexpr | !x.(x: s => x: t) & a: s => a: t
+zq_all_refl       | bexpr | !x.(x = x)
+zq_all_leq        | bexpr | !x.(x <= x)
+zq_xst_wit        | bexpr | a: s => #x.(x: s)
+zq_xst_eq         | bexpr | #x.(x = a)
+zq_xst_eq_rev     | bexpr | #x.(a = x)
+zq_swap2          | bexpr | !x.!y.(x: s => y: t => x: s)
+zq_all_and_split  | bexpr | !x.(x: s & x: t) => !x.(x: s)
+zq_neg_xst        | bexpr | !x.(not(x: s)) => not(#x.(x: s))
+zq_vac            | bexpr | !x.(a: s) => a: s
+za_lit            | bexpr | 1 <= 2
+za_lit_neg        | bexpr | -1 <= 0
+za_lit_zero       | bexpr | 0 <= 0
+za_relax          | bexpr | x <= -1 => x <= 0
+za_neg_bound      | bexpr | -2 <= x => -3 <= x
+za_antisym        | bexpr | x <= y & y <= x => x = y
+za_squeeze        | bexpr | 2 <= x & x <= 2 => x = 2
+za_strict         | bexpr | x < y => x <= y
+za_interval       | bexpr | 1 <= x & x <= 3 => 0 <= x & x <= 4
+za_plus_mono      | bexpr | x <= y => x + 1 <= y + 1
+za_zero_sum       | bexpr | x <= 0 & 0 <= x => x + x <= 0
+za_farkas         | bexpr | x <= 0 => x + x <= 0
+
+# Z post-run findings (third wave; suite 1114✓/0✗ after fixes):
+# - EGALITE now fires from GENERATED replays (za_zero_sum, ze_comm_neg,
+#   ze_ectr_arith, ze_imp_comm{,2}) — the emit path previously validated
+#   only against a hand-completed replay is now corpus-covered.  za_zero_sum
+#   additionally needed a literal-fold bridge in the equality-store evidence
+#   (rewritten antecedent `1<=0` vs in-scope `1-(x+x)<=0` under x:=0).
+# - EAXM31/EAXM32 are goal-closing LEAVES (hyp = the goal's equality
+#   commuted); rule_db had them as 1-child passthroughs (ze_comm_neg ended
+#   its replay at [EAXM32]).  EAXM1, AR5, EQV2 also fire for the first time.
+# - All 13 zb_ bool() goals FAIL AT PP itself when bare — PP cannot prove
+#   bool(P)-round-trips without a hypothesis to match, so BOOL11-52 remain
+#   unreachable end-to-end (now established as a PP limitation, not a
+#   harness artifact).  zq_swap2 likewise unprovable bare.
+# - Rule coverage after the wave: 103/138 rule_db names fire; the remaining
+#   unfired set is BOOL*, half the EAXM/EQC/EIMP5/ECTR5-6 family, NRM16-18,
+#   NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61.

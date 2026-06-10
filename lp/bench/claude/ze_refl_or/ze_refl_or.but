@@ -1,0 +1,1 @@
+Flag(FileOn("ze_refl_or.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(s) | ? | ? | x = x or x: s | nn))

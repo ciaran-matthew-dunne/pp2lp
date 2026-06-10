@@ -1,0 +1,1 @@
+Flag(FileOn("ze_trans.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x = y & y = z => x = z | nn))

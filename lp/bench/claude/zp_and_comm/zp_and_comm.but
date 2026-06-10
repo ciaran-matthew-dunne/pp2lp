@@ -1,0 +1,1 @@
+Flag(FileOn("zp_and_comm.res")) & Set(Valid.1 | Rule(Implication | _delta_p(a) & _delta_p(b) | ? | ? | a & b => b & a | nn))
