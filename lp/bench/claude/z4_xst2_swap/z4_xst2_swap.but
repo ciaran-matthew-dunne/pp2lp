@@ -1,0 +1,1 @@
+Flag(FileOn("z4_xst2_swap.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) & _delta_e(t) | ? | ? | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t) | nn))

@@ -1528,3 +1528,33 @@ za_farkas         | bexpr | x <= 0 => x + x <= 0
 # - Rule coverage after the wave: 103/138 rule_db names fire; the remaining
 #   unfired set is BOOL*, half the EAXM/EQC/EIMP5/ECTR5-6 family, NRM16-18,
 #   NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61.
+
+# Z.e — fourth wave: shapes aimed at the still-unfired rules (EAXM2/91/92,
+# EQC1/2, EIMP51/52, ECTR5/6, EVR11, VR2, ALL2, XST2/61, AR6/7/13,
+# NRM16-18, NRM27/28/30).  All bare; PP-unprovable ones get dropped.
+z4_eaxm2          | bexpr | y = x => (not(x = y) => a: s)
+z4_eaxm2_use      | bexpr | y = x & (not(x = y) or a: s) => a: s
+z4_eimp51         | bexpr | not(y = x) & a: s => (not(x = y) => a: s)
+z4_eimp52         | bexpr | y = x & a: s => (x = y => a: s)
+z4_eqc_deep       | bexpr | (y = x or a: s) & not(a: s) => x = y
+z4_eqc_ante       | bexpr | (y = x => a: s) & x = y => a: s
+z4_ectr_app       | bexpr | x = y & f(x): s & not(f(y): s) => bfalse
+z4_ectr_app2      | bexpr | x = y & not(f(x): s) & f(y): s => bfalse
+z4_evr11_or       | bexpr | not(x = x) or a: s => a: s
+z4_vr2_neg        | bexpr | not(x = x) => bfalse
+z4_vr2_taut       | bexpr | not(not(x = x))
+z4_all2_conj      | bexpr | !x.(x: s) & a: t => a: t
+z4_all2_or        | bexpr | (!x.(x: s)) or a: s => (a: s or !x.(x: s))
+z4_xst2_swap      | bexpr | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t)
+z4_xst61_or       | bexpr | a: s or #x.(x: t) => #x.(x: t) or a: s
+z4_xst61_elim     | bexpr | (a: s or #x.(x: t)) & not(a: s) => #x.(x: t)
+z4_ar6_low        | bexpr | 0 <= x => -2 <= x
+z4_ar6_neg        | bexpr | -1 <= x => -4 <= x
+z4_ar7_swap       | bexpr | y <= x & x <= y => x = y
+z4_ar7_use        | bexpr | y <= x & x <= y & x: s => y: s
+z4_ar13_squeeze   | bexpr | 1 <= x & x <= 1 => x = 1
+z4_ar13_interval  | bexpr | 0 <= x & x <= 1 & not(x = 0) => x = 1
+z4_nrm16_empty    | bexpr | not(#x.(not(x = x)))
+z4_nrm18_neg_xst  | bexpr | !x.(x: s) => not(#y.(not(y: s)))
+z4_nrm18_inst     | bexpr | !x.(0 <= x) => not(#y.(not(0 <= y)))
+z4_nrm2730_xst    | bexpr | (#x.(x <= 0 & 0 <= x & x: s)) => #y.(y: s)

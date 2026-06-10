@@ -1,0 +1,1 @@
+Flag(FileOn("z4_all2_or.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) & _delta_e(a) | ? | ? | (!x.(x: s)) or a: s => (a: s or !x.(x: s)) | nn))
