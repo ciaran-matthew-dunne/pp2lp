@@ -1,0 +1,1 @@
+Flag(FileOn("axc_vacuous_neg.res")) & Set(Valid.1 | Rule(Implication | (not(p) & !x.(x: s & p => x: t)) & _delta_e(p) & _delta_e(s) & _delta_e(t) | ? | ? | not(p) & !x.(x: s & p => x: t) | nn))

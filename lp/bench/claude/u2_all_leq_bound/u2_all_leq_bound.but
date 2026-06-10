@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_leq_bound.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x <= y) & a: s => a <= y) & _delta_e(s) & _delta_e(y) & _delta_e(a) | ? | ? | !x.(x: s => x <= y) & a: s => a <= y | nn))

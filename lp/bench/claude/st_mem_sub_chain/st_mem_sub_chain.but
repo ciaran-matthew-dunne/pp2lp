@@ -1,0 +1,1 @@
+Flag(FileOn("st_mem_sub_chain.res")) & Set(Valid.1 | Rule(Implication | (x: m & m <: n & n <: o & o <: q => x: q) & _delta_e(x) & _delta_e(m) & _delta_e(n) & _delta_e(o) & _delta_e(q) | ? | ? | x: m & m <: n & n <: o & o <: q => x: q | nn))

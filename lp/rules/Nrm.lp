@@ -309,6 +309,76 @@ begin
           hp)))
 end;
 
+// ---- Tail-equality substitution forms (NRM20/21 over an end-of-list pin) ----
+//
+// PP's NRM20/21 pin *whichever* binder an equality conjunct determines, and
+// the equality may sit at the END of the conjunct list (NRM14 prepends ⊤, so
+// a 2-conjunct body reads `⊤ ∧ (x = E)`).  The head-equality forms above
+// (popl/dropl) cover the head position; these cover the tail position, with
+// the witness E a *function of the remaining tuple* — PP may pin x at another
+// still-bound variable (`#x.#y.(x = y)` pins x at y = prj 0 of what remains).
+//
+// Slot discipline (position i in PP's binder list ↦ prj i): the S forms pin
+// slot 0 (PP's first listed binder, the rightmost ⨾-slot), the P forms pin
+// slot 1 (the second).  The emitter picks by the pinned var's position, read
+// off the rule annotation against its child's binder list.
+
+// NRM20S: pin slot 0 by a tail equality `prj 0 v = E (init v)`.
+opaque symbol NRM20S [n] [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
+  (E : Tuple n → τ ι)
+  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj 0 v = E (init v)))) ⇒ Q) ≔
+begin
+  assume n qs Q E hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v')))
+    (λ v' hq,
+      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj 0 v = E (init v)))) hbig (v' ⨾ E v')
+        (⋀_intro hq (eq_refl (E v')))))
+end;
+
+// NRM21S: NRM20S with reversed equality (`E … = prj 0 v`).
+opaque symbol NRM21S [n] [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
+  (E : Tuple n → τ ι)
+  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (E (init v) = prj 0 v))) ⇒ Q) ≔
+begin
+  assume n qs Q E hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v')))
+    (λ v' hq,
+      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (init v) = prj 0 v))) hbig (v' ⨾ E v')
+        (⋀_intro hq (eq_refl (E v')))))
+end;
+
+// NRM20P: pin slot 1 by a tail equality `prj 1 v = E (rm1 v)`.
+opaque symbol NRM20P [n] [qs : Tuple (+1 (+1 n)) → 𝕃* o] [Q : Prop]
+  (E : Tuple (+1 n) → τ ι)
+  : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (prj 1 v = E (rm1 v)))) ⇒ Q) ≔
+begin
+  assume n qs Q E hsmall hbig;
+  refine hsmall
+    (pi_to_♡ (λ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v')))
+      (λ v' hq,
+        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj 1 v = E (rm1 v)))) hbig
+          (tuple_insert1 (E v') v')
+          (⋀_intro hq (eq_refl (E v')))))
+end;
+
+// NRM21P: NRM20P with reversed equality.
+opaque symbol NRM21P [n] [qs : Tuple (+1 (+1 n)) → 𝕃* o] [Q : Prop]
+  (E : Tuple (+1 n) → τ ι)
+  : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (E (rm1 v) = prj 1 v))) ⇒ Q) ≔
+begin
+  assume n qs Q E hsmall hbig;
+  refine hsmall
+    (pi_to_♡ (λ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v')))
+      (λ v' hq,
+        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (rm1 v) = prj 1 v))) hbig
+          (tuple_insert1 (E v') v')
+          (⋀_intro hq (eq_refl (E v')))))
+end;
+
 // NRM22: the ♡-body's tail equality pins the binder at E (general list
 // form; the ⊤-headed NRM14-fed shape is the instance ps := λ _, (∎ ∷ ⊤)).
 opaque symbol NRM22 [Q : Prop] [ps : Tuple 1 → 𝕃* o] (E : τ ι)
@@ -371,6 +441,30 @@ begin
   assume n P Q hp h♡;
   refine hp (pi_to_♡ (λ v', P (tuple_prepend 𝟎 v'))
     (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_prepend 𝟎 v')))
+end;
+
+// PP's NRM26 drops the unused binder *wherever it sits* in the binder list,
+// not only last-listed.  `tuple_prepend` above dummy-fills the leftmost slot
+// (= the last-listed binder); the variants below fill slot 0 (NRM26S — PP's
+// first listed binder) and slot 1 (NRM26M).  With the wrong variant the
+// remaining binders' projections shift onto the dummy slot, so the emitter
+// picks by the dropped var's position (annotation diff against the child).
+opaque symbol NRM26S [n] [P : Tuple (+1 n) → Prop] [Q : Prop]
+  : π ((`♡ v' : Tuple n, P (v' ⨾ 𝟎)) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔
+begin
+  assume n P Q hp h♡;
+  refine hp (pi_to_♡ (λ v', P (v' ⨾ 𝟎))
+    (λ v', ♡_to_pi (λ v, P v) h♡ (v' ⨾ 𝟎)))
+end;
+
+opaque symbol NRM26M [n] [P : Tuple (+1 (+1 n)) → Prop] [Q : Prop]
+  : π ((`♡ v' : Tuple (+1 n), P (tuple_insert1 𝟎 v')) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 (+1 n)), P v) ⇒ Q) ≔
+begin
+  assume n P Q hp h♡;
+  refine hp (pi_to_♡ (λ v', P (tuple_insert1 𝟎 v'))
+    (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_insert1 𝟎 v')))
 end;
 
 // ---- NRM27-30: Arithmetic solver dispatch (trust-free) ----

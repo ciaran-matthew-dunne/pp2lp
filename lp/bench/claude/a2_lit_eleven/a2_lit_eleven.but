@@ -1,0 +1,1 @@
+Flag(FileOn("a2_lit_eleven.res")) & Set(Valid.1 | Rule(Implication | (10 + 1 = 11) | ? | ? | 10 + 1 = 11 | nn))

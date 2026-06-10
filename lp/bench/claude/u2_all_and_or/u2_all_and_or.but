@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_and_or.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a & x: b) => !x.(x: s => x: a or x: c)) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | !x.(x: s => x: a & x: b) => !x.(x: s => x: a or x: c) | nn))

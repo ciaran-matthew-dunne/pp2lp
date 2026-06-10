@@ -1,0 +1,1 @@
+Flag(FileOn("q3_dn_and.res")) & Set(Valid.1 | Rule(Implication | (not(not(a)) & not(not(b)) => a & b) & _delta_p(a) & _delta_p(b) | ? | ? | not(not(a)) & not(not(b)) => a & b | nn))

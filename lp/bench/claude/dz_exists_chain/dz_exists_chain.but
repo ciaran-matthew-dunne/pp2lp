@@ -1,0 +1,1 @@
+Flag(FileOn("dz_exists_chain.res")) & Set(Valid.1 | Rule(Implication | (a: s & !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => #x.(x: v)) & _delta_e(a) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) | ? | ? | a: s & !x.(x: s => x: t) & !x.(x: t => x: u) & !x.(x: u => x: v) => #x.(x: v) | nn))

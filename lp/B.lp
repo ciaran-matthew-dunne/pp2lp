@@ -121,6 +121,11 @@ symbol add_leq_l (x y z : τ ι) : π (x ≤ y) → π (z + x ≤ z + y);
 // no integer strictly between 𝟎 and 𝟏.
 symbol one_not_leq_zero : π (¬ (𝟏 ≤ 𝟎));
 symbol discrete (x : τ ι) : π (¬ (x ≤ 𝟎)) → π (𝟏 ≤ x);
+// The other half of "𝟏 is strictly positive" — not derivable from the
+// above in a partial order (one_not_leq_zero only rules out 𝟏 ≤ 𝟎; this
+// asserts the comparison resolves upward).  Used by the ARITH closer to
+// refute `c·𝟏 ≤ 𝟎` for literal sums c ≥ 2.
+symbol zero_leq_one : π (𝟎 ≤ 𝟏);
 
 // ---- Derived lemmas (left-/right- variants of the axioms) ----
 
@@ -162,6 +167,16 @@ begin
   rewrite add_comm x z;
   rewrite add_comm y z;
   refine add_leq_l x y z h
+end;
+
+// x ≤ x + 𝟏 (zero_leq_one translated by x).  The ARITH closer chains this
+// to refute a positive-literal sum `(𝟏 + … + 𝟏) ≤ 𝟎`.
+opaque symbol leq_plus_one (x : τ ι) : π (x ≤ x + 𝟏) ≔
+begin
+  assume x;
+  refine leq_trans x (x + 𝟎) (x + 𝟏) _ _
+  { rewrite add_zero x; refine leq_refl x }
+  { refine add_leq_l 𝟎 𝟏 x zero_leq_one }
 end;
 
 // Sum of two non-positives is non-positive.

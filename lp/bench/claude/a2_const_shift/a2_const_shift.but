@@ -1,0 +1,1 @@
+Flag(FileOn("a2_const_shift.res")) & Set(Valid.1 | Rule(Implication | (x <= y => x + 3 <= y + 3) & _delta_e(x) & _delta_e(y) | ? | ? | x <= y => x + 3 <= y + 3 | nn))

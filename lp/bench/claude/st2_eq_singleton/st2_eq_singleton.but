@@ -1,0 +1,1 @@
+Flag(FileOn("st2_eq_singleton.res")) & Set(Valid.1 | Rule(Implication | (a = b => {a} = {b}) & _delta_e(a) & _delta_e(b) | ? | ? | a = b => {a} = {b} | nn))

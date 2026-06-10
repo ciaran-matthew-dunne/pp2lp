@@ -1,0 +1,1 @@
+Flag(FileOn("axc_or_body.res")) & Set(Valid.1 | Rule(Implication | (p & !x.(x: s => p or x: t)) & _delta_e(p) & _delta_e(s) & _delta_e(t) | ? | ? | p & !x.(x: s => p or x: t) | nn))

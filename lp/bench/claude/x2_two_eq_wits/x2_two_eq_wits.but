@@ -1,0 +1,1 @@
+Flag(FileOn("x2_two_eq_wits.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x = y)) | ? | ? | #x.#y.(x = y) | nn))

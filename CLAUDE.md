@@ -155,18 +155,36 @@ see Known broken).
 
 ## Known broken
 
-`og` (30), `prv` (70), `synth` (107), `nrm_test` (42), and `gemini` (422) are
-green. `claude` is 222/223 — it probes the frontier on purpose. Residuals:
+All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
+`gemini` (422), `claude` (525). Residuals:
 
-- **`[ARITH] <FAUX>` solver terminal** (`claude/nar_leq_zero`, the one ✗).
-  PP's linear solver closes a leaf (⊥ from the assumed `… ≤ 𝟎` hyps) without
-  recording a certificate; `rule_db` raises `E_UNKNOWN_RULE`. Needs a small
-  Farkas-style combination search over the ≤-hyps emitting a generated
-  add-mono proof (same no-trust approach as the reorder bridges).
 - **Chain AR7_1/AR8_1.** Not exercised by any current suite (the gemini goals
   were dropped); would still fail at tree-build — the result-chain has no
   STOP_1 leaf seed and an AR9_1/AR7_1 same-formula pair the one-node-per-line
   postfix model can't place. Replay-format work in `proof_tree.ml`.
+- **REPLAY truncation (upstream).** Atelier B's REPLAY drops the final
+  ALL7/XST8 continuation for ~30 goal shapes (set-extensionality and
+  equality-prover-heavy proofs); `pp2lp gen` re-detects and drops them every
+  run (`E_REPLAY_TRUNCATED`). In particular no complete EGALITE replay can
+  currently be produced — the EGALITE emit path is validated against a
+  hand-completed minimal replay, not a generated one.
+- **NRM20/21 pin slot ≥ 2.** The substitution lemmas cover pin slots 0/1
+  (after tail rotation); a trace pinning the third-or-later binder fails
+  loudly. Same for NRM26 drops at slot ≥ 2 that aren't the last-listed.
+
+Fixed 2026-06-10 (see git log): `[ARITH] <FAUX>` solver terminal — generated
+Farkas combination over the `≤ 𝟎` hyps (`add_leq_zero` chain + `prove_sum_eq`
++ `one_not_leq_zero`, no trust; `zero_leq_one`/`leq_plus_one` close constants
+≥ 2); `[EGALITE]` equality-prover terminal — the child re-promotes the
+equality-rewritten hyps, each discharged by an `ind_eq` transport
+(`eq_rewrite_evidence`); literal folding in `prove_sum_eq`/`flatten_signed`
+(small literals unfold to 𝟏-atoms, so PP's `1+9→10` AR3/AR3_F folds get real
+equality proofs instead of silent fallbacks); positional NRM26
+(S/M/prepend variants picked by the dropped binder's slot, from the
+annotation diff); NRM20/21 generalised — tail-position pinning equalities,
+dependent witnesses over the remaining tuple (`#x.#y.(x = y)`), RHS
+orientation pinning non-leading binders, and mid-list/head equalities bubbled
+to the tail with generated `conj_swap_last2`/`conj_init_cong` chains.
 
 Fixed 2026-06-09 (see git log): unary numeral OOM (big literals now emit as
 decimal, parsed via Stdlib.Nat's builtins + B.lp's `int_lit` coercion — never
@@ -252,11 +270,14 @@ replay-natively. Unknown rule names raise.
   as loose files; removing a goal removes its dir. nrm_test's `COVERAGE.md` maps
   each NRM rule → goal. Any failing goal ⇒ exit 1.
 - **claude** — a hand-authored *pipeline stress / coverage* suite (same
-  `goals.txt` mechanism), not a green gate: it spans every rule family + proof
-  sizes 1→416 replay lines and probes the failure frontier on purpose (sections
-  L–P are expected ✗/⚠). 233 goals → 85/93 rules exercised. Used to find bugs;
-  inline notes flag each frontier blocker. **`#` existentials are allowed** in
-  goals.txt (the comment splitter no longer eats `#x`).
+  `goals.txt` mechanism): it spans every rule family + proof sizes 1→416
+  replay lines and probes the failure frontier on purpose. Currently 525
+  goals, all ✓ (the former frontier sections L–P are cleared; section W
+  probes the solver terminals and positional substitution forms). ~30 more
+  goals in goals.txt can't be replayed — REPLAY truncates them and gen drops
+  them, loudly. Used to find bugs; inline notes flag each known blocker.
+  **`#` existentials are allowed** in goals.txt (the comment splitter no
+  longer eats `#x`).
 
 ## Commits
 

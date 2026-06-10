@@ -1,0 +1,1 @@
+Flag(FileOn("fn_app_subst.res")) & Set(Valid.1 | Rule(Implication | (u = v & f(u) = w => f(v) = w) & _delta_e(u) & _delta_e(v) & _delta_e(f) & _delta_e(w) | ? | ? | u = v & f(u) = w => f(v) = w | nn))

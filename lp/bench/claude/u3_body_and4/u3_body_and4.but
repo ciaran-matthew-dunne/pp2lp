@@ -1,0 +1,1 @@
+Flag(FileOn("u3_body_and4.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a & x: b & x: c & x: d) & e1: s => e1: c) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e1) | ? | ? | !x.(x: s => x: a & x: b & x: c & x: d) & e1: s => e1: c | nn))

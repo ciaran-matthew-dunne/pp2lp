@@ -1,0 +1,1 @@
+Flag(FileOn("x2_under_all_eq.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) => !x.(x: s => #y.(y: t & y = x))) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => x: t) => !x.(x: s => #y.(y: t & y = x)) | nn))

@@ -91,6 +91,32 @@ rule τ (Tup $n) ↪ Tuple $n;
 symbol init [n] : Tuple (+1 n) → Tuple n;
 rule init ($v ⨾ _) ↪ $v;
 
+// prj commutes through `init` on an *abstract* tuple: dropping the slot-0
+// element shifts every remaining index down by one.  Joinable with the
+// constructor path: `prj k (init (w ⨾ x))` → `prj k w` either way.
+rule prj $k (init $v) ↪ prj (+1 $k) $v;
+
+// ---- Slot-1 surgery: rm1 / tuple_insert1 -----------------------------
+//
+// The NRM20/21 substitution rules may pin (and NRM26 may drop) the binder
+// at slot 1 — the second-rightmost ⨾-slot — not just slot 0 (`init`/`⨾`)
+// or the leftmost (`tuple_prepend`).  `rm1` removes slot 1, `tuple_insert1`
+// inserts there; the prj-commute rules below keep projections reducible on
+// an abstract tuple, mirroring the take/drop and init rules.
+symbol rm1 [n] : Tuple (+1 (+1 n)) → Tuple (+1 n);
+rule rm1 ($v ⨾ $y) ↪ (init $v) ⨾ $y;
+rule prj 0 (rm1 $v) ↪ prj 0 $v
+with prj (+1 $k) (rm1 $v) ↪ prj (+1 (+1 $k)) $v;
+
+symbol tuple_insert1 [n] : τ ι → Tuple (+1 n) → Tuple (+1 (+1 n));
+rule tuple_insert1 $x ($v ⨾ $y) ↪ ($v ⨾ $x) ⨾ $y;
+// NB: a bare numeral ≥1 in a rule pattern parses as a *wildcard*, not the
+// literal — spell slot 1 as `+1 0`.
+rule prj 0 (tuple_insert1 _ $w) ↪ prj 0 $w
+with prj (+1 0) (tuple_insert1 $x _) ↪ $x
+with prj (+1 (+1 $k)) (tuple_insert1 _ $w) ↪ prj (+1 $k) $w
+with rm1 (tuple_insert1 _ $w) ↪ $w;
+
 // η for tuples: `(init v) ⨾ (prj 0 v) = v` for an *abstract* `v : Tuple
 // (+1 n)`.  Direct `induction` on `Tuple (+1 n)` fails (the index is a
 // non-variable `+1 n`); instead drive `ind_Tuple` with a total motive

@@ -1,0 +1,1 @@
+Flag(FileOn("a2_sum_mono3.res")) & Set(Valid.1 | Rule(Implication | (x <= a & y <= b & z <= c => x + y + z <= a + b + c) & _delta_e(x) & _delta_e(a) & _delta_e(y) & _delta_e(b) & _delta_e(z) & _delta_e(c) | ? | ? | x <= a & y <= b & z <= c => x + y + z <= a + b + c | nn))

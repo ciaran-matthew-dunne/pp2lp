@@ -103,6 +103,43 @@ and tree_dispatch ctx = function
          "INS contradiction search failed — no (universal hyp \xc3\x97 witness) \
           discharges every conjunct\n  goal: %s\n%s"
          goal (ins_diagnostic ctx)))
+  | P.Apply { rule; children = [c]; _ }
+    when Rule_db.emit rule = Rule_db.Egalite ->
+    (* EGALITE (the equality-prover terminal): PP rewrites the store's hyps
+       along the stored equalities and re-promotes them as antecedents over
+       the ⊥ goal; the child proves that implication chain.  Emit
+       `refine (λ k : π (chain), k ev₁ … evₙ) _` — the typed λ pins the
+       child goal (a bare `refine _ ev…` leaves it undetermined), each evᵢ a
+       direct hyp or an `ind_eq`-transported one ([Emit_ctx.leaf_evidence]'s
+       equality-store bridge). *)
+    (match goal_of_anno (P.anno_of c) with
+     | Some child_goal ->
+       let rec peel acc = function
+         | Binary (Imp, a, rest) -> peel (a :: acc) rest
+         | _ -> List.rev acc
+       in
+       let antecedents = peel [] child_goal in
+       if antecedents = [] then
+         failwith "translate: EGALITE child goal has no antecedents \
+                   (expected the rewritten-hyp implication chain)";
+       let evs =
+         List.map (fun a ->
+           match leaf_evidence ctx [] a with
+           | Some ev -> ev
+           | None ->
+             failwith (Printf.sprintf
+               "translate: EGALITE — no in-scope hyp matches the rewritten \
+                antecedent (directly or modulo a stored equality)\n  \
+                antecedent: %s" (Emit_pp.prd_to_pp a)))
+           antecedents
+       in
+       let k = fresh_x_local ctx in
+       let cut =
+         L.Lambda (k, Some (L.Pi_pred (proj_env_of_ctx ctx, child_goal)),
+                   L.App (L.Name k, evs))
+       in
+       L.Then (L.Refine (cut, [L.Hole]), tree ctx c)
+     | None -> failwith "translate: EGALITE child has no annotation")
   | P.Apply { rule; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Eqs2 ->
     (* PP's EQS2 (spec p.98) discharges ¬eql_set(E,F) with a FAUX ⇒ R

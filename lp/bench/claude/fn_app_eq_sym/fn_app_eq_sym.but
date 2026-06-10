@@ -1,0 +1,1 @@
+Flag(FileOn("fn_app_eq_sym.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b => b = f(a)) & _delta_e(f) & _delta_e(a) & _delta_e(b) | ? | ? | f(a) = b => b = f(a) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("x2_app_value.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) => #x.(x = f(a))) & _delta_e(a) & _delta_e(f) | ? | ? | a: dom(f) => #x.(x = f(a)) | nn))

@@ -1,11 +1,15 @@
-type binder_ty = Tau_i
-
 (* A PP variable bound by an enclosing compound (n-ary) binder maps to its
    (slot, tuple-var) so it renders as `prj slot tuple-var`.  Same shape
    [Pp_lp] consumes as `~env`.  Carried on [Pred]/[Exp] so the formula is
    rendered with the right projections at print time, not pre-rendered to a
    string. *)
 type proj_env = (string * (int * string)) list
+
+(* `Pi_pred` annotates a λ-binder with `π (<pred>)` — used when the bound
+   proof's type must be pinned explicitly (a metavariable-headed application
+   would otherwise leave the subgoal's type undetermined, e.g. EGALITE's
+   `refine (λ k : π G, k ev…) _`). *)
+type binder_ty = Tau_i | Pi_pred of proj_env * Syntax_pp.prd
 
 (* A Lambdapi term argument.  Fully structured — there is no string escape
    hatch.  A PP formula is carried as [Pred]/[Exp] with its [proj_env] and
@@ -45,6 +49,10 @@ type t =
 
 let pp_binder_ty buf = function
   | Tau_i -> Buffer.add_string buf "\xcf\x84 \xce\xb9" (* τ ι *)
+  | Pi_pred (env, p) ->
+    Buffer.add_string buf "\xcf\x80 ("; (* π *)
+    Pp_lp.pp_prd ~env buf p;
+    Buffer.add_char buf ')'
 
 let rec pp_term buf = function
   | Hole -> Buffer.add_char buf '_'

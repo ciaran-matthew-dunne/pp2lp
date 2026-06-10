@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_conj_wide.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g & x: h) => !x.(x: s => x: d)) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) & _delta_e(g) & _delta_e(h) | ? | ? | !x.(x: s => x: a & x: b & x: c & x: d & x: e & x: g & x: h) => !x.(x: s => x: d) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("ec_fun_cong.res")) & Set(Valid.1 | Rule(Implication | (x = y => f(x) = f(y)) & _delta_e(x) & _delta_e(y) & _delta_e(f) | ? | ? | x = y => f(x) = f(y) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("x3_three_wits.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b => #x.#y.#z.(f(x) = y & y = z)) & _delta_e(f) & _delta_e(a) & _delta_e(b) | ? | ? | f(a) = b => #x.#y.#z.(f(x) = y & y = z) | nn))

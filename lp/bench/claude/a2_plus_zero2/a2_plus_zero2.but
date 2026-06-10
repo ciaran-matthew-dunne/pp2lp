@@ -1,0 +1,1 @@
+Flag(FileOn("a2_plus_zero2.res")) & Set(Valid.1 | Rule(Implication | (x + 0 + 0 = x) & _delta_e(x) | ? | ? | x + 0 + 0 = x | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("at_double_pair.res")) & Set(Valid.1 | Rule(Implication | (x <= y => x + x <= y + y) & _delta_e(x) & _delta_e(y) | ? | ? | x <= y => x + x <= y + y | nn))

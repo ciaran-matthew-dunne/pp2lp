@@ -1,0 +1,1 @@
+Flag(FileOn("axc_hyp_in_all.res")) & Set(Valid.1 | Rule(Implication | (p & !x.(x: s => p & x: s)) & _delta_e(p) & _delta_e(s) | ? | ? | p & !x.(x: s => p & x: s) | nn))

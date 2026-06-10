@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_swap2.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: a => y: b) => !y.!x.(x: a => y: b)) & _delta_e(a) & _delta_e(b) | ? | ? | !x.!y.(x: a => y: b) => !y.!x.(x: a => y: b) | nn))

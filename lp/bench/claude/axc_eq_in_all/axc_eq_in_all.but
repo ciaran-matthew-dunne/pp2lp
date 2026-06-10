@@ -1,0 +1,1 @@
+Flag(FileOn("axc_eq_in_all.res")) & Set(Valid.1 | Rule(Implication | (a = b & !x.(x: s => a = b)) & _delta_e(a) & _delta_e(b) & _delta_e(s) | ? | ? | a = b & !x.(x: s => a = b) | nn))

@@ -71,6 +71,32 @@ opaque symbol conj_snoc_last_cong [ps : 𝕃* o] [P Q : Prop]
   : π (P = Q) → π (⋀ (ps ∷ P) = ⋀ (ps ∷ Q)) ≔
 begin assume ps P Q h; rewrite h; reflexivity end;
 
+// Swap the last two conjuncts.  With [conj_init_cong] below this bubbles a
+// conjunct to the end of the list — the emitter rotates an NRM20/21 pinning
+// equality into tail position before applying the tail-form lemmas.
+opaque symbol conj_swap_last2 [ps : 𝕃* o] [P Q : Prop]
+  : π (⋀ (ps ∷ P ∷ Q) = ⋀ (ps ∷ Q ∷ P)) ≔
+begin
+  assume ps P Q;
+  refine propExt _ _ _ _
+  { assume h;
+    refine ⋀_intro (⋀_intro (⋀_init (⋀_init h)) (⋀_last h))
+                   (⋀_last (⋀_init h)) }
+  { assume h;
+    refine ⋀_intro (⋀_intro (⋀_init (⋀_init h)) (⋀_last h))
+                   (⋀_last (⋀_init h)) }
+end;
+
+// Init congruence: rewrite everything *below* the last conjunct.
+opaque symbol conj_init_cong [ps qs : 𝕃* o] [P : Prop]
+  : π (⋀ ps = ⋀ qs) → π (⋀ (ps ∷ P) = ⋀ (qs ∷ P)) ≔
+begin
+  assume ps qs P h;
+  refine propExt _ _ _ _
+  { assume hc; refine ⋀_intro (=⇒ h (⋀_init hc)) (⋀_last hc) }
+  { assume hc; refine ⋀_intro (=⇒ (eq_sym h) (⋀_init hc)) (⋀_last hc) }
+end;
+
 // Strip a known antecedent: π P → ((P ⇒ Q) = Q).
 opaque symbol imp_known_drop [P Q : Prop]
   : π P → π ((P ⇒ Q) = Q) ≔

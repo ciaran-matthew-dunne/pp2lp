@@ -1,0 +1,1 @@
+Flag(FileOn("a2_lt_leq_mix.res")) & Set(Valid.1 | Rule(Implication | (x < y & y <= z => x < z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x < y & y <= z => x < z | nn))

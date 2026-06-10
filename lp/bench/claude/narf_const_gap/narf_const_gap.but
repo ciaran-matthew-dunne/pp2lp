@@ -1,0 +1,1 @@
+Flag(FileOn("narf_const_gap.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 3 => x + x <= 9)) | ? | ? | !x.(x <= 3 => x + x <= 9) | nn))

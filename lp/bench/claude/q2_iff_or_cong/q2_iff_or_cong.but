@@ -1,0 +1,1 @@
+Flag(FileOn("q2_iff_or_cong.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) => (a or c <=> b or c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a <=> b) => (a or c <=> b or c) | nn))

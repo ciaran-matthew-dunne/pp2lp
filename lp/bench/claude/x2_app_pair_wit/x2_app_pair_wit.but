@@ -1,0 +1,1 @@
+Flag(FileOn("x2_app_pair_wit.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) & f(a): t => #x.(x: dom(f) & f(x): t)) & _delta_e(a) & _delta_e(f) & _delta_e(t) | ? | ? | a: dom(f) & f(a): t => #x.(x: dom(f) & f(x): t) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("q2_or_idem3.res")) & Set(Valid.1 | Rule(Implication | (a or a or a => a) & _delta_p(a) | ? | ? | a or a or a => a | nn))

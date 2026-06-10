@@ -1,0 +1,1 @@
+Flag(FileOn("dz_conj_eq_mix.res")) & Set(Valid.1 | Rule(Implication | (a = b & c = d & e = g & h = i & a: s => b: s & c = d) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) & _delta_e(g) & _delta_e(h) & _delta_e(i) & _delta_e(s) | ? | ? | a = b & c = d & e = g & h = i & a: s => b: s & c = d | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("ec2_mem_two.res")) & Set(Valid.1 | Rule(Implication | (x = y & x: s & x: t => y: s & y: t) & _delta_e(x) & _delta_e(y) & _delta_e(s) & _delta_e(t) | ? | ? | x = y & x: s & x: t => y: s & y: t | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("ec2_star_join.res")) & Set(Valid.1 | Rule(Implication | (a = z & b = z & c = z => a = b & b = c) & _delta_e(a) & _delta_e(z) & _delta_e(b) & _delta_e(c) | ? | ? | a = z & b = z & c = z => a = b & b = c | nn))

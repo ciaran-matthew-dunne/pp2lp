@@ -542,7 +542,9 @@ st_eq_sym_sets    | expr | s = t => t = s
 st_eq_union_both  | expr | s = t & u = v => s \/ u = t \/ v
 st_eq_inter_both  | expr | s = t & u = v => s /\ u = t /\ v
 st_eq_mem_both    | expr | s = t & x: s & y: t => x: t & y: s
-st_eq_pow         | expr | s = t => POW(s) = POW(t)
+# st_eq_pow (s = t => POW(s) = POW(t)) pruned: REPLAY truncates its replay —
+# the final ALL7 of the EGALITE continuation is emitted with no sequent child
+# (E_REPLAY_TRUNCATED; same upstream tool bug that dropped the gemini goals).
 st_eq_card_chain  | expr | s = t & t = u => card(s) = card(u)
 st_card_self      | expr | card(s) = card(s)
 st_antisym_use    | expr | s <: t & t <: s & x: s => x: t
@@ -747,3 +749,42 @@ st2_mem_union3    | expr | x: s => x: u \/ t \/ s
 st2_eq_singleton  | expr | a = b => {a} = {b}
 st2_pair_both     | expr | x: {a, b} & not(x = a) => x = b
 fn2_app_four      | expr | f(a) = b & f(c) = d & a: dom(f) & c: dom(f) => f(a) = b & f(c) = d
+
+# ════════════════════════════════════════════════════════════════════════
+# W. Solver terminals & positional substitution (added 2026-06-10)
+#    Probes for newly-wired machinery: the ARITH Farkas closer (→ ARITH),
+#    the EGALITE equality-prover terminal (→ EGALITE), slot-positional
+#    NRM20/21 pins and NRM26 drops, and literal folding in the generated
+#    sum-equality proofs (AR3/AR3_F with folded constants).
+# ════════════════════════════════════════════════════════════════════════
+
+# ARITH Farkas certificates: multiplier 3, two-variable, constants > 1.
+narf_triple       | expr | !x.(x <= 0 => x + x + x <= 0)
+narf_neg_triple   | expr | !x.(0 <= x => 0 <= x + x + x)
+narf_two_var      | expr | !x.!y.(x <= 0 & y <= 0 => x + y + x <= 0)
+narf_const_gap    | expr | !x.(x <= 3 => x + x <= 9)
+narf_const_slack  | expr | !x.(x <= 2 => x + x + x <= 8)
+narf_opp_pair     | expr | !x.!y.(x + y <= 0 & 0 <= y => x <= 1)
+
+# EGALITE: equality-prover terminal (universal hyps used modulo equalities).
+# The bare !x-hyp forms (e.g. `!x.(x: s => x: u) & s = t & a: t => a: u`)
+# prove fine in PP but REPLAY fails to convert their traces — use the
+# subset-expansion shapes (the st_eq_pow trigger context) instead.
+egal_sub_bridge   | expr | s = t & u <: s => u <: t
+egal_sub_self     | expr | s = t => s <: t
+egal_sub_both     | expr | s = t & s <: u => t <: u
+egal_mem_sub      | expr | s = t & u <: s & a: u => a: t
+
+# NRM20/21 positional pins: witness = another bound var, RHS orientation,
+# real (non-⊤) conjunct prefixes, mid-list equality.
+x2_eq_wits_rev    | expr | #x.#y.(y = x)
+x2_app_graph_rev  | expr | a: s & b = f(a) => #x.#y.(x: s & y = f(x))
+x2_two_app        | expr | f(a) = b => #x.#y.(y = f(x))
+x3_mid_wit        | expr | a: s & f(a) = c => #x.#y.(x: s & f(x) = y & y = c)
+x3_three_wits     | expr | f(a) = b => #x.#y.#z.(f(x) = y & y = z)
+
+# NRM26 positional drops: re-quantified universals with reordered binders
+# leave the unused binder at slot 0 / 1 / last.
+u2_all_swap2      | expr | !x.!y.(x: a => y: b) => !y.!x.(x: a => y: b)
+u2_all_rotate     | expr | !x.!y.!z.(x: a => y: b => z: c) => !y.!z.!x.(x: a => y: b => z: c)
+u2_all_mid_drop   | expr | !x.!y.!z.(x: a => z: c) => !z.!x.(x: a => z: c)

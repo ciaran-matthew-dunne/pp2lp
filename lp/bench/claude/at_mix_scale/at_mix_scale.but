@@ -1,0 +1,1 @@
+Flag(FileOn("at_mix_scale.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & y <= 0 => x + x + y <= 0) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 0 & y <= 0 => x + x + y <= 0 | nn))

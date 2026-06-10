@@ -1,0 +1,1 @@
+Flag(FileOn("q2_imp_dup.res")) & Set(Valid.1 | Rule(Implication | ((a => (a => b)) => (a => b)) & _delta_p(a) & _delta_p(b) | ? | ? | (a => (a => b)) => (a => b) | nn))

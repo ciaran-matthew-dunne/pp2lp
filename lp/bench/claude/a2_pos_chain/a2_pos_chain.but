@@ -1,0 +1,1 @@
+Flag(FileOn("a2_pos_chain.res")) & Set(Valid.1 | Rule(Implication | (0 <= x & x <= y & y <= z => 0 <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | 0 <= x & x <= y & y <= z => 0 <= z | nn))

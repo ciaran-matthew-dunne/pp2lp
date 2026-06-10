@@ -1,0 +1,1 @@
+Flag(FileOn("at_quant_double.res")) & Set(Valid.1 | Rule(Implication | (!x.(0 <= x => 0 <= x + x)) | ? | ? | !x.(0 <= x => 0 <= x + x) | nn))

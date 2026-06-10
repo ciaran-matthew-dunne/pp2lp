@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_mid_drop.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.(x: a => z: c) => !z.!x.(x: a => z: c)) & _delta_e(a) & _delta_e(c) | ? | ? | !x.!y.!z.(x: a => z: c) => !z.!x.(x: a => z: c) | nn))

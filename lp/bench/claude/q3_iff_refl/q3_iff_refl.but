@@ -1,0 +1,1 @@
+Flag(FileOn("q3_iff_refl.res")) & Set(Valid.1 | Rule(Implication | ((a <=> a)) & _delta_p(a) | ? | ? | (a <=> a) | nn))

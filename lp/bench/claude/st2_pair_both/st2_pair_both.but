@@ -1,0 +1,1 @@
+Flag(FileOn("st2_pair_both.res")) & Set(Valid.1 | Rule(Implication | (x: {a, b} & not(x = a) => x = b) & _delta_e(x) & _delta_e(a) & _delta_e(b) | ? | ? | x: {a, b} & not(x = a) => x = b | nn))

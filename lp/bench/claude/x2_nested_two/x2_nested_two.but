@@ -1,0 +1,1 @@
+Flag(FileOn("x2_nested_two.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s & #y.(y: t)) => #y.(y: t) & #x.(x: s)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s & #y.(y: t)) => #y.(y: t) & #x.(x: s) | nn))

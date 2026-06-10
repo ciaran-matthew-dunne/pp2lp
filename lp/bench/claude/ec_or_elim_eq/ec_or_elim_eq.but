@@ -1,0 +1,1 @@
+Flag(FileOn("ec_or_elim_eq.res")) & Set(Valid.1 | Rule(Implication | ((x = a or x = b) & not(x = a) => x = b) & _delta_e(x) & _delta_e(a) & _delta_e(b) | ? | ? | (x = a or x = b) & not(x = a) => x = b | nn))

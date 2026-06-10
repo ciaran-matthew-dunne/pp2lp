@@ -1,0 +1,1 @@
+Flag(FileOn("x2_or_witness.res")) & Set(Valid.1 | Rule(Implication | (a: s or a: t => #x.(x: s or x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s or a: t => #x.(x: s or x: t) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("dz_two_u_two_x.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => #y.(x,y: r)) & !x.(x: t => #y.(x,y: q)) & a: s & b: t => #y.(a,y: r) & #y.(b,y: q)) & _delta_e(s) & _delta_e(r) & _delta_e(t) & _delta_e(q) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => #y.(x,y: r)) & !x.(x: t => #y.(x,y: q)) & a: s & b: t => #y.(a,y: r) & #y.(b,y: q) | nn))

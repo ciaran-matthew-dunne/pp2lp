@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_pair_inst.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x,y: r => y,x: q) & a,b: r => b,a: q) & _delta_e(r) & _delta_e(q) & _delta_e(a) & _delta_e(b) | ? | ? | !x.!y.(x,y: r => y,x: q) & a,b: r => b,a: q | nn))

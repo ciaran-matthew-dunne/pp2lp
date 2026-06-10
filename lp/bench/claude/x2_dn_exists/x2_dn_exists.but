@@ -1,0 +1,1 @@
+Flag(FileOn("x2_dn_exists.res")) & Set(Valid.1 | Rule(Implication | (not(not(#x.(x: s))) => #x.(x: s)) & _delta_e(s) | ? | ? | not(not(#x.(x: s))) => #x.(x: s) | nn))

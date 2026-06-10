@@ -1,0 +1,1 @@
+Flag(FileOn("a2_between.res")) & Set(Valid.1 | Rule(Implication | (x <= y & y <= z & x = z => x = y) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= y & y <= z & x = z => x = y | nn))

@@ -31,12 +31,19 @@ type emit =
   | Opr of bool    (* equality rewrite; [true] = right-to-left (OPR2) *)
   | Axm8
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
+  | Nrm26          (* binder drop at the position PP names (annotation diff
+                      against the child's binder list): slot 0 → NRM26S,
+                      slot 1 → NRM26M, last-listed → NRM26 (tuple_prepend) *)
   | Nrm2730        (* NRM27-30: trust-free solver dispatch — peel the pinned
                       binder at the witness `b`, ⊤-normalise the substituted
                       conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
   | Eqs2           (* EQS2: negated eql_set marker discharged via store evidence *)
   | Ectr           (* ECTR1-6: equality-substitution contradiction leaves *)
+  | Arith          (* ARITH: solver ⊥-terminal — generated Farkas combination
+                      of the in-scope ≤-hyps (see [Emit_ctx.find_arith_contradiction]) *)
+  | Egalite        (* EGALITE: equality-prover ⊥-terminal — INS-style search
+                      with hyps matched modulo the stored equalities *)
 
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
@@ -128,6 +135,14 @@ let rules : (string, rule_info) Hashtbl.t =
   r "FX3" leaf;
   r "STOP" pass;
   r "INS" pass ~emit:Ins;
+  (* Solver terminals.  ARITH: the linear solver closes ⊥ with no recorded
+     certificate; the emitter reconstructs a Farkas combination.  EGALITE:
+     the equality prover rewrites the store's hyps along the stored
+     equalities and re-promotes them as antecedents over ⊥ — the child
+     proves that implication chain; the emitter supplies each rewritten
+     antecedent as an ind_eq-transported hyp. *)
+  r "ARITH" leaf ~emit:Arith;
+  r "EGALITE" pass ~emit:Egalite;
   (* §A.12 Normalisation *)
   r "NRM1" pass;
   r "NRM2" pass;
@@ -154,7 +169,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM23" pass ~emit:Nrm23;
   r "NRM24" pass;
   r "NRM25" pass;
-  r "NRM26" pass;
+  r "NRM26" pass ~emit:Nrm26;
   (* Arithmetic-solver substitution: a conjunction holds [a + xᵢ ≤ 𝟎] and
      [b − xᵢ ≤ 𝟎] with solveur(a + b) = 𝟎, forcing xᵢ = b; substitute
      [xᵢ := b] and drop the binder.  NRM27/29 are the multi-binder (♡-block)

@@ -1,0 +1,1 @@
+Flag(FileOn("st_sub_pow_mem.res")) & Set(Valid.1 | Rule(Implication | (s <: t => s: POW(t)) & _delta_e(s) & _delta_e(t) | ? | ? | s <: t => s: POW(t) | nn))

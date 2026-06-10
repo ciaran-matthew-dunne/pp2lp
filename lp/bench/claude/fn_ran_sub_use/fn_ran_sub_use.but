@@ -1,0 +1,1 @@
+Flag(FileOn("fn_ran_sub_use.res")) & Set(Valid.1 | Rule(Implication | (ran(f) <: t & b: ran(f) => b: t) & _delta_e(f) & _delta_e(t) & _delta_e(b) | ? | ? | ran(f) <: t & b: ran(f) => b: t | nn))

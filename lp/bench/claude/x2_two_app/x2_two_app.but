@@ -1,0 +1,1 @@
+Flag(FileOn("x2_two_app.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b => #x.#y.(y = f(x))) & _delta_e(f) & _delta_e(a) & _delta_e(b) | ? | ? | f(a) = b => #x.#y.(y = f(x)) | nn))

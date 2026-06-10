@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_fun_ext.res")) & Set(Valid.1 | Rule(Implication | (!x.(f(x) = g(x)) => f(c) = g(c)) & _delta_e(f) & _delta_e(g) & _delta_e(c) | ? | ? | !x.(f(x) = g(x)) => f(c) = g(c) | nn))

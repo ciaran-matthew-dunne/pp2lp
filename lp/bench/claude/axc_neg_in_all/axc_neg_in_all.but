@@ -1,0 +1,1 @@
+Flag(FileOn("axc_neg_in_all.res")) & Set(Valid.1 | Rule(Implication | (not(p) & !x.(p => x: t)) & _delta_e(p) & _delta_e(t) | ? | ? | not(p) & !x.(p => x: t) | nn))

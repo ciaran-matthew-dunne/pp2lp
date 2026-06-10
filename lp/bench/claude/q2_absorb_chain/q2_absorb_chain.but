@@ -1,0 +1,1 @@
+Flag(FileOn("q2_absorb_chain.res")) & Set(Valid.1 | Rule(Implication | (a & (a or b) & (a or c) => a) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a & (a or b) & (a or c) => a | nn))

@@ -7,11 +7,13 @@
    environment ([proj_env]) it must be rendered under, and is turned into
    Lambdapi concrete syntax by [Pp_lp] at print time, not before. *)
 
-type binder_ty = Tau_i
-
 (* A PP variable bound by an enclosing compound (n-ary) binder maps to its
    (slot, tuple-var) so it renders as `prj slot tuple-var`. *)
 type proj_env = (string * (int * string)) list
+
+(* `Pi_pred` annotates a λ-binder with `π (<pred>)` — pins the bound proof's
+   type when a metavariable-headed application would leave it undetermined. *)
+type binder_ty = Tau_i | Pi_pred of proj_env * Syntax_pp.prd
 
 type term =
   | Hole

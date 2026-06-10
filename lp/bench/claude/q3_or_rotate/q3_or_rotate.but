@@ -1,0 +1,1 @@
+Flag(FileOn("q3_or_rotate.res")) & Set(Valid.1 | Rule(Implication | (a or b or c => c or a or b) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a or b or c => c or a or b | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("axc_leq_in_all.res")) & Set(Valid.1 | Rule(Implication | (y <= z & !x.(x: s => y <= z & x: s)) & _delta_e(y) & _delta_e(z) & _delta_e(s) | ? | ? | y <= z & !x.(x: s => y <= z & x: s) | nn))

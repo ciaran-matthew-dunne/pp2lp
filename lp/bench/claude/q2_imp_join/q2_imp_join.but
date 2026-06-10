@@ -1,0 +1,1 @@
+Flag(FileOn("q2_imp_join.res")) & Set(Valid.1 | Rule(Implication | ((a => c) & (b => c) & (a or b) => c) & _delta_p(a) & _delta_p(c) & _delta_p(b) | ? | ? | (a => c) & (b => c) & (a or b) => c | nn))

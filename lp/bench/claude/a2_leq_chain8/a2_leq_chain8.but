@@ -1,0 +1,1 @@
+Flag(FileOn("a2_leq_chain8.res")) & Set(Valid.1 | Rule(Implication | (x1 <= x2 & x2 <= x3 & x3 <= x4 & x4 <= x5 & x5 <= x6 & x6 <= x7 & x7 <= x8 => x1 <= x8) & _delta_e(x1) & _delta_e(x2) & _delta_e(x3) & _delta_e(x4) & _delta_e(x5) & _delta_e(x6) & _delta_e(x7) & _delta_e(x8) | ? | ? | x1 <= x2 & x2 <= x3 & x3 <= x4 & x4 <= x5 & x5 <= x6 & x6 <= x7 & x7 <= x8 => x1 <= x8 | nn))

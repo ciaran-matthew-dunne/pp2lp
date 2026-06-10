@@ -1,0 +1,1 @@
+Flag(FileOn("x2_app_graph_rev.res")) & Set(Valid.1 | Rule(Implication | (a: s & b = f(a) => #x.#y.(x: s & y = f(x))) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(f) | ? | ? | a: s & b = f(a) => #x.#y.(x: s & y = f(x)) | nn))

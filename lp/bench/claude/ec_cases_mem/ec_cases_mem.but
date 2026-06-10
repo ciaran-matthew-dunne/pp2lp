@@ -1,0 +1,1 @@
+Flag(FileOn("ec_cases_mem.res")) & Set(Valid.1 | Rule(Implication | ((x = a or x = b) & a: s & b: s => x: s) & _delta_e(x) & _delta_e(a) & _delta_e(b) & _delta_e(s) | ? | ? | (x = a or x = b) & a: s & b: s => x: s | nn))

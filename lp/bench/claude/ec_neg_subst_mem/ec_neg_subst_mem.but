@@ -1,0 +1,1 @@
+Flag(FileOn("ec_neg_subst_mem.res")) & Set(Valid.1 | Rule(Implication | (x = y & not(y: s) => not(x: s)) & _delta_e(x) & _delta_e(y) & _delta_e(s) | ? | ? | x = y & not(y: s) => not(x: s) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("a3_leq_plus2.res")) & Set(Valid.1 | Rule(Implication | (x <= y & 0 <= z => x <= y + z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= y & 0 <= z => x <= y + z | nn))

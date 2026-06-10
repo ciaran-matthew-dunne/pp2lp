@@ -1,0 +1,1 @@
+Flag(FileOn("axc_mem_in_all.res")) & Set(Valid.1 | Rule(Implication | (c: t & !x.(x: s => c: t)) & _delta_e(c) & _delta_e(t) & _delta_e(s) | ? | ? | c: t & !x.(x: s => c: t) | nn))

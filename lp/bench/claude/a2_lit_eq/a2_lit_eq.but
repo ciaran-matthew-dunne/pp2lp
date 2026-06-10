@@ -1,0 +1,1 @@
+Flag(FileOn("a2_lit_eq.res")) & Set(Valid.1 | Rule(Implication | (1 + 1 = 2) | ? | ? | 1 + 1 = 2 | nn))

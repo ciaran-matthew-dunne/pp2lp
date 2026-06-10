@@ -1,0 +1,1 @@
+Flag(FileOn("x2_counterexample.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s & not(x: t)) => not(!y.(y: s => y: t))) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s & not(x: t)) => not(!y.(y: s => y: t)) | nn))

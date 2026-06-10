@@ -137,3 +137,9 @@ val find_ins_contradiction : ctx -> Lp_tree.tactic option
    conjunct(s) that couldn't be discharged.  Used to build the INS failure
    message. *)
 val ins_diagnostic : ctx -> string
+
+(* ARITH: a Farkas-style certificate for ⊥ from the in-scope `e ≤ 𝟎` hyps —
+   small nonnegative multipliers summing the hypotheses to 𝟏, emitted as a
+   generated add_leq_zero / prove_sum_eq proof (no `trust`). *)
+val find_arith_contradiction : ctx -> Lp_tree.tactic option
+val arith_diagnostic : ctx -> string

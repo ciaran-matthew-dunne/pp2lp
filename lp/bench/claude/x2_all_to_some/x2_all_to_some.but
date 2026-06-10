@@ -1,0 +1,1 @@
+Flag(FileOn("x2_all_to_some.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & #x.(x: s) => #x.(x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => x: t) & #x.(x: s) => #x.(x: t) | nn))

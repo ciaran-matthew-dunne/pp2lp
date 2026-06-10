@@ -1,0 +1,1 @@
+Flag(FileOn("st_pair_mem_r.res")) & Set(Valid.1 | Rule(Implication | (b: {a, b}) & _delta_e(b) & _delta_e(a) | ? | ? | b: {a, b} | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("fn_pair_keep.res")) & Set(Valid.1 | Rule(Implication | (a,b: f & c,d: f => a,b: f) & _delta_e(a) & _delta_e(b) & _delta_e(f) & _delta_e(c) & _delta_e(d) | ? | ? | a,b: f & c,d: f => a,b: f | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("axc_bool_const.res")) & Set(Valid.1 | Rule(Implication | (v = TRUE & !x.(x: s => v = TRUE)) & _delta_e(v) & _delta_e(s) | ? | ? | v = TRUE & !x.(x: s => v = TRUE) | nn))

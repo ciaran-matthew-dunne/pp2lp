@@ -1,0 +1,1 @@
+Flag(FileOn("q2_imp_swap_args.res")) & Set(Valid.1 | Rule(Implication | ((a => (b => c)) => (b => (a => c))) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a => (b => c)) => (b => (a => c)) | nn))

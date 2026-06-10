@@ -1,0 +1,1 @@
+Flag(FileOn("x2_union_wit.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s) => #x.(x: s \/ t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s) => #x.(x: s \/ t) | nn))

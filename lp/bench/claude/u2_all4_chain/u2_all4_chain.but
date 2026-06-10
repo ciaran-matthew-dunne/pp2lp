@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all4_chain.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: a => x: b) & !x.(x: b => x: c) & !x.(x: c => x: d) & !x.(x: d => x: e) => !x.(x: a => x: e)) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) | ? | ? | !x.(x: a => x: b) & !x.(x: b => x: c) & !x.(x: c => x: d) & !x.(x: d => x: e) => !x.(x: a => x: e) | nn))

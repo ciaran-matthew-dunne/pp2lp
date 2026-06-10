@@ -1,0 +1,1 @@
+Flag(FileOn("fn_app_chain.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b & g(b) = c => g(f(a)) = c) & _delta_e(f) & _delta_e(a) & _delta_e(b) & _delta_e(g) & _delta_e(c) | ? | ? | f(a) = b & g(b) = c => g(f(a)) = c | nn))

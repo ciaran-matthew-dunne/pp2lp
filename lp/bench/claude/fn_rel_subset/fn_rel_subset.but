@@ -1,0 +1,1 @@
+Flag(FileOn("fn_rel_subset.res")) & Set(Valid.1 | Rule(Implication | (r <: q & a,b: r => a,b: q) & _delta_e(r) & _delta_e(q) & _delta_e(a) & _delta_e(b) | ? | ? | r <: q & a,b: r => a,b: q | nn))

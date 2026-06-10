@@ -1,0 +1,1 @@
+Flag(FileOn("x2_drinker_use.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s => p) & !x.(x: s) => p) & _delta_e(s) & _delta_e(p) | ? | ? | #x.(x: s => p) & !x.(x: s) => p | nn))

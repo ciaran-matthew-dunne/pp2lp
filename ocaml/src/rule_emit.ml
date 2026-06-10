@@ -54,7 +54,8 @@ let metadata_extra_args rule =
      reach the generic path, so they need no metadata here. *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Hyp_search | Rule_db.Ins
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
-  | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr
+  | Rule_db.Nrm26 | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr | Rule_db.Arith
+  | Rule_db.Egalite
   | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10 -> []
 
 (* Holes for the rule's derivation slots; Con slots become `trust` for
@@ -105,6 +106,22 @@ let subst_eq_e_rev = function
       | Eq (e, Var lead) when lead = v0 -> Some e
       | _ -> None) (conjuncts body)
   | _ -> None
+
+(* The binder list of a `forall2(…) ⇒ Q` annotation (NRM20/21/26's shape). *)
+let forall2_vars_of_goal = function
+  | Some (Binary (Imp, Bind (Forall2, vars, _), _)) -> Some vars
+  | _ -> None
+
+(* Position (= prj slot, PP binder position i ↦ prj i) and name of the one
+   var in [vars] missing from [child_vars] — the binder the rule dropped,
+   read off the annotation diff. *)
+let dropped_var_pos vars child_vars =
+  let rec go i = function
+    | [] -> None
+    | v :: rest ->
+      if List.mem v child_vars then go (i + 1) rest else Some (i, v)
+  in
+  go 0 vars
 
 let find_and5_pair conjs =
   let arr = Array.of_list conjs in
@@ -234,6 +251,14 @@ let tactic_for_ectr ctx rule anno =
    strategy. *)
 let tactic_for_rule ctx rule arg anno children =
   match Rule_db.emit rule with
+  | Rule_db.Arith ->
+    (* ARITH `⊥`-terminal: generated Farkas combination of the ≤-hyps. *)
+    (match find_arith_contradiction ctx with
+     | Some t -> t
+     | None ->
+       failwith (Printf.sprintf
+         "translate: ARITH — no small Farkas combination of the in-scope \
+          `e ≤ 𝟎` hypotheses sums to 𝟏\n%s" (arith_diagnostic ctx)))
   | Rule_db.Ectr when children = [] -> tactic_for_ectr ctx rule anno
   | Rule_db.Hyp_search when children = [] -> tactic_for_hyp ctx rule arg anno
   | Rule_db.Axm8 when children = [] -> tactic_for_axm8 ctx rule anno
@@ -248,48 +273,158 @@ let tactic_for_rule ctx rule arg anno children =
        L.Refine (L.Expl (L.Name "AR10"),
          [L.Hole; pred_term ctx q; L.Hole; L.Trust; L.Hole])
      | _ -> L.Refine (L.Name rule, [L.Trust; L.Hole]))
-  | Rule_db.Nrm20 ->
-    (* NRM20 [n] [ps] [Q] (E) : (Π v, π (popl (ps v) = (prj 0 v = E)))
-                              → π (small ⇒ Q) → π (big ⇒ Q).
-       `ps` (the full conjunct list) is inferred by unification from the
-       goal.  Supply E — the substituted expression, env-carried as it may
-       mention enclosing ALL7/ALL8 binders — and the head-equality witness:
-       for a concrete `ps`, `popl (ps v)` reduces to `prj 0 v = E`, so
-       `eq_refl` discharges it.  The trailing hole is the
-       `(♡ y, ¬ ⋀ dropl …) ⇒ Q` continuation child. *)
+  | Rule_db.Nrm20 | Rule_db.Nrm21 ->
+    (* NRM20 pins a binder by an `x = E` conjunct, NRM21 by `E = x`.  PP may
+       pin *any* binder (not only the leading one), the equality may sit at
+       the head or the tail of the conjunct list, and E may mention the
+       *other* still-bound vars (`#x.#y.(x = y)` pins x at y).  Dispatch:
+
+         head equality, leading binder, block-closed E
+           → NRM20/NRM21 (popl/dropl head forms; E + eq_refl witness)
+         tail equality, pin slot 0 / slot 1
+           → NRM20S/21S / NRM20P/21P (E a function of the remaining tuple)
+
+       The pinned var is read off the annotation diff against the child's
+       binder list (fallback: the first orientation-matching equality whose
+       var is in the block). *)
+    let rev = Rule_db.emit rule = Rule_db.Nrm21 in
+    let rule_name = if rev then "NRM21" else "NRM20" in
     (match goal_of_anno anno with
-     | Some goal ->
-       (match subst_eq_e goal with
-        | Some e ->
-          let env = pp_env_of ctx in
-          let v = fresh_x_local ctx in
-          L.Refine (L.Name "NRM20",
-            [ L.Exp (env, e);
-              L.Lambda (v, None,
-                eq_refl (L.Eq (prj 0 (L.Name v), L.Exp (env, e))));
-              L.Hole ])
+     | Some (Binary (Imp, Bind (Forall2, vars, Unary (Not, body)), _)) ->
+       let cs = conjuncts body in
+       let n_cs = List.length cs in
+       let pos_of v =
+         let rec go i = function
+           | [] -> None
+           | x :: rest -> if x = v then Some i else go (i + 1) rest
+         in go 0 vars
+       in
+       let eq_e pinned = function
+         | Eq (Var x, e) when (not rev) && x = pinned -> Some e
+         | Eq (e, Var x) when rev && x = pinned -> Some e
+         | _ -> None
+       in
+       let pinned_opt =
+         match children with
+         | [c] ->
+           (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
+            | Some cvars when List.length cvars = List.length vars - 1 ->
+              Option.map snd (dropped_var_pos vars cvars)
+            | _ -> None)
+         | _ -> None
+       in
+       let candidate =
+         let try_pinned p =
+           let rec find j = function
+             | [] -> None
+             | c :: rest ->
+               (match eq_e p c with
+                | Some e -> Some (p, j, e)
+                | None -> find (j + 1) rest)
+           in find 0 cs
+         in
+         match pinned_opt with
+         | Some p -> try_pinned p
+         | None -> List.find_map try_pinned vars
+       in
+       (match candidate with
+        | Some (pinned, j, e) ->
+          let k = Option.get (pos_of pinned) in
+          let e_vars =
+            (Free_vars.free_vars_of_prd (Eq (e, Nat 0))).Free_vars.exp_vars in
+          let head_ok =
+            j = 0 && k = 0 && n_cs > 1
+            && not (List.exists (fun v -> Free_vars.SS.mem v e_vars) vars)
+          in
+          if head_ok then begin
+            (* head form (the original popl/dropl lemmas, block-closed E). *)
+            let env = pp_env_of ctx in
+            let v = fresh_x_local ctx in
+            let heq_eq =
+              if rev then L.Eq (L.Exp (env, e), prj 0 (L.Name v))
+              else L.Eq (prj 0 (L.Name v), L.Exp (env, e))
+            in
+            L.Refine (L.Name rule_name,
+              [ L.Exp (env, e);
+                L.Lambda (v, None, eq_refl heq_eq);
+                L.Hole ])
+          end
+          else if k = 0 || k = 1 then begin
+            (* tail form: E a function of the remaining tuple.  When the
+               equality isn't the last conjunct, first bubble it to the end
+               with a generated swap-congruence chain and transport the goal
+               (`=⇒ (eq_sym cong)`); the lifted lemmas' implicits are all
+               inferred from the goal term, so the chain is built bare. *)
+            let rvars = List.filter (fun v -> v <> pinned) vars in
+            let name = if k = 0 then rule_name ^ "S" else rule_name ^ "P" in
+            let w = fresh_x_local ctx in
+            let env' =
+              List.mapi (fun i v -> (v, (i, w))) rvars @ pp_env_of ctx in
+            let tail_app hole_or_args =
+              ( [ L.Lambda (w, None, L.Exp (env', e)) ] @ hole_or_args )
+            in
+            if j = n_cs - 1 then
+              L.Refine (L.Name name, tail_app [ L.Hole ])
+            else begin
+              (* swaps at (i, i+1) for i = j..n_cs−2, each lifted once per
+                 element above it; composed with eq_trans. *)
+              let rec lift n t =
+                if n = 0 then t
+                else lift (n - 1) (L.App (L.Name "conj_init_cong", [ t ]))
+              in
+              let rec chain i =
+                let step = lift (n_cs - 2 - i) (L.Name "conj_swap_last2") in
+                if i = n_cs - 2 then step
+                else L.App (L.Name "eq_trans", [ step; chain (i + 1) ])
+              in
+              let u = fresh_x_local ctx in
+              let cong =
+                L.App (L.Name "imp_cong_l",
+                  [ L.App (L.Name "!!_cong",
+                      [ L.Lambda (u, None,
+                          L.App (L.Name "not_cong", [ chain j ])) ]) ])
+              in
+              L.Refine (L.Name "=⇒",
+                [ L.App (L.Name "eq_sym", [ cong ]);
+                  L.App (L.Name name, tail_app [ L.Hole ]) ])
+            end
+          end
+          else
+            failwith (Printf.sprintf
+              "translate: %s equality conjunct at position %d/%d pinning \
+               slot %d — only slots 0/1 have substitution lemmas \
+               (%sS/%sP, after tail rotation)"
+              rule_name j n_cs k rule_name rule_name)
         | None ->
-          failwith "translate: NRM20 annotation lacks an `x = E` equality \
-                    conjunct (LHS = the leading forall2 binder var)")
-     | None -> failwith "translate: NRM20 has no goal annotation")
-  | Rule_db.Nrm21 ->
-    (* NRM21 [n] [ps] [Q] (E) : (Π v, π (popl (ps v) = (E = prj 0 v)))
-                              → π (small ⇒ Q) → π (big ⇒ Q). *)
-    (match goal_of_anno anno with
-     | Some goal ->
-        (match subst_eq_e_rev goal with
-         | Some e ->
-           let env = pp_env_of ctx in
-           let v = fresh_x_local ctx in
-           L.Refine (L.Name "NRM21",
-             [ L.Exp (env, e);
-               L.Lambda (v, None,
-                 eq_refl (L.Eq (L.Exp (env, e), prj 0 (L.Name v))));
-               L.Hole ])
-         | None ->
-           failwith "translate: NRM21 annotation lacks an `E = x` equality \
-                     conjunct (LHS = the leading forall2 binder var)")
-     | None -> failwith "translate: NRM21 has no goal annotation")
+          failwith (Printf.sprintf
+            "translate: %s annotation lacks an `%s` equality conjunct \
+             for the dropped binder"
+            rule_name (if rev then "E = x" else "x = E")))
+     | _ ->
+       failwith (Printf.sprintf
+         "translate: %s expected a `forall2(…)·¬(…) ⇒ Q` annotation" rule_name))
+  | Rule_db.Nrm26 ->
+    (* Binder drop at the position PP names: slot 0 → NRM26S, slot 1 →
+       NRM26M, last-listed (the leftmost slot) → NRM26 (tuple_prepend).
+       Position = annotation diff against the child's binder list; without
+       a usable child annotation keep the historical NRM26. *)
+    let fallback = L.Refine (L.Name "NRM26", [L.Hole]) in
+    (match forall2_vars_of_goal (goal_of_anno anno), children with
+     | Some vars, [c] ->
+       (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
+        | Some cvars when List.length cvars = List.length vars - 1 ->
+          (match dropped_var_pos vars cvars with
+           | Some (k, v) ->
+             if k = List.length vars - 1 then fallback
+             else if k = 0 then L.Refine (L.Name "NRM26S", [L.Hole])
+             else if k = 1 then L.Refine (L.Name "NRM26M", [L.Hole])
+             else
+               failwith (Printf.sprintf
+                 "translate: NRM26 drops binder %s at slot %d — only slots \
+                  0/1/last have LP forms (NRM26S/NRM26M/NRM26)" v k)
+           | None -> fallback)
+        | _ -> fallback)
+     | _, _ -> fallback)
   | Rule_db.Nrm22 ->
     (* NRM22 [P] [Q] (E) : π (¬ (P E) ⇒ Q) → π ((♡ v : Tuple 1, ¬ ⋀ (∎ ∷ P
        (prj 0 v) ∷ (prj 0 v = E))) ⇒ Q).  The replay shape (NRM14 feeds it a
@@ -341,6 +476,7 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar9
   | Rule_db.Nrm2730   (* expands to tree structure in [Translate.default] *)
   | Rule_db.Eqs2      (* handled in [Translate.tree_dispatch] (needs child access) *)
+  | Rule_db.Egalite   (* handled in [Translate.tree_dispatch] (needs child access) *)
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Ins ->
     (* And5/Opr/Ins expand to tree structure in the walker and never reach
        here as a plain tactic; the rest take generic slot args. *)

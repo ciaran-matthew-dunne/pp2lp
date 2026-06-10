@@ -1,0 +1,1 @@
+Flag(FileOn("u2_all_app_mem.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: dom(f) => f(x): t) & a: dom(f) => f(a): t) & _delta_e(f) & _delta_e(t) & _delta_e(a) | ? | ? | !x.(x: dom(f) => f(x): t) & a: dom(f) => f(a): t | nn))

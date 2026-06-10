@@ -483,6 +483,16 @@ let is_atom_exp = function
   | Var _ | Nat _ | App _ | SetImage _ | Inter _ | Union _ -> true
   | AOp _ | Neg _ -> false
 
+(* Numeric literals 2 ≤ k ≤ [lit_unfold_max] flatten to k copies of the
+   `𝟏`-atom, so PP's solver-side literal folding (`1 + 9 → 10` in AR3's
+   `𝟏 − a` sub-premise) is invisible to the multiset comparison and the
+   generated proofs: `int_lit k ≡ 𝟏 + int_lit (k−1)` definitionally, so the
+   recursive [normalize] proof is checked by conversion.  Bounded: a big
+   literal must never be unfolded (decimal numerals exist precisely to keep
+   them folded — whnf of a big `int_lit` blows up), beyond the cap the
+   literal stays an opaque atom as before. *)
+let lit_unfold_max = 64
+
 (* Flatten a `+`/`−` expression to its ordered signed-atom list, pushing unary
    `—` down to the atoms (— distributes over + and is involutive); None if a
    non-arithmetic node blocks it.  Mirrors [normalize]'s recursion exactly, so
@@ -491,6 +501,10 @@ let rec flatten_signed e : (exp * int) list option =
   let negate = Option.map (List.map (fun (a, s) -> (a, -s))) in
   let app o p = match o, p with Some a, Some b -> Some (a @ b) | _ -> None in
   match e with
+  | Nat k when k >= 2 && k <= lit_unfold_max ->
+    Some (List.init k (fun _ -> (Nat 1, 1)))
+  | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
+    Some (List.init k (fun _ -> (Nat 1, -1)))
   | _ when is_atom_exp e -> Some [ (e, 1) ]
   | Neg a when is_atom_exp a -> Some [ (a, -1) ]
   | AOp (Add, a, b) -> app (flatten_signed a) (flatten_signed b)
@@ -577,6 +591,15 @@ let rec normalize env e : ((exp * int) list * L.term) option =
     (lx @ ly, trans (cong px py) (concat env lx ly))
   in
   match e with
+  (* Literal unfold (see [lit_unfold_max]): the printer renders `Nat k` as the
+     left-nested 𝟏-sum `(𝟏 + 𝟏 + … + 𝟏)` — exactly `lfold` of k 𝟏-atoms — so
+     the decomposition is `eq_refl` (the two renderings parse to the same
+     term).  `— k` goes through the `Neg (Add …)` case (opp_add to the
+     leaves), stated at the explicit sum, which parses identically. *)
+  | Nat k when k >= 2 && k <= lit_unfold_max ->
+    Some (List.init k (fun _ -> (Nat 1, 1)), refl e)
+  | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
+    normalize env (Neg (lfold_exp (List.init k (fun _ -> (Nat 1, 1)))))
   | _ when is_atom_exp e -> Some ([ (e, 1) ], refl e)
   | Neg a when is_atom_exp a -> Some ([ (a, -1) ], refl (Neg a))
   | AOp (Add, x, y) ->
@@ -772,6 +795,50 @@ let find_leq_reorder ctx lhs =
          | _ -> None)
       | _ -> None) ctx.hyps
 
+(* Equality-store bridge: [needed] isn't in scope directly, but rewriting a
+   bare-identifier side `v` of an in-scope equality hyp to its other side
+   maps some in-scope hyp H onto it (H[v:=other] ≡ needed, alpha).  Transport
+   H along the equality with `ind_eq (other = v) (λ z, H[v:=z]) h`.  This is
+   how PP's equality prover (EGALITE, ch. 9) discharges goals: hypotheses are
+   matched modulo the stored equalities. *)
+let eq_rewrite_evidence ctx needed =
+  let render_env = proj_env_of_ctx ctx in
+  let transport heq_name ~sym v hyp_name hyp_pred =
+    let z = fresh_x_local ctx in
+    let motive =
+      L.Lambda (z, Some L.Tau_i,
+        L.Pred (render_env, subst_prd [ (v, Var z) ] hyp_pred))
+    in
+    let eqt =
+      if sym then L.App (L.Name "eq_sym", [ L.Name heq_name ])
+      else L.Name heq_name
+    in
+    L.App (L.Name "ind_eq", [ eqt; motive; L.Name hyp_name ])
+  in
+  List.find_map (fun (heq_name, p) ->
+    match p with
+    | Eq (lhs, rhs) when lhs <> rhs ->
+      (* [~sym]: ind_eq wants π (other = v); heq : π (v = other) needs
+         eq_sym, heq : π (other = v) is direct. *)
+      let try_var_side v other ~sym =
+        List.find_map (fun (h, hp) ->
+          if h = heq_name || prd_equiv hp needed then None
+          else if prd_equiv (subst_prd [ (v, other) ] hp) needed
+          then Some (transport heq_name ~sym v h hp)
+          else None) ctx.hyps
+      in
+      let a = match lhs with
+        | Var v -> try_var_side v rhs ~sym:true
+        | _ -> None
+      in
+      (match a with
+       | Some _ as r -> r
+       | None ->
+         match rhs with
+         | Var v -> try_var_side v lhs ~sym:false
+         | _ -> None)
+    | _ -> None) ctx.hyps
+
 let leaf_evidence ctx env leaf =
   if is_true_atom leaf then Some true_intro
   else
@@ -784,16 +851,21 @@ let leaf_evidence ctx env leaf =
     | None ->
       (* arithmetic-reorder bridge: PP recorded the conjunct in a different
          term order than the universal.  Prove `needed = hyp` and transport. *)
-      (match needed with
-       | Leq (lhs, Nat 0) ->
-         (match find_leq_reorder ctx lhs with
-          | Some (h, h_lhs) ->
-            (match prove_sum_eq (proj_env_of_ctx ctx) lhs h_lhs with
-             | Some eqpf ->
-               Some (L.App (L.Name "leq_subst_l", [ eqpf; L.Name h ]))
-             | None -> None)
-          | None -> None)
-       | _ -> None)
+      let reorder =
+        match needed with
+        | Leq (lhs, Nat 0) ->
+          (match find_leq_reorder ctx lhs with
+           | Some (h, h_lhs) ->
+             (match prove_sum_eq (proj_env_of_ctx ctx) lhs h_lhs with
+              | Some eqpf ->
+                Some (L.App (L.Name "leq_subst_l", [ eqpf; L.Name h ]))
+              | None -> None)
+           | None -> None)
+        | _ -> None
+      in
+      (match reorder with
+       | Some _ as r -> r
+       | None -> eq_rewrite_evidence ctx needed)
 
 let match_conj ctx env body =
   let leaves = collect_conj_leaves body in
@@ -867,6 +939,137 @@ let find_ins_contradiction ctx =
           (products (List.length h_vars))
       | _ -> None
     ) ctx.hyps
+
+(* ---- ARITH: Farkas-style linear-combination contradiction ----
+
+   PP's linear solver closes ⊥ from the `eᵢ ≤ 𝟎` hypotheses in scope without
+   recording a certificate.  Reconstruct one: search small nonnegative
+   multipliers λᵢ with Σ λᵢ·eᵢ = 𝟏 — every non-constant atom cancels and the
+   constant lands on exactly one 𝟏 ([flatten_signed] unfolds literals to
+   𝟏-atoms, so "the constant" is the net 𝟏-count) — then emit
+
+     one_not_leq_zero (leq_subst_l (𝟏 = Σ…) (add_leq_zero … hᵢ …))
+
+   with the Σ-equality generated by [prove_sum_eq] (no `trust`).  Combinations
+   summing to a constant ≥ 2 exist in principle (no λ with target 𝟏 then);
+   they are out of scope until a trace needs one. *)
+
+let arith_max_lambda = 4
+let arith_max_hyps = 6
+
+let arith_leq_hyps ctx =
+  let all =
+    List.filter_map (fun (name, p) -> match p with
+      | Leq (e, Nat 0) ->
+        (match flatten_signed e with
+         | Some atoms -> Some (name, e, atoms)
+         | None -> None)
+      | _ -> None) ctx.hyps
+  in
+  (* most-recent-first; bound the search width *)
+  List.filteri (fun i _ -> i < arith_max_hyps) all
+
+let find_arith_contradiction ctx =
+  let env = proj_env_of_ctx ctx in
+  let hyps = arith_leq_hyps ctx in
+  let vec atoms =
+    List.fold_left (fun acc (a, s) ->
+      let cur = try List.assoc a acc with Not_found -> 0 in
+      (a, cur + s) :: List.remove_assoc a acc) [] atoms
+  in
+  let vecs = Array.of_list (List.map (fun (_, _, ats) -> vec ats) hyps) in
+  let names = Array.of_list (List.map (fun (n, e, _) -> (n, e)) hyps) in
+  let n_h = Array.length vecs in
+  (* the combination's net vector must be a single positive constant
+     (every non-𝟏 atom cancels); returns that constant *)
+  let pos_const lambdas =
+    let total = Hashtbl.create 8 in
+    Array.iteri (fun j v ->
+      if lambdas.(j) > 0 then
+        List.iter (fun (a, c) ->
+          let cur = try Hashtbl.find total a with Not_found -> 0 in
+          Hashtbl.replace total a (cur + lambdas.(j) * c)) v) vecs;
+    let ok = Hashtbl.fold (fun a c ok -> ok && (c = 0 || a = Nat 1))
+               total true in
+    let const = try Hashtbl.find total (Nat 1) with Not_found -> 0 in
+    if ok && const >= 1 then Some const else None
+  in
+  let lambdas = Array.make n_h 0 in
+  let rec search i =
+    if i = n_h then
+      if Array.exists (fun l -> l > 0) lambdas
+      then Option.map (fun c -> (Array.copy lambdas, c)) (pos_const lambdas)
+      else None
+    else
+      let rec try_l l =
+        if l > arith_max_lambda then None
+        else begin
+          lambdas.(i) <- l;
+          match search (i + 1) with
+          | Some r -> Some r
+          | None -> try_l (l + 1)
+        end
+      in
+      let r = try_l 0 in
+      lambdas.(i) <- 0;
+      r
+  in
+  (* π (𝟏 ≤ c·𝟏) for the literal c ≥ 1: chain leq_plus_one up the (left-
+     nested, definitionally `lit (k−1) + 𝟏`) literal renders. *)
+  let rec one_leq_lit c =
+    if c <= 1 then L.App (L.Name "leq_refl", [ L.Exp (env, Nat 1) ])
+    else
+      L.App (L.Name "leq_trans",
+        [ L.Exp (env, Nat 1); L.Exp (env, Nat (c - 1)); L.Exp (env, Nat c);
+          one_leq_lit (c - 1);
+          L.App (L.Name "leq_plus_one", [ L.Exp (env, Nat (c - 1)) ]) ])
+  in
+  if n_h = 0 then None
+  else
+    match search 0 with
+    | None -> None
+    | Some (ls, c) ->
+      let uses =
+        List.concat
+          (List.init n_h (fun j ->
+             List.init ls.(j) (fun _ -> names.(j))))
+      in
+      (match uses with
+       | [] -> None
+       | (n0, e0) :: rest ->
+         let hsum, combined =
+           List.fold_left (fun (pf, acc_e) (n, e) ->
+             (L.App (L.Name "add_leq_zero",
+                [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name n ]),
+              AOp (Add, acc_e, e)))
+             (L.Name n0, e0) rest
+         in
+         Option.map
+           (fun eqpf ->
+              let lit_leq_zero =
+                L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) in
+              let one_leq_zero =
+                if c = 1 then lit_leq_zero
+                else
+                  L.App (L.Name "leq_trans",
+                    [ L.Exp (env, Nat 1); L.Exp (env, Nat c);
+                      L.Exp (env, Nat 0);
+                      one_leq_lit c; lit_leq_zero ])
+              in
+              L.Refine (L.Name "one_not_leq_zero", [ one_leq_zero ]))
+           (prove_sum_eq env (Nat c) combined))
+
+let arith_diagnostic ctx =
+  let hyps = arith_leq_hyps ctx in
+  let b = Buffer.create 128 in
+  Buffer.add_string b "  ≤-hypotheses considered (most recent first):";
+  if hyps = [] then Buffer.add_string b " (none)"
+  else
+    List.iter (fun (n, e, _) ->
+      Buffer.add_string b
+        (Printf.sprintf "\n    %s : %s" n (Emit_pp.prd_to_pp (Leq (e, Nat 0)))))
+      hyps;
+  Buffer.contents b
 
 (* Diagnostic for a failed [find_ins_contradiction], built from the same
    predicates the search uses so it reports exactly why no (hyp × witness)

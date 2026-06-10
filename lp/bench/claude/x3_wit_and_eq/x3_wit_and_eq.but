@@ -1,0 +1,1 @@
+Flag(FileOn("x3_wit_and_eq.res")) & Set(Valid.1 | Rule(Implication | (a: s & a = b => #x.(x: s & x = b)) & _delta_e(a) & _delta_e(s) & _delta_e(b) | ? | ? | a: s & a = b => #x.(x: s & x = b) | nn))
