@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_zigzag.res")) & Set(Valid.1 | Rule(Implication | (a = b & c = b & c = d & e = d => a = e) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) | ? | ? | a = b & c = b & c = d & e = d => a = e | nn))

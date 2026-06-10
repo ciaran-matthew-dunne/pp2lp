@@ -1,0 +1,1 @@
+Flag(FileOn("mx_wit_transport.res")) & Set(Valid.1 | Rule(Implication | (a = b & a: s => #x.(x: s & x = b)) & _delta_e(a) & _delta_e(b) & _delta_e(s) | ? | ? | a = b & a: s => #x.(x: s & x = b) | nn))

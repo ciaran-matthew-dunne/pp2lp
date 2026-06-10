@@ -1,0 +1,1 @@
+Flag(FileOn("rv_double_rev.res")) & Set(Valid.1 | Rule(Implication | (b = a & c = b => a = c) & _delta_e(b) & _delta_e(a) & _delta_e(c) | ? | ? | b = a & c = b => a = c | nn))

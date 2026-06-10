@@ -1,0 +1,1 @@
+Flag(FileOn("rl_pair_exists.res")) & Set(Valid.1 | Rule(Implication | (a, b: r => #x.#y.(x, y: r)) & _delta_e(a) & _delta_e(b) & _delta_e(r) | ? | ? | a, b: r => #x.#y.(x, y: r) | nn))

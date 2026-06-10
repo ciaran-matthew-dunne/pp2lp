@@ -1,0 +1,1 @@
+Flag(FileOn("v2_factor_or.res")) & Set(Valid.1 | Rule(Implication | ((a or b) & (a or c) <=> a or (b & c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a or b) & (a or c) <=> a or (b & c) | nn))

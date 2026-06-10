@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_two_orient2.res")) & Set(Valid.1 | Rule(Implication | (y = x & y = z => x = z) & _delta_e(y) & _delta_e(x) & _delta_e(z) | ? | ? | y = x & y = z => x = z | nn))

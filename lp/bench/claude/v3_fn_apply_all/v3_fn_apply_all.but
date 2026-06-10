@@ -1,0 +1,1 @@
+Flag(FileOn("v3_fn_apply_all.res")) & Set(Valid.1 | Rule(Implication | (!x.(f(x) = g(x)) => f(a) = g(a)) & _delta_e(f) & _delta_e(g) & _delta_e(a) | ? | ? | !x.(f(x) = g(x)) => f(a) = g(a) | nn))

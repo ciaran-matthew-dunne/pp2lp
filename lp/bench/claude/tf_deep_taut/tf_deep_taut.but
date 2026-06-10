@@ -1,0 +1,1 @@
+Flag(FileOn("tf_deep_taut.res")) & Set(Valid.1 | Rule(Implication | (((p => p) => q) => q) & _delta_p(p) & _delta_p(q) | ? | ? | ((p => p) => q) => q | nn))

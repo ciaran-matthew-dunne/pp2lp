@@ -1,0 +1,1 @@
+Flag(FileOn("v3_xst_lit.res")) & Set(Valid.1 | Rule(Implication | (#x.(x <= 0)) | ? | ? | #x.(x <= 0) | nn))

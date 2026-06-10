@@ -1,0 +1,1 @@
+Flag(FileOn("xw_eq3.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.#z.(x = y & y = z)) | ? | ? | #x.#y.#z.(x = y & y = z) | nn))

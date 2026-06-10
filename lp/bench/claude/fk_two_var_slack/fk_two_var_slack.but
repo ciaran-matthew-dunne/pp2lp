@@ -1,0 +1,1 @@
+Flag(FileOn("fk_two_var_slack.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x <= 2 & y <= 3 => x + y <= 5)) | ? | ? | !x.!y.(x <= 2 & y <= 3 => x + y <= 5) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("mx_eq_chain_mem.res")) & Set(Valid.1 | Rule(Implication | (a = b & b = c & c: s => a: s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(s) | ? | ? | a = b & b = c & c: s => a: s | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("mx_set_arith.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => 0 <= x) & !x.(x: t => x: s) & a: t => 0 <= a) & _delta_e(s) & _delta_e(t) & _delta_e(a) | ? | ? | !x.(x: s => 0 <= x) & !x.(x: t => x: s) & a: t => 0 <= a | nn))

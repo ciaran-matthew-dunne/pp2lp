@@ -1,0 +1,1 @@
+Flag(FileOn("ag_lit_shift_eq.res")) & Set(Valid.1 | Rule(Implication | (x = 50 => x + 1 = 51) & _delta_e(x) | ? | ? | x = 50 => x + 1 = 51 | nn))

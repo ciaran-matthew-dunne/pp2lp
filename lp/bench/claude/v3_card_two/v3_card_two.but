@@ -1,0 +1,1 @@
+Flag(FileOn("v3_card_two.res")) & Set(Valid.1 | Rule(Implication | (card(s) = 2 & card(t) = card(s) => card(t) = 2) & _delta_e(s) & _delta_e(t) | ? | ? | card(s) = 2 & card(t) = card(s) => card(t) = 2 | nn))

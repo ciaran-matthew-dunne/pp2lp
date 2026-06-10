@@ -1,0 +1,1 @@
+Flag(FileOn("bl_mem_true.res")) & Set(Valid.1 | Rule(Implication | (x: s => bool(x: s) = btrue) & _delta_e(x) & _delta_e(s) & _delta_e(btrue) | ? | ? | x: s => bool(x: s) = btrue | nn))

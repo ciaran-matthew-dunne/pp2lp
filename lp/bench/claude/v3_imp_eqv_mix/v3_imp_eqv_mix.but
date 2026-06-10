@@ -1,0 +1,1 @@
+Flag(FileOn("v3_imp_eqv_mix.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) & (b => c) & a => c) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a <=> b) & (b => c) & a => c | nn))

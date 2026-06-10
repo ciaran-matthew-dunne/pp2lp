@@ -1,0 +1,1 @@
+Flag(FileOn("mx_quant_fn_eq.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => f(x) = g(x)) & a: s & g(a) = w => f(a) = w) & _delta_e(s) & _delta_e(f) & _delta_e(g) & _delta_e(a) & _delta_e(w) | ? | ? | !x.(x: s => f(x) = g(x)) & a: s & g(a) = w => f(a) = w | nn))

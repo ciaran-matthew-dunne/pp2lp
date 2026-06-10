@@ -1,0 +1,1 @@
+Flag(FileOn("v3_lower_chain.res")) & Set(Valid.1 | Rule(Implication | (0 <= x & x <= y => 0 <= y) & _delta_e(x) & _delta_e(y) | ? | ? | 0 <= x & x <= y => 0 <= y | nn))

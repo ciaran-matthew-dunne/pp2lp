@@ -1,0 +1,1 @@
+Flag(FileOn("v3_opr_chain3.res")) & Set(Valid.1 | Rule(Implication | (x = a & a: s => x: s) & _delta_e(x) & _delta_e(a) & _delta_e(s) | ? | ? | x = a & a: s => x: s | nn))

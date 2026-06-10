@@ -1,0 +1,1 @@
+Flag(FileOn("ln_spread.res")) & Set(Valid.1 | Rule(Implication | (x <= 12 & 12 <= y => x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 12 & 12 <= y => x <= y | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("sc_neg_tower4.res")) & Set(Valid.1 | Rule(Implication | (not(not(not(not(a)))) => a) & _delta_p(a) | ? | ? | not(not(not(not(a)))) => a | nn))

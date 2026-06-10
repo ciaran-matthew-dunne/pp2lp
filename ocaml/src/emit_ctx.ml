@@ -501,6 +501,7 @@ let rec flatten_signed e : (exp * int) list option =
   let negate = Option.map (List.map (fun (a, s) -> (a, -s))) in
   let app o p = match o, p with Some a, Some b -> Some (a @ b) | _ -> None in
   match e with
+  | Nat 0 | Neg (Nat 0) -> Some []
   | Nat k when k >= 2 && k <= lit_unfold_max ->
     Some (List.init k (fun _ -> (Nat 1, 1)))
   | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
@@ -565,13 +566,17 @@ let prove_eq_lnested env l_orig : L.term =
   go l_orig
 
 (* π (lfold la + lfold lb = lfold (la @ lb)): peel lb's tail, reassociating
-   each element onto la with add_assoc (left-fold structure). *)
+   each element onto la with add_assoc (left-fold structure).  An empty side
+   is NOT the identity syntactically (`lfold [] ≡ 𝟎`), so those cases close
+   with add_zero/zero_add — reachable since literal `𝟎` flattens to no atom. *)
 let rec concat env la lb : L.term =
   let ex t = L.Exp (env, t) in
-  match List.rev lb with
-  | [] | [ _ ] ->
+  match la, List.rev lb with
+  | _, [] -> L.App (L.Name "add_zero", [ ex (lfold_exp la) ])
+  | [], _ -> L.App (L.Name "zero_add", [ ex (lfold_exp lb) ])
+  | _, [ _ ] ->
     L.App (L.Name "eq_refl", [ ex (AOp (Add, lfold_exp la, lfold_exp lb)) ])
-  | last :: front_rev ->
+  | _, last :: front_rev ->
     let front = List.rev front_rev in
     L.App (L.Name "eq_trans",
       [ L.App (L.Name "eq_sym",
@@ -595,7 +600,11 @@ let rec normalize env e : ((exp * int) list * L.term) option =
      left-nested 𝟏-sum `(𝟏 + 𝟏 + … + 𝟏)` — exactly `lfold` of k 𝟏-atoms — so
      the decomposition is `eq_refl` (the two renderings parse to the same
      term).  `— k` goes through the `Neg (Add …)` case (opp_add to the
-     leaves), stated at the explicit sum, which parses identically. *)
+     leaves), stated at the explicit sum, which parses identically.  `𝟎`
+     contributes NO atom (`lfold [] ≡ 𝟎`, refl; `— 𝟎` via neg_zero) — as an
+     opaque atom it would block cancellation (`1 − 0` vs `1`). *)
+  | Nat 0 -> Some ([], refl e)
+  | Neg (Nat 0) -> Some ([], L.App (L.Name "neg_zero", []))
   | Nat k when k >= 2 && k <= lit_unfold_max ->
     Some (List.init k (fun _ -> (Nat 1, 1)), refl e)
   | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
@@ -954,7 +963,7 @@ let find_ins_contradiction ctx =
    summing to a constant ≥ 2 exist in principle (no λ with target 𝟏 then);
    they are out of scope until a trace needs one. *)
 
-let arith_max_lambda = 4
+let arith_max_lambda = 8
 let arith_max_hyps = 6
 
 let arith_leq_hyps ctx =

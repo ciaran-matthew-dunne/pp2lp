@@ -1,0 +1,1 @@
+Flag(FileOn("rv_xst_rev_eq.res")) & Set(Valid.1 | Rule(Implication | (#x.(a = x)) & _delta_e(a) | ? | ? | #x.(a = x) | nn))

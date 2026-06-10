@@ -1,0 +1,1 @@
+Flag(FileOn("xw_arith_pair.res")) & Set(Valid.1 | Rule(Implication | (a <= b => #x.#y.(x <= y)) & _delta_e(a) & _delta_e(b) | ? | ? | a <= b => #x.#y.(x <= y) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("ln_big_relax.res")) & Set(Valid.1 | Rule(Implication | (x <= 100 => x <= 200) & _delta_e(x) | ? | ? | x <= 100 => x <= 200 | nn))

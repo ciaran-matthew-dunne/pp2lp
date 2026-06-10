@@ -1,0 +1,1 @@
+Flag(FileOn("mx_three_dom.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & a: s & f(a) = b & a <= c => a: t & f(a) = b & a <= c) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(f) & _delta_e(b) & _delta_e(c) | ? | ? | !x.(x: s => x: t) & a: s & f(a) = b & a <= c => a: t & f(a) = b & a <= c | nn))

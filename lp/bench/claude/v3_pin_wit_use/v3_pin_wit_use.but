@@ -1,0 +1,1 @@
+Flag(FileOn("v3_pin_wit_use.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = a & x: s) => a: s) & _delta_e(a) & _delta_e(s) | ? | ? | #x.(x = a & x: s) => a: s | nn))

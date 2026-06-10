@@ -1,0 +1,1 @@
+Flag(FileOn("xw_nested_dep.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: t => #x.(x: s & #y.(y: t))) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) | ? | ? | a: s & b: t => #x.(x: s & #y.(y: t)) | nn))

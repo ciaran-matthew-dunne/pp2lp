@@ -243,6 +243,13 @@ begin
   refine zero_add c
 end;
 
+// —𝟎 = 𝟎 (the generated sum-equality proofs treat 𝟎 as the empty atom list).
+opaque symbol neg_zero : π (— 𝟎 = 𝟎) ≔
+begin
+  rewrite left zero_add (— 𝟎);
+  refine add_neg 𝟎
+end;
+
 // — is involutive: —(—x) = x.
 opaque symbol neg_neg (x : τ ι) : π (— (— x) = x) ≔
 begin

@@ -1,0 +1,1 @@
+Flag(FileOn("v2_eq_sym_chain.res")) & Set(Valid.1 | Rule(Implication | (b = a & b = c & d = c => a = d) & _delta_e(b) & _delta_e(a) & _delta_e(c) & _delta_e(d) | ? | ? | b = a & b = c & d = c => a = d | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_axm_deep_hyp.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: t & c: u & d: v => c: u) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) & _delta_e(c) & _delta_e(u) & _delta_e(d) & _delta_e(v) | ? | ? | a: s & b: t & c: u & d: v => c: u | nn))

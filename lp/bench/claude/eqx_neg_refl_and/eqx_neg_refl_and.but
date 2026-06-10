@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_neg_refl_and.res")) & Set(Valid.1 | Rule(Implication | (not(a: s & x = x) => not(a: s)) & _delta_e(a) & _delta_e(s) & _delta_e(x) | ? | ? | not(a: s & x = x) => not(a: s) | nn))

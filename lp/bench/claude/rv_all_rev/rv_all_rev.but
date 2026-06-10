@@ -1,0 +1,1 @@
+Flag(FileOn("rv_all_rev.res")) & Set(Valid.1 | Rule(Implication | (!x.(x = a => f(x) = f(a))) & _delta_e(a) & _delta_e(f) | ? | ? | !x.(x = a => f(x) = f(a)) | nn))

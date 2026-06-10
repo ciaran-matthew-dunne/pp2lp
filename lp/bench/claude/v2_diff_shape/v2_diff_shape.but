@@ -1,0 +1,1 @@
+Flag(FileOn("v2_diff_shape.res")) & Set(Valid.1 | Rule(Implication | (x: s & not(x: t) => x: s & not(x: t)) & _delta_e(x) & _delta_e(s) & _delta_e(t) | ? | ? | x: s & not(x: t) => x: s & not(x: t) | nn))

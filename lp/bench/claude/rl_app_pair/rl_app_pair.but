@@ -1,0 +1,1 @@
+Flag(FileOn("rl_app_pair.res")) & Set(Valid.1 | Rule(Implication | (x: dom(f) & f(x) = y => f(x) = y & x: dom(f)) & _delta_e(x) & _delta_e(f) & _delta_e(y) | ? | ? | x: dom(f) & f(x) = y => f(x) = y & x: dom(f) | nn))

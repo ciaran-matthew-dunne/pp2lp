@@ -1,0 +1,1 @@
+Flag(FileOn("rl_pair_eq_r.res")) & Set(Valid.1 | Rule(Implication | (y = b & x, y: r => x, b: r) & _delta_e(y) & _delta_e(b) & _delta_e(x) & _delta_e(r) | ? | ? | y = b & x, y: r => x, b: r | nn))

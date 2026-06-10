@@ -1,0 +1,1 @@
+Flag(FileOn("tf_noncontra_and.res")) & Set(Valid.1 | Rule(Implication | (q => q & not(p & not(p))) & _delta_p(q) & _delta_p(p) | ? | ? | q => q & not(p & not(p)) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("sc_b4_swap.res")) & Set(Valid.1 | Rule(Implication | (!w.!x.!y.!z.(w: a => x: b => y: c => z: d) => !z.!y.!x.!w.(w: a => x: b => y: c => z: d)) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) | ? | ? | !w.!x.!y.!z.(w: a => x: b => y: c => z: d) => !z.!y.!x.!w.(w: a => x: b => y: c => z: d) | nn))

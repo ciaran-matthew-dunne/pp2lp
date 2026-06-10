@@ -1,0 +1,1 @@
+Flag(FileOn("sc_b4_mid_drop.res")) & Set(Valid.1 | Rule(Implication | (!w.!x.!y.!z.(w: a => z: d) => !z.!w.(w: a => z: d)) & _delta_e(a) & _delta_e(d) | ? | ? | !w.!x.!y.!z.(w: a => z: d) => !z.!w.(w: a => z: d) | nn))

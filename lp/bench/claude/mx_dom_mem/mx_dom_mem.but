@@ -1,0 +1,1 @@
+Flag(FileOn("mx_dom_mem.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) & dom(f) <: s => a: s) & _delta_e(a) & _delta_e(f) & _delta_e(s) | ? | ? | a: dom(f) & dom(f) <: s => a: s | nn))

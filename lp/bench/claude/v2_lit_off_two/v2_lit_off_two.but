@@ -1,0 +1,1 @@
+Flag(FileOn("v2_lit_off_two.res")) & Set(Valid.1 | Rule(Implication | (x + 2 <= y => x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x + 2 <= y => x <= y | nn))

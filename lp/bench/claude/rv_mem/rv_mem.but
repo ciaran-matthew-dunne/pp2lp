@@ -1,0 +1,1 @@
+Flag(FileOn("rv_mem.res")) & Set(Valid.1 | Rule(Implication | (b = a & a: s => b: s) & _delta_e(b) & _delta_e(a) & _delta_e(s) | ? | ? | b = a & a: s => b: s | nn))

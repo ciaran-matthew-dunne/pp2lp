@@ -156,21 +156,37 @@ see Known broken).
 ## Known broken
 
 All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
-`gemini` (422), `claude` (525). Residuals:
+`gemini` (422), `claude` (1058). Residuals:
 
 - **Chain AR7_1/AR8_1.** Not exercised by any current suite (the gemini goals
   were dropped); would still fail at tree-build — the result-chain has no
   STOP_1 leaf seed and an AR9_1/AR7_1 same-formula pair the one-node-per-line
   postfix model can't place. Replay-format work in `proof_tree.ml`.
-- **REPLAY truncation (upstream).** Atelier B's REPLAY drops the final
-  ALL7/XST8 continuation for ~30 goal shapes (set-extensionality and
-  equality-prover-heavy proofs); `pp2lp gen` re-detects and drops them every
-  run (`E_REPLAY_TRUNCATED`). In particular no complete EGALITE replay can
-  currently be produced — the EGALITE emit path is validated against a
-  hand-completed minimal replay, not a generated one.
-- **NRM20/21 pin slot ≥ 2.** The substitution lemmas cover pin slots 0/1
-  (after tail rotation); a trace pinning the third-or-later binder fails
-  loudly. Same for NRM26 drops at slot ≥ 2 that aren't the last-listed.
+- **REPLAY losses (upstream).** Two failure modes, both detected and dropped
+  at gen time as `E_REPLAY_TRUNCATED`: the tool omits the final ALL7/XST8
+  continuation (~50 goal shapes: set-extensionality, equality-prover-heavy
+  proofs, literal-constant pins `#x.(x = 5)`, arith-pinned existentials), or
+  it writes `**** impossible case in rplMainX ****` mid-file. In particular
+  no complete EGALITE replay can currently be produced — the EGALITE emit
+  path is validated against a hand-completed minimal replay.
+- **NRM20/21 pin slot ≥ 3.** The substitution lemmas cover pin slots 0/1/2
+  (after tail rotation); a trace pinning the fourth-or-later binder fails
+  loudly. Same for NRM26 drops at slot ≥ 3 that aren't the last-listed.
+- **BOOL/EAXM/EQC/EIMP5/ECTR5-6 unreachable.** Under the suite's self-proof
+  harness these prove in one AXM8 step (the promoted hypothesis matches the
+  goal before the special rules fire), so no replay exercises them.
+
+Fixed 2026-06-10, second wave (see git log): suite extended 525 → 1058
+checked proofs (1120-line goals.txt; rule firings 91 → 98 base names).  The
+new probes surfaced and fixed: Farkas multiplier cap raised 4 → 8
+(`fk_mult5/6`); pin/drop slot-2 forms (`rm2`/`tuple_insert2` + NRM20P2/
+NRM21P2/NRM26M2 — 4-binder reorders drop middle slots); NRM22/NRM23 tail
+rotation (mid-list pins in 1-binder blocks, NRM23 generalised to NRM23G's
+list form); `prj 0 (tuple_prepend …)` commute rules (witness searches
+against prepend-normalised hyps left stuck constraints); `𝟎` flattens to no
+atom in the sum-equality engine (PP's `1 − 0 → 1` fold), which exposed and
+fixed wrong `concat` base cases for empty atom lists; `impossible case in
+rplMainX` classified as a REPLAY loss for the gen-time drop.
 
 Fixed 2026-06-10 (see git log): `[ARITH] <FAUX>` solver terminal — generated
 Farkas combination over the `≤ 𝟎` hyps (`add_leq_zero` chain + `prove_sum_eq`
@@ -271,11 +287,13 @@ replay-natively. Unknown rule names raise.
   each NRM rule → goal. Any failing goal ⇒ exit 1.
 - **claude** — a hand-authored *pipeline stress / coverage* suite (same
   `goals.txt` mechanism): it spans every rule family + proof sizes 1→416
-  replay lines and probes the failure frontier on purpose. Currently 525
-  goals, all ✓ (the former frontier sections L–P are cleared; section W
-  probes the solver terminals and positional substitution forms). ~30 more
-  goals in goals.txt can't be replayed — REPLAY truncates them and gen drops
-  them, loudly. Used to find bugs; inline notes flag each known blocker.
+  replay lines and probes the failure frontier on purpose. Currently 1058
+  checked proofs, all ✓ (frontier sections L–P cleared; section W probes the
+  solver terminals and positional substitution; sections X/Y are the
+  coverage push — unfired-rule probes, Farkas/literal/slot stress, scale
+  series, and reliable-family breadth). ~50 more goals in goals.txt can't be
+  replayed — REPLAY truncates or corrupts them and gen drops them, loudly.
+  Used to find bugs; inline notes flag each known blocker and finding.
   **`#` existentials are allowed** in goals.txt (the comment splitter no
   longer eats `#x`).
 

@@ -1,0 +1,1 @@
+Flag(FileOn("sc_disj6_intro.res")) & Set(Valid.1 | Rule(Implication | (a4 => a1 or a2 or a3 or a4 or a5 or a6) & _delta_p(a4) & _delta_p(a1) & _delta_p(a2) & _delta_p(a3) & _delta_p(a5) & _delta_p(a6) | ? | ? | a4 => a1 or a2 or a3 or a4 or a5 or a6 | nn))

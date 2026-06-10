@@ -1,0 +1,1 @@
+Flag(FileOn("v3_subset_inter_r.res")) & Set(Valid.1 | Rule(Implication | (s <: t & x: u /\ s => x: t) & _delta_e(s) & _delta_e(t) & _delta_e(x) & _delta_e(u) | ? | ? | s <: t & x: u /\ s => x: t | nn))

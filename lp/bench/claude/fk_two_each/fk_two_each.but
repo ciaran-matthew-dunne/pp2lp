@@ -1,0 +1,1 @@
+Flag(FileOn("fk_two_each.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x <= 0 & y <= 0 => x + y + y + x <= 0)) | ? | ? | !x.!y.(x <= 0 & y <= 0 => x + y + y + x <= 0) | nn))

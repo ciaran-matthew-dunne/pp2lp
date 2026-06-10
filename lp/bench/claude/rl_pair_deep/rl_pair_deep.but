@@ -1,0 +1,1 @@
+Flag(FileOn("rl_pair_deep.res")) & Set(Valid.1 | Rule(Implication | (x, f(x): r & f(x) = y => x, y: r) & _delta_e(x) & _delta_e(f) & _delta_e(r) & _delta_e(y) | ? | ? | x, f(x): r & f(x) = y => x, y: r | nn))

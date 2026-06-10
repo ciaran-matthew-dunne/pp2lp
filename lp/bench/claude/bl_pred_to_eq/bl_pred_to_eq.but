@@ -1,0 +1,1 @@
+Flag(FileOn("bl_pred_to_eq.res")) & Set(Valid.1 | Rule(Implication | (x = y => bool(x = y) = btrue) & _delta_e(x) & _delta_e(y) & _delta_e(btrue) | ? | ? | x = y => bool(x = y) = btrue | nn))

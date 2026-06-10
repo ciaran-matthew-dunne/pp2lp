@@ -1,0 +1,1 @@
+Flag(FileOn("qn_xst_or_const_r.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: t or a: s) => #x.(x: t) or a: s) & _delta_e(t) & _delta_e(a) & _delta_e(s) | ? | ? | #x.(x: t or a: s) => #x.(x: t) or a: s | nn))

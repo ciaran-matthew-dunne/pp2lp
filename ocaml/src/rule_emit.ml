@@ -93,20 +93,6 @@ let find_conjunct_pos conjs target =
    conjunction for NRM20 but at the *tail* (after a `⊤` from NRM14) for NRM22,
    so we match it by the bound var rather than by position.  The reversed
    `E = x` orientation belongs to NRM21/23, which no current replay exercises. *)
-let subst_eq_e = function
-  | Binary (Imp, Bind (Forall2, v0 :: _, Unary (Not, body)), _) ->
-    List.find_map (function
-      | Eq (Var lead, e) when lead = v0 -> Some e
-      | _ -> None) (conjuncts body)
-  | _ -> None
-
-let subst_eq_e_rev = function
-  | Binary (Imp, Bind (Forall2, v0 :: _, Unary (Not, body)), _) ->
-    List.find_map (function
-      | Eq (e, Var lead) when lead = v0 -> Some e
-      | _ -> None) (conjuncts body)
-  | _ -> None
-
 (* The binder list of a `forall2(…) ⇒ Q` annotation (NRM20/21/26's shape). *)
 let forall2_vars_of_goal = function
   | Some (Binary (Imp, Bind (Forall2, vars, _), _)) -> Some vars
@@ -122,6 +108,41 @@ let dropped_var_pos vars child_vars =
       if List.mem v child_vars then go (i + 1) rest else Some (i, v)
   in
   go 0 vars
+
+(* `((♡v,¬⋀L) ⇒ Q) = ((♡v,¬⋀L') ⇒ Q)` where L' is L with conjunct [j] (of
+   [n_cs]) bubbled to the end: an eq_trans chain of conj_swap_last2 steps,
+   each lifted by conj_init_cong once per element above it, wrapped in
+   not_cong/!!_cong/imp_cong_l.  All implicits are inferred from the goal
+   term at check time, so the chain is built bare. *)
+let conj_bubble_goal_cong ctx n_cs j =
+  let rec lift n t =
+    if n = 0 then t
+    else lift (n - 1) (L.App (L.Name "conj_init_cong", [ t ]))
+  in
+  let rec chain i =
+    let step = lift (n_cs - 2 - i) (L.Name "conj_swap_last2") in
+    if i = n_cs - 2 then step
+    else L.App (L.Name "eq_trans", [ step; chain (i + 1) ])
+  in
+  let u = fresh_x_local ctx in
+  L.App (L.Name "imp_cong_l",
+    [ L.App (L.Name "!!_cong",
+        [ L.Lambda (u, None, L.App (L.Name "not_cong", [ chain j ])) ]) ])
+
+(* The orientation-respecting pinning-equality conjunct: its index and the
+   witness side.  [rev] = the pinned var on the RHS (NRM21/23). *)
+let pin_eq_conjunct ~rev pinned cs =
+  let eq_e = function
+    | Eq (Var x, e) when (not rev) && x = pinned -> Some e
+    | Eq (e, Var x) when rev && x = pinned -> Some e
+    | _ -> None
+  in
+  let rec find j = function
+    | [] -> None
+    | c :: rest ->
+      (match eq_e c with Some e -> Some (j, e) | None -> find (j + 1) rest)
+  in
+  find 0 cs
 
 let find_and5_pair conjs =
   let arr = Array.of_list conjs in
@@ -299,11 +320,6 @@ let tactic_for_rule ctx rule arg anno children =
            | x :: rest -> if x = v then Some i else go (i + 1) rest
          in go 0 vars
        in
-       let eq_e pinned = function
-         | Eq (Var x, e) when (not rev) && x = pinned -> Some e
-         | Eq (e, Var x) when rev && x = pinned -> Some e
-         | _ -> None
-       in
        let pinned_opt =
          match children with
          | [c] ->
@@ -315,13 +331,7 @@ let tactic_for_rule ctx rule arg anno children =
        in
        let candidate =
          let try_pinned p =
-           let rec find j = function
-             | [] -> None
-             | c :: rest ->
-               (match eq_e p c with
-                | Some e -> Some (p, j, e)
-                | None -> find (j + 1) rest)
-           in find 0 cs
+           Option.map (fun (j, e) -> (p, j, e)) (pin_eq_conjunct ~rev p cs)
          in
          match pinned_opt with
          | Some p -> try_pinned p
@@ -349,14 +359,15 @@ let tactic_for_rule ctx rule arg anno children =
                 L.Lambda (v, None, eq_refl heq_eq);
                 L.Hole ])
           end
-          else if k = 0 || k = 1 then begin
+          else if k <= 2 then begin
             (* tail form: E a function of the remaining tuple.  When the
                equality isn't the last conjunct, first bubble it to the end
                with a generated swap-congruence chain and transport the goal
                (`=⇒ (eq_sym cong)`); the lifted lemmas' implicits are all
                inferred from the goal term, so the chain is built bare. *)
             let rvars = List.filter (fun v -> v <> pinned) vars in
-            let name = if k = 0 then rule_name ^ "S" else rule_name ^ "P" in
+            let name =
+              rule_name ^ (match k with 0 -> "S" | 1 -> "P" | _ -> "P2") in
             let w = fresh_x_local ctx in
             let env' =
               List.mapi (fun i v -> (v, (i, w))) rvars @ pp_env_of ctx in
@@ -365,36 +376,17 @@ let tactic_for_rule ctx rule arg anno children =
             in
             if j = n_cs - 1 then
               L.Refine (L.Name name, tail_app [ L.Hole ])
-            else begin
-              (* swaps at (i, i+1) for i = j..n_cs−2, each lifted once per
-                 element above it; composed with eq_trans. *)
-              let rec lift n t =
-                if n = 0 then t
-                else lift (n - 1) (L.App (L.Name "conj_init_cong", [ t ]))
-              in
-              let rec chain i =
-                let step = lift (n_cs - 2 - i) (L.Name "conj_swap_last2") in
-                if i = n_cs - 2 then step
-                else L.App (L.Name "eq_trans", [ step; chain (i + 1) ])
-              in
-              let u = fresh_x_local ctx in
-              let cong =
-                L.App (L.Name "imp_cong_l",
-                  [ L.App (L.Name "!!_cong",
-                      [ L.Lambda (u, None,
-                          L.App (L.Name "not_cong", [ chain j ])) ]) ])
-              in
+            else
               L.Refine (L.Name "=⇒",
-                [ L.App (L.Name "eq_sym", [ cong ]);
+                [ L.App (L.Name "eq_sym", [ conj_bubble_goal_cong ctx n_cs j ]);
                   L.App (L.Name name, tail_app [ L.Hole ]) ])
-            end
           end
           else
             failwith (Printf.sprintf
               "translate: %s equality conjunct at position %d/%d pinning \
-               slot %d — only slots 0/1 have substitution lemmas \
-               (%sS/%sP, after tail rotation)"
-              rule_name j n_cs k rule_name rule_name)
+               slot %d — only slots 0/1/2 have substitution lemmas \
+               (%sS/%sP/%sP2, after tail rotation)"
+              rule_name j n_cs k rule_name rule_name rule_name)
         | None ->
           failwith (Printf.sprintf
             "translate: %s annotation lacks an `%s` equality conjunct \
@@ -418,39 +410,43 @@ let tactic_for_rule ctx rule arg anno children =
              if k = List.length vars - 1 then fallback
              else if k = 0 then L.Refine (L.Name "NRM26S", [L.Hole])
              else if k = 1 then L.Refine (L.Name "NRM26M", [L.Hole])
+             else if k = 2 then L.Refine (L.Name "NRM26M2", [L.Hole])
              else
                failwith (Printf.sprintf
                  "translate: NRM26 drops binder %s at slot %d — only slots \
-                  0/1/last have LP forms (NRM26S/NRM26M/NRM26)" v k)
+                  0/1/2/last have LP forms (NRM26S/NRM26M/NRM26M2/NRM26)" v k)
            | None -> fallback)
         | _ -> fallback)
      | _, _ -> fallback)
-  | Rule_db.Nrm22 ->
-    (* NRM22 [P] [Q] (E) : π (¬ (P E) ⇒ Q) → π ((♡ v : Tuple 1, ¬ ⋀ (∎ ∷ P
-       (prj 0 v) ∷ (prj 0 v = E))) ⇒ Q).  The replay shape (NRM14 feeds it a
-       ⊤-headed body) matches this with `P := λ_, ⊤`; the encoding is sound,
-       only E must be supplied — Lambdapi infers it nowhere else.  Like NRM20,
-       E may mention enclosing binders, so env-carry it.  The trailing hole is
-       the `¬ (P E) ⇒ Q` continuation child. *)
+  | Rule_db.Nrm22 | Rule_db.Nrm23 ->
+    (* Single-binder pins.  NRM22 [ps] [Q] (E) concludes
+       `(♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q` (NRM23G the
+       reversed `E = prj 0 v`); E may mention enclosing binders, so
+       env-carry it.  Like NRM20/21, the pinning equality may sit anywhere
+       in the conjunct list — bubble it to the tail first when needed. *)
+    let rev = Rule_db.emit rule = Rule_db.Nrm23 in
+    let rule_name = if rev then "NRM23G" else "NRM22" in
     (match goal_of_anno anno with
-     | Some goal ->
-       (match subst_eq_e goal with
-        | Some e -> L.Refine (L.Name "NRM22", [exp_term ctx e; L.Hole])
+     | Some (Binary (Imp, Bind (Forall2, [ v0 ], Unary (Not, body)), _)) ->
+       let cs = conjuncts body in
+       let n_cs = List.length cs in
+       (match pin_eq_conjunct ~rev v0 cs with
+        | Some (j, e) ->
+          let plain = L.App (L.Name rule_name, [ exp_term ctx e; L.Hole ]) in
+          if j = n_cs - 1 then L.Refine (L.Name rule_name, [ exp_term ctx e; L.Hole ])
+          else
+            L.Refine (L.Name "=⇒",
+              [ L.App (L.Name "eq_sym", [ conj_bubble_goal_cong ctx n_cs j ]);
+                plain ])
         | None ->
-          failwith "translate: NRM22 annotation lacks an `x = E` equality \
-                    conjunct (LHS = the leading forall2 binder var)")
-     | None -> failwith "translate: NRM22 has no goal annotation")
-  | Rule_db.Nrm23 ->
-    (* NRM23 [P] [Q] (E) : π (¬ (P E) ⇒ Q) → π ((♡ v : Tuple 1, ¬ ⋀ (∎ ∷ P
-       (prj 0 v) ∷ (E = prj 0 v))) ⇒ Q). *)
-    (match goal_of_anno anno with
-     | Some goal ->
-        (match subst_eq_e_rev goal with
-         | Some e -> L.Refine (L.Name "NRM23", [exp_term ctx e; L.Hole])
-         | None ->
-           failwith "translate: NRM23 annotation lacks an `E = x` equality \
-                     conjunct (LHS = the leading forall2 binder var)")
-     | None -> failwith "translate: NRM23 has no goal annotation")
+          failwith (Printf.sprintf
+            "translate: %s annotation lacks an `%s` equality conjunct \
+             pinning the binder"
+            rule_name (if rev then "E = x" else "x = E")))
+     | _ ->
+       failwith (Printf.sprintf
+         "translate: %s expected a 1-binder `forall2(x)·¬(…) ⇒ Q` annotation"
+         rule_name))
   | Rule_db.Ar5_6 ->
     (* AR5/AR6 [a R] : π (solver-fact) → π (cont) → π ((±a ≤ 𝟎) ⇒ R).  `a` is
        implicit (inferred from the goal); the first premise (a ≪ 𝟎 / —a ≤ 𝟎)

@@ -1,0 +1,1 @@
+Flag(FileOn("mx_guard_or.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t or x: u) & a: s & not(a: t) => a: u) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(a) | ? | ? | !x.(x: s => x: t or x: u) & a: s & not(a: t) => a: u | nn))

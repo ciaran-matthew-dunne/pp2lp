@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_diamond.res")) & Set(Valid.1 | Rule(Implication | (a = b & b = d & a = c & c = d => b = c) & _delta_e(a) & _delta_e(b) & _delta_e(d) & _delta_e(c) | ? | ? | a = b & b = d & a = c & c = d => b = c | nn))

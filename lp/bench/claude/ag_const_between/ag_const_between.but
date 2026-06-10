@@ -1,0 +1,1 @@
+Flag(FileOn("ag_const_between.res")) & Set(Valid.1 | Rule(Implication | (1 <= x & x <= 1 => x = 1) & _delta_e(x) | ? | ? | 1 <= x & x <= 1 => x = 1 | nn))

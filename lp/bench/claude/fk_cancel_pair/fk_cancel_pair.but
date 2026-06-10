@@ -1,0 +1,1 @@
+Flag(FileOn("fk_cancel_pair.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x + y <= 0 & x - y <= 0 => x <= 0)) | ? | ? | !x.!y.(x + y <= 0 & x - y <= 0 => x <= 0) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_ran_subset.res")) & Set(Valid.1 | Rule(Implication | (ran(f) <: t & y: ran(f) => y: t) & _delta_e(f) & _delta_e(t) & _delta_e(y) | ? | ? | ran(f) <: t & y: ran(f) => y: t | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("bl_neg_to_false.res")) & Set(Valid.1 | Rule(Implication | (not(x = y) => bool(x = y) = bfalse) & _delta_e(x) & _delta_e(y) & _delta_e(bfalse) | ? | ? | not(x = y) => bool(x = y) = bfalse | nn))

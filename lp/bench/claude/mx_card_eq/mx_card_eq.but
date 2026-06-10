@@ -1,0 +1,1 @@
+Flag(FileOn("mx_card_eq.res")) & Set(Valid.1 | Rule(Implication | (card(s) = card(t) & card(t) = m => card(s) = m) & _delta_e(s) & _delta_e(t) & _delta_e(m) | ? | ? | card(s) = card(t) & card(t) = m => card(s) = m | nn))

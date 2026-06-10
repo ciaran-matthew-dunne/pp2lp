@@ -1,0 +1,1 @@
+Flag(FileOn("ag_strict_lit.res")) & Set(Valid.1 | Rule(Implication | (x < 3 => x <= 2) & _delta_e(x) | ? | ? | x < 3 => x <= 2 | nn))

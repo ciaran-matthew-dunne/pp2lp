@@ -1,0 +1,1 @@
+Flag(FileOn("v3_inst_arith2.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => 0 <= x) & a: s & b: s => 0 <= a & 0 <= b) & _delta_e(s) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => 0 <= x) & a: s & b: s => 0 <= a & 0 <= b | nn))

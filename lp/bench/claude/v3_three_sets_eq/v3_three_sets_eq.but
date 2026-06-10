@@ -1,0 +1,1 @@
+Flag(FileOn("v3_three_sets_eq.res")) & Set(Valid.1 | Rule(Implication | (s = t & u = v & x: s & y: u => x: t & y: v) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) & _delta_e(x) & _delta_e(y) | ? | ? | s = t & u = v & x: s & y: u => x: t & y: v | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_fn_eq_chain4.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b & g(b) = c & h(c) = d => h(g(f(a))) = d) & _delta_e(f) & _delta_e(a) & _delta_e(b) & _delta_e(g) & _delta_e(c) & _delta_e(h) & _delta_e(d) | ? | ? | f(a) = b & g(b) = c & h(c) = d => h(g(f(a))) = d | nn))

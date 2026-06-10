@@ -1,0 +1,1 @@
+Flag(FileOn("sc_deep_paren4.res")) & Set(Valid.1 | Rule(Implication | (p => (((p => q) => q) => q) => q) & _delta_p(p) & _delta_p(q) | ? | ? | p => (((p => q) => q) => q) => q | nn))

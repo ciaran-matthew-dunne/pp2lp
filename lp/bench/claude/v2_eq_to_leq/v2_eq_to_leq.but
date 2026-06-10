@@ -1,0 +1,1 @@
+Flag(FileOn("v2_eq_to_leq.res")) & Set(Valid.1 | Rule(Implication | (x = y => x <= y & y <= x) & _delta_e(x) & _delta_e(y) | ? | ? | x = y => x <= y & y <= x | nn))

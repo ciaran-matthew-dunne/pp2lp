@@ -1,0 +1,1 @@
+Flag(FileOn("pin_third.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.#z.(z = x)) | ? | ? | #x.#y.#z.(z = x) | nn))

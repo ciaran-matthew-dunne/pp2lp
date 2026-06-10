@@ -1,0 +1,1 @@
+Flag(FileOn("v3_xst_two_pins.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x = a & y = b & x: s & y: t) => a: s & b: t) & _delta_e(a) & _delta_e(b) & _delta_e(s) & _delta_e(t) | ? | ? | #x.#y.(x = a & y = b & x: s & y: t) => a: s & b: t | nn))

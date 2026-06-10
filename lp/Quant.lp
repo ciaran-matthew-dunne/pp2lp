@@ -96,13 +96,13 @@ rule init ($v ⨾ _) ↪ $v;
 // constructor path: `prj k (init (w ⨾ x))` → `prj k w` either way.
 rule prj $k (init $v) ↪ prj (+1 $k) $v;
 
-// ---- Slot-1 surgery: rm1 / tuple_insert1 -----------------------------
+// ---- Slot surgery: rm1/rm2, tuple_insert1/2, tuple_prepend ------------
 //
 // The NRM20/21 substitution rules may pin (and NRM26 may drop) the binder
-// at slot 1 — the second-rightmost ⨾-slot — not just slot 0 (`init`/`⨾`)
-// or the leftmost (`tuple_prepend`).  `rm1` removes slot 1, `tuple_insert1`
-// inserts there; the prj-commute rules below keep projections reducible on
-// an abstract tuple, mirroring the take/drop and init rules.
+// at slots 1 and 2 — not just slot 0 (`init`/`⨾`) or the leftmost
+// (`tuple_prepend`).  `rmK` removes slot K, `tuple_insertK` inserts there;
+// the prj-commute rules keep projections reducible on an abstract tuple,
+// mirroring the take/drop and init rules.
 symbol rm1 [n] : Tuple (+1 (+1 n)) → Tuple (+1 n);
 rule rm1 ($v ⨾ $y) ↪ (init $v) ⨾ $y;
 rule prj 0 (rm1 $v) ↪ prj 0 $v
@@ -116,6 +116,31 @@ rule prj 0 (tuple_insert1 _ $w) ↪ prj 0 $w
 with prj (+1 0) (tuple_insert1 $x _) ↪ $x
 with prj (+1 (+1 $k)) (tuple_insert1 _ $w) ↪ prj (+1 $k) $w
 with rm1 (tuple_insert1 _ $w) ↪ $w;
+
+symbol rm2 [n] : Tuple (+1 (+1 (+1 n))) → Tuple (+1 (+1 n));
+rule rm2 ($v ⨾ $y) ↪ (rm1 $v) ⨾ $y;
+rule prj 0 (rm2 $v) ↪ prj 0 $v
+with prj (+1 0) (rm2 $v) ↪ prj (+1 0) $v
+with prj (+1 (+1 $k)) (rm2 $v) ↪ prj (+1 (+1 (+1 $k))) $v;
+
+symbol tuple_insert2 [n] : τ ι → Tuple (+1 (+1 n)) → Tuple (+1 (+1 (+1 n)));
+rule tuple_insert2 $x ($v ⨾ $y) ↪ (tuple_insert1 $x $v) ⨾ $y;
+rule prj 0 (tuple_insert2 _ $w) ↪ prj 0 $w
+with prj (+1 0) (tuple_insert2 _ $w) ↪ prj (+1 0) $w
+with prj (+1 (+1 0)) (tuple_insert2 $x _) ↪ $x
+with prj (+1 (+1 (+1 $k))) (tuple_insert2 _ $w) ↪ prj (+1 (+1 $k)) $w
+with rm2 (tuple_insert2 _ $w) ↪ $w;
+
+// Prepend (dummy-fill the LEFTMOST slot — the last-listed binder; the
+// historical NRM26 form).  Lives here with the other slot surgery; the
+// k = 0 commute is unconditionally sound (prepending never displaces the
+// rightmost slot) and is what witness searches against prepend-normalised
+// hypotheses unify with.
+symbol tuple_prepend [n] : τ ι → Tuple n → Tuple (+1 n);
+rule tuple_prepend [0] $x unit ↪ unit ⨾ $x
+with tuple_prepend [+1 $n] $x ($w ⨾ $y) ↪ tuple_prepend [$n] $x $w ⨾ $y;
+rule prj 0 (tuple_prepend [+1 _] _ $v) ↪ prj 0 $v
+with prj 0 (tuple_prepend [0] $x _) ↪ $x;
 
 // η for tuples: `(init v) ⨾ (prj 0 v) = v` for an *abstract* `v : Tuple
 // (+1 n)`.  Direct `induction` on `Tuple (+1 n)` fails (the index is a

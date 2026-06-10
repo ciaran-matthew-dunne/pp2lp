@@ -1,0 +1,1 @@
+Flag(FileOn("qn_all_conj_both.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s & x: t) => !x.(x: t) & !x.(x: s)) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s & x: t) => !x.(x: t) & !x.(x: s) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("rl_dom_two.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) & b: dom(f) => b: dom(f) & a: dom(f)) & _delta_e(a) & _delta_e(f) & _delta_e(b) | ? | ? | a: dom(f) & b: dom(f) => b: dom(f) & a: dom(f) | nn))

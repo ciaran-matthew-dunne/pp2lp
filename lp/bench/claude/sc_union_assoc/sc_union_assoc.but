@@ -1,0 +1,1 @@
+Flag(FileOn("sc_union_assoc.res")) & Set(Valid.1 | Rule(Implication | (x: (s1 \/ s2) \/ s3 => x: s1 \/ (s2 \/ s3)) & _delta_e(x) & _delta_e(s1) & _delta_e(s2) & _delta_e(s3) | ? | ? | x: (s1 \/ s2) \/ s3 => x: s1 \/ (s2 \/ s3) | nn))

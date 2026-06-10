@@ -1,0 +1,1 @@
+Flag(FileOn("v2_imp_weaken.res")) & Set(Valid.1 | Rule(Implication | (b => (a => b)) & _delta_p(b) & _delta_p(a) | ? | ? | b => (a => b) | nn))

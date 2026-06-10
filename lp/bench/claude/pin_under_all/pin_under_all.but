@@ -1,0 +1,1 @@
+Flag(FileOn("pin_under_all.res")) & Set(Valid.1 | Rule(Implication | (!z.(z: s => #x.(x = z))) & _delta_e(s) | ? | ? | !z.(z: s => #x.(x = z)) | nn))

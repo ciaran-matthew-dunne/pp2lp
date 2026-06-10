@@ -1,0 +1,1 @@
+Flag(FileOn("rv_rev_subst.res")) & Set(Valid.1 | Rule(Implication | (y = x => f(x) = f(y)) & _delta_e(y) & _delta_e(x) & _delta_e(f) | ? | ? | y = x => f(x) = f(y) | nn))

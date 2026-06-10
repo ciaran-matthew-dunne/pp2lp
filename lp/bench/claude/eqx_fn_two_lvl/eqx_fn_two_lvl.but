@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_fn_two_lvl.res")) & Set(Valid.1 | Rule(Implication | (x = y & f(y) = z & g(z) = w => g(f(x)) = w) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(z) & _delta_e(g) & _delta_e(w) | ? | ? | x = y & f(y) = z & g(z) = w => g(f(x)) = w | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_and_quant_mix.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & !x.(x: u => x: v) & a: s & a: u => a: t & a: v) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(v) & _delta_e(a) | ? | ? | !x.(x: s => x: t) & !x.(x: u => x: v) & a: s & a: u => a: t & a: v | nn))

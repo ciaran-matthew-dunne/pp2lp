@@ -788,3 +788,638 @@ x3_three_wits     | expr | f(a) = b => #x.#y.#z.(f(x) = y & y = z)
 u2_all_swap2      | expr | !x.!y.(x: a => y: b) => !y.!x.(x: a => y: b)
 u2_all_rotate     | expr | !x.!y.!z.(x: a => y: b => z: c) => !y.!z.!x.(x: a => y: b => z: c)
 u2_all_mid_drop   | expr | !x.!y.!z.(x: a => z: c) => !z.!x.(x: a => z: c)
+
+# ════════════════════════════════════════════════════════════════════════
+# X. COVERAGE PUSH (added 2026-06-10, second wave): targets the 47 rules no
+#    replay fires (BOOL*, EAXM*, EQC*, EIMP5*, EVR1/2/11, ECTR5/6, FX1/2,
+#    VR2, NRM2/4/16-18/27/28/30, ALL2, XST2/51/61, AR2/5/6/13) and the 15
+#    thin ones.  Sections X.* by family; expected mostly ✓ — a ✗ here is a
+#    pipeline finding, see the session notes.
+#
+#    Post-run findings (all surviving goals ✓):
+#    - The bl_/eqx_ probes prove in ONE AXM8 step: the promoted self-proof
+#      hypothesis matches the goal before any bool()/equality-special rule
+#      can fire.  BOOL11-52, EAXM*, EQC1/2, EIMP5*, ECTR5/6, EVR11 stay
+#      REPLAY-unreachable under this harness (they need hyp/goal
+#      normalisation to diverge); bl_* still validates that `bool(P)`
+#      round-trips the whole pipeline.  Newly fired instead: AR2, EVR1,
+#      EVR2, FX1, NRM2, NRM4, XST51.
+#    - fk_sandwich and qs_pin_{zero,first,second,both} hit a SECOND
+#      upstream REPLAY failure mode: the tool writes
+#      `**** impossible case in rplMainX ****` mid-file.  Classified
+#      E_REPLAY_TRUNCATED and gen-dropped, like the continuation drops.
+#    - 14 further REPLAY-truncation drops (literal-constant pins
+#      `#x.(x = 5)`, arith-pinned existentials, vacuous-binder nestings —
+#      see the gen output).
+# ════════════════════════════════════════════════════════════════════════
+
+# X.a — bool(P) operator (→ BOOL11-52; PP's bool-valued predicates)
+bl_refl_true      | expr | bool(x = x) = btrue
+bl_eq_to_pred     | expr | bool(x = y) = btrue => x = y
+bl_pred_to_eq     | expr | x = y => bool(x = y) = btrue
+bl_false_to_neg   | expr | bool(x = y) = bfalse => not(x = y)
+bl_neg_to_false   | expr | not(x = y) => bool(x = y) = bfalse
+bl_leq_true       | expr | x <= y => bool(x <= y) = btrue
+bl_leq_back       | expr | bool(x <= y) = btrue => x <= y
+bl_mem_true       | expr | x: s => bool(x: s) = btrue
+bl_mem_back       | expr | bool(x: s) = btrue => x: s
+bl_true_or_false  | expr | bool(x = y) = btrue or bool(x = y) = bfalse
+bl_not_both       | expr | not(bool(x = y) = btrue & bool(x = y) = bfalse)
+bl_two_bools      | expr | bool(x = y) = btrue & bool(y = z) = btrue => x = z
+bl_via_eq         | expr | x = y => bool(x = z) = bool(y = z)
+bl_chain          | expr | bool(x: s) = btrue & bool(y: t) = btrue => x: s & y: t
+bl_neq_consts     | expr | not(btrue = bfalse)
+bl_neq_consts_rev | expr | not(bfalse = btrue)
+bl_mem_false      | expr | bool(x: s) = bfalse => not(x: s)
+bl_arith_false    | expr | bool(x <= y) = bfalse => not(x <= y)
+
+# X.b — equality-prover special rules: commuted-orientation hyps (EQC1/2,
+# EAXM1/2), reflexivity specials (EVR1/2/11), commuted-imp (EIMP51/52),
+# positive-G substitution contradictions (ECTR5/6).
+eqx_comm_use      | expr | y = x => x = y
+eqx_comm_neg      | expr | not(x = y) => not(y = x)
+eqx_comm_mem      | expr | y = x & y: s => x: s
+eqx_comm_mem2     | expr | y = x & x: s => y: s
+eqx_comm_both     | expr | y = x & w = z => x = y & z = w
+eqx_comm_app      | expr | y = f(x) => f(x) = y
+eqx_comm_leq      | expr | y = x & x <= z => y <= z
+eqx_refl_or       | expr | x = x or a: s
+eqx_refl_or_r     | expr | a: s or x = x
+eqx_refl_and_mem  | expr | a: s => x = x & a: s
+eqx_refl_ante     | expr | (x = x => a: s) => a: s
+eqx_neg_refl_hyp  | expr | not(x = x) => a: s
+eqx_neg_refl_or   | expr | not(x = x) or a: s => a: s
+eqx_neg_refl_and  | expr | not(a: s & x = x) => not(a: s)
+eqx_imp_comm_ante | expr | (x = y => a: s) & y = x => a: s
+eqx_imp_comm2     | expr | (y = x => a: s) & x = y => a: s
+eqx_imp_comm_app  | expr | (f(x) = y => a: s) & y = f(x) => a: s
+eqx_two_orient    | expr | x = y & z = y => x = z
+eqx_two_orient2   | expr | y = x & y = z => x = z
+eqx_star4         | expr | x1 = c & x2 = c & x3 = c & x4 = c => x1 = x4
+eqx_diamond       | expr | a = b & b = d & a = c & c = d => b = c
+eqx_subst_deep    | expr | x = y => g(f(x)) = g(f(y))
+eqx_subst_two_arg | expr | x = y => g(f(x), f(y)) = g(f(y), f(x))
+eqx_ectr5         | expr | x = y & x: s & not(y: s) => bfalse
+eqx_ectr6         | expr | x = y & not(x: s) & y: s => bfalse
+eqx_ectr_arith    | expr | x = y & x <= z & not(y <= z) => bfalse
+eqx_ectr_app      | expr | x = y & f(x) = w & not(f(y) = w) => bfalse
+eqx_ectr_rev      | expr | y = x & x: s & not(y: s) => bfalse
+eqx_chain8        | expr | c1 = c2 & c2 = c3 & c3 = c4 & c4 = c5 & c5 = c6 & c6 = c7 & c7 = c8 => c1 = c8
+eqx_chain10       | expr | c1 = c2 & c2 = c3 & c3 = c4 & c4 = c5 & c5 = c6 & c6 = c7 & c7 = c8 & c8 = c9 & c9 = c10 => c1 = c10
+eqx_zigzag        | expr | a = b & c = b & c = d & e = d => a = e
+eqx_app_zig       | expr | f(a) = w & f(b) = w & f(b) = v => f(a) = v
+eqx_fn_two_lvl    | expr | x = y & f(y) = z & g(z) = w => g(f(x)) = w
+eqx_neq_prop     | expr | not(x = y) & y = z => not(x = z)
+eqx_neq_left      | expr | not(x = y) & x = w => not(w = y)
+eqx_eq_or_neq     | expr | x = y or not(x = y)
+eqx_app_neq       | expr | not(f(x) = f(y)) => not(x = y)
+eqx_mem_disagree  | expr | x: s & not(y: s) => not(x = y)
+eqx_leq_disagree  | expr | x <= z & not(y <= z) => not(x = y)
+eqx_three_cong    | expr | x = y & y = z => f(x) = f(z)
+eqx_self_app      | expr | f(x) = x => f(f(x)) = x
+
+# X.c — VRAI/FAUX structure (FX1/2, VR2; ⊥-from-⊤-negation plumbing)
+tf_dn_em          | prop | not(not(p or not(p)))
+tf_neg_em_ante    | prop | not(p or not(p)) => q
+tf_false_ante_or  | prop | (p & not(p)) or q => q
+tf_taut_or        | prop | (p => p) or q
+tf_taut_and_q     | prop | q => (p => p) & q
+tf_contra_eqv     | prop | (p <=> not(p)) => q
+tf_deep_taut      | prop | ((p => p) => q) => q
+tf_em_and         | prop | q => q & (p or not(p))
+tf_noncontra_and  | prop | q => q & not(p & not(p))
+tf_absurd_chain   | prop | p & not(p) & q => r
+tf_taut_ante_neg  | prop | (not(p or not(p)) => q) & r => r
+tf_double_taut    | prop | (p => p) & (q => q) or r
+
+# X.d — quantifier-normalisation gaps: vacuous binders (NRM1-4/16-18,
+# ALL2/6), ∃-or splits (XST5/51/6/61), ∃ in antecedent position (XST2/6/7)
+qn_vac_all        | expr | !x.(a: s) => a: s
+qn_vac_xst        | expr | #x.(a: s) => a: s
+qn_vac_all2       | expr | !x.!y.(a: s) => a: s
+qn_vac_intro      | expr | a: s => !x.(a: s)
+qn_vac_xst_intro  | expr | a: s => #x.(a: s)
+qn_vac_mid        | expr | !x.!y.(x: s) => !x.(x: s)
+qn_vac_inner      | expr | !x.(x: s => !y.(x: s)) 
+qn_all_conj_split | expr | !x.(x: s & x: t) => !x.(x: s)
+qn_all_conj_both  | expr | !x.(x: s & x: t) => !x.(x: t) & !x.(x: s)
+qn_all_conj_swap  | expr | !x.(x: s & x: t) => !x.(x: t & x: s)
+qn_xst_conj_l     | expr | #x.(x: s & x: t) => #x.(x: s)
+qn_xst_conj_r     | expr | #x.(x: s & x: t) => #x.(x: t)
+qn_xst_or_split   | expr | #x.(x: s or x: t) => #x.(x: s) or #x.(x: t)
+qn_or_xst_join    | expr | #x.(x: s) or #x.(x: t) => #x.(x: s or x: t)
+qn_xst_or_const_l | expr | #x.(a: s or x: t) => a: s or #x.(x: t)
+qn_xst_or_const_r | expr | #x.(x: t or a: s) => #x.(x: t) or a: s
+qn_all_imp_vac    | expr | !x.(a: s => x: t) & a: s => !x.(x: t)
+qn_all_const_csq  | expr | !x.(x: s => a: t) & b: s => a: t
+qn_nested3_vac    | expr | !x.!y.!z.(y: s) => !y.(y: s)
+qn_xst_ante       | expr | (#x.(x: s) => a: t) & b: s => a: t
+qn_xst_ante_eq    | expr | (#x.(x = c) => a: t) & b: s => a: t
+qn_xst_ante_or    | expr | (#x.(x: s) or a: t) & not(#x.(x: s)) => a: t
+qn_all_neg_xst    | expr | !x.(not(x: s)) => not(#x.(x: s))
+qn_neg_xst_all    | expr | not(#x.(x: s)) => !x.(not(x: s))
+qn_neg_all_xst    | expr | not(!x.(x: s)) => #x.(not(x: s))
+qn_xst_neg_all    | expr | #x.(not(x: s)) => not(!x.(x: s))
+qn_all_or_l       | expr | !x.(a: s or x: t) & not(a: s) => !x.(x: t)
+qn_all_two_const  | expr | !x.(a: s & b: t) => a: s & b: t
+qn_all_under_or   | expr | a: s or !x.(x: t) => !x.(a: s or x: t)
+qn_swap_const     | expr | !x.!y.(y: s & a: t) => !y.!x.(y: s & a: t)
+qn_all6_dup       | expr | !x.!y.(x: s) => !z.(z: s)
+qn_xst2_merge     | expr | #x.(#y.(x: s & y: t)) => #x.#y.(x: s & y: t)
+qn_all_eq_body    | expr | !x.(x = x)
+qn_xst_eq_body    | expr | #x.(x = x)
+qn_all_leq_self   | expr | !x.(x <= x)
+qn_xst_leq_self   | expr | #x.(x <= x)
+qn_all_xst_pair   | expr | !x.(#y.(y = x))
+qn_deep_vac       | expr | !x.(x: s => !y.!z.(x: s)) 
+qn_two_blocks     | expr | !x.(x: s => x: t) & #y.(y: s) => #y.(y: t)
+qn_three_vac      | expr | !x.!y.!z.(a: s) => a: s
+qn_xst3_project   | expr | #x.#y.#z.(x: s & y: t & z: u) => #y.(y: t)
+qn_mixed_vac      | expr | !x.(#y.(a: s)) => a: s
+qn_const_eqv      | expr | !x.(a: s <=> a: s)
+qn_imp_refl_all   | expr | !x.(x: s => x: s) & a: t => a: t
+
+# X.e — arithmetic-solver binder substitution (NRM27-30: a pinned binder
+# from cancelling bounds; only NRM29 had a single firing)
+qs_pin_zero       | expr | #x.(x <= 0 & 0 <= x & a: s) => a: s
+qs_pin_three      | expr | #x.(x <= 3 & 3 <= x & a: s) => a: s
+qs_pin_neg        | expr | #x.(x <= -2 & -2 <= x & a: s) => a: s
+qs_pin_var        | expr | #x.(x <= y & y <= x & a: s) => a: s
+qs_pin_sum        | expr | #x.(x <= y + 1 & y + 1 <= x & a: s) => a: s
+qs_pin_first      | expr | #x.#y.(x <= 0 & 0 <= x & y: s) => #y.(y: s)
+qs_pin_second     | expr | #x.#y.(y <= 0 & 0 <= y & x: s) => #x.(x: s)
+qs_pin_both       | expr | #x.#y.(x <= 0 & 0 <= x & y <= 1 & 1 <= y & a: s) => a: s
+qs_pin_only       | expr | #x.(x <= 0 & 0 <= x)
+qs_pin_lit_only   | expr | #x.(x <= 7 & 7 <= x)
+
+# X.f — arithmetic gaps: literal side-conditions (AR2/5/6/13), antisymmetry
+# (AR7/8 main-tree), strict order (AR11/12), slack weakening, coefficients
+ag_lit_relax      | expr | x <= -1 => x <= 0
+ag_lit_relax2     | expr | x <= -3 => x <= 2
+ag_lit_neg_pos    | expr | -2 <= x => -5 <= x
+ag_lit_left       | expr | 3 <= x => 1 <= x
+ag_lit_both       | expr | 2 <= x & x <= 2 => x = 2
+ag_antisym_var    | expr | x <= y & y <= x => x = y
+ag_antisym_use    | expr | x <= y & y <= x & f(x) = z => f(y) = z
+ag_antisym_mem    | expr | x <= y & y <= x & x: s => y: s
+ag_lit_chain      | expr | x <= 1 & 1 <= y & y <= 2 & 2 <= z => x <= z
+ag_strict_intro   | expr | x < y => x <= y
+ag_strict_chain4  | expr | x < y & y < z & z < w => x < w
+ag_strict_mixl    | expr | x < y & y <= z => x < z
+ag_strict_mixr    | expr | x <= y & y < z => x < z
+ag_strict_lit     | expr | x < 3 => x <= 2
+ag_lit_strict     | expr | x <= 2 => x < 3
+ag_succ_strict    | expr | x + 1 <= y => x < y
+ag_strict_succ    | expr | x < y => x + 1 <= y
+ag_dn_leq         | expr | not(not(x <= y)) => x <= y
+ag_neg_flip       | expr | not(x <= y) => y <= x
+ag_neg_flip_strict| expr | not(x <= y) => y < x
+ag_flip_neg       | expr | y < x => not(x <= y)
+ag_zero_pin       | expr | x <= 0 & -x <= 0 => x = 0
+ag_zero_sq        | expr | x <= 0 & 0 <= x & y <= x => y <= 0
+ag_sub_zero       | expr | x - x <= 0
+ag_sub_self_eq    | expr | x - x = 0
+ag_add_sub_id     | expr | x + y - y = x
+ag_sub_add_id     | expr | x - y + y = x
+ag_swap4          | expr | x + y + z + w <= v => w + z + y + x <= v
+ag_neg_swap       | expr | -(x + y) <= z => -(y + x) <= z
+ag_neg_distrib2   | expr | -(x - y) <= z => y - x <= z
+ag_coeff3         | expr | 3*x <= y => x + x + x <= y
+ag_coeff_back     | expr | x + x <= y => 2*x <= y
+ag_mixed_coeff    | expr | 2*x + 3*y <= z => y + x + y + x + y <= z
+ag_coeff_eq       | expr | 2*x = y => x + x = y
+ag_lit_sum_eq     | expr | x = 2 & y = 3 => x + y = 5
+ag_lit_shift_eq   | expr | x = 50 => x + 1 = 51
+ag_const_between  | expr | 1 <= x & x <= 1 => x = 1
+ag_two_var_pin    | expr | x <= y & y <= x & y <= z & z <= y => x = z
+ag_leq_total      | expr | x <= y or y <= x
+ag_lt_or_geq      | expr | x < y or y <= x
+
+# X.g — Farkas stress: multiplier at/above the search cap, more hyps,
+# bigger constants, two-variable cancellations
+fk_mult4          | expr | !x.(x <= 0 => x + x + x + x <= 0)
+fk_mult5          | expr | !x.(x <= 0 => x + x + x + x + x <= 0)
+fk_mult6          | expr | !x.(x <= 0 => x + x + x + x + x + x <= 0)
+fk_two_each       | expr | !x.!y.(x <= 0 & y <= 0 => x + y + y + x <= 0)
+fk_three_hyps     | expr | !x.!y.!z.(x <= 0 & y <= 0 & z <= 0 => x + y + z <= 0)
+fk_three_mixed    | expr | !x.!y.!z.(x <= 0 & y <= 0 & z <= 0 => z + x + y + x <= 0)
+fk_asym31         | expr | !x.!y.(x <= 0 & y <= 0 => x + x + x + y <= 0)
+fk_const_big      | expr | !x.(x <= 5 => x + x <= 12)
+fk_const_exact    | expr | !x.(x <= 5 => x + x <= 10)
+fk_const_three    | expr | !x.(x <= 2 => x + x + x <= 7)
+fk_neg_mix        | expr | !x.!y.(0 <= x & y + x <= 0 => y <= 0)
+fk_sandwich       | expr | !x.!y.(x <= y & y <= x & x <= 0 => y <= 0)
+fk_cancel_pair    | expr | !x.!y.(x + y <= 0 & x - y <= 0 => x <= 0)
+fk_global_flat    | expr | x <= 0 & y <= x + 1 => y <= 1
+fk_flat_three     | expr | x <= y & y <= z & z <= 0 => x <= 0
+fk_shifted        | expr | !x.(x <= 1 => x + x <= 2)
+fk_lower_bound    | expr | !x.(0 <= x => 0 <= x + x + x + x)
+fk_two_var_slack  | expr | !x.!y.(x <= 2 & y <= 3 => x + y <= 5)
+fk_two_var_loose  | expr | !x.!y.(x <= 2 & y <= 3 => x + y <= 9)
+fk_neg_const      | expr | !x.(x <= -1 => x + x <= -2)
+fk_neg_loose      | expr | !x.(x <= -1 => x + x <= 0)
+fk_opp_cancel     | expr | !x.!y.(x + y <= 0 & 0 <= y => x <= 0)
+
+# X.h — literal scale: the 64-atom unfold cap, decimal big literals,
+# folded constants inside Farkas/INS sums
+ln_fold_sum       | expr | x <= 30 & y <= 34 => x + y <= 64
+ln_fold_sum65     | expr | x <= 30 & y <= 35 => x + y <= 65
+ln_fold_sum80     | expr | x <= 40 & y <= 40 => x + y <= 80
+ln_cap_below      | expr | x <= 63 => x <= 64
+ln_cap_at         | expr | x <= 64 => x <= 65
+ln_cap_above      | expr | x <= 65 => x <= 66
+ln_cap_wide       | expr | x <= 60 => x <= 70
+ln_big_dec        | expr | x <= 1000 => x <= 1000
+ln_big_relax      | expr | x <= 100 => x <= 200
+ln_big_pair       | expr | x <= 500 & 500 <= x => x = 500
+ln_lit_const_64   | expr | 60 <= 64
+ln_lit_const_100  | expr | 90 <= 100
+ln_mid_const      | expr | x + 10 <= y & y <= 20 => x <= 10
+ln_sub_consts     | expr | x <= 20 - 5 => x <= 15
+ln_add_consts     | expr | x <= 7 + 8 => x <= 15
+ln_spread         | expr | x <= 12 & 12 <= y => x <= y
+
+# X.i — scale stress: long implication/equality chains, wide conjunctions
+# and disjunctions, deep nesting, 4/5-binder blocks (tuple sizes the corpus
+# never reaches; the reorders drop binders at middle slots)
+sc_imp_chain8     | prop | a1 & (a1 => a2) & (a2 => a3) & (a3 => a4) & (a4 => a5) & (a5 => a6) & (a6 => a7) & (a7 => a8) => a8
+sc_imp_syll8      | prop | (a1 => a2) & (a2 => a3) & (a3 => a4) & (a4 => a5) & (a5 => a6) & (a6 => a7) & (a7 => a8) => (a1 => a8)
+sc_conj8_mid      | prop | a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 => a5
+sc_conj10_ends    | prop | a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9 & a10 => a1 & a10
+sc_disj6_intro    | prop | a4 => a1 or a2 or a3 or a4 or a5 or a6
+sc_disj6_cases    | prop | (a1 => c) & (a2 => c) & (a3 => c) & (a4 => c) & (a5 => c) & (a6 => c) => (a1 or a2 or a3 or a4 or a5 or a6 => c)
+sc_demorgan5      | prop | not(a1 & a2 & a3 & a4 & a5) <=> not(a1) or not(a2) or not(a3) or not(a4) or not(a5)
+sc_demorgan_or5   | prop | not(a1 or a2 or a3 or a4 or a5) <=> not(a1) & not(a2) & not(a3) & not(a4) & not(a5)
+sc_deep_paren4    | prop | p => (((p => q) => q) => q) => q
+sc_nest_eqv3      | prop | ((a <=> b) <=> c) & a & b => c
+sc_distrib_big    | prop | a & (b or c or d) <=> (a & b) or (a & c) or (a & d)
+sc_curry4         | prop | (a & b & c & d => e) <=> (a => b => c => d => e)
+sc_b4_swap        | expr | !w.!x.!y.!z.(w: a => x: b => y: c => z: d) => !z.!y.!x.!w.(w: a => x: b => y: c => z: d)
+sc_b4_rotate      | expr | !w.!x.!y.!z.(w: a => x: b => y: c => z: d) => !x.!y.!z.!w.(w: a => x: b => y: c => z: d)
+sc_b4_mid_drop    | expr | !w.!x.!y.!z.(w: a => z: d) => !z.!w.(w: a => z: d)
+sc_b5_swap_outer  | expr | !v.!w.!x.!y.!z.(v: a => z: e) => !z.!v.(v: a => z: e)
+sc_b4_inst        | expr | !w.!x.!y.!z.(w: a => x: b => y: c => z: d) & e1: a & e2: b & e3: c & e4: d => e4: d
+sc_x4_wits        | expr | e1: a & e2: b & e3: c & e4: d => #w.#x.#y.#z.(w: a & x: b & y: c & z: d)
+sc_x5_wits        | expr | e1: a & e2: b & e3: c & e4: d & e5: q => #v.#w.#x.#y.#z.(v: a & w: b & x: c & y: d & z: q)
+sc_inter4_mid     | expr | x: s1 /\ s2 /\ s3 /\ s4 => x: s3
+sc_union5_intro   | expr | x: s1 => x: s1 \/ s2 \/ s3 \/ s4 \/ s5
+sc_union5_last    | expr | x: s5 => x: s1 \/ s2 \/ s3 \/ s4 \/ s5
+sc_fn_stack3      | expr | f(g(h(x))) = y => y = f(g(h(x)))
+sc_fn_stack4      | expr | f(g(h(k(x)))) = y & y = z => f(g(h(k(x)))) = z
+sc_mem_chain6     | expr | x: m1 & m1 <: m2 & m2 <: m3 & m3 <: m4 & m4 <: m5 & m5 <: m6 => x: m6
+sc_two_quant_deep | expr | !x.(x: s => !y.(y: t => x: u)) & a: s & b: t => a: u
+sc_mixed_three    | expr | !x.(x: s => f(x): t) & !y.(y: t => g(y): u) & a: s => g(f(a)): u
+sc_eqv_chain6     | prop | (a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) & (e <=> f) => (a <=> f)
+sc_or_assoc4      | prop | ((a or b) or c) or d <=> a or (b or (c or d))
+sc_and_perm5      | prop | a & b & c & d & e => e & c & a & d & b
+sc_imp_perm       | prop | (a => b => c => d) => (c => a => b => d)
+sc_neg_tower4     | prop | not(not(not(not(a)))) => a
+sc_neg_tower5     | prop | not(not(not(not(not(a))))) => not(a)
+sc_big_mp_tree    | prop | (a & b => c) & (c & d => e) & a & b & d => e
+sc_wide_target    | prop | a & b & c & d & e & f => (a & f) & (c & d)
+sc_xst_four_eq    | expr | #w.#x.#y.#z.(w = x & y = z)
+sc_all_eq_wide    | expr | !x.!y.(x = y => y = x)
+sc_all4_const     | expr | !w.!x.!y.!z.(a: s) => a: s
+sc_quant_or_fix   | expr | !x.(x: s or x: t) & not(b: s) => b: t
+sc_inter_assoc    | expr | x: (s1 /\ s2) /\ s3 => x: s1 /\ (s2 /\ s3)
+sc_union_assoc    | expr | x: (s1 \/ s2) \/ s3 => x: s1 \/ (s2 \/ s3)
+sc_dist_inter     | expr | x: s /\ (t1 \/ t2) => x: (s /\ t1) \/ (s /\ t2)
+sc_dist_union     | expr | x: (s /\ t1) \/ (s /\ t2) => x: s /\ (t1 \/ t2)
+
+# X.j — substitution-pin slot probing: pins at the third binder and beyond,
+# multiple pins in one block, dependent and constant witnesses mixed
+pin_third         | expr | #x.#y.#z.(z = x)
+pin_mid3          | expr | #x.#y.#z.(y = x)
+pin_first3        | expr | #x.#y.#z.(x = z)
+pin_third_app     | expr | f(a) = b => #x.#y.#z.(z = f(x))
+pin_two_pins      | expr | a: s => #x.#y.(x = a & y = a)
+pin_cross         | expr | a: s => #x.#y.(x = y & y = a)
+pin_chain_dep     | expr | a: s => #x.#y.(x = a & y = x)
+pin_const_lit     | expr | #x.(x = 5)
+pin_const_two     | expr | #x.#y.(x = 1 & y = 2)
+pin_rev_const     | expr | #x.(5 = x)
+pin_rev_two       | expr | #x.#y.(1 = x & 2 = y)
+pin_rev_dep       | expr | #x.#y.(a = x & x = y)
+pin_app_const     | expr | #x.(x = f(a))
+pin_rev_app       | expr | #x.(f(a) = x)
+pin_mixed_mem     | expr | a: s => #x.#y.(x: s & y = x)
+pin_under_all     | expr | !z.(z: s => #x.(x = z))
+pin_two_blocks    | expr | #x.(x = a) & #y.(y = b) => #x.#y.(x = a & y = b)
+pin_eq_pair_deep  | expr | #w.#x.#y.#z.(w = x & x = y & y = z)
+
+# X.k — mixed-domain crosses: arithmetic × sets × functions × quantifiers
+mx_arith_mem      | expr | !x.(x: s => x <= 9) & a: s & 9 <= y => a <= y
+mx_eq_arith       | expr | x = y & y <= z => x <= z
+mx_arith_eq       | expr | x <= y & y = z => x <= z
+mx_fn_arith       | expr | f(a) = x & x <= 3 => f(a) <= 3
+mx_set_arith      | expr | !x.(x: s => 0 <= x) & !x.(x: t => x: s) & a: t => 0 <= a
+mx_two_levels     | expr | !x.(x: s => f(x): t) & !y.(y: t => y: u) & a: s => f(a): u
+mx_card_bound     | expr | card(s) = n & n <= 3 => card(s) <= 3
+mx_card_eq        | expr | card(s) = card(t) & card(t) = m => card(s) = m
+mx_dom_mem        | expr | a: dom(f) & dom(f) <: s => a: s
+mx_maplet_sub     | expr | x, y: r & r <: q => x, y: q
+mx_fn_bound       | expr | !x.(x: s => f(x) <= 7) & a: s => f(a) <= 7
+mx_fn_bound_tr    | expr | !x.(x: s => f(x) <= 7) & a: s & 7 <= z => f(a) <= z
+mx_quant_fn_eq    | expr | !x.(x: s => f(x) = g(x)) & a: s & g(a) = w => f(a) = w
+mx_set_eq_arith   | expr | s = t & !x.(x: t => x <= 5) & a: s => a <= 5
+mx_exists_bound   | expr | #x.(x: s & x <= 3) & !y.(y: s => 0 <= y) => #x.(x: s & x <= 3 & 0 <= x)
+mx_interval_mem   | expr | !x.(x: s => 1 <= x & x <= 9) & a: s => 1 <= a
+mx_neg_mem_arith  | expr | !x.(x <= 0 => not(x: s)) & a: s => not(a <= 0)
+mx_fn_chain_leq   | expr | f(a) <= g(b) & g(b) <= h(c) => f(a) <= h(c)
+mx_pair_arith     | expr | x, y: r & x <= 0 & 0 <= x => x = 0
+mx_set_pin        | expr | #x.(x: s & x = a) => a: s
+mx_wit_transport  | expr | a = b & a: s => #x.(x: s & x = b)
+mx_two_wit_arith  | expr | a <= 0 & 0 <= b => #x.#y.(x <= 0 & 0 <= y)
+mx_all_pairs      | expr | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t => a, b: r
+mx_fn_set_eq      | expr | s = t & f(a): s => f(a): t
+mx_card_arith     | expr | card(s) <= 5 & 5 <= card(t) => card(s) <= card(t)
+mx_three_dom      | expr | !x.(x: s => x: t) & a: s & f(a) = b & a <= c => a: t & f(a) = b & a <= c
+mx_eq_chain_mem   | expr | a = b & b = c & c: s => a: s
+mx_leq_eq_mix4    | expr | w <= x & x = y & y <= z => w <= z
+mx_two_funs       | expr | f(a) = g(b) & g(b) = c => f(a) = c
+mx_quant_pair     | expr | !x.(x: s => x, f(x): r) & a: s => a, f(a): r
+mx_guard_or       | expr | !x.(x: s => x: t or x: u) & a: s & not(a: t) => a: u
+mx_double_guard   | expr | !x.(x: s & x: t => x: u) & a: s & a: t => a: u
+mx_wide_ante      | expr | !x.(x: s1 & x: s2 & x: s3 => x: s4) & a: s1 & a: s2 & a: s3 => a: s4
+mx_arith_wit_eq   | expr | a <= b & b <= a => #x.(x = a & x = b)
+
+# X.l — reversed-equality goal shapes (OPR2 / NRM21/23 right-orientation)
+rv_app_wit        | expr | c = f(a) => #x.(c = f(x))
+rv_two_wits       | expr | c = f(a) & d = g(b) => #x.#y.(c = f(x) & d = g(y))
+rv_mem            | expr | b = a & a: s => b: s
+rv_const_first    | expr | 5 = x => x = 5
+rv_app_chain      | expr | w = f(x) & f(x) = z => w = z
+rv_double_rev     | expr | b = a & c = b => a = c
+rv_rev_subst      | expr | y = x => f(x) = f(y)
+rv_rev_leq        | expr | y = x & x <= z => y <= z
+rv_xst_rev_eq     | expr | #x.(a = x)
+rv_all_rev        | expr | !x.(x = a => f(x) = f(a))
+rv_rev_in_conj    | expr | a: s & b = a => b: s
+rv_rev_neg        | expr | b = a & not(b: s) => not(a: s)
+
+# X.m — existential width & structure: multi-witness blocks, swaps,
+# projections, nesting (XST family breadth)
+xw_four           | expr | e1: a & e2: b & e3: c & e4: d => #w.#x.#y.#z.(w: a & x: b & y: c & z: d)
+xw_wit_mix        | expr | a: s & f(a) = b => #x.(x: s & f(x) = b)
+xw_two_same       | expr | a: s => #x.#y.(x: s & y: s)
+xw_eq3            | expr | #x.#y.#z.(x = y & y = z)
+xw_swap           | expr | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t)
+xw_proj_l         | expr | #x.#y.(x: s & y: t) => #x.(x: s)
+xw_proj_r         | expr | #x.#y.(x: s & y: t) => #y.(y: t)
+xw_or_wit_l       | expr | a: s => #x.(x: s or x: t)
+xw_or_wit_r       | expr | a: t => #x.(x: s or x: t)
+xw_nested_dep     | expr | a: s & b: t => #x.(x: s & #y.(y: t))
+xw_deep_pair      | expr | a: s & b: t => #x.(#y.(x: s & y: t))
+xw_from_all       | expr | !x.(x: s => x: t) & a: s => #y.(y: t)
+xw_two_from_one   | expr | a: s & a: t => #x.(x: s & x: t)
+xw_leq_wit        | expr | a <= 0 => #x.(x <= 0)
+xw_arith_pair     | expr | a <= b => #x.#y.(x <= y)
+xw_app_two        | expr | f(a) = b & g(b) = c => #x.#y.(f(x) = y & g(y) = c)
+xw_triple_chain   | expr | a: s & f(a): t & g(f(a)): u => #x.(x: s & f(x): t & g(f(x)): u)
+xw_wit_const      | expr | 0 <= 1 => #x.#y.(x <= y)
+xw_set_wit        | expr | a: s /\ t => #x.(x: s & x: t)
+xw_union_wit      | expr | a: s => #x.(x: s \/ t)
+xw_card_wit       | expr | card(s) = n => #x.(card(s) = x)
+xw_pair_wit       | expr | a, b: r => #x.(a, x: r)
+xw_pair_wit2      | expr | a, b: r => #x.#y.(x, y: r)
+xw_dom_wit        | expr | a: dom(f) => #x.(x: dom(f))
+xw_neg_wit        | expr | not(a: s) => #x.(not(x: s))
+xw_eq_neq_pair    | expr | not(a = b) => #x.#y.(not(x = y))
+
+# X.n — relations / maplets breadth (pair-membership shapes)
+rl_pair_refl      | expr | x, y: r => x, y: r
+rl_pair_two       | expr | x, y: r & y, z: q => x, y: r & y, z: q
+rl_pair_eq_l      | expr | x = a & x, y: r => a, y: r
+rl_pair_eq_r      | expr | y = b & x, y: r => x, b: r
+rl_pair_eq_both   | expr | x = a & y = b & x, y: r => a, b: r
+rl_pair_sub_chain | expr | x, y: r & r <: q & q <: p1 => x, y: p1
+rl_pair_or        | expr | x, y: r or x, y: q => x, y: r or x, y: q
+rl_dom_two        | expr | a: dom(f) & b: dom(f) => b: dom(f) & a: dom(f)
+rl_ran_mem        | expr | y: ran(f) & ran(f) <: t => y: t
+rl_app_pair       | expr | x: dom(f) & f(x) = y => f(x) = y & x: dom(f)
+rl_pair_swap_mem  | expr | x, y: r & y, x: r => y, x: r
+rl_pair_all       | expr | !x.!y.(x, y: r => y, x: q) & a, b: r => b, a: q
+rl_pair_exists    | expr | a, b: r => #x.#y.(x, y: r)
+rl_pair_deep      | expr | x, f(x): r & f(x) = y => x, y: r
+
+# ════════════════════════════════════════════════════════════════════════
+# Y. Reliable-family breadth (second wave): systematic variants in families
+#    with zero historical drop rate — propositional shapes, equality
+#    congruence, set membership, function congruence, linear arithmetic.
+#    Volume here both regression-protects the emitter's hot paths and
+#    pushes the suite past 1000 checked proofs.
+# ════════════════════════════════════════════════════════════════════════
+
+v2_imp_swap2      | prop | (a => b => c) <=> (b => a => c)
+v2_imp_weaken     | prop | b => (a => b)
+v2_imp_dup        | prop | (a => a => b) => (a => b)
+v2_imp_exp        | prop | (a & b => c) => (a => b => c)
+v2_imp_join       | prop | (a => b) & (a => c) => (a => b & c)
+v2_imp_split      | prop | (a => b & c) => (a => b) & (a => c)
+v2_imp_or_intro   | prop | (a => b) => (a => b or c)
+v2_imp_const      | prop | b => (a => b) & (not(a) => b)
+v2_or_idem3       | prop | a or a or a <=> a
+v2_and_idem3      | prop | a & a & a <=> a
+v2_or_absorb2     | prop | (a or b) & a <=> a
+v2_and_absorb2    | prop | (a & b) or a <=> a
+v2_neg_or_l       | prop | not(a) & (a or b) => b
+v2_neg_or_r       | prop | not(b) & (a or b) => a
+v2_dneg_eqv       | prop | not(not(a)) <=> a
+v2_contra_neg     | prop | (a => not(a)) => not(a)
+v2_consequentia   | prop | (not(a) => a) => a
+v2_or_imp_l       | prop | (a or b => c) => (a => c)
+v2_or_imp_r       | prop | (a or b => c) => (b => c)
+v2_and_imp_use    | prop | (a => c) => (a & b => c)
+v2_resolution     | prop | (a or b) & (not(a) or c) => b or c
+v2_cut_rule       | prop | (a => b) & (b => c) & a => c
+v2_dilemma        | prop | (a => c) & (b => d) & (a or b) => c or d
+v2_neg_dilemma    | prop | (a => b) & (a => not(b)) => not(a)
+v2_eqv_neg_l      | prop | (not(a) <=> b) => (a <=> not(b))
+v2_eqv_subst_or   | prop | (a <=> b) => (a or c <=> b or c)
+v2_eqv_subst_imp  | prop | (a <=> b) => ((a => c) <=> (b => c))
+v2_eqv_swap_args  | prop | (a <=> b) & (c <=> d) => ((a => c) <=> (b => d))
+v2_iff_or_and     | prop | (a <=> b) => ((a or b) <=> (a & b))
+v2_xor_shape      | prop | (a or b) & not(a & b) & a => not(b)
+v2_three_cases    | prop | (a or b or c) & (a => d) & (b => d) & (c => d) => d
+v2_nested_or_and  | prop | ((a & b) or (a & c)) => a
+v2_factor_left    | prop | (a & b) or (a & c) <=> a & (b or c)
+v2_factor_or      | prop | (a or b) & (a or c) <=> a or (b & c)
+v2_imp_chain_skip | prop | (a => b) & (b => c) & (c => d) & a => c
+v2_mp_under_and   | prop | a & b & (b => c) => a & c
+v2_mt_chain       | prop | (a => b) & (b => c) & not(c) => not(a)
+v2_neg_imp_l      | prop | not(a => b) => a
+v2_neg_imp_r      | prop | not(a => b) => not(b)
+v2_imp_total      | prop | (a => b) or (b => a)
+v2_peirce_neg     | prop | ((a => not(a)) => a) => a
+v2_weak_peirce    | prop | ((a => b) => a) & (a => b) => b
+v2_eq_app3        | expr | x = y => f(f(f(x))) = f(f(f(y)))
+v2_eq_app4        | expr | x = y => f(f(f(f(x)))) = f(f(f(f(y))))
+v2_eq_mixed_args  | expr | x = y & z = w => g(x, z) = g(y, w)
+v2_eq_const_arg   | expr | x = y => g(x, c) = g(y, c)
+v2_eq_three_app   | expr | x = y & y = z => g(x, z) = g(y, y)
+v2_eq_sym_chain   | expr | b = a & b = c & d = c => a = d
+v2_eq_app_left    | expr | f(x) = c & x = y => f(y) = c
+v2_eq_two_chains  | expr | a = b & b = c & w = v & v = u => a = c & w = u
+v2_eq_cross       | expr | a = b & f(b) = g(a) => f(a) = g(b)
+v2_eq_app_swap    | expr | g(x, y) = c & x = y => g(y, x) = c
+v2_mem_pair_neq   | expr | x: {a, b} & not(x = b) => x = a
+v2_mem_triple_mid | expr | x: {a, b, c} & not(x = a) & not(x = c) => x = b
+v2_mem_singleton  | expr | x: {a} => x = a
+v2_singleton_in   | expr | x = a => x: {a}
+v2_enum_subset    | expr | x: {a, b} => x: {a, b, c}
+v2_inter_comm     | expr | x: s /\ t => x: t /\ s
+v2_union_comm     | expr | x: s \/ t => x: t \/ s
+v2_inter_lower_l  | expr | x: s /\ t => x: s
+v2_inter_lower_r  | expr | x: s /\ t => x: t
+v2_union_glue     | expr | x: s or x: t => x: s \/ t
+v2_union_split    | expr | x: s \/ t => x: s or x: t
+v2_inter_glue     | expr | x: s & x: t => x: s /\ t
+v2_mem_union_mid  | expr | x: t => x: s \/ t \/ u
+v2_diff_shape     | expr | x: s & not(x: t) => x: s & not(x: t)
+v2_subset_inter   | expr | s <: t & x: s /\ u => x: t
+v2_subset_two     | expr | s <: t & t <: u & x: s => x: u
+v2_subset_mem_eq  | expr | s <: t & x: s & x = y => y: t
+v2_leq_chain5     | expr | v <= w & w <= x & x <= y & y <= z => v <= z
+v2_leq_chain6     | expr | u <= v & v <= w & w <= x & x <= y & y <= z => u <= z
+v2_leq_plus_l     | expr | x <= y => z + x <= z + y
+v2_leq_plus_r     | expr | x <= y => x + z <= y + z
+v2_leq_both_add   | expr | x <= y & w <= z => x + w <= y + z
+v2_leq_neg_flip   | expr | x <= y => -y <= -x
+v2_leq_sub_intro  | expr | x <= y => x - y <= 0
+v2_leq_sub_elim   | expr | x - y <= 0 => x <= y
+v2_zero_le_sq     | expr | x <= 0 => x + x <= x
+v2_leq_zero_mix   | expr | x <= 0 & y <= 0 => x + y <= x
+v2_lit_ladder     | expr | x <= 1 => x <= 2
+v2_lit_ladder2    | expr | x <= 2 => x <= 4
+v2_lit_off_one    | expr | x + 1 <= y => x <= y
+v2_lit_off_two    | expr | x + 2 <= y => x <= y
+v2_neg_lit        | expr | x <= -1 => x + 1 <= 0
+v2_sub_shift      | expr | x - 1 <= y => x <= y + 1
+v2_add_shift      | expr | x + 1 <= y => x <= y - 1
+v2_two_sided_lit  | expr | 0 <= x & x <= 2 => 0 <= x + x & x + x <= 4
+v2_abs_pattern    | expr | x <= y & -x <= y => x + x <= y + y
+v2_arith_eq_l     | expr | x = y + 1 => y <= x
+v2_arith_eq_r     | expr | x = y - 1 => x <= y
+v2_eq_to_leq      | expr | x = y => x <= y & y <= x
+v2_half_antisym   | expr | x <= y & not(x = y) => x < y
+v2_strict_neq     | expr | x < y => not(x = y)
+v2_strict_asym    | expr | x < y => not(y < x)
+
+# Y.2 — more breadth in zero-drop families (prop matrices, OPR rewrite
+# chains, AXM hyp-search shapes, INS-driving universal+witness combos)
+v3_k_axiom        | prop | a => (b => a)
+v3_s_axiom        | prop | (a => b => c) => (a => b) => (a => c)
+v3_b_axiom        | prop | (b => c) => (a => b) => (a => c)
+v3_c_axiom        | prop | (a => b => c) => (b => a => c)
+v3_w_axiom        | prop | (a => a => b) => (a => b)
+v3_imp_or3        | prop | a => a or b or c
+v3_or3_mid        | prop | b => a or b or c
+v3_and3_swap      | prop | a & b & c => c & b & a
+v3_and4_rot       | prop | a & b & c & d => b & c & d & a
+v3_or4_rot        | prop | a or b or c or d => b or c or d or a
+v3_demorgan_mix   | prop | not(a & not(b)) => (a => b)
+v3_demorgan_back  | prop | (a => b) => not(a & not(b))
+v3_nand_shape     | prop | not(a & b) & a => not(b)
+v3_nor_shape      | prop | not(a or b) => not(a)
+v3_nor_shape_r    | prop | not(a or b) => not(b)
+v3_imp_neg_mix    | prop | (not(a) => b) & not(b) => a
+v3_or_to_imp2     | prop | a or b => (not(b) => a)
+v3_chain_branch   | prop | (a => b) & (a => c) & (b & c => d) & a => d
+v3_double_mp      | prop | a & b & (a => c) & (b => d) => c & d
+v3_triple_mp      | prop | a & (a => b) & (b => c) & (c => d) & (d => e) => e
+v3_eqv_refl       | prop | a <=> a
+v3_eqv_true_unit  | prop | a => (a <=> (a or a))
+v3_eqv_and_self   | prop | a <=> a & a
+v3_eqv_or_self    | prop | a <=> a or a
+v3_eqv_chain_neg  | prop | (a <=> b) & (b <=> c) => (not(a) <=> not(c))
+v3_imp_eqv_mix    | prop | (a <=> b) & (b => c) & a => c
+v3_eqv_both_neg   | prop | (not(a) <=> not(b)) => (a <=> b)
+v3_opr_two        | expr | x = a & y = b & x: s & y: t => x: s & y: t
+v3_opr_chain3     | expr | x = a & a: s => x: s
+v3_opr_rev_use    | expr | a = x & a: s => x: s
+v3_opr_double     | expr | x = a & y = x & y: s => a: s
+v3_opr_app        | expr | x = f(a) & x: s => f(a): s
+v3_opr_leq        | expr | x = a & x <= y => a <= y
+v3_opr_leq_rhs    | expr | y = b & x <= y => x <= b
+v3_opr_both_sides | expr | x = a & y = b & x <= y => a <= b
+v3_axm_deep_hyp   | expr | a: s & b: t & c: u & d: v => c: u
+v3_axm_neg_hyp    | expr | not(a: s) & b: t => not(a: s)
+v3_axm_mixed      | expr | a: s & not(b: t) & c = d => not(b: t) & c = d
+v3_ins_classic    | expr | !x.(x: s => x: t) & a: s & not(a: t) => bfalse
+v3_ins_two_step   | expr | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & not(a: u) => bfalse
+v3_ins_neg_univ   | expr | !x.(not(x: s)) & a: s => bfalse
+v3_ins_arith      | expr | !x.(x: s => x <= 0) & a: s & not(a <= 0) => bfalse
+v3_ins_eq_univ    | expr | !x.(x: s => x = c) & a: s & not(a = c) => bfalse
+v3_ins_pair       | expr | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t & not(a, b: r) => bfalse
+v3_two_inst       | expr | !x.(x: s => x: t) & a: s & b: s => a: t & b: t
+v3_three_inst     | expr | !x.(x: s => x: t) & a: s & b: s & c: s => a: t & b: t & c: t
+v3_inst_app       | expr | !x.(x: s => f(x): t) & a: s & b: s => f(a): t & f(b): t
+v3_inst_arith2    | expr | !x.(x: s => 0 <= x) & a: s & b: s => 0 <= a & 0 <= b
+v3_mixed_inst     | expr | !x.(x: s => x: t) & !y.(y: u => y: v) & a: s & b: u => a: t & b: v
+v3_eq_set_chain   | expr | s = t & t = u & x: s => x: u
+v3_eq_set_rev     | expr | t = s & x: s => x: t
+v3_eq_fn_sets     | expr | s = t & f(a): s & f(b): t => f(a): t & f(b): s
+v3_subset_refl_use| expr | s <: s & x: s => x: s
+v3_subset_inter_r | expr | s <: t & x: u /\ s => x: t
+v3_union_to_super | expr | s <: u & t <: u & x: s \/ t => x: u
+v3_inter_to_sub   | expr | x: s /\ t & s /\ t <: u => x: u
+v3_pow_mem        | expr | s: POW(t) & s: POW(t) => s: POW(t)
+v3_card_two       | expr | card(s) = 2 & card(t) = card(s) => card(t) = 2
+v3_leq_zero_chain | expr | x <= 0 & y <= x & z <= y => z <= 0
+v3_leq_interleave | expr | a <= b & c <= d & b <= c => a <= d
+v3_leq_diamond    | expr | x <= y & x <= z & y <= w & z <= w => x <= w
+v3_plus_comm_use  | expr | x + y <= z => y + x <= z
+v3_plus_assoc_use | expr | (x + y) + z <= w => x + (y + z) <= w
+v3_plus_rot3      | expr | x + y + z <= w => z + x + y <= w
+v3_minus_chain    | expr | x - y <= z & z <= w => x - y <= w
+v3_neg_neg_use    | expr | -(-x) <= y => x <= y
+v3_neg_through    | expr | -x <= y => -y <= x
+v3_zero_plus      | expr | 0 + x <= y => x <= y
+v3_plus_zero_r    | expr | x + 0 <= y => x <= y
+v3_lit_two_three  | expr | x <= 2 => x <= 3
+v3_lit_jump       | expr | x <= 5 => x <= 9
+v3_lit_neg_chain  | expr | x <= -2 => x <= -1
+v3_succ_chain2    | expr | x + 1 <= y & y + 1 <= z => x + 2 <= z
+v3_succ_collapse  | expr | x + 1 <= y & y <= x + 1 => y = x + 1
+v3_between_unique | expr | x <= y & y <= x + 1 & not(y = x) => y = x + 1
+v3_three_bounds   | expr | x <= 3 & y <= 2 & z <= 1 => x + y + z <= 6
+v3_bound_shift    | expr | x + y <= 5 & 0 <= y => x <= 5
+v3_two_lower      | expr | 0 <= x & 0 <= y => 0 <= x + y
+v3_lower_chain    | expr | 0 <= x & x <= y => 0 <= y
+v3_squeeze_three  | expr | x <= y & y <= z & z <= x => x = z
+v3_eq_by_squeeze  | expr | x <= y & y <= z & z <= x => y = z
+v3_xst_lit        | expr | #x.(x <= 0)
+v3_xst_lit_pair   | expr | #x.#y.(x <= y)
+v3_xst_refl_eq    | expr | #x.(x = x & x <= x)
+v3_all_total_self | expr | !x.(x <= x & x = x)
+v3_fn_eq_chain4   | expr | f(a) = b & g(b) = c & h(c) = d => h(g(f(a))) = d
+v3_fn_two_args_eq | expr | g(a, b) = c & a = x & b = y => g(x, y) = c
+v3_fn_nested_mix  | expr | f(g(a)) = b & g(a) = c => f(c) = b
+v3_fn_apply_all   | expr | !x.(f(x) = g(x)) => f(a) = g(a)
+v3_fn_apply_two   | expr | !x.(f(x) = g(x)) => f(a) = g(a) & f(b) = g(b)
+v3_pair_in_two    | expr | x, y: r /\ q => x, y: r
+v3_pair_union     | expr | x, y: r => x, y: r \/ q
+v3_dom_subset     | expr | dom(f) <: s & a: dom(f) => a: s
+v3_ran_subset     | expr | ran(f) <: t & y: ran(f) => y: t
+v3_three_sets_eq  | expr | s = t & u = v & x: s & y: u => x: t & y: v
+v3_pin_wit_use    | expr | #x.(x = a & x: s) => a: s
+v3_pin_wit_rev    | expr | #x.(a = x & x: s) => a: s
+v3_pin_wit_leq    | expr | #x.(x = a & x <= y) => a <= y
+v3_pin_app_use    | expr | #x.(x = f(a) & x: s) => f(a): s
+v3_xst_two_pins   | expr | #x.#y.(x = a & y = b & x: s & y: t) => a: s & b: t
+v3_neg_xst_inst   | expr | not(#x.(x: s & x: t)) & a: s => not(a: t)
+v3_neg_all_wit    | expr | not(!x.(x: s)) & (not(#x.(not(x: s))) => bfalse) => not(!x.(x: s))
+v3_or_quant_mix   | expr | !x.(x: s => x: t) or !x.(x: s => x: u) => !x.(x: s => x: t or x: u)
+v3_and_quant_mix  | expr | !x.(x: s => x: t) & !x.(x: u => x: v) & a: s & a: u => a: t & a: v
+v3_quant_neg_body | expr | !x.(x: s => not(x: t)) & a: t => not(a: s)
+v3_quant_contrapos| expr | !x.(x: s => x: t) & not(a: t) => not(a: s)
+v3_imp5_shape     | expr | a: s & (a: s => b: t) & (b: t => c: u) => c: u
+v3_deep_or_inst   | expr | !x.(x: s => x: t or x: u) & a: s & not(a: u) => a: t
+v3_wide_or_inst   | expr | !x.(x: s => x: t1 or x: t2 or x: t3) & a: s & not(a: t1) & not(a: t2) => a: t3
+v3_exists_or_inst | expr | #x.(x: s & (x: t or x: u)) => #x.(x: s & x: t) or #x.(x: s & x: u)
+v3_all8_depth2    | expr | !x.(x: s => !y.(y: t => x, y: r)) & a: s & b: t => a, b: r
+v3_two_layer_wit  | expr | a: s & b: t => #x.(x: s & #y.(y: t & x: s))
+v3_eqv_expr       | expr | (x: s <=> x: t) & x: s => x: t
+v3_eqv_expr_neg   | expr | (x: s <=> x: t) & not(x: t) => not(x: s)
+v3_eqv_arith      | expr | (x <= y <=> y <= x) & x <= y => y <= x
+v3_eq_under_all   | expr | !x.(x: s => x = c) & a: s & b: s => a = b

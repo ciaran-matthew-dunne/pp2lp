@@ -1,0 +1,1 @@
+Flag(FileOn("v2_leq_chain6.res")) & Set(Valid.1 | Rule(Implication | (u <= v & v <= w & w <= x & x <= y & y <= z => u <= z) & _delta_e(u) & _delta_e(v) & _delta_e(w) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | u <= v & v <= w & w <= x & x <= y & y <= z => u <= z | nn))

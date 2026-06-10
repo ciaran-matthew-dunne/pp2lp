@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_leq_disagree.res")) & Set(Valid.1 | Rule(Implication | (x <= z & not(y <= z) => not(x = y)) & _delta_e(x) & _delta_e(z) & _delta_e(y) | ? | ? | x <= z & not(y <= z) => not(x = y) | nn))

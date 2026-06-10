@@ -1,0 +1,1 @@
+Flag(FileOn("sc_two_quant_deep.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => !y.(y: t => x: u)) & a: s & b: t => a: u) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => !y.(y: t => x: u)) & a: s & b: t => a: u | nn))

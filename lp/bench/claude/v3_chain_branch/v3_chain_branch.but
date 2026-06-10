@@ -1,0 +1,1 @@
+Flag(FileOn("v3_chain_branch.res")) & Set(Valid.1 | Rule(Implication | ((a => b) & (a => c) & (b & c => d) & a => d) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | (a => b) & (a => c) & (b & c => d) & a => d | nn))

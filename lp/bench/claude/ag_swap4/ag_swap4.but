@@ -1,0 +1,1 @@
+Flag(FileOn("ag_swap4.res")) & Set(Valid.1 | Rule(Implication | (x + y + z + w <= v => w + z + y + x <= v) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) & _delta_e(v) | ? | ? | x + y + z + w <= v => w + z + y + x <= v | nn))

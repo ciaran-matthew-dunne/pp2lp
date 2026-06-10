@@ -1,0 +1,1 @@
+Flag(FileOn("v2_leq_zero_mix.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & y <= 0 => x + y <= x) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 0 & y <= 0 => x + y <= x | nn))

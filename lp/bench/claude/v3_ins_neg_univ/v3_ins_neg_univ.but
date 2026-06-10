@@ -1,0 +1,1 @@
+Flag(FileOn("v3_ins_neg_univ.res")) & Set(Valid.1 | Rule(Implication | (!x.(not(x: s)) & a: s => bfalse) & _delta_e(s) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(not(x: s)) & a: s => bfalse | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_eq_under_all.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x = c) & a: s & b: s => a = b) & _delta_e(s) & _delta_e(c) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => x = c) & a: s & b: s => a = b | nn))

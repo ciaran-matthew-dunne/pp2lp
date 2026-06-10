@@ -1,0 +1,1 @@
+Flag(FileOn("mx_set_eq_arith.res")) & Set(Valid.1 | Rule(Implication | (s = t & !x.(x: t => x <= 5) & a: s => a <= 5) & _delta_e(s) & _delta_e(t) & _delta_e(a) | ? | ? | s = t & !x.(x: t => x <= 5) & a: s => a <= 5 | nn))

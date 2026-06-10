@@ -1,0 +1,1 @@
+Flag(FileOn("mx_two_wit_arith.res")) & Set(Valid.1 | Rule(Implication | (a <= 0 & 0 <= b => #x.#y.(x <= 0 & 0 <= y)) & _delta_e(a) & _delta_e(b) | ? | ? | a <= 0 & 0 <= b => #x.#y.(x <= 0 & 0 <= y) | nn))

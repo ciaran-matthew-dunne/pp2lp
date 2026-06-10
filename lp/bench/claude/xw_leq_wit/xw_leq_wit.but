@@ -1,0 +1,1 @@
+Flag(FileOn("xw_leq_wit.res")) & Set(Valid.1 | Rule(Implication | (a <= 0 => #x.(x <= 0)) & _delta_e(a) | ? | ? | a <= 0 => #x.(x <= 0) | nn))

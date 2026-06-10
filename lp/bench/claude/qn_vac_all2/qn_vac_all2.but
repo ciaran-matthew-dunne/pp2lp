@@ -1,0 +1,1 @@
+Flag(FileOn("qn_vac_all2.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(a: s) => a: s) & _delta_e(a) & _delta_e(s) | ? | ? | !x.!y.(a: s) => a: s | nn))

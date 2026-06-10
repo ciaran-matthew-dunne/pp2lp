@@ -1,0 +1,1 @@
+Flag(FileOn("qn_two_blocks.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & #y.(y: s) => #y.(y: t)) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => x: t) & #y.(y: s) => #y.(y: t) | nn))

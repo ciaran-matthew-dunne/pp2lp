@@ -1,0 +1,1 @@
+Flag(FileOn("tf_em_and.res")) & Set(Valid.1 | Rule(Implication | (q => q & (p or not(p))) & _delta_p(q) & _delta_p(p) | ? | ? | q => q & (p or not(p)) | nn))

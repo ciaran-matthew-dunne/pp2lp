@@ -1,0 +1,1 @@
+Flag(FileOn("v3_or3_mid.res")) & Set(Valid.1 | Rule(Implication | (b => a or b or c) & _delta_p(b) & _delta_p(a) & _delta_p(c) | ? | ? | b => a or b or c | nn))

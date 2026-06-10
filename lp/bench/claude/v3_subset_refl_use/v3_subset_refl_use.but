@@ -1,0 +1,1 @@
+Flag(FileOn("v3_subset_refl_use.res")) & Set(Valid.1 | Rule(Implication | (s <: s & x: s => x: s) & _delta_e(s) & _delta_e(x) | ? | ? | s <: s & x: s => x: s | nn))

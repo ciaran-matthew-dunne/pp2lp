@@ -1,0 +1,1 @@
+Flag(FileOn("mx_arith_mem.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x <= 9) & a: s & 9 <= y => a <= y) & _delta_e(s) & _delta_e(a) & _delta_e(y) | ? | ? | !x.(x: s => x <= 9) & a: s & 9 <= y => a <= y | nn))

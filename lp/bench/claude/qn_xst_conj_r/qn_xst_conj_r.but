@@ -1,0 +1,1 @@
+Flag(FileOn("qn_xst_conj_r.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s & x: t) => #x.(x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s & x: t) => #x.(x: t) | nn))

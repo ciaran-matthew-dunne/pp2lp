@@ -1,0 +1,1 @@
+Flag(FileOn("v3_pin_app_use.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = f(a) & x: s) => f(a): s) & _delta_e(f) & _delta_e(a) & _delta_e(s) | ? | ? | #x.(x = f(a) & x: s) => f(a): s | nn))

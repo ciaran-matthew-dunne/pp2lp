@@ -1,0 +1,1 @@
+Flag(FileOn("v3_union_to_super.res")) & Set(Valid.1 | Rule(Implication | (s <: u & t <: u & x: s \/ t => x: u) & _delta_e(s) & _delta_e(u) & _delta_e(t) & _delta_e(x) | ? | ? | s <: u & t <: u & x: s \/ t => x: u | nn))

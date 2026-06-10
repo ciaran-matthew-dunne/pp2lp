@@ -1,0 +1,1 @@
+Flag(FileOn("v2_strict_asym.res")) & Set(Valid.1 | Rule(Implication | (x < y => not(y < x)) & _delta_e(x) & _delta_e(y) | ? | ? | x < y => not(y < x) | nn))

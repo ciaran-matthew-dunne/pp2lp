@@ -1,0 +1,1 @@
+Flag(FileOn("v2_subset_mem_eq.res")) & Set(Valid.1 | Rule(Implication | (s <: t & x: s & x = y => y: t) & _delta_e(s) & _delta_e(t) & _delta_e(x) & _delta_e(y) | ? | ? | s <: t & x: s & x = y => y: t | nn))

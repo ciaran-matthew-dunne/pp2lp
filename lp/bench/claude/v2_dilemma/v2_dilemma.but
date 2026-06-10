@@ -1,0 +1,1 @@
+Flag(FileOn("v2_dilemma.res")) & Set(Valid.1 | Rule(Implication | ((a => c) & (b => d) & (a or b) => c or d) & _delta_p(a) & _delta_p(c) & _delta_p(b) & _delta_p(d) | ? | ? | (a => c) & (b => d) & (a or b) => c or d | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("ag_leq_total.res")) & Set(Valid.1 | Rule(Implication | (x <= y or y <= x) & _delta_e(x) & _delta_e(y) | ? | ? | x <= y or y <= x | nn))

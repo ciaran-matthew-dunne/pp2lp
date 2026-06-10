@@ -1,0 +1,1 @@
+Flag(FileOn("rv_rev_in_conj.res")) & Set(Valid.1 | Rule(Implication | (a: s & b = a => b: s) & _delta_e(a) & _delta_e(s) & _delta_e(b) | ? | ? | a: s & b = a => b: s | nn))

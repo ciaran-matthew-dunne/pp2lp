@@ -1,0 +1,1 @@
+Flag(FileOn("mx_card_arith.res")) & Set(Valid.1 | Rule(Implication | (card(s) <= 5 & 5 <= card(t) => card(s) <= card(t)) & _delta_e(s) & _delta_e(t) | ? | ? | card(s) <= 5 & 5 <= card(t) => card(s) <= card(t) | nn))

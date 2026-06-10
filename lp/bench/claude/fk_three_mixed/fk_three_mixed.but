@@ -1,0 +1,1 @@
+Flag(FileOn("fk_three_mixed.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.(x <= 0 & y <= 0 & z <= 0 => z + x + y + x <= 0)) | ? | ? | !x.!y.!z.(x <= 0 & y <= 0 & z <= 0 => z + x + y + x <= 0) | nn))

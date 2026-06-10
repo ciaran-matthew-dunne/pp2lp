@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_neg_refl_hyp.res")) & Set(Valid.1 | Rule(Implication | (not(x = x) => a: s) & _delta_e(x) & _delta_e(a) & _delta_e(s) | ? | ? | not(x = x) => a: s | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_two_inst.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & a: s & b: s => a: t & b: t) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => x: t) & a: s & b: s => a: t & b: t | nn))

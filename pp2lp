@@ -110,7 +110,11 @@ _ERROR_RULES = [
     (re.compile(r"unknown rule"),               "E_UNKNOWN_RULE"),
     (re.compile(r"unsupported arity"),          "E_ARITY"),
     (re.compile(r"arity \d+ unsupported"),      "E_DISPATCH"),
-    (re.compile(r"no sequent continuation|REPLAY truncated"), "E_REPLAY_TRUNCATED"),
+    # `impossible case in rpl*` is REPLAY itself giving up mid-file (its error
+    # text lands verbatim in the .replay) — same upstream-loss family as the
+    # dropped ALL7/XST8 continuations, so classify it for the gen-time drop.
+    (re.compile(r"no sequent continuation|REPLAY truncated|impossible case in rpl"),
+     "E_REPLAY_TRUNCATED"),
     (re.compile(r"INS contradiction"),          "E_INS"),
     (re.compile(r"tree-build error|unconsumed|expected a .*child"), "E_TREE_BUILD"),
     (re.compile(r"parse error|replay-line parse|unrecognised line"), "E_PARSE"),

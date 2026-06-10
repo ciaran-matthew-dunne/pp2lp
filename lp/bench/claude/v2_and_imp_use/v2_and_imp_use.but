@@ -1,0 +1,1 @@
+Flag(FileOn("v2_and_imp_use.res")) & Set(Valid.1 | Rule(Implication | ((a => c) => (a & b => c)) & _delta_p(a) & _delta_p(c) & _delta_p(b) | ? | ? | (a => c) => (a & b => c) | nn))

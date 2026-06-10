@@ -1,0 +1,1 @@
+Flag(FileOn("v2_neg_lit.res")) & Set(Valid.1 | Rule(Implication | (x <= -1 => x + 1 <= 0) & _delta_e(x) | ? | ? | x <= -1 => x + 1 <= 0 | nn))

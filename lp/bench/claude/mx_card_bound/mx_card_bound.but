@@ -1,0 +1,1 @@
+Flag(FileOn("mx_card_bound.res")) & Set(Valid.1 | Rule(Implication | (card(s) = n & n <= 3 => card(s) <= 3) & _delta_e(s) & _delta_e(n) | ? | ? | card(s) = n & n <= 3 => card(s) <= 3 | nn))

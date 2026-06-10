@@ -1,0 +1,1 @@
+Flag(FileOn("qn_xst_leq_self.res")) & Set(Valid.1 | Rule(Implication | (#x.(x <= x)) | ? | ? | #x.(x <= x) | nn))

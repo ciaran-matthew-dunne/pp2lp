@@ -1,0 +1,1 @@
+Flag(FileOn("v2_consequentia.res")) & Set(Valid.1 | Rule(Implication | ((not(a) => a) => a) & _delta_p(a) | ? | ? | (not(a) => a) => a | nn))

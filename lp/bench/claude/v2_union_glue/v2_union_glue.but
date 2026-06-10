@@ -1,0 +1,1 @@
+Flag(FileOn("v2_union_glue.res")) & Set(Valid.1 | Rule(Implication | (x: s or x: t => x: s \/ t) & _delta_e(x) & _delta_e(s) & _delta_e(t) | ? | ? | x: s or x: t => x: s \/ t | nn))

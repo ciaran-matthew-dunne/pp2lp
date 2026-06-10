@@ -1,0 +1,1 @@
+Flag(FileOn("ag_lit_sum_eq.res")) & Set(Valid.1 | Rule(Implication | (x = 2 & y = 3 => x + y = 5) & _delta_e(x) & _delta_e(y) | ? | ? | x = 2 & y = 3 => x + y = 5 | nn))

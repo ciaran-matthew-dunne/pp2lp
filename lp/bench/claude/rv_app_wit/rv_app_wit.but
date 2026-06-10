@@ -1,0 +1,1 @@
+Flag(FileOn("rv_app_wit.res")) & Set(Valid.1 | Rule(Implication | (c = f(a) => #x.(c = f(x))) & _delta_e(c) & _delta_e(f) & _delta_e(a) | ? | ? | c = f(a) => #x.(c = f(x)) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_eqv_or_self.res")) & Set(Valid.1 | Rule(Implication | (a <=> a or a) & _delta_p(a) | ? | ? | a <=> a or a | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("rv_two_wits.res")) & Set(Valid.1 | Rule(Implication | (c = f(a) & d = g(b) => #x.#y.(c = f(x) & d = g(y))) & _delta_e(c) & _delta_e(f) & _delta_e(a) & _delta_e(d) & _delta_e(g) & _delta_e(b) | ? | ? | c = f(a) & d = g(b) => #x.#y.(c = f(x) & d = g(y)) | nn))

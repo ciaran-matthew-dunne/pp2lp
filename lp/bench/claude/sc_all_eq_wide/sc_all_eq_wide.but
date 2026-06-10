@@ -1,0 +1,1 @@
+Flag(FileOn("sc_all_eq_wide.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x = y => y = x)) | ? | ? | !x.!y.(x = y => y = x) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("pin_const_lit.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = 5)) | ? | ? | #x.(x = 5) | nn))

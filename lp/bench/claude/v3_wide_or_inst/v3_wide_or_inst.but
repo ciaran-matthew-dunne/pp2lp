@@ -1,0 +1,1 @@
+Flag(FileOn("v3_wide_or_inst.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t1 or x: t2 or x: t3) & a: s & not(a: t1) & not(a: t2) => a: t3) & _delta_e(s) & _delta_e(t1) & _delta_e(t2) & _delta_e(t3) & _delta_e(a) | ? | ? | !x.(x: s => x: t1 or x: t2 or x: t3) & a: s & not(a: t1) & not(a: t2) => a: t3 | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("tf_absurd_chain.res")) & Set(Valid.1 | Rule(Implication | (p & not(p) & q => r) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | p & not(p) & q => r | nn))

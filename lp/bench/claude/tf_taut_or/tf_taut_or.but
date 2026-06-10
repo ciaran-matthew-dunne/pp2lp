@@ -1,0 +1,1 @@
+Flag(FileOn("tf_taut_or.res")) & Set(Valid.1 | Rule(Implication | ((p => p) or q) & _delta_p(p) & _delta_p(q) | ? | ? | (p => p) or q | nn))

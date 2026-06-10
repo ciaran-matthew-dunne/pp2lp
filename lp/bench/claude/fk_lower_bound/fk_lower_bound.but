@@ -1,0 +1,1 @@
+Flag(FileOn("fk_lower_bound.res")) & Set(Valid.1 | Rule(Implication | (!x.(0 <= x => 0 <= x + x + x + x)) | ? | ? | !x.(0 <= x => 0 <= x + x + x + x) | nn))

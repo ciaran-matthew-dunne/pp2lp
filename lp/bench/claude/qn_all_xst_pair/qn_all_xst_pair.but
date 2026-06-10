@@ -1,0 +1,1 @@
+Flag(FileOn("qn_all_xst_pair.res")) & Set(Valid.1 | Rule(Implication | (!x.(#y.(y = x))) | ? | ? | !x.(#y.(y = x)) | nn))

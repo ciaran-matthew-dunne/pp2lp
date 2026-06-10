@@ -1,0 +1,1 @@
+Flag(FileOn("sc_demorgan5.res")) & Set(Valid.1 | Rule(Implication | (not(a1 & a2 & a3 & a4 & a5) <=> not(a1) or not(a2) or not(a3) or not(a4) or not(a5)) & _delta_p(a1) & _delta_p(a2) & _delta_p(a3) & _delta_p(a4) & _delta_p(a5) | ? | ? | not(a1 & a2 & a3 & a4 & a5) <=> not(a1) or not(a2) or not(a3) or not(a4) or not(a5) | nn))

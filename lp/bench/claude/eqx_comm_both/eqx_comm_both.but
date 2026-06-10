@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_comm_both.res")) & Set(Valid.1 | Rule(Implication | (y = x & w = z => x = y & z = w) & _delta_e(y) & _delta_e(x) & _delta_e(w) & _delta_e(z) | ? | ? | y = x & w = z => x = y & z = w | nn))

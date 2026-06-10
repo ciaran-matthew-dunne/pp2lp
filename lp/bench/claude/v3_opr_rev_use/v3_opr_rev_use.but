@@ -1,0 +1,1 @@
+Flag(FileOn("v3_opr_rev_use.res")) & Set(Valid.1 | Rule(Implication | (a = x & a: s => x: s) & _delta_e(a) & _delta_e(x) & _delta_e(s) | ? | ? | a = x & a: s => x: s | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("v3_lit_jump.res")) & Set(Valid.1 | Rule(Implication | (x <= 5 => x <= 9) & _delta_e(x) | ? | ? | x <= 5 => x <= 9 | nn))

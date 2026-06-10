@@ -1,0 +1,1 @@
+Flag(FileOn("v2_mem_singleton.res")) & Set(Valid.1 | Rule(Implication | (x: {a} => x = a) & _delta_e(x) & _delta_e(a) | ? | ? | x: {a} => x = a | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("eqx_app_neq.res")) & Set(Valid.1 | Rule(Implication | (not(f(x) = f(y)) => not(x = y)) & _delta_e(f) & _delta_e(x) & _delta_e(y) | ? | ? | not(f(x) = f(y)) => not(x = y) | nn))

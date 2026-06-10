@@ -1,0 +1,1 @@
+Flag(FileOn("ln_mid_const.res")) & Set(Valid.1 | Rule(Implication | (x + 10 <= y & y <= 20 => x <= 10) & _delta_e(x) & _delta_e(y) | ? | ? | x + 10 <= y & y <= 20 => x <= 10 | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("rl_pair_refl.res")) & Set(Valid.1 | Rule(Implication | (x, y: r => x, y: r) & _delta_e(x) & _delta_e(y) & _delta_e(r) | ? | ? | x, y: r => x, y: r | nn))

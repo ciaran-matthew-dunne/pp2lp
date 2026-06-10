@@ -1,0 +1,1 @@
+Flag(FileOn("xw_two_from_one.res")) & Set(Valid.1 | Rule(Implication | (a: s & a: t => #x.(x: s & x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s & a: t => #x.(x: s & x: t) | nn))

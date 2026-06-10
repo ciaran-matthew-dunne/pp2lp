@@ -1,0 +1,1 @@
+Flag(FileOn("v2_mem_pair_neq.res")) & Set(Valid.1 | Rule(Implication | (x: {a, b} & not(x = b) => x = a) & _delta_e(x) & _delta_e(a) & _delta_e(b) | ? | ? | x: {a, b} & not(x = b) => x = a | nn))

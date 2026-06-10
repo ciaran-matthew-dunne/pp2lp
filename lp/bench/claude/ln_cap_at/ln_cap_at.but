@@ -1,0 +1,1 @@
+Flag(FileOn("ln_cap_at.res")) & Set(Valid.1 | Rule(Implication | (x <= 64 => x <= 65) & _delta_e(x) | ? | ? | x <= 64 => x <= 65 | nn))

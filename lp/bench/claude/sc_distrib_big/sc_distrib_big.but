@@ -1,0 +1,1 @@
+Flag(FileOn("sc_distrib_big.res")) & Set(Valid.1 | Rule(Implication | (a & (b or c or d) <=> (a & b) or (a & c) or (a & d)) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | a & (b or c or d) <=> (a & b) or (a & c) or (a & d) | nn))
