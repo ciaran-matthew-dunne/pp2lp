@@ -326,8 +326,31 @@ and default ctx rule arg anno children =
     in
     (match hbound_and_val with
      | Some (hb, value) ->
+       (* The solver fact `(a + c) = 𝟎` is a cancellation (a = `rhs_e`, the
+          antisymmetry RHS; c = —a) — [prove_sum_zero], no trust.  For AR7 c is
+          the explicit value `—rhs_e`; for AR8 c is *goal-inferred* (the left
+          summand of the goal antecedent `c + b`, b = lhs_e), so read it from
+          there or the distributed form won't unify with `—rhs_e`.  Trust only
+          if the shape is off. *)
+       let acc_eq =
+         let env = proj_env_of_ctx ctx in
+         match goal_of_anno (P.anno_of c) with
+         | Some (Binary (Imp, Eq (lhs_e, rhs_e), _)) ->
+           let ac =
+             if is_ar7 then Some (AOp (Add, rhs_e, Neg rhs_e))
+             else
+               (match goal_of_anno anno with
+                | Some (Binary (Imp, Leq (AOp (Add, c_e, b_e), Nat 0), _))
+                  when b_e = lhs_e -> Some (AOp (Add, rhs_e, c_e))
+                | _ -> None)
+           in
+           (match ac with
+            | Some ac -> Option.value ~default:L.Trust (prove_sum_zero env ac)
+            | None -> L.Trust)
+         | _ -> L.Trust
+       in
        let tactic =
-         L.Refine (L.Name (base rule), [value; hb; L.Trust; L.Hole]) in
+         L.Refine (L.Name (base rule), [value; hb; acc_eq; L.Hole]) in
        L.Then (tactic, tree ctx c)
      | None ->
        L.Then (tactic_for_rule ctx rule arg anno children, tree ctx c))
