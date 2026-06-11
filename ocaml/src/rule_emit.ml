@@ -484,14 +484,39 @@ let tactic_for_rule ctx rule arg anno children =
     L.Refine (L.Name rule, [L.Trust; L.Hole])
   | Rule_db.Ar4 ->
     (* AR4 [E R] (F) : π (F ≤ 𝟎) → π ((E + F) > 𝟎) → π ((E ≤ 𝟎) ⇒ R).  A leaf
-       deriving ⊥ from a hyp `F ≤ 𝟎` and the solver fact `(E + F) > 𝟎`.  F is
-       not in the replay; recover it as the LHS of an in-scope `? ≤ 𝟎` hyp,
-       then trust the (E+F)>0 conjunct (the documented AR solver gap). *)
-    (match find_leq_zero_hyp ctx with
-     | Some (f, h) -> L.Refine (L.Name rule, [exp_term ctx f; L.Name h; L.Trust])
+       deriving ⊥ from a hyp `F ≤ 𝟎` and `(E + F) > 𝟎`.  AR4 follows AR3's
+       `𝟏 − a` normalisation, so E = `𝟏 − F` for the cancelling hyp F and
+       `E + F = 𝟏`; then `(E+F) > 𝟎 = ¬((E+F) ≤ 𝟎)` is `one_not_leq_zero`
+       transported along the generated `(E+F) = 𝟏` — no trust.  Pick the F≤𝟎 hyp
+       that cancels; fall back to the first F≤𝟎 hyp + trust if none does. *)
+    let env = proj_env_of_ctx ctx in
+    let e_opt = match goal_of_anno anno with
+      | Some (Binary (Imp, Leq (e, Nat 0), _)) -> Some e | _ -> None in
+    let generated =
+      match e_opt with
+      | Some e ->
+        List.find_map (fun (name, p) -> match p with
+          | Leq (f, Nat 0) ->
+            Option.map (fun eqpf ->
+              let h_gt =
+                L.App (L.Name "=\xe2\x87\x92",          (* =⇒ *)
+                  [ L.App (L.Name "eq_sym",
+                      [ L.App (L.Name "not_cong",
+                          [ L.App (L.Name "leq_zero_eq", [eqpf]) ]) ]);
+                    L.Name "one_not_leq_zero" ]) in
+              L.Refine (L.Name rule, [exp_term ctx f; L.Name name; h_gt]))
+              (prove_sum_eq env (AOp (Add, e, f)) (Nat 1))
+          | _ -> None) ctx.hyps
+      | None -> None
+    in
+    (match generated with
+     | Some t -> t
      | None ->
-       failwith "translate: AR4 needs an in-scope `F ≤ 𝟎` hypothesis, none found \
-                 (the solver's F is not recorded in the replay)")
+       match find_leq_zero_hyp ctx with
+       | Some (f, h) -> L.Refine (L.Name rule, [exp_term ctx f; L.Name h; L.Trust])
+       | None ->
+         failwith "translate: AR4 needs an in-scope `F ≤ 𝟎` hypothesis, none found \
+                   (the solver's F is not recorded in the replay)")
   | Rule_db.Ar7_8 ->
     (* AR7/AR8 need the solver's witness (the `a` in `a + c = 𝟎`), which PP
        does not record in the replay (see doc Known-broken).  Fail explicitly
