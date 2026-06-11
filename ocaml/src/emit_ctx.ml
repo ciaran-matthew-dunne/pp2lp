@@ -408,6 +408,47 @@ let witness_candidates (x_name, x_pp_vars) =
     whole :: components
 
 
+(* First-order match: find a substitution σ over [vars] (the only flexible
+   symbols) with `pat[σ] = tgt`.  Used to read an AXM9 witness straight off the
+   goal's antecedent when it is a *constant* (`0 ϵ s` matched against the hyp
+   body `u ϵ s` gives `u ↦ 0`), which the `ctx.xs` variable search can't do. *)
+let match_pattern vars pat_prd tgt_prd : (string * exp) list option =
+  let acc = ref [] and ok = ref true in
+  let bind v e =
+    match List.assoc_opt v !acc with
+    | Some e' -> if e' <> e then ok := false
+    | None -> acc := (v, e) :: !acc
+  in
+  let rec me pat tgt =
+    if !ok then match pat, tgt with
+    | Var v, _ when List.mem v vars -> bind v tgt
+    | Var v, Var v' -> if v <> v' then ok := false
+    | Var _, _ -> ok := false
+    | Nat n, Nat n' -> if n <> n' then ok := false
+    | App (f, a), App (f', a') when f = f' && List.length a = List.length a' ->
+      List.iter2 me a a'
+    | AOp (o, a, b), AOp (o', a', b') when o = o' -> me a a'; me b b'
+    | Neg a, Neg a' -> me a a'
+    | SetImage (a, b), SetImage (a', b') -> me a a'; me b b'
+    | Inter (a, b), Inter (a', b') -> me a a'; me b b'
+    | Union (a, b), Union (a', b') -> me a a'; me b b'
+    | _ -> ok := false
+  in
+  let rec mp pat tgt =
+    if !ok then match pat, tgt with
+    | Lift e, Lift e' -> me e e'
+    | Unary (o, p), Unary (o', p') when o = o' -> mp p p'
+    | Binary (o, a, b), Binary (o', a', b') when o = o' -> mp a a'; mp b b'
+    | Bind (bd, vs, p), Bind (bd', vs', p') when bd = bd' && vs = vs' -> mp p p'
+    | Mem (es, e), Mem (es', e') when List.length es = List.length es' ->
+      List.iter2 me es es'; me e e'
+    | Eq (a, b), Eq (a', b') -> me a a'; me b b'
+    | Leq (a, b), Leq (a', b') -> me a a'; me b b'
+    | _ -> ok := false
+  in
+  mp pat_prd tgt_prd;
+  if !ok then Some (List.rev !acc) else None
+
 let find_axm9_match ctx goal =
   match antecedent_of goal with
   | None -> None
@@ -421,11 +462,38 @@ let find_axm9_match ctx goal =
         else None
       | _ -> None
     in
-    List.find_map (fun x ->
-      List.find_map (fun cand ->
-        List.find_map (try_candidate cand) ctx.hyps
-      ) (witness_candidates x)
-    ) ctx.xs
+    let from_xs =
+      List.find_map (fun x ->
+        List.find_map (fun cand ->
+          List.find_map (try_candidate cand) ctx.hyps
+        ) (witness_candidates x)
+      ) ctx.xs
+    in
+    match from_xs with
+    | Some _ as r -> r
+    | None ->
+      (* Derive the witness from the antecedent: the universal hyp body
+         `R u` matched against `p_v` binds each `u` to the witness component
+         (a constant, e.g. `0`/`7`, that no `ctx.xs` var supplies).  Build the
+         tuple `unit ⨾ σ(u₀) ⨾ … ⨾ σ(uₙ)`. *)
+      let env =
+        List.concat_map (fun (x, vs) ->
+          List.mapi (fun i v -> (v, (i, x))) vs) ctx.xs
+      in
+      List.find_map (fun (h_name, h_pred) ->
+        match axm9_hyp_shape h_pred with
+        | Some (h_vars, h_body) ->
+          (match match_pattern h_vars h_body p_v with
+           | Some sigma when List.length sigma = List.length h_vars ->
+             let witness =
+               List.fold_left (fun acc v ->
+                 L.App (L.Name "\xe2\xa8\xbe",
+                        [acc; L.Exp (env, List.assoc v sigma)]))
+                 (L.Name "unit") h_vars
+             in
+             Some (witness, h_name)
+           | _ -> None)
+        | None -> None) ctx.hyps
 
 let find_nrm19_match ctx goal =
   match goal with

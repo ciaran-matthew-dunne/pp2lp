@@ -1570,15 +1570,8 @@ z5_anti_zero_rev  | expr | !x.(0 <= x => x <= 0 => 0 = x)
 z5_anti_flip      | expr | !x.!y.(x <= y => y <= x => y = x)
 z5_anti_sub       | expr | !x.!y.(x - y <= 0 => y - x <= 0 => x = y)
 z5_anti_use       | expr | !x.!y.(x <= y => y <= x => x: s => y: s)
-# z5_anti_zero_use — DROPPED: the *constant*-membership consequent (`0: s`) forces an
-# existential witness, so PP routes through XST8/AXM9 and the proof hits the base-AXM9
-# existential-under-universal HO-unification frontier (Known broken) — a different
-# residual from the AR7_1/AR8_1 chain this block hunts.  (The bound-var consequent
-# `y: s` in z5_anti_use above stays first-order and passes.)
-# z5_anti_zero_use  | expr | !x.(x <= 0 => 0 <= x => x: s => 0: s)
+z5_anti_zero_use  | expr | !x.(x <= 0 => 0 <= x => x: s => 0: s)
 z5_anti_zero_useb | bexpr | !x.(x <= 0 => 0 <= x => x: s => 0: s)
 z5_anti_three     | expr | !x.!y.!z.(x <= y => y <= x => x = y or z = z)
 z5_anti_neg       | expr | !x.(-x <= 0 => 0 <= -x => x = 0)
-# z5_anti_lit_use — DROPPED: same base-AXM9 / XST8 existential frontier as
-# z5_anti_zero_use (constant `7: s` consequent forces the existential witness).
-# z5_anti_lit_use   | expr | !x.(x <= 7 => 7 <= x => x: s => 7: s)
+z5_anti_lit_use   | expr | !x.(x <= 7 => 7 <= x => x: s => 7: s)
