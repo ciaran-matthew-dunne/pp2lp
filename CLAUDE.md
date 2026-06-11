@@ -254,19 +254,23 @@ folded with a `(×N)` count so they never bury the real error.
 
 - **`lp/B.lp:17` — `symbol trust : π P`.** Intentional; the only declared
   `axiom`/`admit` in `lp/`.
-- **Where trust remains (2026-06-11).** Corpus trust is down from 5628 → 12
-  tokens (372 → 12 proofs).  Every `_1` rule that fires is trust-free, AXM9/AXM9_1
-  included (the ALL7/XST8 frontier was closed — witness derived from the
-  antecedent).  The trust still present is:
-  - **Emitted at use sites: only `AXM3_1` (12 tokens, the z5_anti/qar
-    antisymmetry chain).** The hyp it needs (`−x+y ≤ 𝟎`, the second `≤` bound)
-    is introduced by a *chain-local* `IMP4_1`, which the Res-term encoding does
-    not expose as a λ-bound LP hypothesis — the genuine chain-encoding frontier
-    (the AR7_1/AR8_1 item).  Everything else is generated: BOOL membership via
-    injected `V ϵ BOOL` typing premises (`Bool_split`); AR9/AR10 are `eq_refl`
-    (identity `solveur`); AR4's `(E+F)>𝟎` from `prove_gt_zero`; AR5/6 from the
-    in-scope bound; AR7/AR8's `(a+c)=𝟎` from `prove_sum_zero`.  Never a
-    whole-goal `refine trust;`.
+- **Where trust remains (2026-06-11).** **The corpus is trust-free — 0 tokens
+  in any emitted proof** (down from 5628 in 372 proofs).  Everything is
+  generated: BOOL membership via injected `V ϵ BOOL` typing premises
+  (`Bool_split`); AR9/AR10 are `eq_refl` (identity `solveur`); AR2's `a > b` /
+  AR4's `(E+F)>𝟎` from `prove_gt_zero` (+ `sub_leq_eq`); AR5/6 from the in-scope
+  bound; AR7/AR8's `(a+c)=𝟎` from `prove_sum_zero`; AXM9 from a derived witness;
+  and the AXM3 chain-antisymmetry frontier closed by `IMP4_1U` (below).  Never a
+  whole-goal `refine trust;`.
+  - **AXM3 chain antisymmetry (the old frontier), closed.** Per §8.8, IMP4 is
+    one of the two rules that *change the hypotheses* (IMP4' mounts P into H);
+    AXM3 reads it back.  pp2lp's chain `IMP4_1` consumed its child as a closed
+    term, never binding P, so a chain-local `AXM3_1` had no `π P`.  `IMP4_1U
+    [P Q R] (f : π P → π (Q = R))` (Impl.lp) binds it — R is inferred since
+    `res_ts` reduces through `mk_0`/`concat` independent of the hyp — and the
+    emitter packages `IMP4_1U (λ hp, res_eq child)`, pushing the antecedent into
+    `ctx.hyps` so the AXM's existing `leaf_evidence` finds it.  No new `Res`
+    type; uses `imp_cong_r_under` (Res.lp).
   - **Static rule lemmas: only the 10 binder-reshape `_1`** —
     `ALL1–5_1`/`ALL3R_1`, `XST1–4_1`.  They need a `!!`/`??`-currying tuple
     isomorphism (`Tuple (+1 n) ≅ Tuple n × Tuple 1`); none fire, so this is
