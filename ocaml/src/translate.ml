@@ -512,14 +512,34 @@ and chain_term ctx node : L.term =
     when Rule_db.emit rule = Rule_db.Ar10 ->
     (* AR10_1 [P Q R] (heq : P = Q) (r : Res (Q ⇒ R)) : Res (P ⇒ R).
        Q is the solver result and can't be inferred from P ⇒ R alone, so
-       supply it explicitly (env-carried) with `trust` for the equality.
+       supply it explicitly (env-carried).  PP's `solveur(P) = Q` is the
+       identity (P ≡ Q), so the equality is `eq_refl Q`, not `trust`.
        Mirrors the main-tree AR10 dispatch. *)
     let q_term = match arg with
       | Some (Pred q) -> pred_term ctx q
       | _ -> L.Hole
     in
+    let heq = match arg with
+      | Some (Pred _) -> L.App (L.Name "eq_refl", [q_term])
+      | _ -> L.Trust
+    in
     L.App (L.Expl (L.Name rule),
-      [L.Hole; q_term; L.Hole; L.Trust; chain_term ctx c])
+      [L.Hole; q_term; L.Hole; heq; chain_term ctx c])
+  | P.Apply { rule; arg; children = [c]; _ }
+    when Rule_db.emit rule = Rule_db.Ar9 ->
+    (* AR9_1 (F) (he : E = F) (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R).
+       PP's `solveur(E) = F` is the identity (E ≡ F), so `he` is `eq_refl F`,
+       not `trust`.  Mirrors the main-tree AR9 dispatch. *)
+    (match dynamic_value_args ctx rule arg with
+     | [f] ->
+       app (chain_emit_name rule)
+         [f; L.App (L.Name "eq_refl", [f]); chain_term ctx c]
+     | _ ->
+       app (chain_emit_name rule)
+         (plug rule
+            (dynamic_value_args ctx rule arg
+             @ metadata_extra_args rule @ slot_hole_args rule)
+            [chain_term ctx c]))
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar3 ->
     (* AR3 in a Res chain.  PP's solver records the sub-premise `𝟏 - a` in a

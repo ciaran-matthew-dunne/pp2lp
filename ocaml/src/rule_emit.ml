@@ -293,14 +293,16 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Axm8 when children = [] -> tactic_for_axm8 ctx rule anno
   | Rule_db.Witness_hyp -> tactic_for_witness_hyp ctx rule anno
   | Rule_db.Ar10 ->
-    (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).
-       Supply Q explicitly so Lambdapi can type the `trust` equality.
-       Q may mention enclosing-binder vars, so carry the tuple-projection
-       env rather than the raw PP names. *)
+    (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).  PP's `solveur(P) = Q`
+       is the identity on every corpus occurrence (P ≡ Q — the antecedent equals
+       its own normal form), so the equality is `eq_refl Q`, not `trust`.  Q is
+       supplied explicitly (it can't be inferred from `P ⇒ R`) and carries the
+       tuple-projection env so enclosing-binder vars render as `prj k v`. *)
     (match arg with
      | Some (Pred q) ->
+       let qt = pred_term ctx q in
        L.Refine (L.Expl (L.Name "AR10"),
-         [L.Hole; pred_term ctx q; L.Hole; L.Trust; L.Hole])
+         [L.Hole; qt; L.Hole; L.App (L.Name "eq_refl", [qt]); L.Hole])
      | _ -> L.Refine (L.Name rule, [L.Trust; L.Hole]))
   | Rule_db.Nrm20 | Rule_db.Nrm21 ->
     (* NRM20 pins a binder by an `x = E` conjunct, NRM21 by `E = x`.  PP may
@@ -476,8 +478,16 @@ let tactic_for_rule ctx rule arg anno children =
        rather than emit an ill-typed `refine`. *)
     failwith "translate: AR7/AR8 unsupported — the solver witness (a in a + c = 𝟎) \
               is not recorded in the replay"
+  | Rule_db.Ar9 ->
+    (* AR9 (F) : π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R).  Like AR10,
+       PP's `solveur(E) = F` is the identity (E ≡ F on every corpus occurrence),
+       so the equality is `eq_refl F`, not `trust`.  The Seq slot (the
+       continuation) is the remaining hole. *)
+    (match dynamic_value_args ctx rule arg with
+     | [f] -> L.Refine (L.Name "AR9", [f; L.App (L.Name "eq_refl", [f]); L.Hole])
+     | _ -> L.Refine (L.Name rule, default_rule_args ctx rule arg))
   | Rule_db.Hyp_search | Rule_db.Axm8 | Rule_db.Ectr  (* children <> [] — leaf rules, so unreached *)
-  | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar9
+  | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f
   | Rule_db.Nrm2730   (* expands to tree structure in [Translate.default] *)
   | Rule_db.Eqs2      (* handled in [Translate.tree_dispatch] (needs child access) *)
   | Rule_db.Egalite   (* handled in [Translate.tree_dispatch] (needs child access) *)

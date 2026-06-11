@@ -284,7 +284,7 @@ symbol AR9_1 [E : τ ι] (F : τ ι) [R : Prop]
 
 symbol AR10_1 [P Q R : Prop]
   (heq : π (P = Q)) (r : Res (Q ⇒ R)) : Res (P ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l heq) (res_eq r));
 
 symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P) ≔ mk_0 trust;
 
