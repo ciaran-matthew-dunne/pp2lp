@@ -1,0 +1,1 @@
+Flag(FileOn("z5_anti_free.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= y => y <= x => x = y)) & _delta_e(y) | ? | ? | !x.(x <= y => y <= x => x = y) | nn))

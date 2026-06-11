@@ -1,0 +1,1 @@
+Flag(FileOn("z5_anti_lit.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 3 => 3 <= x => x = 3)) | ? | ? | !x.(x <= 3 => 3 <= x => x = 3) | nn))

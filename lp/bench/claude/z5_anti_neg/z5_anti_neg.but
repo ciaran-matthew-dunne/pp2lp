@@ -1,0 +1,1 @@
+Flag(FileOn("z5_anti_neg.res")) & Set(Valid.1 | Rule(Implication | (!x.(-x <= 0 => 0 <= -x => x = 0)) | ? | ? | !x.(-x <= 0 => 0 <= -x => x = 0) | nn))

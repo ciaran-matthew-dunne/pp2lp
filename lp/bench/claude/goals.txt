@@ -1558,3 +1558,20 @@ z4_nrm16_empty    | bexpr | not(#x.(not(x = x)))
 z4_nrm18_neg_xst  | bexpr | !x.(x: s) => not(#y.(not(y: s)))
 z4_nrm18_inst     | bexpr | !x.(0 <= x) => not(#y.(not(0 <= y)))
 z4_nrm2730_xst    | bexpr | (#x.(x <= 0 & 0 <= x & x: s)) => #y.(y: s)
+
+# Z.f — chain-side antisymmetry hunt: AR7_1/AR8_1 (the last emit-side
+# residual — no producible trace so far) and the NRM27/28/30 zero-pin
+# specialisations of NRM29.  Variants of qar_antisym (the one shape whose
+# chain REPLAY survives).
+z5_anti_free      | expr | !x.(x <= y => y <= x => x = y)
+z5_anti_lit       | expr | !x.(x <= 3 => 3 <= x => x = 3)
+z5_anti_zero      | expr | !x.(x <= 0 => 0 <= x => x = 0)
+z5_anti_zero_rev  | expr | !x.(0 <= x => x <= 0 => 0 = x)
+z5_anti_flip      | expr | !x.!y.(x <= y => y <= x => y = x)
+z5_anti_sub       | expr | !x.!y.(x - y <= 0 => y - x <= 0 => x = y)
+z5_anti_use       | expr | !x.!y.(x <= y => y <= x => x: s => y: s)
+z5_anti_zero_use  | expr | !x.(x <= 0 => 0 <= x => x: s => 0: s)
+z5_anti_zero_useb | bexpr | !x.(x <= 0 => 0 <= x => x: s => 0: s)
+z5_anti_three     | expr | !x.!y.!z.(x <= y => y <= x => x = y or z = z)
+z5_anti_neg       | expr | !x.(-x <= 0 => 0 <= -x => x = 0)
+z5_anti_lit_use   | expr | !x.(x <= 7 => 7 <= x => x: s => 7: s)
