@@ -190,7 +190,7 @@ symbol XST4_1 [n] [P : Tuple (+1 n) → Prop]
 symbol XST5_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`!! v, ¬ (P v)) ⇒ R))
   : Res (¬ (`?? v, P v) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l xst6_eq) (res_eq r));
 
 symbol XST51_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`!! v, P v) ⇒ R))

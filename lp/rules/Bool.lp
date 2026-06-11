@@ -138,11 +138,11 @@ symbol BOOL12_1 [V : τ ι] [P : Prop]
 
 symbol BOOL21_1 [V : τ ι] [P : Prop]
   (r : Res ((V = BTRUE) ⇒ P)) : Res ((BTRUE = V) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (eq_comm_prop BTRUE V)) (res_eq r));
 
 symbol BOOL22_1 [V : τ ι] [P : Prop]
   (r : Res ((V = BFALSE) ⇒ P)) : Res ((BFALSE = V) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (eq_comm_prop BFALSE V)) (res_eq r));
 
 symbol BOOL31_1 [V : τ ι] [P : Prop]
   (hb : π (V ϵ BOOL)) (r : Res ((V = BFALSE) ⇒ P))

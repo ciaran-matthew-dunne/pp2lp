@@ -88,11 +88,12 @@ symbol STOP_1 [P : Prop] : Res P
 // VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤ — ¬⊤ is absurd, vacuously ⊤.
 symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_0 (prop_eq_top VR1);
 
-// VR2_1: Schema 1 — child's Res ⊥ becomes Res (¬⊤). Uses stdlib's
-// `¬⊥ : π (¬⊥ = ⊤)` after swapping the direction.
+// VR2_1: Schema 1 — child's Res ⊥ becomes Res (¬⊤) via ¬⊤ = ⊥.
+// (The old `mk_0 trust` was wrong: it claimed ¬⊤ = ⊤; this is a Schema-1
+// passthrough, so the result is the child's, bridged by `not_top_eq_bot`.)
 symbol VR2_1
   (r : Res ⊥) : Res (¬ ⊤)
-  ≔ mk_0 trust;
+  ≔ mk_1 (res_tm r) (eq_trans not_top_eq_bot (res_eq r));
 
 // VR3_1: Schema 1 — passthrough. Uses stdlib's `⊤⇒ P : π ((⊤ ⇒ P) = P)`.
 symbol VR3_1 [P : Prop]

@@ -35,6 +35,21 @@ begin
   { assume h; refine hp }
 end;
 
+// ¬⊤ = ⊥, as a propositional equality (for VR2_1's Schema-1 passthrough).
+opaque symbol not_top_eq_bot : π ((¬ ⊤) = ⊥) ≔
+begin
+  refine propExt _ _ _ _
+    { assume h; refine h ⊤ᵢ }
+    { assume h; refine ⊥ₑ h }
+end;
+
+// Equality is commutative, as a propositional equality (for BOOL21/22_1).
+opaque symbol eq_comm_prop [a] (x y : τ a) : π ((x = y) = (y = x)) ≔
+begin
+  assume a x y;
+  refine propExt _ _ (λ h, eq_sym h) (λ h, eq_sym h)
+end;
+
 // Conj congruence: lift independent equalities to their conjunction.
 opaque symbol conj_eq [A B S1 S2 : Prop]
   : π (A = S1) → π (B = S2) → π ((A ∧ B) = (S1 ∧ S2)) ≔
