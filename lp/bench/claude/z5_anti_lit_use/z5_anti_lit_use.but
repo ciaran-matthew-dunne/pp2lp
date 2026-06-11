@@ -1,1 +1,0 @@
-Flag(FileOn("z5_anti_lit_use.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 7 => 7 <= x => x: s => 7: s)) & _delta_e(s) | ? | ? | !x.(x <= 7 => 7 <= x => x: s => 7: s) | nn))

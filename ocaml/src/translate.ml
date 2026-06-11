@@ -454,6 +454,29 @@ and chain_term ctx node : L.term =
            L.Lambda (v, None, pred_term ctx a);
            pred_term ctx b ])
      | _ -> assert false)
+  | P.Apply { rule; anno; children = []; _ }
+    when (match base rule with
+          | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" -> true
+          | _ -> false) ->
+    (* Chain-form AXM1-6 (Schema 0): the `_1` lemma needs the same hyp the
+       base rule looks up.  Recover it from scope as a real proof term
+       ([leaf_evidence] also bridges arith-reorder / equality-store shapes);
+       the LP lemma reuses the base rule + `prop_eq_top`.  No hyp recovered ⇒
+       `trust`, matching the pre-evidence behaviour (no regression). *)
+    let ev =
+      match goal_of_anno anno with
+      | Some goal ->
+        (match expected_hyp_pred rule goal with
+         | Some needed -> Option.value ~default:L.Trust (leaf_evidence ctx [] needed)
+         | None -> L.Trust)
+      | None -> L.Trust
+    in
+    L.App (L.Name (chain_emit_name rule), [ev])
+  | P.Apply { rule; anno; children = []; _ } when base rule = "AXM8" ->
+    (* Chain-form AXM8: the conjunct-extraction `π C → π r` the base rule
+       builds, handed to AXM8_1 (which wraps it in `mk_0 ∘ prop_eq_top`). *)
+    let f = Option.value ~default:L.Trust (axm8_extraction ctx anno) in
+    L.App (L.Name (chain_emit_name rule), [f])
   | P.Apply { rule; children = []; arg; _ } ->
     app (chain_emit_name rule)
       (dynamic_value_args ctx rule arg @ slot_hole_args rule)

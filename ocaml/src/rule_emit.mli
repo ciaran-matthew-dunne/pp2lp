@@ -27,6 +27,10 @@ val metadata_extra_args : string -> Lp_tree.term list
    the conjunct(s) at the returned positions. *)
 val find_and5_pair : prd list -> (int list * int) option
 
+(* AXM8 conjunct-extraction `λ h, π C → π r` (r is a conjunct of C).  The
+   main-tree AXM8 refines with it; the Res-chain AXM8_1 wraps it. *)
+val axm8_extraction : Emit_ctx.ctx -> rhs option -> Lp_tree.term option
+
 (* The single `refine` tactic for a proof node.  Exhaustive over
    [Rule_db.emit]; the walker handles the tree-expanding strategies
    (And5/Opr/Ins/branching) before calling in here. *)

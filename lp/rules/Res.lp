@@ -22,6 +22,19 @@ opaque symbol eq_trans [a] [P Q R : τ a]
   : π (P = Q) → π (Q = R) → π (P = R) ≔
 begin assume a P Q R h1 h2; rewrite h1; refine h2 end;
 
+// A true proposition equals ⊤.  This is the Schema-0 result bridge
+// (§8.13): a rule "sans antécédent véritable" produces the result VRAI,
+// which the spec requires to be *equivalent to the consequent P* — here
+// modulo the hypotheses H that license the rule's side-condition.  Given
+// a proof of P (the hyp the rule looked up), `propExt` discharges `P = ⊤`.
+opaque symbol prop_eq_top [P : Prop] (hp : π P) : π (P = ⊤) ≔
+begin
+  assume P hp;
+  refine propExt _ _ _ _
+  { assume h; refine ⊤ᵢ }
+  { assume h; refine hp }
+end;
+
 // Conj congruence: lift independent equalities to their conjunction.
 opaque symbol conj_eq [A B S1 S2 : Prop]
   : π (A = S1) → π (B = S2) → π ((A ∧ B) = (S1 ∧ S2)) ≔

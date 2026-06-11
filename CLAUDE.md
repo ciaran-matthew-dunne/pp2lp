@@ -155,8 +155,8 @@ replay are dropped at gen time — see Known broken).
 
 ## Known broken
 
-All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
-`gemini` (422), `claude` (1140). Residuals:
+All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (39),
+`gemini` (17), `claude` (1148). Residuals:
 
 - **Chain AR7_1/AR8_1.** Not exercised by any current suite (the gemini goals
   were dropped); would still fail at tree-build — the result-chain has no
@@ -180,6 +180,23 @@ All suites are green: `og` (30), `prv` (70), `synth` (107), `nrm_test` (42),
   unfired: BOOL*, EAXM2/91/92, EQC1/2, EIMP5*, ECTR5/6, EVR11, NRM16-18,
   NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61 (105/138 rule_db names
   fire — AR7 and XST61 joined via swapped-antisymmetry / or-right shapes).
+
+Fixed 2026-06-11 (see git log): chain-form AXM*_1 trust elimination.  The
+Res-form `_1` AXM rules are Schema 0 (§8.13: result VRAI, which the spec
+requires to be *equivalent to the consequent* — here modulo the hypotheses H
+the side-condition asserts), and were blanket `mk_0 trust`.  Each now takes the
+same hyp evidence its base rule looks up, reuses the (verified) base proof, and
+wraps it `mk_0 ∘ prop_eq_top` (a new `π P → π (P = ⊤)` bridge in `Res.lp`).  The
+chain emitter (`translate.ml chain_term`) recovers the hyp from scope —
+`expected_hyp_pred` + `leaf_evidence` for AXM1-6, the conjunct extraction
+(factored as `Rule_emit.axm8_extraction`) for AXM8 — and falls back to `trust`
+only when the hyp isn't in scope (no regression).  33/45 corpus AXM*_1 sites are
+now trust-free; the 12 residual are all `AXM3_1` inside a chain-local `IMP4_1`
+(the antisymmetry `−x+y ≤ 𝟎` step the AR7_1/AR8_1 frontier owns).  AXM7_1 was
+already unconditional (`⇒_idem`); AXM9_1 stays `trust` (the documented ALL7/XST8
+HO-unification frontier).  Two untested `z5_anti_*_use` probes were dropped from
+the claude goals.txt — their constant-membership consequent routes through the
+base-AXM9 existential frontier, not the AR chain they were hunting.
 
 Fixed 2026-06-10, second wave (see git log): suite extended 525 → 1058
 checked proofs (1120-line goals.txt; rule firings 91 → 98 base names).  The
@@ -292,7 +309,7 @@ replay-natively. Unknown rule names raise.
   each NRM rule → goal. Any failing goal ⇒ exit 1.
 - **claude** — a hand-authored *pipeline stress / coverage* suite (same
   `goals.txt` mechanism): it spans every rule family + proof sizes 1→416
-  replay lines and probes the failure frontier on purpose. Currently 1140
+  replay lines and probes the failure frontier on purpose. Currently 1148
   checked proofs, all ✓ (frontier sections L–P cleared; section W probes the
   solver terminals and positional substitution; sections X/Y are the
   coverage push — unfired-rule probes, Farkas/literal/slot stress, scale

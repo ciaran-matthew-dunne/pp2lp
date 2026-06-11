@@ -94,23 +94,34 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// All AXM rules are Schema 0 (no genuine antecedent — the hyp lookup
-// is a side-condition). Per spec the result is TRUE. The proofs of
-// `(rule_consequent = ⊤)` rely on PP's having confirmed the rule's
-// applicability and are passed as `trust` since the chain emit does
-// not thread the hyp arg.
+// All AXM rules are Schema 0 (no genuine antecedent — the hyp lookup is a
+// side-condition).  Per the spec's schema n0 the result is VRAI (⊤), which
+// must be *equivalent to the consequent* — here modulo the hypotheses H
+// that the rule's side-condition asserts.  So each `_1` takes the same
+// evidence its base rule does (the looked-up hyp), reuses the base rule to
+// prove the consequent, and `prop_eq_top` turns that into the `= ⊤` the
+// Σ-typed `Res` (via `mk_0`) demands.  The emitter's chain path supplies
+// the evidence (`Translate.chain_term`); when it can't recover the hyp it
+// falls back to `trust`, so no shape regresses.
 
-// AXM7_1: the only AXM_N_1 whose proof is unconditional — `P ⇒ P` is
-// always propositionally `⊤` (stdlib `⇒_idem`).
+// AXM7_1: the one AXM_N_1 whose proof is unconditional — `P ⇒ P` is always
+// propositionally `⊤` (stdlib `⇒_idem`), no hyp needed.
 symbol AXM7_1 [P : Prop] : Res (P ⇒ P) ≔ mk_0 (⇒_idem P);
 
-symbol AXM1_1 [P Q : Prop] : Res (P ⇒ Q) ≔ mk_0 trust;
-symbol AXM2_1 [P Q : Prop] : Res (¬ P ⇒ Q) ≔ mk_0 trust;
-symbol AXM3_1 [P : Prop] : Res P ≔ mk_0 trust;
-symbol AXM4_1 [P R : Prop] : Res (P ⇒ R) ≔ mk_0 trust;
-symbol AXM5_1 [P Q R : Prop] : Res (P ⇒ (Q ⇒ R)) ≔ mk_0 trust;
-symbol AXM6_1 [P Q R : Prop] : Res (P ⇒ (¬ Q ⇒ R)) ≔ mk_0 trust;
-symbol AXM8_1 [C r : Prop] : Res (C ⇒ r) ≔ mk_0 trust;
+symbol AXM1_1 [P Q : Prop] (hnp : π (¬ P)) : Res (P ⇒ Q)
+  ≔ mk_0 (prop_eq_top (AXM1 hnp));
+symbol AXM2_1 [P Q : Prop] (hp : π P) : Res (¬ P ⇒ Q)
+  ≔ mk_0 (prop_eq_top (AXM2 hp));
+symbol AXM3_1 [P : Prop] (hp : π P) : Res P
+  ≔ mk_0 (prop_eq_top (AXM3 hp));
+symbol AXM4_1 [P R : Prop] (hr : π R) : Res (P ⇒ R)
+  ≔ mk_0 (prop_eq_top (AXM4 hr));
+symbol AXM5_1 [P Q R : Prop] (hnq : π (¬ Q)) : Res (P ⇒ (Q ⇒ R))
+  ≔ mk_0 (prop_eq_top (AXM5 hnq));
+symbol AXM6_1 [P Q R : Prop] (hq : π Q) : Res (P ⇒ (¬ Q ⇒ R))
+  ≔ mk_0 (prop_eq_top (AXM6 hq));
+symbol AXM8_1 [C r : Prop] (f : π C → π r) : Res (C ⇒ r)
+  ≔ mk_0 (prop_eq_top (AXM8 f));
 // AXM9_1: NOTE — `@inh_tuple n` hardcodes the witness, which is wrong when the
 // existential is witnessed by a ∀-bound variable (`P inh_tuple ≡ P _x` is then
 // unsolvable).  Fixing it (explicit witness + a v-dependent consequent so the

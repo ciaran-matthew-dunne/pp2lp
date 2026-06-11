@@ -210,8 +210,11 @@ let tactic_for_witness_hyp ctx rule anno =
     | Some (witness, h) -> L.Refine (L.Name rule, [witness; L.Name h])
     | None -> fallback
 
-let tactic_for_axm8 ctx rule anno =
-  let fallback = L.Refine (L.Name rule, [L.Hole]) in
+(* The AXM8 extraction function `λ h, <∧ₑ chain pulling conjunct k>` : π C → π r,
+   where the goal is `C ⇒ r` and r is the conjunct at position k of C.  Shared
+   by the base AXM8 tactic and the chain-form AXM8_1 (which wraps it in
+   `mk_0 ∘ prop_eq_top`).  [None] when the goal isn't `C ⇒ r` with r a conjunct. *)
+let axm8_extraction ctx anno : L.term option =
   match goal_of_anno anno with
   | Some (Binary (Imp, lhs, rhs)) ->
     let conjs = conjuncts lhs in
@@ -219,9 +222,14 @@ let tactic_for_axm8 ctx rule anno =
      | Some k ->
        ctx.n <- ctx.n + 1;
        let h = Printf.sprintf "_h%d" ctx.n in
-       L.Refine (L.Name rule, [L.Lambda (h, None, extract (L.Name h) conjs k)])
-     | None -> fallback)
-  | _ -> fallback
+       Some (L.Lambda (h, None, extract (L.Name h) conjs k))
+     | None -> None)
+  | _ -> None
+
+let tactic_for_axm8 ctx rule anno =
+  match axm8_extraction ctx anno with
+  | Some f -> L.Refine (L.Name rule, [f])
+  | None -> L.Refine (L.Name rule, [L.Hole])
 
 (* ECTR1-6: equality-substitution contradiction leaves.  Both premises
    live in PP's store; the conclusion (the annotation's antecedent) gives
