@@ -200,7 +200,7 @@ symbol XST51_1 [n] [P : Tuple n → Prop] [R : Prop]
 symbol XST6_1 [n] [P : Tuple n → Prop]
   (r : Res (`!! v, ¬ (P v)))
   : Res (¬ (`?? v, P v))
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans xst6_eq (res_eq r));
 
 symbol XST61_1 [n] [P : Tuple n → Prop]
   (r : Res (`!! v, P v))

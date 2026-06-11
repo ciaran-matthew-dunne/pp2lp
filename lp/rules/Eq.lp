@@ -310,8 +310,9 @@ end;
 // EQS2: Schema 1 passthrough.
 // OPR1, OPR2: Schema 1 via the opr1_eq / opr2_eq bridges.
 
-// EVR1: ¬(E=E) ⇒ P ≡ ⊥ ⇒ P ≡ ⊤ via stdlib's `=_idem` + `⊥⇒`.
-symbol EVR1_1 [E : τ ι] [P : Prop] : Res (¬ (E = E) ⇒ P) ≔ mk_0 trust;
+// EVR1: ¬(E=E) ⇒ P ≡ ⊥ ⇒ P ≡ ⊤ — ¬(E=E) is absurd (eq_refl), vacuously ⊤.
+symbol EVR1_1 [E : τ ι] [P : Prop] : Res (¬ (E = E) ⇒ P)
+  ≔ mk_0 (prop_eq_top EVR1);
 
 // EVR2: Schema 1 — passthrough through stdlib's `¬=_idem`.
 symbol EVR2_1 [E : τ ι]

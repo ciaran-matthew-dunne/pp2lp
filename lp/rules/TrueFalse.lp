@@ -85,8 +85,8 @@ end;
 symbol STOP_1 [P : Prop] : Res P
   ≔ mk_res (∎ ∷ P) (eq_refl P);
 
-// VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤.
-symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_0 trust;
+// VR1_1: ¬⊤ ⇒ R ≡ ⊥ ⇒ R ≡ ⊤ — ¬⊤ is absurd, vacuously ⊤.
+symbol VR1_1 [R : Prop] : Res (¬ ⊤ ⇒ R) ≔ mk_0 (prop_eq_top VR1);
 
 // VR2_1: Schema 1 — child's Res ⊥ becomes Res (¬⊤). Uses stdlib's
 // `¬⊥ : π (¬⊥ = ⊤)` after swapping the direction.

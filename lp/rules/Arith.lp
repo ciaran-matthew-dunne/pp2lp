@@ -229,9 +229,18 @@ end;
 // equality. Other AR rules use `trust` for the propositional equality
 // since the chain emit doesn't thread the solver side-conditions.
 
+// (E ≤ E) ⇒ R ≡ R — the antecedent is always true (leq_refl).  Mirrors evr3_eq.
+opaque symbol ar1_eq [E : τ ι] [R : Prop] : π (((E ≤ E) ⇒ R) = R) ≔
+begin
+  assume E R;
+  refine propExt _ _ _ _
+    { assume h; refine h (leq_refl E) }
+    { assume h h0; refine h }
+end;
+
 symbol AR1_1 [E : τ ι] [R : Prop]
   (r : Res R) : Res ((E ≤ E) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans ar1_eq (res_eq r));
 
 symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_0 trust;
 
@@ -247,8 +256,7 @@ symbol AR3'_1 (a r : τ ι) [R : Prop]
   (eq : π (𝟏 - a = r))
   (cont : Res ((r ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
   ≔ mk_1 (res_tm cont)
-       (eq_trans trust
-          (eq_trans (imp_cong_l (leq_zero_eq eq)) (res_eq cont)));
+       (eq_trans (imp_cong_l (ar3f_eq a r eq)) (res_eq cont));
 
 symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι) : Res ((E ≤ 𝟎) ⇒ R)
   ≔ mk_0 trust;
@@ -286,7 +294,8 @@ symbol AR10_1 [P Q R : Prop]
   (heq : π (P = Q)) (r : Res (Q ⇒ R)) : Res (P ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l heq) (res_eq r));
 
-symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P) ≔ mk_0 trust;
+symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P)
+  ≔ mk_0 (prop_eq_top AR11);  // ¬(E≤E) absurd (leq_refl) ⇒ vacuously ⊤
 
 symbol AR12_1 [a b : τ ι] [P : Prop]
   (r : Res P) : Res ((a ≤ b) ⇒ P)

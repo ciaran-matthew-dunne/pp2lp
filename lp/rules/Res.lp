@@ -406,6 +406,18 @@ begin
         (λ v hpv, !!_to_pi (λ v, P v ⇒ R) hall v hpv) hex }
 end;
 
+// XST6: ¬(∃-block, P) = (∀-block, ¬P)  (quantifier De Morgan).
+opaque symbol xst6_eq [n] [P : Tuple n → Prop]
+  : π ((¬ (`?? v, P v)) = (`!! v, ¬ (P v))) ≔
+begin
+  assume n P;
+  refine propExt _ _ _ _
+    { assume hne; refine pi_to_!! (λ v, ¬ (P v))
+        (λ v hpv, hne (pi_to_??_intro P v hpv)) }
+    { assume hall hex; refine pi_to_??_elim P
+        (λ v hpv, !!_to_pi (λ v, ¬ (P v)) hall v hpv) hex }
+end;
+
 // XST8: (∃-block, P) = ((∀-block, ¬P) ⇒ ⊥)
 opaque symbol xst8_eq [n] [P : Tuple n → Prop]
   : π ((`?? v, P v) = ((`!! v, ¬ (P v)) ⇒ ⊥)) ≔
