@@ -128,13 +128,35 @@ end;
 // BOOL31/32/41/42: Schema 1 with the `V ϵ BOOL` side-condition.
 // BOOL51/52: Schema 0 — `bool_distinct` makes the antecedent ⊥.
 
-symbol BOOL11_1 [V : τ ι] [P : Prop]
-  (r : Res P) : Res ((V = BTRUE) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+// Given V ϵ BOOL, ¬(V=BTRUE) = (V=BFALSE) and ¬(V=BFALSE) = (V=BTRUE)
+// (bool_cases + bool_distinct) — the BOOL31/32/41/42_1 case-split equalities.
+opaque symbol bool_not_true_eq_false [V : τ ι] (hb : π (V ϵ BOOL))
+  : π ((¬ (V = BTRUE)) = (V = BFALSE)) ≔
+begin
+  assume V hb;
+  refine propExt _ _ _ _
+    { assume hnt; refine ∨ₑ (bool_cases V hb) (λ ht, ⊥ₑ (hnt ht)) (λ hf, hf) }
+    { assume hf ht; refine bool_distinct (eq_trans (eq_sym ht) hf) }
+end;
 
-symbol BOOL12_1 [V : τ ι] [P : Prop]
+opaque symbol bool_not_false_eq_true [V : τ ι] (hb : π (V ϵ BOOL))
+  : π ((¬ (V = BFALSE)) = (V = BTRUE)) ≔
+begin
+  assume V hb;
+  refine propExt _ _ _ _
+    { assume hnf; refine ∨ₑ (bool_cases V hb) (λ ht, ht) (λ hf, ⊥ₑ (hnf hf)) }
+    { assume ht hf; refine bool_distinct (eq_trans (eq_sym ht) hf) }
+end;
+
+// BOOL11/12: Schema 1 — strip the known equality antecedent (imp_known_drop),
+// the V = BTRUE/BFALSE supplied as evidence.
+symbol BOOL11_1 [V : τ ι] [P : Prop] (h : π (V = BTRUE))
+  (r : Res P) : Res ((V = BTRUE) ⇒ P)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
+
+symbol BOOL12_1 [V : τ ι] [P : Prop] (h : π (V = BFALSE))
   (r : Res P) : Res ((V = BFALSE) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
 symbol BOOL21_1 [V : τ ι] [P : Prop]
   (r : Res ((V = BTRUE) ⇒ P)) : Res ((BTRUE = V) ⇒ P)
@@ -147,22 +169,30 @@ symbol BOOL22_1 [V : τ ι] [P : Prop]
 symbol BOOL31_1 [V : τ ι] [P : Prop]
   (hb : π (V ϵ BOOL)) (r : Res ((V = BFALSE) ⇒ P))
   : Res (¬ (V = BTRUE) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (bool_not_true_eq_false hb)) (res_eq r));
 
 symbol BOOL32_1 [V : τ ι] [P : Prop]
   (hb : π (V ϵ BOOL)) (r : Res ((V = BTRUE) ⇒ P))
   : Res (¬ (V = BFALSE) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (bool_not_false_eq_true hb)) (res_eq r));
 
 symbol BOOL41_1 [V : τ ι] [P : Prop]
   (hb : π (V ϵ BOOL)) (r : Res ((V = BFALSE) ⇒ P))
   : Res (¬ (BTRUE = V) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (eq_trans (not_cong (eq_comm_prop BTRUE V))
+                                       (bool_not_true_eq_false hb)))
+                 (res_eq r));
 
 symbol BOOL42_1 [V : τ ι] [P : Prop]
   (hb : π (V ϵ BOOL)) (r : Res ((V = BTRUE) ⇒ P))
   : Res (¬ (BFALSE = V) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (eq_trans (not_cong (eq_comm_prop BFALSE V))
+                                       (bool_not_false_eq_true hb)))
+                 (res_eq r));
 
 // BTRUE = BFALSE is absurd (bool_distinct), so the implication is vacuously ⊤.
 symbol BOOL51_1 [P : Prop] : Res ((BTRUE = BFALSE) ⇒ P)
