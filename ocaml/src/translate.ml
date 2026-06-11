@@ -441,19 +441,19 @@ and chain_term ctx node : L.term =
     when base rule = "AXM9" && (match goal_of_anno anno with
                                 | Some (Binary (Imp, _, _)) -> true
                                 | _ -> false) ->
-    (* AXM9_1's inh_tuple-indexed type makes `P (@inh_tuple n) ≡ A` a
-       non-pattern HO problem (P has both constant and projecting
-       solutions), so lambdapi leaves it unsolved.  The rule is
-       trust-backed; pass the constant P explicitly:
-       `@AXM9_1 1 (λ _, A) B` β-reduces to `Res (A ⇒ B)`. *)
+    (* AXM9_1 [n] [P] (v) [Q] (h) : Res (P v ⇒ Q).  Recover the witness `v`
+       and the universal hyp `h` exactly as the base AXM9 does — `P` infers
+       from `h` (a Miller pattern), so the result type is determined without
+       the old `@inh_tuple` constant-P hack and the `trust` it forced. *)
     (match goal_of_anno anno with
-     | Some (Binary (Imp, a, b)) ->
-       let v = fresh_x_local ctx in
-       L.App (L.Expl (L.Name (chain_emit_name rule)),
-         [ L.Name "1";
-           L.Lambda (v, None, pred_term ctx a);
-           pred_term ctx b ])
-     | _ -> assert false)
+     | Some goal ->
+       (match find_axm9_match ctx goal with
+        | Some (witness, h) ->
+          L.App (L.Name (chain_emit_name rule), [witness; L.Name h])
+        | None ->
+          failwith "translate: AXM9_1 — no (witness × universal hyp) match for \
+                    the chain antecedent")
+     | None -> assert false)
   | P.Apply { rule; anno; children = []; _ }
     when (match base rule with
           | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" -> true

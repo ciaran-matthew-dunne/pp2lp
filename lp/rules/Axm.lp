@@ -122,13 +122,12 @@ symbol AXM6_1 [P Q R : Prop] (hq : π Q) : Res (P ⇒ (¬ Q ⇒ R))
   ≔ mk_0 (prop_eq_top (AXM6 hq));
 symbol AXM8_1 [C r : Prop] (f : π C → π r) : Res (C ⇒ r)
   ≔ mk_0 (prop_eq_top (AXM8 f));
-// AXM9_1: NOTE — `@inh_tuple n` hardcodes the witness, which is wrong when the
-// existential is witnessed by a ∀-bound variable (`P inh_tuple ≡ P _x` is then
-// unsolvable).  Fixing it (explicit witness + a v-dependent consequent so the
-// ALL7 chain `λ v, AXM9_1 v` generalises) is necessary but NOT sufficient — the
-// existential-under-universal goals (xst_under_all, xstf_all_exists) also leave
-// the outer XST8 negation chain's Res unresolved by HO-unification.  Deferred as
-// one item: the ALL7/XST8 continuation HO-unification frontier (Known broken).
-symbol AXM9_1 [n] [P : Tuple n → Prop] [Q : Prop]
-  : Res (P (@inh_tuple n) ⇒ Q)
-  ≔ mk_0 trust;
+// AXM9_1: the Res-form of AXM9.  Takes the witness `v` and the universal hyp
+// `h` explicitly, exactly like the base rule — so `P` is inferred from `h`'s
+// type via the Miller pattern `¬⋀(∎∷⊤∷ ?P u)` (no `@inh_tuple` guess) and the
+// result `P v ⇒ Q` is fully determined.  The emitter recovers `(v, h)` with the
+// same `find_axm9_match` the base AXM9 uses.
+symbol AXM9_1 [n] [P : Tuple n → Prop] (v : Tuple n) [Q : Prop]
+  (h : π (`!! u, ¬ ⋀ (∎ ∷ ⊤ ∷ P u)))
+  : Res (P v ⇒ Q)
+  ≔ mk_0 (prop_eq_top (AXM9 v h));
