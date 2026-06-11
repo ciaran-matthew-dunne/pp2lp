@@ -267,13 +267,14 @@ folded with a `(×N)` count so they never bury the real error.
     (identity `solveur`); AR4's `(E+F)>𝟎` from `prove_gt_zero`; AR5/6 from the
     in-scope bound; AR7/AR8's `(a+c)=𝟎` from `prove_sum_zero`.  Never a
     whole-goal `refine trust;`.
-  - **Static rule lemmas, non-firing only.** Binder-reshape `ALL1–4_1`/`XST1–4_1`
-    (need a `!!`-currying tuple isomorphism), `BOOL11/12/31/32/41/42_1`
-    (antecedent-true / membership context), Schema-0 solver gaps
-    (`AR2/4/13_1`), numeric `≠` (`EVR11_1`), and the hyp-threaded
-    `EAXM1/2_1` + `ECTR1–6_1`.  These compile only because the rule isn't
-    reached; converting them is rule-library hygiene with no effect on any
-    checked proof.
+  - **Static rule lemmas: only the 10 binder-reshape `_1`** —
+    `ALL1–5_1`/`ALL3R_1`, `XST1–4_1`.  They need a `!!`/`??`-currying tuple
+    isomorphism (`Tuple (+1 n) ≅ Tuple n × Tuple 1`); none fire, so this is
+    rule-library hygiene only.  Every other `_1` lemma is trust-free: the
+    Schema-0 / hyp-driven ones (AXM, EAXM, ECTR, BOOL11/12, AR2/4/13, EVR11,
+    INS) take their evidence as a parameter and reuse the verified base rule;
+    the connective passthroughs (EAXM31/32/91/92, EIMP, EQC, EQS, XST5/51/61,
+    FX1, AR3/12, BOOL31/32/41/42) use a proven transformation equality.
 - **Schema-0 result bridge.** A trust-free `_1` whose result is ⊤ (§8.13
   schema n0) reuses its verified base rule wrapped `mk_0 (prop_eq_top …)`
   (`Res.lp`); a Schema-1 passthrough uses `mk_1 (res_tm r) (eq_trans <law>
