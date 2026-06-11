@@ -56,6 +56,7 @@ let metadata_extra_args rule =
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
   | Rule_db.Nrm26 | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr | Rule_db.Arith
   | Rule_db.Egalite
+  | Rule_db.Ar2
   | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10
   | Rule_db.Bool_split -> []
 
@@ -477,6 +478,26 @@ let tactic_for_rule ctx rule arg anno children =
        failwith (Printf.sprintf
          "translate: %s expected a 1-binder `forall2(x)·¬(…) ⇒ Q` annotation"
          rule_name))
+  | Rule_db.Ar2 ->
+    (* AR2 leaf: `(a ≤ b) ⇒ R` with `a > b`.  `a > b ≡ ¬(a≤b)`; transport
+       `prove_gt_zero (a−b)` (a−b cancels to a positive literal) back along
+       `sub_leq_eq`.  Trust if a−b isn't a positive-literal cancellation. *)
+    let env = proj_env_of_ctx ctx in
+    let gen =
+      match goal_of_anno anno with
+      | Some (Binary (Imp, Leq (a, b), _)) ->
+        Option.map (fun gt ->
+          L.Refine (L.Name rule,
+            [ L.App (L.Name "=\xe2\x87\x92",          (* =⇒ *)
+                [ L.App (L.Name "eq_sym",
+                    [ L.App (L.Name "not_cong",
+                        [ L.App (L.Name "sub_leq_eq",
+                            [exp_term ctx a; exp_term ctx b]) ]) ]);
+                  gt ]) ]))
+          (prove_gt_zero env (AOp (Sub, a, b)))
+      | _ -> None
+    in
+    (match gen with Some t -> t | None -> L.Refine (L.Name rule, [L.Trust]))
   | Rule_db.Ar5_6 ->
     (* AR5 [a R] : π (a ≪ 𝟎) → … → π ((—a ≤ 𝟎) ⇒ R) — the antisymmetry-to-zero:
        given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.

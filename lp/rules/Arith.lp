@@ -75,6 +75,11 @@ begin
   { assume hsub; refine not_leq_of_sub1 a hsub }
 end;
 
+// (a ≤ b) = (a − b ≤ 𝟎), as a propositional equality (AR2's `a > b`, the
+// emitter transports `prove_gt_zero (a−b)` back along its negation).
+opaque symbol sub_leq_eq (a b : τ ι) : π ((a ≤ b) = (a - b ≤ 𝟎)) ≔
+begin assume a b; refine propExt _ _ (sub_leq a b) (leq_of_sub a b) end;
+
 // AR3_F is *not* a single symbol: PP's forward normalisation rewrites a
 // `¬(a ≤ 𝟎)` occurrence in place, at an arbitrary binder-nested position.
 // The emitter (translate.ml `ar3f_cong`) builds the congruence proof for

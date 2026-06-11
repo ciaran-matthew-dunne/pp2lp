@@ -37,6 +37,8 @@ type emit =
   | Nrm2730        (* NRM27-30: trust-free solver dispatch — peel the pinned
                       binder at the witness `b`, ⊤-normalise the substituted
                       conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
+  | Ar2            (* AR2: leaf `(a≤b) ⇒ R`, a > b — generate `¬(a≤b)` from a
+                      positive-literal `a−b` (prove_gt_zero, via sub_leq_eq) *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
   | Bool_split     (* BOOL31/32/41/42: discharge the `V ϵ BOOL` side-condition
                       from an injected typing hypothesis (Emit_ctx.bool_split_var) *)
@@ -213,7 +215,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ECTR6" leaf ~emit:Ectr;
   (* §A.14 Arithmetic *)
   r "AR1" pass;
-  r "AR2" (Arity [Con]) ~emit:Trust_cons;
+  r "AR2" (Arity [Con]) ~emit:Ar2;
   r "AR3" pass ~emit:Ar3;
   r "AR3_F" pass ~emit:Ar3_f;
   r "AR4" leaf ~emit:Ar4;

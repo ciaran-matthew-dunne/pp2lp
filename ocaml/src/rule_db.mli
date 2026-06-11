@@ -25,6 +25,7 @@ type emit =
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
   | Nrm26
   | Nrm2730
+  | Ar2
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
   | Bool_split
   | Eqs2

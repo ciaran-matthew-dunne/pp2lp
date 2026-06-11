@@ -112,10 +112,10 @@ opaque symbol imp_cong_r [P Q R : Prop]
 begin assume P Q R h; rewrite h; reflexivity end;
 
 // Implication right congruence *under the antecedent*: the consequent
-// equality may consume π P.  This is what discharges an under-hypothesis
-// chain result (ResU) at its binding IMP4_1 — the antecedent a chain-local
-// AXM3_1 consumed is re-bound by the implication, so the equality of the
-// whole node is unconditional (IMP4U_1 in Impl.lp).
+// equality may consume π P.  This re-binds the antecedent a chain-local
+// AXM3_1 consumed, making the equality of the whole node unconditional —
+// the mechanism behind IMP4_1U (Impl.lp), which threads the IMP4'
+// hypothesis to its child chain.
 opaque symbol imp_cong_r_under [P Q R : Prop]
   (h : π P → π (Q = R)) : π ((P ⇒ Q) = (P ⇒ R)) ≔
 begin
