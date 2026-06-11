@@ -242,7 +242,8 @@ symbol AR1_1 [E : τ ι] [R : Prop]
   (r : Res R) : Res ((E ≤ E) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans ar1_eq (res_eq r));
 
-symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_0 trust;
+symbol AR2_1 [a b : τ ι] [R : Prop] (h : π (a > b))
+  : Res ((a ≤ b) ⇒ R) ≔ mk_0 (prop_eq_top (AR2 h));
 
 symbol AR3_1 (a : τ ι) [R : Prop]
   (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
@@ -250,35 +251,42 @@ symbol AR3_1 (a : τ ι) [R : Prop]
        (eq_trans (imp_cong_l (ar3f_eq a (𝟏 - a) (eq_refl (𝟏 - a)))) (res_eq r));
 
 // AR3'_1: bridged Res-chain AR3, for when PP's solver records the sub-premise
-// `𝟏 - a` in a different (neg-normalised) term order `r`.  The `¬(a≤𝟎) =
-// (𝟏-a≤𝟎)` step is the AR3 logical bridge (trusted, as in AR3_1); the
-// `(𝟏-a≤𝟎) = (r≤𝟎)` step is the real, emitter-supplied equality `eq : 𝟏-a=r`.
+// `𝟏 - a` in a different (neg-normalised) term order `r`.  Both steps are now
+// real: `¬(a≤𝟎) = (r≤𝟎)` is `ar3f_eq a r eq` and `eq : 𝟏-a=r` is the
+// emitter-supplied equality (cf. AR3_1, which is the special case r = 𝟏-a).
 symbol AR3'_1 (a r : τ ι) [R : Prop]
   (eq : π (𝟏 - a = r))
   (cont : Res ((r ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
   ≔ mk_1 (res_tm cont)
        (eq_trans (imp_cong_l (ar3f_eq a r eq)) (res_eq cont));
 
-symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι) : Res ((E ≤ 𝟎) ⇒ R)
-  ≔ mk_0 trust;
+// AR4_1: reuse the base rule (F≤𝟎, (E+F)>𝟎 solver facts as evidence).
+symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι)
+  (hf : π (F ≤ 𝟎)) (hef : π ((E + F) > 𝟎)) : Res ((E ≤ 𝟎) ⇒ R)
+  ≔ mk_0 (prop_eq_top (AR4 F hf hef));
 
-symbol AR5_1 [a : τ ι] [R : Prop]
+// AR5/AR6: antisymmetry-to-zero — `a = 𝟎` (from the two bounds) lets the inner
+// `(a=𝟎) ⇒` be stripped (imp_known_drop under imp_cong_r).
+symbol AR5_1 [a : τ ι] [R : Prop] (h0 : π (a = 𝟎))
   (r : Res ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))) : Res ((— a ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (eq_sym (imp_cong_r (imp_known_drop h0))) (res_eq r));
 
-symbol AR6_1 [a : τ ι] [R : Prop]
+symbol AR6_1 [a : τ ι] [R : Prop] (h0 : π (a = 𝟎))
   (r : Res ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))) : Res ((a ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (eq_sym (imp_cong_r (imp_known_drop h0))) (res_eq r));
 
-symbol AR7_1 [a b : τ ι] (c : τ ι) [R : Prop]
+// AR7/AR8: the antisymmetry `a = b` strips the leading `(a=b) ⇒`.
+symbol AR7_1 [a b : τ ι] (c : τ ι) [R : Prop] (hab : π (a = b))
   (r : Res ((a = b) ⇒ (((a - b) ≤ 𝟎) ⇒ R)))
   : Res (((a - b) ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (imp_known_drop hab)) (res_eq r));
 
-symbol AR8_1 (a : τ ι) [b c : τ ι] [R : Prop]
+symbol AR8_1 (a : τ ι) [b c : τ ι] [R : Prop] (hab : π (a = b))
   (r : Res ((a = b) ⇒ (((c + b) ≤ 𝟎) ⇒ R)))
   : Res (((c + b) ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (imp_known_drop hab)) (res_eq r));
 
 // AR9_1: solver-confirmed equality on the antecedent of a Res chain.
 // Mirrors the spec AR9 but in Res form: given a bridge proof E = F, a
@@ -298,8 +306,10 @@ symbol AR10_1 [P Q R : Prop]
 symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P)
   ≔ mk_0 (prop_eq_top AR11);  // ¬(E≤E) absurd (leq_refl) ⇒ vacuously ⊤
 
-symbol AR12_1 [a b : τ ι] [P : Prop]
+symbol AR12_1 [a b : τ ι] [P : Prop] (h : π (a ≤ b))
   (r : Res P) : Res ((a ≤ b) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
-symbol AR13_1 [a b : τ ι] : Res (¬ (a ≤ 𝟎)) ≔ mk_0 trust;
+// AR13: `¬(a ≤ 𝟎)` is the result; supply it as evidence (a > 𝟎 from the solver).
+symbol AR13_1 [a b : τ ι] (h : π (¬ (a ≤ 𝟎))) : Res (¬ (a ≤ 𝟎))
+  ≔ mk_0 (prop_eq_top h);

@@ -117,5 +117,5 @@ symbol FX3_1 [R : Prop] : Res (⊥ ⇒ R) ≔ mk_0 (⊥⇒ R);
 // INS_1: Schema 1 — passthrough. The chain leaf is supplied by PP's
 // instantiation phase; LP-side carries res_tm through.
 symbol INS_1 [P : Prop]
-  (r : Res ⊥) : Res P
-  ≔ mk_0 trust;
+  (h : π ⊥) : Res P
+  ≔ mk_0 (prop_eq_top (⊥ₑ h));
