@@ -254,23 +254,24 @@ folded with a `(×N)` count so they never bury the real error.
 
 - **`lp/B.lp:17` — `symbol trust : π P`.** Intentional; the only declared
   `axiom`/`admit` in `lp/`.
-- **Where trust remains (2026-06-11).** Every `_1` rule that *fires* in a
-  checked proof is trust-free except `AXM9_1` (the ALL7/XST8 HO-unification
-  frontier).  The trust still present is:
-  - **Emitted at use sites (corpus `.lp`, ~4.2k tokens in 83 proofs).** ~98% is
-    **BOOL membership** — `BOOLk trust` for the `V ϵ BOOL` side-condition (`V`
-    is an abstract goal var, no typing context, so it is genuinely
-    underivable — the documented PP limitation).  The rest is the arith solver
-    side-conditions (`AR4`'s `(E+F)>𝟎`, `AR5`) and the `AXM3_1` antisymmetry
-    fallback (AR7_1/AR8_1 frontier).  AR9/AR10 used to dominate this but are now
-    `eq_refl` (their `solveur` equality is the identity).  Never a whole-goal
-    `refine trust;`.
+- **Where trust remains (2026-06-11).** Corpus trust is down from 5628 → 12
+  tokens (372 → 12 proofs).  Every `_1` rule that fires is trust-free, AXM9/AXM9_1
+  included (the ALL7/XST8 frontier was closed — witness derived from the
+  antecedent).  The trust still present is:
+  - **Emitted at use sites: only `AXM3_1` (12 tokens, the z5_anti/qar
+    antisymmetry chain).** The hyp it needs (`−x+y ≤ 𝟎`, the second `≤` bound)
+    is introduced by a *chain-local* `IMP4_1`, which the Res-term encoding does
+    not expose as a λ-bound LP hypothesis — the genuine chain-encoding frontier
+    (the AR7_1/AR8_1 item).  Everything else is generated: BOOL membership via
+    injected `V ϵ BOOL` typing premises (`Bool_split`); AR9/AR10 are `eq_refl`
+    (identity `solveur`); AR4's `(E+F)>𝟎` from `prove_gt_zero`; AR5/6 from the
+    in-scope bound; AR7/AR8's `(a+c)=𝟎` from `prove_sum_zero`.  Never a
+    whole-goal `refine trust;`.
   - **Static rule lemmas, non-firing only.** Binder-reshape `ALL1–4_1`/`XST1–4_1`
     (need a `!!`-currying tuple isomorphism), `BOOL11/12/31/32/41/42_1`
     (antecedent-true / membership context), Schema-0 solver gaps
     (`AR2/4/13_1`), numeric `≠` (`EVR11_1`), and the hyp-threaded
-    `EAXM1/2_1` + `ECTR1–6_1` (would need the AXM-style chain evidence threading,
-    but no replay exercises them).  These compile only because the rule isn't
+    `EAXM1/2_1` + `ECTR1–6_1`.  These compile only because the rule isn't
     reached; converting them is rule-library hygiene with no effect on any
     checked proof.
 - **Schema-0 result bridge.** A trust-free `_1` whose result is ⊤ (§8.13
