@@ -635,5 +635,11 @@ and chain_term ctx node : L.term =
       "translate: chain %s arity %d unsupported"
       rule (List.length children))
 
-let translate (pp_tree : P.pp_tree) : L.t =
-  tree (create_ctx ()) pp_tree
+(* The BOOL31/32/41/42 emit accumulates its `V ϵ BOOL` typing premises into
+   [ctx.bool_typings] as it fires (it needs the in-scope tuple binder, only
+   known mid-walk); return them alongside the script so [Emit_lp] adds them to
+   the symbol header. *)
+let translate (pp_tree : P.pp_tree) : L.t * (string * string) list =
+  let ctx = create_ctx () in
+  let script = tree ctx pp_tree in
+  (script, ctx.bool_typings)

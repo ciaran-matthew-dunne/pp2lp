@@ -15,6 +15,7 @@ type ctx = {
   mutable n : int;
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
+  mutable bool_typings : (string * string) list;
 }
 
 val create_ctx : unit -> ctx
@@ -56,6 +57,12 @@ val and5_fwd : Lp_tree.term -> prd list -> int list -> int -> Lp_tree.term
 
 val goal_of_anno : rhs option -> prd option
 val binder_vars_of : prd -> string list option
+
+(* The discharge term for a BOOL31/32/41/42 rule's `V ϵ BOOL` side-condition on
+   bound var [v] — a per-(arity,slot) typing premise registered in
+   [ctx.bool_typings] and applied to the in-scope tuple ([None] if [v] isn't a
+   bound tuple slot). *)
+val bool_typing_term : ctx -> string -> Lp_tree.term option
 
 (* ---- Searches over the context ---- *)
 

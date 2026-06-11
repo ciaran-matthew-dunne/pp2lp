@@ -38,6 +38,8 @@ type emit =
                       binder at the witness `b`, ⊤-normalise the substituted
                       conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
+  | Bool_split     (* BOOL31/32/41/42: discharge the `V ϵ BOOL` side-condition
+                      from an injected typing hypothesis (Emit_ctx.bool_split_var) *)
   | Eqs2           (* EQS2: negated eql_set marker discharged via store evidence *)
   | Ectr           (* ECTR1-6: equality-substitution contradiction leaves *)
   | Arith          (* ARITH: solver ⊥-terminal — generated Farkas combination
@@ -229,10 +231,10 @@ let rules : (string, rule_info) Hashtbl.t =
   r "BOOL12" pass;
   r "BOOL21" pass;
   r "BOOL22" pass;
-  r "BOOL31" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "BOOL32" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "BOOL41" (Arity [Con; Seq]) ~emit:Trust_cons;
-  r "BOOL42" (Arity [Con; Seq]) ~emit:Trust_cons;
+  r "BOOL31" (Arity [Con; Seq]) ~emit:Bool_split;
+  r "BOOL32" (Arity [Con; Seq]) ~emit:Bool_split;
+  r "BOOL41" (Arity [Con; Seq]) ~emit:Bool_split;
+  r "BOOL42" (Arity [Con; Seq]) ~emit:Bool_split;
   r "BOOL51" leaf;
   r "BOOL52" leaf;
   (* Phantom entries *)

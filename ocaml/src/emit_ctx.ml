@@ -24,9 +24,13 @@ type ctx = {
   mutable n : int;
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
+  (* Boolean-typing premises accumulated during emission: (name, type), one
+     per (arity, slot) a BOOL31/32/41/42 split needs.  [Emit_lp] adds them to
+     the symbol header. *)
+  mutable bool_typings : (string * string) list;
 }
 
-let create_ctx () = { n = 0; hyps = []; xs = [] }
+let create_ctx () = { n = 0; hyps = []; xs = []; bool_typings = [] }
 
 let fresh_h ctx pred =
   ctx.n <- ctx.n + 1;
@@ -139,6 +143,37 @@ let binder_vars_of = function
 let is_true_atom = function
   | Lift (Var ("VRAI" | "TRUE")) -> true
   | _ -> false
+
+(* Locate the bound variable [v] in the in-scope tuple binders: returns the
+   tuple's LP name, [v]'s slot, and the tuple's arity.  Innermost binder wins
+   (ctx.xs is a stack). *)
+let find_tuple_slot ctx v =
+  List.find_map (fun (tname, pvs) ->
+    let rec idx i = function
+      | [] -> None
+      | x :: _ when x = v -> Some i
+      | _ :: rest -> idx (i + 1) rest
+    in
+    match idx 0 pvs with
+    | Some k -> Some (tname, k, List.length pvs)
+    | None -> None) ctx.xs
+
+(* The `V ϵ BOOL` discharge term for a BOOL31/32/41/42 split on bound var [v]:
+   a per-(arity,slot) typing premise `Π u : Tuple n, π (prj k u ϵ BOOL)`
+   (registered in [ctx.bool_typings] so [Emit_lp] adds it to the header),
+   applied to the in-scope tuple.  [None] when [v] isn't a bound tuple slot. *)
+let bool_typing_term ctx v =
+  match find_tuple_slot ctx v with
+  | Some (tname, k, n) ->
+    let name = Printf.sprintf "_bt_%d_%d" n k in
+    let ty =
+      Printf.sprintf
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 BOOL)" n k
+    in
+    if not (List.mem_assoc name ctx.bool_typings) then
+      ctx.bool_typings <- ctx.bool_typings @ [ (name, ty) ];
+    Some (L.App (L.Name name, [ L.Name tname ]))
+  | None -> None
 
 (* ---- Hyp lookup: derive the needed predicate from the goal ----
 

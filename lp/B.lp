@@ -40,6 +40,10 @@ constant symbol BOOL : τ ι;
 symbol bool_cases (v : τ ι) :
   π (v ϵ BOOL) → π (v = BTRUE ∨ v = BFALSE);
 symbol bool_distinct : π (BTRUE ≠ BFALSE);
+// BTRUE, BFALSE are the elements of BOOL — the (definitional) converse of
+// bool_cases, for BOOL31/32/41/42 splits where PP concretised V to a literal.
+symbol btrue_in_bool : π (BTRUE ϵ BOOL);
+symbol bfalse_in_bool : π (BFALSE ϵ BOOL);
 
 // Pair injectivity
 symbol pair_inj (a b c d : τ ι) :

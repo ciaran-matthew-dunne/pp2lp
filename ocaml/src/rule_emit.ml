@@ -56,7 +56,8 @@ let metadata_extra_args rule =
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
   | Rule_db.Nrm26 | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr | Rule_db.Arith
   | Rule_db.Egalite
-  | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10 -> []
+  | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10
+  | Rule_db.Bool_split -> []
 
 (* Holes for the rule's derivation slots; Con slots become `trust` for
    the [Trust_cons] strategy (solver-confirmed side conditions). *)
@@ -292,6 +293,25 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Hyp_search when children = [] -> tactic_for_hyp ctx rule arg anno
   | Rule_db.Axm8 when children = [] -> tactic_for_axm8 ctx rule anno
   | Rule_db.Witness_hyp -> tactic_for_witness_hyp ctx rule anno
+  | Rule_db.Bool_split ->
+    (* BOOL31/32/41/42: the `V ϵ BOOL` Con slot.  V is the non-literal side of
+       the goal's `¬(V = b)` / `¬(b = V)` (BOOL31/32 vs BOOL41/42).  When V is a
+       bound tuple slot, discharge from an injected `Π u, prj k u ϵ BOOL` typing
+       premise applied to the in-scope tuple; when PP concretised V to a boolean
+       literal, from the `b*_in_bool` axiom.  Otherwise trust (no regression). *)
+    let con =
+      match goal_of_anno anno with
+      | Some (Binary (Imp, Unary (Not, Eq (a, b)), _)) ->
+        let v_exp =
+          match base rule with "BOOL31" | "BOOL32" -> a | _ -> b in
+        (match v_exp with
+         | Var ("TRUE" | "VRAI") -> L.Name "btrue_in_bool"
+         | Var ("FALSE" | "FAUX") -> L.Name "bfalse_in_bool"
+         | Var v -> Option.value ~default:L.Trust (bool_typing_term ctx v)
+         | _ -> L.Trust)
+      | _ -> L.Trust
+    in
+    L.Refine (L.Name rule, [con; L.Hole])
   | Rule_db.Ar10 ->
     (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).  PP's `solveur(P) = Q`
        is the identity on every corpus occurrence (P ≡ Q — the antecedent equals
