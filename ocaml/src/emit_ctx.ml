@@ -819,6 +819,41 @@ let prove_sum_zero env e : L.term option =
     else None
   | None -> None
 
+(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] cancels to a positive literal k:
+   `¬(k ≤ 𝟎)` (one_not_leq_zero for k=1; for k≥2, `𝟏 ≤ k ≤ 𝟎` is absurd via the
+   chained `leq_plus_one`), transported along the generated `e = k`.  Used by
+   AR4, whose `(E+F) > 𝟎` premise has `E + F` cancelling to a literal. *)
+let prove_gt_zero env e : L.term option =
+  let rec one_leq_lit c =                         (* π (𝟏 ≤ c·𝟏), c ≥ 1 *)
+    if c <= 1 then L.App (L.Name "leq_refl", [ L.Exp (env, Nat 1) ])
+    else
+      L.App (L.Name "leq_trans",
+        [ L.Exp (env, Nat 1); L.Exp (env, Nat (c - 1)); L.Exp (env, Nat c);
+          one_leq_lit (c - 1);
+          L.App (L.Name "leq_plus_one", [ L.Exp (env, Nat (c - 1)) ]) ])
+  in
+  let lit_not_leq_zero c =                         (* π (¬(c·𝟏 ≤ 𝟎)) *)
+    if c = 1 then L.Name "one_not_leq_zero"
+    else
+      L.Lambda ("_hk", None,
+        L.App (L.Name "one_not_leq_zero",
+          [ L.App (L.Name "leq_trans",
+              [ L.Exp (env, Nat 1); L.Exp (env, Nat c); L.Exp (env, Nat 0);
+                one_leq_lit c; L.Name "_hk" ]) ]))
+  in
+  let rec try_k k =
+    if k > 8 then None
+    else match prove_sum_eq env e (Nat k) with
+      | Some eqpf ->
+        Some (L.App (L.Name "=\xe2\x87\x92",        (* =⇒ : π (A = B) → π A → π B *)
+          [ L.App (L.Name "eq_sym",
+              [ L.App (L.Name "not_cong",
+                  [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
+            lit_not_leq_zero k ]))
+      | None -> try_k (k + 1)
+  in
+  try_k 1
+
 (* ---- NRM29 trust-free dispatch: witness + ⊤-normalisation bridge ----
 
    The (post-AR3_F) NRM29 goal is `(♡(d,rest…)·¬⋀(bounds)) ⇒ R` where the

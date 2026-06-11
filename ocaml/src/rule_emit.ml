@@ -497,15 +497,9 @@ let tactic_for_rule ctx rule arg anno children =
       | Some e ->
         List.find_map (fun (name, p) -> match p with
           | Leq (f, Nat 0) ->
-            Option.map (fun eqpf ->
-              let h_gt =
-                L.App (L.Name "=\xe2\x87\x92",          (* =⇒ *)
-                  [ L.App (L.Name "eq_sym",
-                      [ L.App (L.Name "not_cong",
-                          [ L.App (L.Name "leq_zero_eq", [eqpf]) ]) ]);
-                    L.Name "one_not_leq_zero" ]) in
+            Option.map (fun h_gt ->
               L.Refine (L.Name rule, [exp_term ctx f; L.Name name; h_gt]))
-              (prove_sum_eq env (AOp (Add, e, f)) (Nat 1))
+              (prove_gt_zero env (AOp (Add, e, f)))
           | _ -> None) ctx.hyps
       | None -> None
     in

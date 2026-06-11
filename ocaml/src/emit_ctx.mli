@@ -117,6 +117,9 @@ val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
    Used by the trust-free NRM29 dispatch for the substituted cancelling bounds. *)
 val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
 
+(* `π (e > 𝟎)` when [e] cancels to a positive literal (AR4's `(E+F) > 𝟎`). *)
+val prove_gt_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
+
 (* Proof of a single `≤ 𝟎` (or ⊤) leaf from the in-scope hyps: a direct
    match (up to alpha / binder-kind) or, failing that, an arithmetic-reorder
    bridge (`prove_sum_eq` + `leq_subst_l`).  [None] if no hyp covers it.
