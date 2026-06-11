@@ -254,10 +254,30 @@ folded with a `(×N)` count so they never bury the real error.
 
 - **`lp/B.lp:17` — `symbol trust : π P`.** Intentional; the only declared
   `axiom`/`admit` in `lp/`.
-- **Emitted `trust` at use sites.** The emitter passes `trust` for inline
-  side-condition arguments where PP's check is solver-confirmed rather than
-  tracked (BOOL membership, INS arithmetic-match conjuncts, AR2/AR4/AR5/AR6/
-  AR10/AR13 side conditions). It must NOT emit a whole-goal `refine trust;`.
+- **Where trust remains (2026-06-11).** Every `_1` rule that *fires* in a
+  checked proof is trust-free except `AXM9_1` (the ALL7/XST8 HO-unification
+  frontier).  The trust still present is:
+  - **Emitted at use sites (corpus `.lp`, ~4.2k tokens in 83 proofs).** ~98% is
+    **BOOL membership** — `BOOLk trust` for the `V ϵ BOOL` side-condition (`V`
+    is an abstract goal var, no typing context, so it is genuinely
+    underivable — the documented PP limitation).  The rest is the arith solver
+    side-conditions (`AR4`'s `(E+F)>𝟎`, `AR5`) and the `AXM3_1` antisymmetry
+    fallback (AR7_1/AR8_1 frontier).  AR9/AR10 used to dominate this but are now
+    `eq_refl` (their `solveur` equality is the identity).  Never a whole-goal
+    `refine trust;`.
+  - **Static rule lemmas, non-firing only.** Binder-reshape `ALL1–4_1`/`XST1–4_1`
+    (need a `!!`-currying tuple isomorphism), `BOOL11/12/31/32/41/42_1`
+    (antecedent-true / membership context), Schema-0 solver gaps
+    (`AR2/4/13_1`), numeric `≠` (`EVR11_1`), and the hyp-threaded
+    `EAXM1/2_1` + `ECTR1–6_1` (would need the AXM-style chain evidence threading,
+    but no replay exercises them).  These compile only because the rule isn't
+    reached; converting them is rule-library hygiene with no effect on any
+    checked proof.
+- **Schema-0 result bridge.** A trust-free `_1` whose result is ⊤ (§8.13
+  schema n0) reuses its verified base rule wrapped `mk_0 (prop_eq_top …)`
+  (`Res.lp`); a Schema-1 passthrough uses `mk_1 (res_tm r) (eq_trans <law>
+  (res_eq r))` with the connective law (`ar1_eq`, `ar3f_eq`, `xst6_eq`,
+  `eq_comm_prop`, the `*_eq` family).
 - **Unsupported shapes.** `rule_emit.ml` / `translate.ml` `failwith` rather than
   emit a whole-goal `trust` (e.g. AR7/AR8). New shapes get an explicit `emit`
   constructor in `rule_db.ml` plus its dispatch arm.
