@@ -1,5 +1,5 @@
 // Implication (§A.3) — shallow encoding
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 
@@ -95,6 +95,17 @@ symbol IMP3_1 [P Q R : Prop]
 symbol IMP4_1 [P Q : Prop]
   (r : Res Q) : Res (P ⇒ Q)
   ≔ mk_1 (P ⇒ res_tm r) (imp_cong_r (res_eq r));
+
+// IMP4_1U: IMP4_1 whose child chain uses the antecedent — PP holds the assumed
+// antecedent in its hypothesis store, so a chain-local AXM3_1 discharges a
+// conjunct equal to it.  Take the child as the *equality under the hypothesis*
+// `π P → π (Q = R)`; `imp_cong_r_under` lifts it to the unconditional
+// implication equality.  R (the child's result) is inferred: it is
+// `conj (res_ts (child hp))`, and `res_ts` reduces through the `mk_0`/`concat`
+// structure without touching `hp`, so it closes to a hypothesis-free formula.
+symbol IMP4_1U [P Q R : Prop]
+  (f : π P → π (Q = R)) : Res (P ⇒ Q)
+  ≔ mk_1 (P ⇒ R) (imp_cong_r_under f);
 
 // IMP5_1: strip a known antecedent (hp : π P) — collapses the ⇒.
 symbol IMP5_1 [P Q : Prop]

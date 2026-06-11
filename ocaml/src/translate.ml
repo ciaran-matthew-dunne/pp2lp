@@ -25,6 +25,22 @@ let branch_binder_vars rule goal =
   | "XST8", Some g -> Option.value ~default:[] (binder_vars_of g)
   | _ -> []
 
+(* Does the Res-chain subtree [node] contain an AXM1-6 leaf that looks up the
+   predicate [pred]?  Used at a chain `IMP4_1` to decide whether its antecedent
+   has to be threaded down to a chain-local AXM (which otherwise trusts). *)
+let rec chain_looks_up node pred =
+  match node with
+  | P.Apply { rule; anno; children; _ } ->
+    let here =
+      (match base rule with
+       | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" ->
+         (match goal_of_anno anno with
+          | Some g -> expected_hyp_pred rule g = Some pred
+          | None -> false)
+       | _ -> false)
+    in
+    here || List.exists (fun c -> chain_looks_up c pred) children
+
 (* AR3_F congruence-path builder.  PP's forward normalisation rewrites a
    `¬(a ≤ 𝟎)` occurrence to `r ≤ 𝟎` *in place*, wherever it sits in the
    binder-nested goal.  Build the propositional-equality proof `goal = goal'`
@@ -624,6 +640,29 @@ and chain_term ctx node : L.term =
           L.App (L.Expl (L.Name "ALL3R_1"),
             [L.Hole; p_lambda; L.Hole; chain_term ctx c])
         | _ -> assert false))
+  | P.Apply { rule; anno; children = [c]; _ }
+    when base rule = "IMP4"
+         && (match goal_of_anno anno with
+             | Some (Binary (Imp, ant, _)) ->
+               chain_looks_up c ant && find_hyp_by_pred ctx ant = None
+             | _ -> false) ->
+    (* Chain `IMP4_1` whose child looks up the antecedent (the spec's IMP4'
+       mounts P into H; a chain-local AXM3_1 then discharges a conjunct equal
+       to it).  Bind the antecedent as a hypothesis, emit the child under it
+       (the AXM's existing `leaf_evidence` search now finds it), and package as
+       `IMP4_1U (λ hp, res_eq child)` — the result is unchanged, but the AXM is
+       trust-free.  R (the child result) is inferred. *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, ant, _)) ->
+       ctx.n <- ctx.n + 1;
+       let hp = Printf.sprintf "_h%d" ctx.n in
+       let body =
+         scoped_hyps ctx (fun () ->
+           ctx.hyps <- (hp, ant) :: ctx.hyps;
+           L.App (L.Name "res_eq", [chain_term ctx c]))
+       in
+       L.App (L.Name "IMP4_1U", [L.Lambda (hp, None, body)])
+     | _ -> assert false)
   | P.Apply { rule; arg; children = [c]; _ } ->
     (* Mirror the main-tree arg bundle: dynamic value args, then the solver
        side-condition metadata (AR9's `trust` for `E = F`), then slot holes.
