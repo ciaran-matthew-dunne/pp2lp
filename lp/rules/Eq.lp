@@ -334,12 +334,16 @@ symbol EVR3_1 [E : τ ι] [P : Prop]
 // EVR4: trivial — `E = E = ⊤` via stdlib's `=_idem`.
 symbol EVR4_1 [E : τ ι] : Res (E = E) ≔ mk_0 (=_idem ι E);
 
-// EVR11: numeric ≠ — trusted.
-symbol EVR11_1 [n m : τ ι] [P : Prop] : Res ((n = m) ⇒ P) ≔ mk_0 trust;
+// EVR11: numeric ≠ — the antecedent n = m is absurd (n, m distinct literals),
+// so the implication is vacuously ⊤.  Takes that disequality as evidence.
+symbol EVR11_1 [n m : τ ι] [P : Prop] (h : π (¬ (n = m)))
+  : Res ((n = m) ⇒ P) ≔ mk_0 (prop_eq_top (λ heq, ⊥ₑ (h heq)));
 
-// EAXM1/EAXM2: hyp-driven contradictions, leaf form.
-symbol EAXM1_1 [E F : τ ι] [P : Prop] : Res ((E = F) ⇒ P) ≔ mk_0 trust;
-symbol EAXM2_1 [E F : τ ι] [P : Prop] : Res (¬ (E = F) ⇒ P) ≔ mk_0 trust;
+// EAXM1/EAXM2: hyp-driven contradictions, leaf form (Schema 0, reuse base).
+symbol EAXM1_1 [E F : τ ι] [P : Prop] (h : π (¬ (F = E)))
+  : Res ((E = F) ⇒ P) ≔ mk_0 (prop_eq_top (EAXM1 h));
+symbol EAXM2_1 [E F : τ ι] [P : Prop] (h : π (F = E))
+  : Res (¬ (E = F) ⇒ P) ≔ mk_0 (prop_eq_top (EAXM2 h));
 
 // EAXM31/EAXM32: Schema 1 passthrough through eq commutativity.
 symbol EAXM31_1 [E F : τ ι]
@@ -350,23 +354,25 @@ symbol EAXM32_1 [E F : τ ι]
   (r : Res (¬ (F = E))) : Res (¬ (E = F))
   ≔ mk_1 (res_tm r) (eq_trans (not_cong (eq_comm_prop E F)) (res_eq r));
 
-// EIMP51/EIMP52: Schema 1 passthrough.
-symbol EIMP51_1 [E F : τ ι] [P : Prop]
+// EIMP51/EIMP52: Schema 1 — strip the known (dis)equality antecedent
+// (imp_known_drop), the equality supplied as evidence.
+symbol EIMP51_1 [E F : τ ι] [P : Prop] (h : π (¬ (E = F)))
   (r : Res P) : Res (¬ (E = F) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
-symbol EIMP52_1 [E F : τ ι] [P : Prop]
+symbol EIMP52_1 [E F : τ ι] [P : Prop] (h : π (E = F))
   (r : Res P) : Res ((E = F) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
-// EAXM91/EAXM92: Schema 1 passthrough through eq commutativity.
+// EAXM91/EAXM92: Schema 1 — strip the instantiation (dis)equality (known from
+// the universal hyp), supplied as evidence.
 symbol EAXM91_1 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q : Prop]
-  (r : Res Q) : Res ((q v = p v) ⇒ Q)
-  ≔ mk_1 (res_tm r) trust;
+  (h : π (q v = p v)) (r : Res Q) : Res ((q v = p v) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
 symbol EAXM92_1 [n] [p q : Tuple n → τ ι] (v : Tuple n) [Q : Prop]
-  (r : Res Q) : Res (¬ (q v = p v) ⇒ Q)
-  ≔ mk_1 (res_tm r) trust;
+  (h : π (¬ (q v = p v))) (r : Res Q) : Res (¬ (q v = p v) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (imp_known_drop h) (res_eq r));
 
 // OPR1_1: Schema 1 via the opr1_eq bridge.
 symbol OPR1_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
@@ -403,27 +409,27 @@ symbol EQS2_1 [E F : τ ι] [R : Prop]
   (r : Res (¬ (E = F) ⇒ R)) : Res (¬ eql_set E F ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (not_cong eql_set_eq)) (res_eq r));
 
-// ECTR1–6: hyp-driven contradictions, Schema 0 leaves.
+// ECTR1–6: hyp-driven contradictions, Schema 0 leaves (reuse base + prop_eq_top).
 symbol ECTR1_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
-  : Res ((E = F) ⇒ P)
-  ≔ mk_0 trust;
+  (h1 : π (¬ (Q E))) (h2 : π (Q F)) : Res ((E = F) ⇒ P)
+  ≔ mk_0 (prop_eq_top (ECTR1 Q h1 h2));
 
 symbol ECTR2_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]
-  : Res ((F = E) ⇒ P)
-  ≔ mk_0 trust;
+  (h1 : π (¬ (Q E))) (h2 : π (Q F)) : Res ((F = E) ⇒ P)
+  ≔ mk_0 (prop_eq_top (ECTR2 Q h1 h2));
 
 symbol ECTR3_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
-  : Res (¬ (P E) ⇒ Q)
-  ≔ mk_0 trust;
+  (h1 : π (E = F)) (h2 : π (P F)) : Res (¬ (P E) ⇒ Q)
+  ≔ mk_0 (prop_eq_top (ECTR3 P h1 h2));
 
 symbol ECTR4_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
-  : Res (¬ (P E) ⇒ Q)
-  ≔ mk_0 trust;
+  (h1 : π (F = E)) (h2 : π (P F)) : Res (¬ (P E) ⇒ Q)
+  ≔ mk_0 (prop_eq_top (ECTR4 P h1 h2));
 
 symbol ECTR5_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
-  : Res ((P E) ⇒ Q)
-  ≔ mk_0 trust;
+  (h1 : π (E = F)) (h2 : π (¬ (P F))) : Res ((P E) ⇒ Q)
+  ≔ mk_0 (prop_eq_top (ECTR5 P h1 h2));
 
 symbol ECTR6_1 [E F : τ ι] (P : τ ι → Prop) [Q : Prop]
-  : Res ((P E) ⇒ Q)
-  ≔ mk_0 trust;
+  (h1 : π (F = E)) (h2 : π (¬ (P F))) : Res ((P E) ⇒ Q)
+  ≔ mk_0 (prop_eq_top (ECTR6 P h1 h2));
