@@ -478,10 +478,23 @@ let tactic_for_rule ctx rule arg anno children =
          "translate: %s expected a 1-binder `forall2(x)·¬(…) ⇒ Q` annotation"
          rule_name))
   | Rule_db.Ar5_6 ->
-    (* AR5/AR6 [a R] : π (solver-fact) → π (cont) → π ((±a ≤ 𝟎) ⇒ R).  `a` is
-       implicit (inferred from the goal); the first premise (a ≪ 𝟎 / —a ≤ 𝟎)
-       is solver-confirmed → trust.  The Seq slot is the continuation child. *)
-    L.Refine (L.Name rule, [L.Trust; L.Hole])
+    (* AR5 [a R] : π (a ≪ 𝟎) → … → π ((—a ≤ 𝟎) ⇒ R) — the antisymmetry-to-zero:
+       given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.
+       AR6 is the mirror (antecedent `a ≤ 𝟎`, bound `—a ≤ 𝟎`).  That bound is
+       PP's solver fact, but it's the matching `≤ 𝟎` hypothesis in scope — find
+       it; trust only if absent.  The Seq slot is the continuation child. *)
+    let bound =
+      match base rule, goal_of_anno anno with
+      | "AR5", Some (Binary (Imp, Leq (Neg a, Nat 0), _)) -> Some (Leq (a, Nat 0))
+      | "AR6", Some (Binary (Imp, Leq (a, Nat 0), _)) -> Some (Leq (Neg a, Nat 0))
+      | _ -> None
+    in
+    let con =
+      match Option.bind bound (find_hyp_by_pred ctx) with
+      | Some h -> L.Name h
+      | None -> L.Trust
+    in
+    L.Refine (L.Name rule, [con; L.Hole])
   | Rule_db.Ar4 ->
     (* AR4 [E R] (F) : π (F ≤ 𝟎) → π ((E + F) > 𝟎) → π ((E ≤ 𝟎) ⇒ R).  A leaf
        deriving ⊥ from a hyp `F ≤ 𝟎` and `(E + F) > 𝟎`.  AR4 follows AR3's
