@@ -180,6 +180,13 @@ end;
 symbol eql_set (X Y : τ ι) ≔
   (`∀ a, (a ϵ X) ⇔ (a ϵ Y));
 
+// eql_set E F = (E = F), as a propositional equality (set extensionality).
+opaque symbol eql_set_eq [E F : τ ι] : π (eql_set E F = (E = F)) ≔
+begin
+  assume E F;
+  refine propExt _ _ (λ h, ∧ₑ₂ (set_ext E F) h) (λ h, ∧ₑ₁ (set_ext E F) h)
+end;
+
 // EQS1: H ⊢ (E=F) ⇒ R → H ⊢ eql_set(E,F) ⇒ R
 // From (E=F)⇒R, derive (∀x.x∈E⇔x∈F)⇒R.
 opaque symbol EQS1 [E F : τ ι] [R]
@@ -334,14 +341,14 @@ symbol EVR11_1 [n m : τ ι] [P : Prop] : Res ((n = m) ⇒ P) ≔ mk_0 trust;
 symbol EAXM1_1 [E F : τ ι] [P : Prop] : Res ((E = F) ⇒ P) ≔ mk_0 trust;
 symbol EAXM2_1 [E F : τ ι] [P : Prop] : Res (¬ (E = F) ⇒ P) ≔ mk_0 trust;
 
-// EAXM31/EAXM32: Schema 1 passthrough.
+// EAXM31/EAXM32: Schema 1 passthrough through eq commutativity.
 symbol EAXM31_1 [E F : τ ι]
   (r : Res (F = E)) : Res (E = F)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (eq_comm_prop E F) (res_eq r));
 
 symbol EAXM32_1 [E F : τ ι]
   (r : Res (¬ (F = E))) : Res (¬ (E = F))
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (not_cong (eq_comm_prop E F)) (res_eq r));
 
 // EIMP51/EIMP52: Schema 1 passthrough.
 symbol EIMP51_1 [E F : τ ι] [P : Prop]
@@ -371,25 +378,30 @@ symbol OPR2_1 [E : τ ι] (P : τ ι → Prop) [x : τ ι]
   (r : Res (E = x ⇒ P E)) : Res (E = x ⇒ P x)
   ≔ mk_1 (res_tm r) (eq_trans (opr2_eq P x) (res_eq r));
 
-// EQC1/EQC2: pair-equality decomposition, Schema 1 passthrough.
+// EQC1/EQC2: pair-equality decomposition, Schema 1 passthrough (pair_inj).
 symbol EQC1_1 [a b c d : τ ι] [P : Prop]
   (r : Res ((¬ (a = c) ∨ ¬ (b = d)) ⇒ P))
   : Res (¬ ((a ↦ b) = (c ↦ d)) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (eq_trans (not_cong pair_eq_decomp)
+                                       (deMorgan_∧ (a = c) (b = d))))
+                 (res_eq r));
 
 symbol EQC2_1 [a b c d : τ ι] [P : Prop]
   (r : Res (⋀ (∎ ∷ (a = c) ∷ (b = d)) ⇒ P))
   : Res (((a ↦ b) = (c ↦ d)) ⇒ P)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (eq_trans pair_eq_decomp (eq_sym conj2_eq)))
+                 (res_eq r));
 
-// EQS1/EQS2: set-equality lifting, Schema 1 passthrough.
+// EQS1/EQS2: set-equality lifting, Schema 1 passthrough (eql_set_eq).
 symbol EQS1_1 [E F : τ ι] [R : Prop]
   (r : Res ((E = F) ⇒ R)) : Res (eql_set E F ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l eql_set_eq) (res_eq r));
 
 symbol EQS2_1 [E F : τ ι] [R : Prop]
   (r : Res (¬ (E = F) ⇒ R)) : Res (¬ eql_set E F ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l (not_cong eql_set_eq)) (res_eq r));
 
 // ECTR1–6: hyp-driven contradictions, Schema 0 leaves.
 symbol ECTR1_1 [E F : τ ι] (Q : τ ι → Prop) [P : Prop]

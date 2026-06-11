@@ -50,6 +50,33 @@ begin
   refine propExt _ _ (λ h, eq_sym h) (λ h, eq_sym h)
 end;
 
+// ¬¬A = A (classical) — for the XST51/61_1 double-negation passthroughs.
+opaque symbol not_not_eq [A : Prop] : π ((¬ ¬ A) = A) ≔
+begin assume A; refine propExt _ _ (λ h, ¬¬ₑ A h) (λ h hn, hn h) end;
+
+// (¬⊥ ⇒ R) = R — ¬⊥ is provable, so the antecedent drops (FX1_1).
+opaque symbol not_bot_imp_eq [R : Prop] : π ((¬ ⊥ ⇒ R) = R) ≔
+begin assume R; refine propExt _ _ (λ h, h (λ b, b)) (λ hr _, hr) end;
+
+// ⋀(∎ ∷ X ∷ Y) = (X ∧ Y) — the 2-element snoc conjunction is binary ∧ (EQC2_1).
+opaque symbol conj2_eq [X Y : Prop] : π ((⋀ (∎ ∷ X ∷ Y)) = (X ∧ Y)) ≔
+begin
+  assume X Y;
+  refine propExt _ _
+    (λ h, ∧ᵢ (⋀₂_hd h) (⋀₂_snd h))
+    (λ h, ⋀₂_intro (∧ₑ₁ h) (∧ₑ₂ h))
+end;
+
+// (a↦b)=(c↦d) = (a=c ∧ b=d) — pair injectivity (EQC1/2_1).
+opaque symbol pair_eq_decomp [a b c d : τ ι]
+  : π (((a ↦ b) = (c ↦ d)) = ((a = c) ∧ (b = d))) ≔
+begin
+  assume a b c d;
+  refine propExt _ _
+    (λ h, pair_inj a b c d h)
+    (λ h, pair_cong a b c d (∧ₑ₁ h) (∧ₑ₂ h))
+end;
+
 // Conj congruence: lift independent equalities to their conjunction.
 opaque symbol conj_eq [A B S1 S2 : Prop]
   : π (A = S1) → π (B = S2) → π ((A ∧ B) = (S1 ∧ S2)) ≔
@@ -431,6 +458,14 @@ begin
         (λ v hpv, hne (pi_to_??_intro P v hpv)) }
     { assume hall hex; refine pi_to_??_elim P
         (λ v hpv, !!_to_pi (λ v, ¬ (P v)) hall v hpv) hex }
+end;
+
+// XST61: ¬(∃v·¬P v) = (∀v·P v) — quantifier De Morgan then double negation.
+opaque symbol xst61_eq [n] [P : Tuple n → Prop]
+  : π ((¬ (`?? v, ¬ (P v))) = (`!! v, P v)) ≔
+begin
+  assume n P;
+  refine eq_trans xst6_eq (!!_cong (λ v, not_not_eq))
 end;
 
 // XST8: (∃-block, P) = ((∀-block, ¬P) ⇒ ⊥)

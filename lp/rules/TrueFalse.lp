@@ -103,10 +103,10 @@ symbol VR3_1 [P : Prop]
 // VR4_1: Schema 0 — trivially `⊤ = ⊤`.
 symbol VR4_1 : Res ⊤ ≔ mk_0 (eq_refl ⊤);
 
-// FX1_1: Schema 1 — passthrough through `¬⊥ ⇒ R = R`.
+// FX1_1: Schema 1 — passthrough through `¬⊥ ⇒ R = R` (not_bot_imp_eq).
 symbol FX1_1 [R : Prop]
   (r : Res R) : Res (¬ ⊥ ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans not_bot_imp_eq (res_eq r));
 
 // FX2_1: Schema 0 — `¬⊥ = ⊤` from stdlib.
 symbol FX2_1 : Res (¬ ⊥) ≔ mk_0 ¬⊥;

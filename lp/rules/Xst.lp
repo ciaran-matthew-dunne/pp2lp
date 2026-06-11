@@ -195,7 +195,7 @@ symbol XST5_1 [n] [P : Tuple n → Prop] [R : Prop]
 symbol XST51_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`!! v, P v) ⇒ R))
   : Res (¬ (`?? v, ¬ (P v)) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l xst61_eq) (res_eq r));
 
 symbol XST6_1 [n] [P : Tuple n → Prop]
   (r : Res (`!! v, ¬ (P v)))
@@ -205,7 +205,7 @@ symbol XST6_1 [n] [P : Tuple n → Prop]
 symbol XST61_1 [n] [P : Tuple n → Prop]
   (r : Res (`!! v, P v))
   : Res (¬ (`?? v, ¬ (P v)))
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r) (eq_trans xst61_eq (res_eq r));
 
 // XST7_1: (∃-block, P) ⇒ R via (∀-block, P ⇒ R).
 symbol XST7_1 [n] [P : Tuple n → Prop] [R : Prop]

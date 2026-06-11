@@ -246,7 +246,8 @@ symbol AR2_1 [a b : τ ι] [R : Prop] : Res ((a ≤ b) ⇒ R) ≔ mk_0 trust;
 
 symbol AR3_1 (a : τ ι) [R : Prop]
   (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
+  ≔ mk_1 (res_tm r)
+       (eq_trans (imp_cong_l (ar3f_eq a (𝟏 - a) (eq_refl (𝟏 - a)))) (res_eq r));
 
 // AR3'_1: bridged Res-chain AR3, for when PP's solver records the sub-premise
 // `𝟏 - a` in a different (neg-normalised) term order `r`.  The `¬(a≤𝟎) =
