@@ -157,32 +157,45 @@ end;
 // conjunct lists is the ∧ of their conjs.  `conj_concat_eq` is the
 // equality the schema-2 `_1` rules use to combine two children's lists.
 
-symbol conj_snoc (qs : 𝕃* o) (y : Prop)
-  : π (conj (qs ∷ y) = (conj qs ∧ y));
-//begin
-//  induction
-//  { assume y; refine eq_sym (⊤∧ y) }
-//  { assume qs' q _ih y;
-//    refine propExt _ _ _ _
-//    { assume h; refine ∧ᵢ (⋀_init h) (⋀_last h) }
-//    { assume h; refine ⋀_intro (∧ₑ₁ h) (∧ₑ₂ h) } }
-//end;
+// `conj_cons` bridges the stuck `ite (is_nil p) …` left by `conj (p ∷ q)` to
+// the plain `⋀ (p ∷ q)` (the `is_nil p` guard is irreducible for an abstract
+// p, so the two are not convertible directly).  Trivial by induction — both
+// cases reduce to reflexivity — and both proofs below lean on it.
+opaque symbol conj_cons (p : 𝕃* o) (q : Prop)
+  : π (conj (p ∷ q) = ⋀ (p ∷ q)) ≔
+begin
+  induction
+  { assume q; reflexivity }
+  { assume p' ih x q; reflexivity }
+end;
 
-symbol conj_concat_eq (l1 l2 : 𝕃* o)
-  : π ((conj l1 ∧ conj l2) = conj (concat l1 l2));
-//begin
-//  assume l1;
-//  induction
-//  { refine ∧⊤ (conj l1) }
-//  { assume l2' ih y;
-//    have hL : π (conj (l2' ∷ y) = (conj l2' ∧ y)) { refine conj_snoc l2' y };
-//    have hR : π (conj (concat l1 (l2' ∷ y)) = (conj (concat l1 l2') ∧ y))
-//      { refine conj_snoc (concat l1 l2') y };
-//    rewrite hL;
-//    rewrite hR;
-//    rewrite left ih;
-//    refine eq_sym (∧_assoc (conj l1) (conj l2') y) }
-//end;
+opaque symbol conj_snoc (qs : 𝕃* o) (y : Prop)
+  : π (conj (qs ∷ y) = (conj qs ∧ y)) ≔
+begin
+  induction
+  { assume y; refine eq_sym (⊤∧ y) }
+  { assume qs' ih q y;
+    rewrite conj_cons qs' q;
+    refine propExt _ _ _ _
+    { assume h; refine ∧ᵢ (⋀_init h) (⋀_last h) }
+    { assume h; refine ⋀_intro (∧ₑ₁ h) (∧ₑ₂ h) } }
+end;
+
+opaque symbol conj_concat_eq (l1 l2 : 𝕃* o)
+  : π ((conj l1 ∧ conj l2) = conj (concat l1 l2)) ≔
+begin
+  assume l1;
+  induction
+  { refine ∧⊤ (conj l1) }
+  { assume l2' ih y;
+    have hL : π (conj (l2' ∷ y) = (conj l2' ∧ y)) { refine conj_snoc l2' y };
+    have hR : π (conj (concat l1 (l2' ∷ y)) = (conj (concat l1 l2') ∧ y))
+      { refine conj_snoc (concat l1 l2') y };
+    rewrite hL;
+    rewrite hR;
+    rewrite left ih;
+    refine eq_sym (∧_assoc (conj l1) (conj l2') y) }
+end;
 
 // ---- 2-element helpers ----
 //
