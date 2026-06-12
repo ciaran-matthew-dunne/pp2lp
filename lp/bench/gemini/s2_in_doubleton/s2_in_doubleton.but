@@ -1,1 +1,0 @@
-Flag(FileOn("s2_in_doubleton.res")) & Set(Valid.1 | Rule(Implication | (x: {x,y}) & _delta_e(x) & _delta_e(y) | ? | ? | x: {x,y} | nn))

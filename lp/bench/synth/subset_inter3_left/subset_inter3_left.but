@@ -1,1 +1,0 @@
-Flag(FileOn("subset_inter3_left.res")) & Set(Valid.1 | Rule(Implication | (s /\ t /\ u <: s) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | s /\ t /\ u <: s | nn))

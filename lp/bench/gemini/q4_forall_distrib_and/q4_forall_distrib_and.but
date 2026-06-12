@@ -1,1 +1,0 @@
-Flag(FileOn("q4_forall_distrib_and.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: p & x: q) <=> (!x.(x: s => x: p) & !x.(x: s => x: q))) & _delta_e(s) & _delta_e(p) & _delta_e(q) | ? | ? | !x.(x: s => x: p & x: q) <=> (!x.(x: s => x: p) & !x.(x: s => x: q)) | nn))

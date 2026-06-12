@@ -1,1 +1,0 @@
-Flag(FileOn("eq_union.res")) & Set(Valid.1 | Rule(Implication | (s \/ t = s \/ t) & _delta_e(s) & _delta_e(t) | ? | ? | s \/ t = s \/ t | nn))

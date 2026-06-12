@@ -24,8 +24,11 @@ let rec collect_exp_fv bound fv = function
     let fv = if SS.mem f bound || SS.mem f reserved then fv
              else { fv with exp_vars = SS.add f fv.exp_vars } in
     List.fold_left (collect_exp_fv bound) fv args
-  | SetImage (e1, e2) | Inter (e1, e2) | Union (e1, e2) ->
+  | SetImage (e1, e2) | Inter (e1, e2) | Union (e1, e2) | Range (e1, e2)
+  | Maplet (e1, e2) | DomRestrict (e1, e2) | RanRestrict (e1, e2) ->
     collect_exp_fv bound (collect_exp_fv bound fv e1) e2
+  | Inverse e -> collect_exp_fv bound fv e
+  | SetLit es -> List.fold_left (collect_exp_fv bound) fv es
 
 let rec collect_prd_fv bound fv = function
   | Lift (Var s) when SS.mem s bound ->

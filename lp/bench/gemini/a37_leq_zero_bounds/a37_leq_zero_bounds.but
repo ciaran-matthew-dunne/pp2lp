@@ -1,1 +1,0 @@
-Flag(FileOn("a37_leq_zero_bounds.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & y <= 0 & z <= 0 => x + y + z <= 0) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= 0 & y <= 0 & z <= 0 => x + y + z <= 0 | nn))

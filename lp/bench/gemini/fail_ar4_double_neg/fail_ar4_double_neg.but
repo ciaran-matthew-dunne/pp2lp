@@ -1,1 +1,0 @@
-Flag(FileOn("fail_ar4_double_neg.res")) & Set(Valid.1 | Rule(Implication | (!x.(not(not(x <= y)) => x <= y)) & _delta_e(y) | ? | ? | !x.(not(not(x <= y)) => x <= y) | nn))

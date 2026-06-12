@@ -1,1 +1,0 @@
-Flag(FileOn("in_bool.res")) & Set(Valid.1 | Rule(Implication | (b: BOOL) & _delta_e(b) | ? | ? | b: BOOL | nn))

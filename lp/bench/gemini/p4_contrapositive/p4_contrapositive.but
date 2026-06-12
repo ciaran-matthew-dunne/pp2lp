@@ -1,1 +1,0 @@
-Flag(FileOn("p4_contrapositive.res")) & Set(Valid.1 | Rule(Implication | ((p => q) <=> (not(q) => not(p))) & _delta_p(p) & _delta_p(q) | ? | ? | (p => q) <=> (not(q) => not(p)) | nn))

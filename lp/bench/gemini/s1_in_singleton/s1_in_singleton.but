@@ -1,1 +1,0 @@
-Flag(FileOn("s1_in_singleton.res")) & Set(Valid.1 | Rule(Implication | (x: {x}) & _delta_e(x) | ? | ? | x: {x} | nn))

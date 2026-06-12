@@ -80,8 +80,28 @@ let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
 let rec tree ctx node =
   match node with
   | P.Apply { rule; children = [c]; _ }
-    when Rule_db.is_hoas_identity (base rule) ->
-    (* HOAS identity: no tactic of its own; the child carries provenance. *)
+    when Rule_db.is_hoas_identity (base rule)
+      || Rule_db.is_binder_merge (base rule) ->
+    (* Skip to the child — the rule emits no tactic of its own.  Two distinct
+       justifications, both leaving the live goal unchanged:
+
+       - [hoas_identity] (ALL6): the transformation is LP-definitional
+         (¬Q ≡ Q⇒⊥), so parent and child goals are convertible.
+
+       - [binder_merge] (ALL1–4 / XST1–4): PP *regroups* `∀x·∀y·P` into the
+         compound `∀(x,y)·P` (spec §A.7–8, "regroupement des quantifications").
+         We perform that merge at the AST level in [Syntax_pp.flatten_binds]
+         instead of via the LP `ALLn`/`XSTn` lemma, so both goals already render
+         to the same compound `Tuple n` binder and the rule has nothing to do.
+         Why skip rather than emit the lemma?  ALL3 has been re-encoded curried
+         (`!! w, !! y, P w y`, All.lp) where P is a *pattern*, so it CAN be
+         emitted with P inferred — [branch_cont] does exactly that (`refine
+         ALL3 _`) when a branch continuation's nested antecedent escaped
+         flattening.  The other merge rules still carry the compound-tuple
+         encoding (`P (w ⨾ prj 0 y)`), where P sits at a non-pattern position
+         lambdapi cannot invert, so the [Default] hole-emit leaves P unsolved;
+         emitting them would need an explicit predicate at every site — the
+         complexity flatten_binds buys us out of until they too are curried. *)
     tree ctx c
   | P.Apply { rule; src_line; anno; _ } ->
     L.Commented (prov_of rule src_line anno, tree_dispatch ctx node)
@@ -346,8 +366,8 @@ and default ctx rule arg anno children =
           antisymmetry RHS; c = —a) — [prove_sum_zero], no trust.  For AR7 c is
           the explicit value `—rhs_e`; for AR8 c is *goal-inferred* (the left
           summand of the goal antecedent `c + b`, b = lhs_e), so read it from
-          there or the distributed form won't unify with `—rhs_e`.  Trust only
-          if the shape is off. *)
+          there or the distributed form won't unify with `—rhs_e`.  Fail (never
+          trust) if the shape is off. *)
        let acc_eq =
          let env = proj_env_of_ctx ctx in
          match goal_of_anno (P.anno_of c) with
@@ -361,9 +381,16 @@ and default ctx rule arg anno children =
                 | _ -> None)
            in
            (match ac with
-            | Some ac -> Option.value ~default:L.Trust (prove_sum_zero env ac)
-            | None -> L.Trust)
-         | _ -> L.Trust
+            | Some ac ->
+              (match prove_sum_zero env ac with
+               | Some t -> t
+               | None -> failwith "translate: AR7/AR8 chain — prove_sum_zero \
+                                   failed for the `(a+c)=𝟎` cancellation, \
+                                   refusing to emit trust")
+            | None -> failwith "translate: AR7/AR8 chain — unexpected goal shape \
+                                for the `(a+c)=𝟎` cancellation, refusing to emit trust")
+         | _ -> failwith "translate: AR7/AR8 chain — child annotation isn't the \
+                          expected `E = F ⇒ …` equality, refusing to emit trust"
        in
        let tactic =
          L.Refine (L.Name (base rule), [value; hb; acc_eq; L.Hole]) in
@@ -423,35 +450,24 @@ and branching ctx rule anno chain_node cont =
 
 (* A branching continuation's goal is `(!! v, res_tm (ρ v)) ⇒ R`.  When the
    chain result is itself a universal, that antecedent is *structurally
-   nested* (`!! v, !! y, …`) — unlike everywhere else, where the renderer
-   already merges nested PP binders into one compound tuple (which is why
-   ALL3 is a HOAS identity by default).  Here PP's ALL3 merge must be
-   emitted for real, as ALL3R: its compound premise appends the *outer*
-   element last, matching the renderer's slot order (first PP binder ↦
-   prj 0), so downstream hyp searches stay consistent.  P sits applied at
-   a tuple constructor — a non-pattern position lambdapi cannot invert —
-   so it is passed explicitly, built from the child's merged annotation. *)
+   nested* (`!! w, !! y, …`) — unlike everywhere else, where the renderer
+   already merges nested PP binders into one compound tuple (the `binder_merge`
+   skip).  Here PP's ALL3 merge must be emitted for real.  The curried `ALL3`
+   (All.lp) states the nested conclusion as `!! w, !! y, P w y`, a *pattern* in
+   P, so `refine ALL3 _` infers P from the goal — no explicit predicate — and
+   its take/drop compound premise already matches the renderer's slot order
+   (which is why the old explicit-P `ALL3R` variant is gone). *)
 and branch_cont ctx cont =
   match cont with
   | P.Apply { rule; children = [c]; src_line; anno; _ }
-    when base rule = "ALL3" ->
-    let merged =
-      match c with
-      | P.Apply { anno = canno; _ } ->
-        (match goal_of_anno canno with
-         | Some (Binary (Imp, Bind (_, vars, body), _)) -> Some (vars, body)
-         | _ -> None)
-    in
-    (match merged with
-     | Some (vars, body) ->
-       let u = fresh_x_local ctx in
-       let p_lambda =
-         with_x ctx u vars (fun () -> L.Lambda (u, None, pred_term ctx body))
-       in
-       let tactic = L.Refine (L.Expl (L.Name "ALL3R"),
-         [L.Hole; p_lambda; L.Hole; L.Hole]) in
-       L.Commented (prov_of rule src_line anno, L.Then (tactic, tree ctx c))
-     | None -> tree ctx cont)
+    when base rule = "ALL3"
+         && (match c with
+             | P.Apply { anno = canno; _ } ->
+               (match goal_of_anno canno with
+                | Some (Binary (Imp, Bind (_, _, _), _)) -> true
+                | _ -> false)) ->
+    let tactic = L.Refine (L.Name "ALL3", [L.Hole]) in
+    L.Commented (prov_of rule src_line anno, L.Then (tactic, tree ctx c))
   | _ -> tree ctx cont
 
 (* The Res-chain handed to ALL7/XST8 has type `Π v : Tuple n, Res (P v)`.
@@ -501,20 +517,31 @@ and chain_term ctx node : L.term =
        base rule looks up.  Recover it from scope as a real proof term
        ([leaf_evidence] also bridges arith-reorder / equality-store shapes);
        the LP lemma reuses the base rule + `prop_eq_top`.  No hyp recovered ⇒
-       `trust`, matching the pre-evidence behaviour (no regression). *)
+       fail (never trust). *)
+    let no_ev () =
+      failwith (Printf.sprintf
+        "translate: chain-form %s — the hypothesis it needs isn't recoverable \
+         from scope, refusing to emit trust" rule)
+    in
     let ev =
       match goal_of_anno anno with
       | Some goal ->
         (match expected_hyp_pred rule goal with
-         | Some needed -> Option.value ~default:L.Trust (leaf_evidence ctx [] needed)
-         | None -> L.Trust)
-      | None -> L.Trust
+         | Some needed ->
+           (match leaf_evidence ctx [] needed with Some t -> t | None -> no_ev ())
+         | None -> no_ev ())
+      | None -> no_ev ()
     in
     L.App (L.Name (chain_emit_name rule), [ev])
   | P.Apply { rule; anno; children = []; _ } when base rule = "AXM8" ->
     (* Chain-form AXM8: the conjunct-extraction `π C → π r` the base rule
        builds, handed to AXM8_1 (which wraps it in `mk_0 ∘ prop_eq_top`). *)
-    let f = Option.value ~default:L.Trust (axm8_extraction ctx anno) in
+    let f =
+      match axm8_extraction ctx anno with
+      | Some t -> t
+      | None -> failwith "translate: chain-form AXM8 — couldn't extract the \
+                          conjunct evidence, refusing to emit trust"
+    in
     L.App (L.Name (chain_emit_name rule), [f])
   | P.Apply { rule; children = []; arg; _ } ->
     app (chain_emit_name rule)
@@ -560,7 +587,8 @@ and chain_term ctx node : L.term =
     in
     let heq = match arg with
       | Some (Pred _) -> L.App (L.Name "eq_refl", [q_term])
-      | _ -> L.Trust
+      | _ -> failwith "translate: chain-form AR10 without a Q (solveur result) \
+                       argument, refusing to emit trust"
     in
     L.App (L.Expl (L.Name rule),
       [L.Hole; q_term; L.Hole; heq; chain_term ctx c])
@@ -628,18 +656,9 @@ and chain_term ctx node : L.term =
                (match goal_of_anno canno with
                 | Some (Binary (Imp, Bind (_, _, _), _)) -> true
                 | _ -> false)) ->
-    (* Chain form of the explicit-P ALL3R emission (see `branch_cont`). *)
-    (match c with
-     | P.Apply { anno = canno; _ } ->
-       (match goal_of_anno canno with
-        | Some (Binary (Imp, Bind (_, vars, body), _)) ->
-          let u = fresh_x_local ctx in
-          let p_lambda =
-            with_x ctx u vars (fun () -> L.Lambda (u, None, pred_term ctx body))
-          in
-          L.App (L.Expl (L.Name "ALL3R_1"),
-            [L.Hole; p_lambda; L.Hole; chain_term ctx c])
-        | _ -> assert false))
+    (* Chain form of the curried ALL3 merge (see `branch_cont`): P is inferred
+       from the result type `!! w, !! y, P w y`, so no explicit predicate. *)
+    L.App (L.Name "ALL3_1", [chain_term ctx c])
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP4"
          && (match goal_of_anno anno with

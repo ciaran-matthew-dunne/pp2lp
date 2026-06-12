@@ -1,1 +1,0 @@
-Flag(FileOn("prop_double_neg.res")) & Set(Valid.1 | Rule(Implication | (not(not(a))) & _delta_p(a) | ? | ? | not(not(a)) | nn))

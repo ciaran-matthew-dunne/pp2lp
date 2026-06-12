@@ -1,1 +1,0 @@
-Flag(FileOn("p9_syllogism.res")) & Set(Valid.1 | Rule(Implication | ((p => q) & (q => r) => (p => r)) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p => q) & (q => r) => (p => r) | nn))

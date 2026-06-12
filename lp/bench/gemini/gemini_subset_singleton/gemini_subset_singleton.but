@@ -1,1 +1,0 @@
-Flag(FileOn("gemini_subset_singleton.res")) & Set(Valid.1 | Rule(Implication | ({x} <: s & {y} <: s => {x,y} <: s) & _delta_e(x) & _delta_e(s) & _delta_e(y) | ? | ? | {x} <: s & {y} <: s => {x,y} <: s | nn))

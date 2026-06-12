@@ -1,1 +1,0 @@
-Flag(FileOn("nrm14_neg_mem.res")) & Set(Valid.1 | Rule(Implication | (!x.not(x: s)) & _delta_e(s) | ? | ? | !x.not(x: s) | nn))

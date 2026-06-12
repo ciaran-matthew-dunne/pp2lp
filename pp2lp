@@ -11,14 +11,17 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import difflib
+import hashlib
 import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 try:
@@ -822,19 +825,37 @@ def find_kin(hints):
     return next((str(h) for h in hints if Path(h).exists()), None)
 
 
+# krt children currently running — an interrupt (gen_apero) kills these so
+# blocked worker threads return immediately instead of riding out the timer.
+_KRT_LIVE: set = set()
+
+
 def run_krt(krt, kin, goal_file, cwd, timeout=120.0, timer="R45", patterns=_SATURATION):
+    """Run a krt kernel under the standard child caps — wall-clock `timeout`,
+    RLIMIT_AS (PP2LP_CHECK_MEM_GB) + RLIMIT_CPU via _child_limits, and its own
+    session group — so a runaway PP/REPLAY can't take down the host."""
     argv = [krt] + (["-i", timer] if timer else []) + ["-b", kin, goal_file]
+    p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True,
+                         preexec_fn=_child_limits(timeout),
+                         start_new_session=True)
+    _KRT_LIVE.add(p)
     try:
-        r = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return False, "", "timeout"
-    text = (r.stdout or "") + "\n" + (r.stderr or "")
+        try:
+            out, err = p.communicate(timeout=timeout or None)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.communicate()
+            return False, "", "timeout"
+    finally:
+        _KRT_LIVE.discard(p)
+    text = (out or "") + "\n" + (err or "")
     for reason, pat in patterns:
         if re.search(pat, text):
-            return False, r.stdout, reason
-    if r.returncode != 0:
-        return False, r.stdout, f"rc={r.returncode}"
-    return True, r.stdout, ""
+            return False, out, reason
+    if p.returncode != 0:
+        return False, out, f"rc={p.returncode}"
+    return True, out, ""
 
 
 _GEN_KEYWORDS = {"BOOL", "FALSE", "INTEGER", "NAT", "NATURAL", "NATURAL1", "POW",
@@ -926,6 +947,346 @@ def _strip_flags(content):
     return content
 
 
+# ── apero: CLEARSY's open PO corpus (POG XML → PP rule-validation .but) ────
+# Dataset: 5 434 .pog files, 36 Atelier B projects (DOI 10.5281/zenodo.7050797).
+# Point PP2LP_APERO_POG at the extracted `zenodo-dataset-pog-20220905` dir
+# (default: vendor/apero/pog).  There is no Atelier B path from .pog to PP —
+# the modern proof-mechanism drivers all target SMT/TPTP — so we render each
+# obligation (full hypothesis set, as stated) into PP's own rule-validator
+# input, the same .but shape Atelier B writes for the prv corpus.
+#
+# Conversion and the PP run are fused and streamed: a benchmark dir
+# materialises only when PP proves the goal, so disk scales with proofs, not
+# with the ~600k-goal corpus.  A content-hash ledger (.gen_ledger.json)
+# dedupes the very repetitive corpus and makes the pass resumable; --force
+# resets it.  PP timer: PP2LP_APERO_TIMER (default R45, as gen_traces);
+# workers: PP2LP_GEN_JOBS (default half the cores).
+
+_APERO_NS = "{https://www.atelierb.eu/Formats/pog}"
+
+class _AperoUnsupported(Exception):
+    pass
+
+_APERO_CMP = {":": ":", "/:": "/:", "<:": "<:", "/<:": "/<:", "<<:": "<<:",
+              "/<<:": "/<<:", "=": "=", "/=": "/=",
+              "<=i": "<=", "<i": "<", ">=i": ">=", ">i": ">",
+              "<=f": "<=", "<f": "<", ">=f": ">=", ">f": ">",
+              "<=": "<=", "<": "<", ">=": ">=", ">": ">"}
+_APERO_BIN = {"+i": "+", "-i": "-", "*i": "*", "/i": "/", "**i": "**",
+              "+f": "+", "-f": "-", "*f": "*", "/f": "/",
+              "-s": "-", "*s": "*", "+s": "+"}
+_APERO_UN = {"imax": "max", "imin": "min", "rmax": "max", "rmin": "min"}
+
+
+def _apero_src() -> Path:
+    return Path(os.environ.get("PP2LP_APERO_POG")
+                or str(ROOT / "vendor" / "apero" / "pog"))
+
+
+def _ap_tag(el):
+    return el.tag.replace(_APERO_NS, "")
+
+
+def _ap_exp(el) -> str:
+    t = _ap_tag(el)
+    if t == "Id":
+        v = el.get("value")
+        s = el.get("suffix")
+        return f"{v}${s}" if s else v
+    if t == "Integer_Literal":
+        return el.get("value")
+    if t == "Boolean_Literal":
+        return el.get("value")
+    if t == "EmptySet":
+        return "{}"
+    if t == "EmptySeq":
+        return "[]"
+    if t == "Boolean_Exp":
+        return f"bool({_ap_prd(el[0])})"
+    if t == "Unary_Exp":
+        op = el.get("op")
+        a = _ap_exp(el[0])
+        if op == "~":
+            return f"({a})~"
+        if op in ("-i", "-"):
+            return f"(-({a}))"
+        return f"{_APERO_UN.get(op, op)}({a})"
+    if t == "Binary_Exp":
+        op = el.get("op")
+        a, b = _ap_exp(el[0]), _ap_exp(el[1])
+        if op == "(":
+            return f"{a}({b})"
+        if op == "[":
+            return f"({a})[{b}]"
+        if op == "'":
+            raise _AperoUnsupported("record field access")
+        return f"({a} {_APERO_BIN.get(op, op)} {b})"
+    if t == "Nary_Exp":
+        op = el.get("op")
+        parts = [_ap_exp(c) for c in el]
+        if op == "{":
+            return "{" + ", ".join(parts) + "}"
+        if op == "[":
+            return "[" + ", ".join(parts) + "]"
+        raise _AperoUnsupported(f"nary exp {op!r}")
+    if t == "Quantified_Exp":
+        op = el.get("op") or el.get("type")
+        name = {"%": "%", "iSIGMA": "SIGMA", "iPI": "PI", "rSIGMA": "SIGMA",
+                "UNION": "UNION", "INTER": "INTER"}.get(op)
+        if name is None:
+            raise _AperoUnsupported(f"quantified exp {op!r}")
+        vs = ",".join(_ap_exp(v) for v in el.find(f"{_APERO_NS}Variables"))
+        pred = _ap_prd(el.find(f"{_APERO_NS}Pred")[0])
+        body = _ap_exp(el.find(f"{_APERO_NS}Body")[0])
+        return f"{name}({vs}).({pred} | {body})"
+    raise _AperoUnsupported(f"exp node {t}")
+
+
+def _ap_prd(el) -> str:
+    t = _ap_tag(el)
+    if t == "Exp_Comparison":
+        op = el.get("op")
+        if op not in _APERO_CMP:
+            raise _AperoUnsupported(f"comparison {op!r}")
+        return f"({_ap_exp(el[0])} {_APERO_CMP[op]} {_ap_exp(el[1])})"
+    if t == "Nary_Pred":
+        op = el.get("op")
+        if op not in ("&", "or"):
+            raise _AperoUnsupported(f"nary pred {op!r}")
+        return "(" + f" {op} ".join(_ap_prd(c) for c in el) + ")"
+    if t == "Binary_Pred":
+        op = el.get("op")
+        if op not in ("=>", "<=>"):
+            raise _AperoUnsupported(f"binary pred {op!r}")
+        return f"({_ap_prd(el[0])} {op} {_ap_prd(el[1])})"
+    if t == "Unary_Pred":
+        return f"not({_ap_prd(el[0])})"
+    if t == "Quantified_Pred":
+        op = el.get("op") or el.get("type")
+        if op not in ("!", "#"):
+            raise _AperoUnsupported(f"quantifier {op!r}")
+        vs = ",".join(_ap_exp(v) for v in el.find(f"{_APERO_NS}Variables"))
+        return f"{op}({vs}).({_ap_prd(el.find(f'{_APERO_NS}Body')[0])})"
+    if t == "Set":
+        enum = el.find(f"{_APERO_NS}Enumerated_Values")
+        if enum is None:
+            return ""                  # deferred set: no usable hypothesis
+        sid = _ap_exp(el.find(f"{_APERO_NS}Id"))
+        return f"({sid} = {{{', '.join(_ap_exp(c) for c in enum)}}})"
+    raise _AperoUnsupported(f"pred node {t}")
+
+
+def _apero_goals(pogfile: Path):
+    """Yield (name, but_content_or_None, unsupported_reason) per simple goal,
+    with the obligation's full hypothesis set (Definition refs + Hypothesis +
+    the goal's Ref_Hyp'd Local_Hyps)."""
+    root = ET.parse(pogfile).getroot()
+    defs = {d.get("name"): list(d) for d in root.findall(f"{_APERO_NS}Define")}
+    proj, stem = pogfile.parent.name, pogfile.stem
+    for i, po in enumerate(root.findall(f"{_APERO_NS}Proof_Obligation")):
+        hyp_els = []
+        for dref in po.findall(f"{_APERO_NS}Definition"):
+            hyp_els += defs.get(dref.get("name"), [])
+        hyp_els += [h[0] for h in po.findall(f"{_APERO_NS}Hypothesis")]
+        loc = {h.get("num"): h for h in po.findall(f"{_APERO_NS}Local_Hyp")}
+        for j, sg in enumerate(po.findall(f"{_APERO_NS}Simple_Goal")):
+            name = f"ap_{proj}_{stem}_po{i}_g{j}"
+            try:
+                hyps = [s for s in (_ap_prd(h) for h in hyp_els) if s]
+                lh = [_ap_prd(loc[r.get("num")][0])
+                      for r in sg.findall(f"{_APERO_NS}Ref_Hyp")
+                      if r.get("num") in loc]
+                goal = _ap_prd(sg.find(f"{_APERO_NS}Goal")[0])
+            except _AperoUnsupported as e:
+                yield name, None, str(e)
+                continue
+            hyp = " & ".join(hyps + [s for s in lh if s]) or "1 = 1"
+            yield name, f"Set(Valid.1 | Rule(Implication | {hyp} | ? | ? | {goal} | nn))\n", None
+
+
+def _apero_pp_one(krt, pp_kin, timer, name, content):
+    """Run PP on one converted goal in a scratch dir; return (verdict, trace_bytes)."""
+    with tempfile.TemporaryDirectory(prefix="pp2lp_apero_") as td:
+        goal = Path(td) / "case.goal"
+        goal.write_text(f'Flag(TraceOn("{name}.trace")) & '
+                        f'Flag(FileOn("{name}.res")) & ' + content)
+        okk, _out, reason = run_krt(krt, pp_kin, goal.name, td, timer=timer)
+        trace = Path(td) / f"{name}.trace"
+        if okk and trace.exists():
+            data = trace.read_bytes()
+            if data.strip():
+                return "proved", data
+        if reason.startswith("timer") or reason == "timeout":
+            return "pp-timeout", None
+        if reason.startswith("saturation"):
+            return reason, None
+        return "no-proof", None
+
+
+def gen_apero(krt, force=False):
+    """Fused convert+prove pass over the apero POG corpus.  Returns a stats
+    dict; benchmark dirs (NAME/{NAME.but,NAME.trace}) materialise only for
+    proved goals.  Resumable via the content-hash ledger."""
+    src = _apero_src()
+    if not src.is_dir():
+        sys.exit(f"pp2lp: apero POG dataset not found at {src}\n"
+                 "  extract https://doi.org/10.5281/zenodo.7050797 and point "
+                 "PP2LP_APERO_POG at the zenodo-dataset-pog-20220905 directory "
+                 "(or symlink it to vendor/apero/pog)")
+    pp_kin = find_kin(["/opt/atelierb-free-24.04.2/bin/PP.kin",
+                       os.path.expanduser("~/atelierb/bin/PP.kin")])
+    if not pp_kin:
+        sys.exit("pp2lp: PP.kin not found")
+    timer = os.environ.get("PP2LP_APERO_TIMER", "R45")
+    jobs = int(os.environ.get("PP2LP_GEN_JOBS") or max(4, (os.cpu_count() or 8) // 2))
+    here = BENCH / "apero"
+    here.mkdir(parents=True, exist_ok=True)
+    ledger_path = here / ".gen_ledger.json"
+    ledger = {}
+    if ledger_path.exists() and not force:
+        ledger = {k: e for k, e in json.loads(ledger_path.read_text()).items()
+                  if e.get("v") != "pending"}   # an interrupted run's claims
+    # Anything on disk the ledger doesn't know is stale (old experiments,
+    # interrupted runs): regenerate from the corpus, not from leftovers.
+    known = {e["n"] for e in ledger.values() if e.get("n")}
+    for d in sorted(p for p in here.iterdir() if p.is_dir()):
+        if d.name not in known:
+            _rm_benchmark(d)
+
+    stats = {"goals": 0, "dups": 0, "unsupported": 0, "proved": 0,
+             "no-proof": 0, "pp-timeout": 0, "saturation": 0}
+    unsup_reasons: dict[str, int] = {}
+    flush_every = 200
+
+    def flush():
+        tmp = ledger_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(ledger))
+        tmp.replace(ledger_path)
+
+    def admit(name, content, data):
+        d = here / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{name}.but").write_text(content)
+        (d / f"{name}.trace").write_bytes(data)
+
+    # Smallest files first: progress is visible immediately and the handful of
+    # 100 MB+ monsters (slow even to XML-parse) come last.
+    files = sorted(src.glob("*/*.pog"), key=lambda p: p.stat().st_size)
+    t0 = time.time()
+    pending = decided = files_done = 0
+    last_flush = 0
+    last_line = last_tty = 0.0
+    sig_seen = []
+
+    def _on_sig(signum, _frame):
+        sig_seen.append(signum)
+        raise KeyboardInterrupt
+
+    def _line():
+        el = (time.time() - t0) / 60
+        return (f"pog {files_done}/{len(files)} files · {stats['goals']} goals · "
+                f"{stats['proved']} proved · {stats['dups']} dups · "
+                f"{stats['unsupported']} unsup · {stats['no-proof']} unproved · "
+                f"{stats['pp-timeout']} t/o · {el:.0f}m")
+
+    def progress():
+        nonlocal last_line, last_tty
+        now = time.time()
+        if IS_TTY:
+            if now - last_tty >= 0.2:              # throttle terminal rewrites
+                sys.stdout.write("\r\033[K  " + dim(_line()))
+                sys.stdout.flush()
+                last_tty = now
+        elif now - last_line >= 60:                # piped/nohup: one line a minute
+            print("  " + _line(), flush=True)
+            last_line = now
+
+    futs: dict = {}
+
+    def record(f):
+        nonlocal pending, decided
+        key, name, content = futs.pop(f)
+        verdict, data = f.result()
+        v = verdict if verdict in stats else "saturation"
+        stats[v] += 1
+        ledger[key] = {"v": verdict, "n": name if verdict == "proved" else None}
+        if verdict == "proved":
+            admit(name, content, data)
+        pending -= 1
+        decided += 1
+
+    def drain(block_at):
+        nonlocal last_flush
+        while pending >= block_at:
+            done, _ = concurrent.futures.wait(
+                list(futs), return_when=concurrent.futures.FIRST_COMPLETED)
+            for f in done:
+                record(f)
+            if decided - last_flush >= flush_every:
+                flush()
+                last_flush = decided
+            progress()
+
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=jobs)
+    old_int = signal.signal(signal.SIGINT, _on_sig)
+    old_term = signal.signal(signal.SIGTERM, _on_sig)
+    interrupted = False
+    try:
+        for pog in files:
+            for name, content, unsup in _apero_goals(pog):
+                stats["goals"] += 1
+                if unsup is not None:
+                    stats["unsupported"] += 1
+                    unsup_reasons[unsup] = unsup_reasons.get(unsup, 0) + 1
+                    continue
+                key = hashlib.sha1(content.encode()).hexdigest()
+                if key in ledger:
+                    stats["dups"] += 1
+                    progress()                     # tick while skipping through dups
+                    continue
+                ledger[key] = {"v": "pending", "n": None}   # claim before submit
+                futs[ex.submit(_apero_pp_one, krt, pp_kin, timer, name, content)] = \
+                    (key, name, content)
+                pending += 1
+                drain(jobs * 2)
+            files_done += 1
+            progress()
+        drain(1)
+    except KeyboardInterrupt:
+        interrupted = True
+        for f in list(futs):
+            f.cancel()
+        for p in list(_KRT_LIVE):                  # unblock the worker threads now
+            try:
+                p.kill()
+            except OSError:
+                pass
+        for f in list(futs):                       # harvest what did finish
+            if f.done() and not f.cancelled():
+                try:
+                    record(f)
+                except Exception:
+                    pass
+    finally:
+        signal.signal(signal.SIGINT, old_int)
+        signal.signal(signal.SIGTERM, old_term)
+        ex.shutdown(wait=True, cancel_futures=True)
+        if IS_TTY:
+            sys.stdout.write("\r\033[K")
+            sys.stdout.flush()
+    # Drop the pending claims (unfinished submissions) from the ledger.
+    ledger = {k: e for k, e in ledger.items() if e.get("v") != "pending"}
+    flush()
+    if interrupted:
+        print(yellow(f"  pog:     interrupted — {decided} goals decided this run, "
+                     f"{stats['proved']} proved; ledger saved — "
+                     f"rerun `pp2lp gen apero` to resume"))
+        sys.exit(128 + (sig_seen[0] if sig_seen else 2))
+    stats["unsup_reasons"] = dict(sorted(unsup_reasons.items(),
+                                         key=lambda kv: -kv[1]))
+    return stats
+
+
 def gen_traces(suite, krt, force=False):
     pp_kin = find_kin(["/opt/atelierb-free-24.04.2/bin/PP.kin",
                        os.path.expanduser("~/atelierb/bin/PP.kin")])
@@ -984,12 +1345,39 @@ def gen_replays(suite, krt, force=False):
         (d / f"{stem}.lp").unlink(missing_ok=True)
         if not probe["ok"] and (probe.get("error") or {}).get("code") == "E_REPLAY_TRUNCATED":
             replay.unlink(missing_ok=True)
+            hint = ("prune it from goals.txt"
+                    if (BENCH / suite / "goals.txt").exists() else "upstream REPLAY loss")
             print(yellow(f"  ⚠ dropped {stem}: truncated replay "
-                         f"(REPLAY dropped the ALL7/XST8 continuation; prune it from goals.txt)"))
+                         f"(REPLAY dropped the ALL7/XST8 continuation; {hint})"))
             dropped += 1
         else:
             ok += 1
     return ok, fail, skip, dropped
+
+
+def apero_reconcile_replays():
+    """Post-replay hygiene for the apero suite: a dir whose trace yielded no
+    complete replay (REPLAY truncation/abort) can never verify — remove it and
+    record the loss in the ledger so re-runs neither re-prove nor re-replay it."""
+    here = BENCH / "apero"
+    ledger_path = here / ".gen_ledger.json"
+    if not ledger_path.exists():
+        return 0
+    ledger = json.loads(ledger_path.read_text())
+    by_name = {e.get("n"): k for k, e in ledger.items() if e.get("n")}
+    lost = 0
+    for d in sorted(p for p in here.iterdir() if p.is_dir()):
+        if (d / f"{d.name}.trace").exists() and not (d / f"{d.name}.replay").exists():
+            key = by_name.get(d.name)
+            if key:
+                ledger[key] = {"v": "replay-lost", "n": None}
+            _rm_benchmark(d)
+            lost += 1
+    if lost:
+        tmp = ledger_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(ledger))
+        tmp.replace(ledger_path)
+    return lost
 
 
 def cmd_gen(args) -> int:
@@ -1017,10 +1405,24 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
 
     for st in [s.strip() for s in stages_str.split(",") if s.strip()]:
         if st == "buts":
+            if suite == "apero":
+                print(dim("  buts:    apero converts from POG at the traces stage — skipped"))
+                continue
             r = gen_buts(suite, force=force)
             print(dim("  buts:    no goals.txt — skipped") if r is None
                   else dim(f"  buts:    {r[0]} written, {r[1] - r[0]} unchanged"))
         elif st == "traces":
+            if suite == "apero":
+                s = gen_apero(get_krt(), force=force)
+                print(dim(f"  pog:     {s['goals']} goals → {s['proved']} proved "
+                          f"({s['dups']} dups, {s['unsupported']} unsupported, "
+                          f"{s['no-proof']} unproved, {s['pp-timeout']} timeout, "
+                          f"{s['saturation']} saturated)"))
+                if s["unsup_reasons"]:
+                    top = ", ".join(f"{k} ×{v}"
+                                    for k, v in list(s["unsup_reasons"].items())[:6])
+                    print(dim(f"           unsupported: {top}"))
+                continue
             if not list(here.glob("*/*.but")):
                 print(dim("  traces:  no .but files — skipped")); continue
             ok, fail, skip = gen_traces(suite, get_krt(), force=force)
@@ -1034,6 +1436,11 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             ok, fail, skip, dropped = gen_replays(suite, get_krt(), force=force)
             tail = f", {dropped} dropped (truncated)" if dropped else ""
             print(dim(f"  replays: {ok} ok, {fail} failed, {skip} up-to-date{tail}"))
+            if suite == "apero":
+                lost = apero_reconcile_replays()
+                if lost:
+                    print(dim(f"  apero:   {lost} replay-lost dirs removed "
+                              f"(recorded in the ledger; --force retries them)"))
         else:
             sys.exit(f"pp2lp: unknown --gen stage {st!r} (buts|traces|replays)")
 
@@ -1062,8 +1469,13 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
 
     g = sub.add_parser("gen", help="(re)generate suite inputs via Atelier B krt",
-                       description="run PP/REPLAY (krt) to (re)build a suite's .but/.trace/.replay")
-    g.add_argument("target", nargs="?", default="synth", help="SUITE (default: synth)")
+                       description="run PP/REPLAY (krt) to (re)build a suite's "
+                                   ".but/.trace/.replay.  The apero suite converts the "
+                                   "CLEARSY POG corpus instead of a goals.txt "
+                                   "(PP2LP_APERO_POG points at the dataset; "
+                                   "PP2LP_APERO_TIMER and PP2LP_GEN_JOBS tune the PP pass; "
+                                   "resumable, --force resets the ledger)")
+    g.add_argument("target", nargs="?", default="claude", help="SUITE (default: claude)")
     g.add_argument("--only", default="buts,traces,replays", metavar="STAGES",
                    help="comma-separated subset of buts,traces,replays (default: all)")
     g.add_argument("--force", action="store_true",

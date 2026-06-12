@@ -1,1 +1,0 @@
-Flag(FileOn("nrm4_double_mid.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => a: t => b: u => x: v)) & _delta_e(s) & _delta_e(a) & _delta_e(t) & _delta_e(b) & _delta_e(u) & _delta_e(v) | ? | ? | !x.(x: s => a: t => b: u => x: v) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("nrm_relation.res")) & Set(Valid.1 | Rule(Implication | (r: s <-> t) & _delta_e(r) & _delta_e(s) & _delta_e(t) | ? | ? | r: s <-> t | nn))

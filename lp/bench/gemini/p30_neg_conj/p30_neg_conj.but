@@ -1,1 +1,0 @@
-Flag(FileOn("p30_neg_conj.res")) & Set(Valid.1 | Rule(Implication | (not(p) or not(q) => not(p & q)) & _delta_p(p) & _delta_p(q) | ? | ? | not(p) or not(q) => not(p & q) | nn))

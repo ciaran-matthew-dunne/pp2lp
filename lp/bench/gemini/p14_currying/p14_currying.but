@@ -1,1 +1,0 @@
-Flag(FileOn("p14_currying.res")) & Set(Valid.1 | Rule(Implication | ((p & q => r) <=> (p => (q => r))) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p & q => r) <=> (p => (q => r)) | nn))

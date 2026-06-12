@@ -1,1 +1,0 @@
-Flag(FileOn("nrm17_contra_univ2.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) => (!y.(y: t => not(y: s)) => (a: s => bfalse))) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(x: s => x: t) => (!y.(y: t => not(y: s)) => (a: s => bfalse)) | nn))

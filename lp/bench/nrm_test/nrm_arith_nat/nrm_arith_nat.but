@@ -1,1 +1,0 @@
-Flag(FileOn("nrm_arith_nat.res")) & Set(Valid.1 | Rule(Implication | (x: NAT) & _delta_e(x) | ? | ? | x: NAT | nn))

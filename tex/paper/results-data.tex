@@ -2,60 +2,53 @@
 %  LIVE BENCHMARK NUMBERS — single source of truth for the paper.
 %  Tool and paper evolve together; refresh these as the suites move.
 %
-%  Last refreshed: 2026-06-10  (pp2lp run <suite> -q on `claude-bench-suite`,
-%  commit 8972c43).  ALL SUITES GREEN:
-%    og            30 ✓ / 0 ✗
-%    prv-no-arith  13 ✓ / 0 ✗
-%    synth        107 ✓ / 0 ✗
-%    prv           70 ✓ / 0 ✗    <- full Atelier B corpus, now 100%
-%    nrm_test      42 ✓ / 0 ✗    (NRM-rule coverage suite)
-%    gemini       422 ✓ / 0 ✗
-%    claude      1140 ✓ / 0 ✗    (hand-authored stress/coverage suite)
+%  Last refreshed: 2026-06-12 (bench/results/*.json + file counts on
+%  `main`).  ALL SUITES GREEN; the corpus is trust-free (0 `trust`
+%  tokens in any emitted proof).
 %
-%  !! eval.tex's PROSE still tells the May story (prv 23/70, "the gap
-%  !! is ..."): the gap narrative no longer holds — prv is fully green
-%  !! and the arithmetic solver terminals (ARITH, EGALITE) now emit
-%  !! generated certificates.  Rewrite eval.tex before submission.
+%  Suite layout since 2026-06-12: the old synth/nrm_test/gemini suites
+%  are retired INTO claude.  Three suites remain: og, prv, claude.
+%
+%  Column semantics:
+%    Goals    = inputs to the upstream toolchain (.but files; og has
+%               none — its 30 checked-in traces are the source).
+%    Replays  = complete replays the PP/REPLAY toolchain produces
+%               (the rest are dropped at gen time: PP failures or
+%               documented REPLAY truncation/corruption).
+%    Verified = replays pp2lp translates and lambdapi type-checks.
 % ════════════════════════════════════════════════════════════════════
 
 % ---- Rule coverage -------------------------------------------------
 % rule_db.ml: 138 rule entries + 3 phantoms (FIN/STOP_NORM/NRM).
-% "Not implemented" = loud-failure paths a trace would hit: the NRM27/28/30
-% solver-substitution dispatch arms (only NRM29 is wired trust-free) and
-% the chain-form AR7_1/AR8_1 (replay-format work; no producible trace).
 \newcommand{\numRulesCovered}{138}   % distinct rule entries in rule_db.ml
 \newcommand{\numRulesSpec}{140}      % rules in PP spec Annexe A (approx.)
-\newcommand{\numRulesNotImpl}{5}     % NRM27/28/30 dispatch + AR7_1/AR8_1 chains
 \newcommand{\numRulesFired}{105}     % rule_db names exercised by some replay
+\newcommand{\numRulesTrust}{9}       % _1 lemmas still bodied by trust (all
+                                     % quantifier-regrouping chain forms;
+                                     % unreachable — see encoding.tex)
 
-% ---- og suite ------------------------------------------------------
+% ---- og (checked-in traces; the baseline) --------------------------
+\newcommand{\ogReplayed}{30}
 \newcommand{\ogPass}{30}
-\newcommand{\ogTot}{30}
 
-% ---- prv-no-arith (non-arithmetic Atelier B subset) ----------------
-\newcommand{\pvnaPass}{13}
-\newcommand{\pvnaTot}{13}
-
-% ---- synth (targeted feature tests) --------------------------------
-\newcommand{\synthPass}{107}
-\newcommand{\synthTot}{107}
-
-% ---- prv (full Atelier B PRV corpus) -------------------------------
+% ---- prv (Atelier B rule-validation corpus) ------------------------
+\newcommand{\prvGoals}{123}
+\newcommand{\prvReplayed}{70}
 \newcommand{\prvPass}{70}
-\newcommand{\prvTot}{70}
 
-% ---- nrm_test (NRM normalisation-rule coverage) --------------------
-\newcommand{\nrmPass}{42}
-\newcommand{\nrmTot}{42}
-
-% ---- gemini (synthetic corpus) -------------------------------------
-\newcommand{\geminiPass}{422}
-\newcommand{\geminiTot}{422}
-
-% ---- claude (hand-authored pipeline stress / coverage suite) -------
-\newcommand{\claudePass}{1140}
-\newcommand{\claudeTot}{1140}
+% ---- claude (synthetic stress / coverage suite) --------------------
+\newcommand{\claudeGoals}{1284}
+\newcommand{\claudeReplayed}{1207}
+\newcommand{\claudePass}{1207}
 
 % ---- aggregate ------------------------------------------------------
-\newcommand{\allPass}{1824}          % sum of the seven suites above
-\newcommand{\allTot}{1824}
+\newcommand{\allReplayed}{1307}      % 30 + 70 + 1207
+\newcommand{\allPass}{1307}
+
+% ---- timing (cold-emit run, 2026-06-12: rm *.lp/*.lpo, run all) -----
+% Machine: 13th-gen Intel i9-13950HX laptop (32 hw threads), 32 GiB.
+% og 0.4s + prv 13.2s + claude 8.9s wall; summed engine emit ≈130s and
+% lambdapi check ≈300s of CPU time across the pool.
+\newcommand{\benchMachine}{a 32-thread Intel i9 laptop}
+\newcommand{\benchWallAll}{under half a minute}
+\newcommand{\benchCpuAll}{about five CPU-minutes}

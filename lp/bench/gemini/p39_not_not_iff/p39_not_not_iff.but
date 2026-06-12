@@ -1,1 +1,0 @@
-Flag(FileOn("p39_not_not_iff.res")) & Set(Valid.1 | Rule(Implication | (not(not(p <=> q)) <=> (p <=> q)) & _delta_p(p) & _delta_p(q) | ? | ? | not(not(p <=> q)) <=> (p <=> q) | nn))

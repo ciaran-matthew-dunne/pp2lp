@@ -28,6 +28,12 @@ and exp =
   | SetImage of exp * exp
   | Inter of exp * exp
   | Union of exp * exp
+  | Range of exp * exp          (* B interval a..b (apero/EGALITE replays) *)
+  | Maplet of exp * exp         (* ordered pair a|->b *)
+  | Inverse of exp              (* relational inverse r~ (postfix) *)
+  | SetLit of exp list          (* set extension {a,b,c}; [] is {} *)
+  | DomRestrict of exp * exp    (* domain restriction S <| r *)
+  | RanRestrict of exp * exp    (* range restriction r |> T *)
 
 type arg =
   | Pred of prd
@@ -85,6 +91,12 @@ let rec subst_exp env = function
   | Neg e -> Neg (subst_exp env e)
   | SetImage (e1, e2) -> SetImage (subst_exp env e1, subst_exp env e2)
   | Inter (e1, e2) -> Inter (subst_exp env e1, subst_exp env e2)
+  | Range (e1, e2) -> Range (subst_exp env e1, subst_exp env e2)
+  | Maplet (e1, e2) -> Maplet (subst_exp env e1, subst_exp env e2)
+  | Inverse e -> Inverse (subst_exp env e)
+  | SetLit es -> SetLit (List.map (subst_exp env) es)
+  | DomRestrict (e1, e2) -> DomRestrict (subst_exp env e1, subst_exp env e2)
+  | RanRestrict (e1, e2) -> RanRestrict (subst_exp env e1, subst_exp env e2)
   | Union (e1, e2) -> Union (subst_exp env e1, subst_exp env e2)
 
 let rec subst_prd env = function

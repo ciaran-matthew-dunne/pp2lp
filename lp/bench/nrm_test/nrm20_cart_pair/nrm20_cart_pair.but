@@ -1,1 +1,0 @@
-Flag(FileOn("nrm20_cart_pair.res")) & Set(Valid.1 | Rule(Implication | ({a,b}*c <: d) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) | ? | ? | {a,b}*c <: d | nn))

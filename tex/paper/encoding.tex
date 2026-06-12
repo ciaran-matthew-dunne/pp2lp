@@ -1,132 +1,300 @@
-% ── encoding.tex · §3 · STATUS: full draft (the core section) ────────
-% Owns the AND2 figure (fig:and2). The "rules are PROVED sound, not
-% axiomatized" point is the paper's differentiator — keep it prominent.
-\section{Encoding PP's rules in LambdaPi}\label{sec:encoding}
+% ── encoding.tex · §2 ──────────────────
+\section{Encoding \pp{} in \lp}\label{sec:encoding}
 
-\subsection{The trusted base}
-In \lp, propositions are terms of a type \(\Prop\), and \(\Prf\) maps a
-proposition to the type of its proofs (\(\Prf : \Prop \to \mathsf{TYPE}\)).
-\bmethod{} expressions are terms of \(\El\,\iota\), where \(\iota\) is the
-universal domain of \bbook{} set theory. A single module, \texttt{B.lp},
-fixes this kernel: it reuses the logical connectives from \lp's standard
-library and adds the \bbook{} primitives our proofs need---set membership
-\(\,\epsilon\,\), the maplet \(\,\mapsto\,\), equality, the Boolean
-elements, and just enough of a discretely ordered abelian group on
-\(\El\,\iota\) to discharge \pp's arithmetic rules. The \emph{only} outright
-axiom is \(\trust : \Pi P,\ \Prf\,P\) (\autoref{sec:trust}); everything else
-is a standard-library primitive or a lemma proved from it. This kernel is
-the entire trusted base against which reconstructed proofs are checked.
+\subsection{The Predicate Prover}\label{sec:pp-syntax}
 
-\subsection{Rules as soundness-proved symbols}
-We encode each \pp{} inference rule as a \lp{} symbol whose \emph{dependent
-type expresses the rule's soundness}: its premises become the symbol's
-argument types and its conclusion the return type, each wrapped in
-\(\Prf\). The symbol's body is a proof term---written as a tactic
-script---that derives the conclusion from the premises using only the
-kernel. Because \lp{} type-checks the body, the rule is \emph{proved}
-sound rather than assumed. This is the key difference from encodings that
-postulate each rule as an axiom and verify only its well-typedness, as is
-done when reconstructing SMT proofs through hand-written per-rule
-lemmas~\cite{coltellacciReconstructionSMTProofs2024a,mohamed25leansmt}:
-here the per-rule justification is itself a checked object.
+\pp{} proves sequents $H \seq P$, where $H$ is a list of hypothesis
+predicates and $P$ a goal predicate, over the first-order fragment of B's
+logic.
+%
+Its formulas are built from \emph{expressions} and \emph{predicates}:
+\begin{align*}
+  E, F &\Coloneqq x \mid n \mid E \mapsto F \mid f(E_1,\ldots,E_k)
+         \mid E + F \mid E - F \mid -E \\
+  P, Q &\Coloneqq E \mid E = F \mid E \leq F
+         \mid E_1,\ldots,E_k \in F
+         \mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
+         \mid P \Leftrightarrow Q
+         \mid \mathcal{Q}\,\vec{x} \cdot P
+\end{align*}
+where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's
+pairing, and $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
+\emph{vector} of variables.
+%
+An expression standing alone is an atom (this is how propositional
+variables appear).
+%
+$\Dia$ and $\Hrt$ (the spec's \texttt{forall} and \texttt{forall2}) are
+$n$-ary universal quantifiers that \pp's normalisation introduces on the
+goal and hypothesis side respectively; semantically both are $\forall$ —
+they differ only in the role they play during proof search.
+%
+The set-theoretic surface of B (powersets, intervals, relational
+operators, \ldots) reaches \pp{} as applications of function symbols;
+\pp{} reasons about them through its normalisation and equality rules,
+not through their set-theoretic definitions.
 
-% --- AND2 figure ----------------------------------------------------
-\begin{figure}[t]
-  \centering
-  \begin{minipage}[c]{0.34\linewidth}\centering
-    {\footnotesize\bfseries \pp{} specification}\\[3pt]
-    \begin{tcolorbox}[colback=lpBoxBg, colframe=lpBoxFr, arc=2pt,
-        boxrule=0.4pt, left=4pt, right=4pt, top=6pt, bottom=6pt]
-      \[ \dfrac{H \seq P \Rightarrow \lnot Q}{H \seq \lnot(P \land Q)}\ \;\rn{AND2} \]
-    \end{tcolorbox}
-  \end{minipage}\hfill
-  \begin{minipage}[c]{0.62\linewidth}\centering
-    {\footnotesize\bfseries \lp{} encoding \& soundness proof}\\[3pt]
+\pp's inference rules are specified in the annex of its internal
+specification~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
+families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
+\rn{NOT}), hypothesis discharge (\rn{AXM1--9}), quantifiers
+(\rn{ALL1--9}, \rn{XST1--8}), equality and the equality prover
+(\rn{EQL}, \rn{EAXM}, \rn{EQC}, \rn{ECTR}, \ldots), booleans
+(\rn{BOOL}), linear arithmetic (\rn{AR1--13} plus the solver terminals
+\rn{ARITH} and \rn{EGALITE}), and normalisation and instantiation
+(\rn{NRM1--30}, \rn{INS}).
+%
+A rule application consumes the current sequent and produces zero, one,
+or two premise sequents, possibly under side-conditions (``$P$ occurs in
+$H$'', ``the arithmetic solver refutes the hypotheses'', \ldots).
+
+How \pp{} \emph{finds} a proof is irrelevant here: we consume its
+replays.
+%
+\pp{} can be instrumented to record a compact \trace{} of the rules it
+applied; a companion utility (\textsc{replay}) re-runs the proof and
+expands the trace into a \replay{} that annotates every step with the
+formula it was applied to:
+\begin{codePP}
+[RULE] <formula>        rule application + the goal it rewrote or closed
+[RULE(a)] <formula>     rule argument (hypothesis, subscript, predicate)
+[RULE_1] <formula>      result-form variant, inside a normalisation chain
+[RULE_n] <formula>      n-ary variant binding n variables
+[FIN(P)], [STOP_NORM]   phantom normalisation markers
+\end{codePP}
+The main proof is recorded prefix-style (a rule precedes its
+subproofs), with two irregularities: the \emph{result chain} feeding a
+branching quantifier (\rn{ALL7}, \rn{XST8}) is emitted \emph{before}
+the branch rule itself, and phantom normalisation markers are
+interleaved throughout.
+%
+The first non-phantom annotation is the overall goal.
+
+The \texttt{\_1} (\emph{result-form}) variants deserve explanation, as
+they shape the encoding.
+%
+Inside a normalisation chain a rule does not close a sequent: it
+transforms a formula and passes the \emph{result} on.
+%
+The specification (\S 8.13) assigns every result-form rule one of three
+schemas: its result is the constant true (the formula is discharged), a
+single transformed formula, or the combination of the results of its two
+children.
+
+\subsection{\lp}\label{sec:lp}
+
+\lp~\cite{hondet:hal-02981561} is a proof assistant for the
+\lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
+logical framework~\cite{assaf2023dedukti}: a dependently-typed
+$\lambda$-calculus whose conversion is generated by $\beta$ together
+with user-declared rewrite rules.
+%
+A development is a sequence of declarations.
+%
+\texttt{symbol} introduces a typed constant, with explicit
+$(x : A)$ and implicit $[x : A]$ parameters and an optional definition;
+\texttt{rule} $\ell ↪ r$ adds a rewrite rule over pattern variables
+\texttt{\$x}, checked for subject reduction at declaration time;
+\texttt{inductive} generates constructors and a recursor.
+%
+Modifiers refine a symbol's status: \texttt{constant} symbols admit no
+rewrite rule at their head, \texttt{injective} symbols may be inverted
+during unification, and the definition of an \texttt{opaque} symbol is
+sealed once type-checked.
+%
+A definition may be given as a proof script (\texttt{begin} \ldots{}
+\texttt{end}) whose tactics — \texttt{assume}, \texttt{refine},
+\texttt{rewrite}, \texttt{have}, \texttt{induction} — elaborate to a
+term that the kernel re-checks, so the tactic layer adds nothing to the
+trusted base.
+
+We build on \lp's standard library~\cite{Blanqui2021}: a Tarski-style
+universe $\Setu$ with $\El : \Setu \to \mathsf{TYPE}$ mapping each set
+code to its type of inhabitants, and a type $\Prop$ of propositions with
+$\Prf : \Prop \to \mathsf{TYPE}$ mapping each proposition to its type of
+proofs (the library also provides the code $o : \Setu$ with
+$\El\,o ↪ \Prop$).
+%
+Connectives and quantifiers are the standard impredicative encodings;
+on top of these we assume the library's classical axioms — excluded
+middle and propositional extensionality.
+
+\subsection{Encoding Formulas}\label{sec:enc-formulas}
+
+The encoding is shallow.
+%
+All B expressions inhabit a single domain: a set code $\iota$, so an
+expression is a term of type $\El\,\iota$ and a predicate is a term of
+type $\Prop$.
+%
+The kernel file \texttt{B.lp} declares the domain constants —
+$\mapsto$ (pairing), $\epsilon$ (membership), $\mathsf{BOOL}$ with
+$\mathsf{BTRUE}$ and $\mathsf{BFALSE}$, B's functional application, and
+the arithmetic signature $\mathbf{0}, \mathbf{1}, +, -, \leq$ — together
+with their axioms: injectivity and congruence of pairing, set
+extensionality, the two-element axioms for $\mathsf{BOOL}$, and for
+arithmetic the theory of a discretely ordered abelian group
+($+$ commutative and associative with identity $\mathbf{0}$ and inverse
+$-$; $\leq$ a partial order, invariant under translation; and the
+discreteness axioms $\mathbf{0} \leq \mathbf{1}$,
+$\lnot(\mathbf{1} \leq \mathbf{0})$ and
+$\lnot(x \leq \mathbf{0}) \Rightarrow \mathbf{1} \leq x$).
+%
+This is just enough to \emph{derive} \pp's arithmetic rules; it is not a
+formalisation of $\mathbb{Z}$.
+%
+Numerals are decimal literals of the library's $\mathbb{N}$, coerced
+into the domain by an embedding that \lp{} inserts automatically.
+%
+Every other operator (set operators, projections, \ldots) is an
+uninterpreted constant.
+
+\paragraph{$n$-ary conjunction.}
+\pp{} treats $\land$ as left-associative and its rules address a
+conjunction through its \emph{last} conjunct and the remainder; worse,
+when a normalisation step discharges a conjunct, \pp{} silently drops it
+from every formula it subsequently records.
+%
+Encoding $\land$ binarily would therefore force proofs to rewrite
+associativity and unit collapses at nearly every step.
+%
+Instead, a conjunction is a \emph{snoc list}: an inductive type
+$\mathbb{L}^{*}$ with empty list $∎$ and right append $∷$, and an
+injective operator $\bwand : \mathbb{L}^{*}\,o \to \Prop$ with the
+rewrite rules
+$\bwand(∎ ∷ P) ↪ P$ and
+$\bwand(ps ∷ \top) ↪ \bwand ps$
+(a singleton conjunction \emph{is} its conjunct; discharged conjuncts
+erase).
+%
+Its structural interface — introduction, and elimination of the last
+conjunct and of the remainder — is axiomatised.
+%
+\pp's conjunction rules then become single structural matches; for
+example (\texttt{lp/rules/Conj.lp}):
 \begin{codeLP}
-opaque symbol AND2 [ps : 𝕃* o] [P : Prop]
-  : π ($\bigwedge$ ps ⇒ ¬ P)
-  → π (¬ $\bigwedge$ (ps ∷ P)) ≔
+opaque symbol AND2 [ps : $\mathbb{L}^{*}$ o] [P : Prop]
+  : π ($\bigwedge$ ps ⇒ ¬ P) → π (¬ $\bigwedge$ (ps ∷ P)) ≔
 begin
   assume ps P h1 hc;
   refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
 end;
 \end{codeLP}
-  \end{minipage}
-  \caption{\pp's rule \rn{AND2} and its \lp{} encoding. The premise
-    \(H \seq P \Rightarrow \lnot Q\) becomes the argument type and the
-    conclusion the return type; the body is a proof that the rule is
-    sound. \pp's conjunction is binary but left-associative, so we encode
-    an \(n\)-ary conjunction as \(\bigwedge ps\) over a snoc list
-    \(ps : \mathbb{L}^{*}\,o\), whose last element \(P\) and initial
-    segment \(ps\) are exposed by \texttt{∷}; \texttt{\bwand\_init} and
-    \texttt{\bwand\_last} project them (\autoref{sec:infra}).}
-  \label{fig:and2}
-\end{figure}
-% --------------------------------------------------------------------
 
-\autoref{fig:and2} shows the rule \rn{AND2}. Its body reads directly: from
-a proof \(h_1\) of \(\bigwedge ps \Rightarrow \lnot P\) and the full
-conjunction \(hc : \bigwedge(ps \mathbin{::} P)\), the term
-\(h_1\,(\texttt{\bwand\_init}\,hc)\,(\texttt{\bwand\_last}\,hc)\) derives a
-contradiction, which witnesses \(\lnot\bigwedge(ps \mathbin{::} P)\). The
-same \(\mathbin{::}\)-pattern handles every conjunction rule uniformly,
-whatever the arity \(n\), because \lp{} infers \(ps\) and \(P\) from the
-goal.
+\paragraph{Compound binders.}
+\pp{} regroups consecutive quantifiers — $\forall x \cdot \forall y
+\cdot P$ becomes $\forall (x,y) \cdot P$ — and its quantifier rules
+manipulate the compound binder as a unit.
+%
+We mirror this with an inductive type $\Tuple\,n$ of $n$-tuples over
+$\El\,\iota$ (with projections $\prj$), and \emph{rigid} $n$-ary
+quantifiers
+$\allI, \xstI : (\Tuple\,n \to \Prop) \to \Prop$
+whose introduction and elimination principles are axiomatised bridges to
+the $\Pi$-types of \lp{} (e.g.\
+$(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
+converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
+of their own.
+%
+Rigidity — no rewrite rule unfolds $\allI$ to nested $\forall$ — is
+essential: if the quantifier reduced away, the surface form would vanish
+from goals before any rule lemma could address it, and inferring the
+implicit predicate $P$ at rule applications would require inverting the
+reduction, a higher-order unification problem \lp{} does not attempt.
+%
+The translator performs \pp's regrouping itself while building the goal,
+so the \lp{} goal always carries one compound binder and the regrouping
+rules (\rn{ALL1--4}, \rn{XST1--4}) are consumed without emitting
+anything.
 
-\subsection{The shape of a rule}
-A \pp{} rule appears in a replay as a bracketed name, and its shape is
-decoded from that name by \tool's rule database (the single source of
-truth for rule metadata):
-\begin{itemize}
-  \item \emph{base} --- e.g. \rn{AND2}: a plain \refine{} against the
-    encoded symbol.
-  \item \emph{\(n\)-ary} (suffix \texttt{\_N}) --- e.g. \rn{ALL7\_2},
-    \rn{NRM1\_3}: the suffix is a binder count, so the rule is applied
-    with \(N\) bound variables. Quantifier and normalisation rules range
-    over tuples of variables (\autoref{sec:infra}).
-  \item \emph{result-form} (suffix \texttt{\_1}, ``primed'') --- e.g.
-    \rn{AND2\_1}: a variant living in \(\Res\), the type of the
-    equality-/rewrite-\emph{chain} \pp{} threads through a proof before a
-    branching quantifier. Rather than a \(\Prf\)-proof, such a rule
-    produces a \(\Res\,\varphi\): a term carrying the running goal's
-    proof together with a proof that it equals \(\varphi\)
-    (\(\mathsf{mk\_res}\), \(\mathsf{concat}\), \(\restm\)).
-\end{itemize}
-The two introduction rules that branch, \rn{ALL7} and \rn{XST8}, are
-two-child: a \(\Res\)-typed chain establishing the body for an arbitrary
-tuple witness, followed by a continuation under the bound variable. Their
-types thread a per-tuple result \(\rho : \Pi v : \Tuple\,n,\ \Res(P\,v)\)
-into the conclusion.
+\subsection{Encoding Rules}\label{sec:enc-rules}
 
-\subsection{Quantifiers and conjunction lists}\label{sec:infra}
-Two pieces of infrastructure support the rules above. \emph{(i)~Conjunction
-lists.} \pp's left-associative \(n\)-ary conjunction is represented as
-\(\bigwedge : \mathbb{L}^{*}\,o \to \Prop\) over a snoc list of
-propositions, with constructor \texttt{\bwand\_intro} and projections
-\texttt{\bwand\_init}/\texttt{\bwand\_last}; a unification rule lets a goal
-\(\bigwedge(ps \mathbin{::} P)\) split structurally, so one rule matches all
-arities. \emph{(ii)~Tuple quantifiers.} \pp's quantifiers range over lists
-of variables, which we encode uniformly over \(\Tuple\,n\) (an \(n\)-tuple
-of \(\El\,\iota\)) with projection \(\prj\) and tuple snoc. Four quantifier
-formers appear: \(\allI\)/\(\xstI\) for the single-variable
-\(\forall\)/\(\exists\) (over \(\Tuple\,1\)), and the \(n\)-ary
-\(\Dia\)/\(\Hrt\)---\pp's \texttt{forall}/\texttt{forall2}, distinguished
-by whether the quantified formula sits on the goal or the hypothesis side.
-A single \(\Tuple\)-based rule then covers a whole family of arities, and
-the emitter selects quantifier witnesses by tuple projection.
+Each \pp{} rule is a \lp{} symbol whose type states the rule and whose
+body \emph{proves} it.
+%
+The encoding of a rule's statement is positional: the conclusion sequent
+$H \seq P$ appears as $\Prf\,P$; a premise that extends the hypotheses,
+$H, P \seq Q$, appears as the function type $\Prf\,P \to \Prf\,Q$; and a
+side-condition ``$P$ occurs in $H$'' becomes an explicit argument of
+type $\Prf\,P$, which the emitter supplies by looking the hypothesis up
+in scope.
+%
+For example, \rn{IMP4} (``to prove $P \Rightarrow Q$, assume $P$ and
+prove $Q$'') and the discharge rule \rn{AXM1} (``$\lnot P$ occurs in
+$H$, so $P \Rightarrow Q$ holds'') are
+\[
+  \rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
+  \qquad
+  \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q),
+\]
+each an \texttt{opaque symbol} with a short tactic proof, type-checked
+once when the rule library is built.
 
-\subsection{Trust, audited}\label{sec:trust}
-A few \pp{} steps are discharged by its internal solver rather than by
-tracked inference: the replay records the conclusion but no checkable
-justification. For these, the encoding passes the kernel's \(\trust\)
-axiom \emph{as an argument} to an otherwise fully proved rule---never as a
-whole-goal proof. Three categories occur:
-(i)~\(\,\epsilon\,\)\,\textsc{bool} membership side-conditions (\pp{}
-cannot reason about \(v : \textsc{bool}\) abstractly);
-(ii)~the arithmetic-match conjuncts of the instantiation rule \rn{INS};
-and (iii)~solver-confirmed numeric side-conditions of the arithmetic
-rules (e.g. \rn{AR2}, \rn{AR13}). Each use is localized to one argument
-and documented, and a pre-commit audit checks that no emitted proof
-contains a bare whole-goal \(\refine\,\trust\). The trusted base is thus
-exactly the \texttt{B.lp} kernel plus these enumerated, argument-level
-uses.
+\paragraph{Solver side-conditions.}
+Some rules are licensed not by a structural premise but by a verdict of
+\pp's arithmetic solver or equality prover: \rn{AR4} requires
+$(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
+\rn{ARITH} terminal closes a goal because the accumulated
+$\leq$-hypotheses are contradictory.
+%
+The corresponding lemmas take these facts as explicit $\Prf$-arguments,
+and \tool{} \emph{generates} the witnessing proof at emission time: a
+nonnegative (Farkas-style) combination of the $\leq \mathbf{0}$
+hypotheses refuting the \rn{ARITH} goal, equality-transport chains for
+the equality prover, and permutation proofs from the group axioms
+wherever \pp{} recorded a sum in a different association order than the
+lemma needs.
+%
+There is no fallback oracle: when a witnessing proof cannot be
+generated, emission fails loudly (\autoref{sec:trust}).
+
+\paragraph{Result chains.}
+To encode the result-form (\texttt{\_1}) rules we package a
+normalisation result as a dependent record: for a formula $t$,
+$\Res\,t$ pairs the list $ts$ of surviving conjuncts with a proof of
+$\Prf\,(t = \mathsf{conj}\,ts)$, where $\mathsf{conj}$ folds a list
+back into a formula.
+%
+The three specification schemas map directly onto its constructors: a
+discharged formula is the empty list with a proof of $t = \top$; a
+transformation reuses a proved equality law (for example, \rn{NOT2}'s
+chain form is
+$\mathsf{mk_1}\,(\restm\,r)\,(\mathsf{eq\_trans}\ \texttt{¬¬-law}\
+(\mathsf{res\_eq}\,r))$); and a combination concatenates the two
+children's lists, justified by a concatenation law for $\mathsf{conj}$.
+%
+The $\top$-erasure rewrite rules on $\bwand$ and on list concatenation
+make the combined result reduce to exactly the conjuncts \pp{} records —
+discharged conjuncts disappear in any position, mirroring \pp.
+%
+A branching quantifier consumes a chain.
+%
+\rn{ALL7} normalises the body of a universal hypothesis pointwise and
+continues under the normalised form:
+\begin{codeLP}
+opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
+  (ρ : Π v : Tuple n, Res (P v))
+  : π ((`$\diamondsuit$ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔ $\ldots$
+\end{codeLP}
+where the proof transports each instance along the chain's equality
+($\mathsf{res\_eq}$).
+
+\subsection{The Trusted Base}\label{sec:trust}
+A reconstructed proof type-checks against: the \lp{} kernel; the
+standard library with its classical axioms; the B domain axioms of
+\autoref{sec:enc-formulas}; the structural interface of $\bwand$; and
+the quantifier bridges.
+%
+Everything else is a theorem.
+%
+Of the \numRulesCovered{} rules in the library, every rule that can
+occur in a replay carries a soundness proof; the \numRulesTrust{}
+remaining chain forms of the regrouping rules are still stated with a
+postulated oracle (\texttt{trust}), but they are unreachable — the
+translator regroups binders at the syntax level, so no replay path emits
+them.
+%
+The emitter is incapable of producing a proof that mentions
+\texttt{trust} at all: its term grammar has no such constructor, so any
+side-condition it cannot prove is a hard failure rather than a silent
+axiom.

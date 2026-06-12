@@ -16,16 +16,16 @@
 \author{
   Ciar\'an Dunne\inst{1}
   \and
-  Guillaume Burel\inst{2}
+  Guillaume Burel\inst{1,2}
+  \and
+  Catherine Dubois\inst{1,2}
 }
-\authorrunning{C. Dunne and G. Burel}
+\authorrunning{C. Dunne, G. Burel, C. Dubois}
 \institute{
   SAMOVAR, T\'el\'ecom SudParis, Institut Polytechnique de Paris,
   Palaiseau, France\\
-  \email{ciaran-matthew.dunne@telecom-sudparis.eu}
-  \and
-  SAMOVAR, ENSIIE, Institut Polytechnique de Paris, \'Evry, France\\
-  \email{guillaume.burel@ensiie.fr}
+\and
+  ensIIE, Centre de recherche Sen's, Évry, France
 }
 
 \begin{document}
@@ -56,14 +56,12 @@
 	benchmark suites.
 \end{abstract}
 
-% Sections (one \section each). Status is in each file's header comment:
-%   intro, encoding = full drafts;  background, replay, eval, conclusion = skeletons.
+% pages 1-2: abstract, intro, related work.
 \input{intro.tex}
-\input{background.tex}
+% pages 3-5: abstract syntax for PP & LP. encoding PP in LP.
 \input{encoding.tex}
-\input{replay.tex}
+% pages 6-8: pipeline, benchmark eval, discussion, conclusion
 \input{eval.tex}
-\input{conclusion.tex}
 
 \printbibliography
 

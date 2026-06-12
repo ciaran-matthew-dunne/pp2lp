@@ -33,6 +33,12 @@ and exp =
   | SetImage of exp * exp
   | Inter of exp * exp
   | Union of exp * exp
+  | Range of exp * exp
+  | Maplet of exp * exp
+  | Inverse of exp
+  | SetLit of exp list
+  | DomRestrict of exp * exp
+  | RanRestrict of exp * exp
 
 type arg =
   | Pred of prd

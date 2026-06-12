@@ -1,1 +1,0 @@
-Flag(FileOn("sub8_union_subset_dist.res")) & Set(Valid.1 | Rule(Implication | (s <: u & t <: u => s \/ t <: u) & _delta_e(s) & _delta_e(u) & _delta_e(t) | ? | ? | s <: u & t <: u => s \/ t <: u | nn))

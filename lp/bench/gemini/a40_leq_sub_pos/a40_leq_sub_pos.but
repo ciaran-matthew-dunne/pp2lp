@@ -1,1 +1,0 @@
-Flag(FileOn("a40_leq_sub_pos.res")) & Set(Valid.1 | Rule(Implication | (0 <= y => x - y <= x) & _delta_e(y) & _delta_e(x) | ? | ? | 0 <= y => x - y <= x | nn))

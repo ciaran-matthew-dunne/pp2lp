@@ -1,1 +1,0 @@
-Flag(FileOn("p35_disj_assoc_l.res")) & Set(Valid.1 | Rule(Implication | (p or (q or r) => (p or q) or r) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | p or (q or r) => (p or q) or r | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("p26_imply_self.res")) & Set(Valid.1 | Rule(Implication | ((p => q) => (p => q)) & _delta_p(p) & _delta_p(q) | ? | ? | (p => q) => (p => q) | nn))

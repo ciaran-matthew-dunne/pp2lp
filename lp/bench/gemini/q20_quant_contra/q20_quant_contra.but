@@ -1,1 +1,0 @@
-Flag(FileOn("q20_quant_contra.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => not(x: t)) => !x.(x: t => not(x: s))) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => not(x: t)) => !x.(x: t => not(x: s)) | nn))

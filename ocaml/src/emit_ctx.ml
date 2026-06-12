@@ -390,6 +390,12 @@ let rec canon_exp env = function
   | SetImage (a, b) -> SetImage (canon_exp env a, canon_exp env b)
   | Inter (a, b) -> Inter (canon_exp env a, canon_exp env b)
   | Union (a, b) -> Union (canon_exp env a, canon_exp env b)
+  | Range (a, b) -> Range (canon_exp env a, canon_exp env b)
+  | Maplet (a, b) -> Maplet (canon_exp env a, canon_exp env b)
+  | Inverse a -> Inverse (canon_exp env a)
+  | SetLit es -> SetLit (List.map (canon_exp env) es)
+  | DomRestrict (a, b) -> DomRestrict (canon_exp env a, canon_exp env b)
+  | RanRestrict (a, b) -> RanRestrict (canon_exp env a, canon_exp env b)
 
 let rec canon_prd depth env = function
   | Lift e -> Lift (canon_exp env e)
@@ -586,7 +592,8 @@ let proj_env_of_ctx ctx : L.proj_env =
     List.mapi (fun i v -> (v, (i, x_name))) pp_vars) ctx.xs
 
 let is_atom_exp = function
-  | Var _ | Nat _ | App _ | SetImage _ | Inter _ | Union _ -> true
+  | Var _ | Nat _ | App _ | SetImage _ | Inter _ | Union _ | Range _
+  | Maplet _ | Inverse _ | SetLit _ | DomRestrict _ | RanRestrict _ -> true
   | AOp _ | Neg _ -> false
 
 (* Numeric literals 2 ≤ k ≤ [lit_unfold_max] flatten to k copies of the

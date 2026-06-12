@@ -1,1 +1,0 @@
-Flag(FileOn("s28_subset_inter_self.res")) & Set(Valid.1 | Rule(Implication | (s <: s /\ s) & _delta_e(s) | ? | ? | s <: s /\ s | nn))

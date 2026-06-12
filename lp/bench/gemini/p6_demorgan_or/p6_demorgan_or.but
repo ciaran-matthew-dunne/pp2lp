@@ -1,1 +1,0 @@
-Flag(FileOn("p6_demorgan_or.res")) & Set(Valid.1 | Rule(Implication | (not(p or q) <=> (not(p) & not(q))) & _delta_p(p) & _delta_p(q) | ? | ? | not(p or q) <=> (not(p) & not(q)) | nn))

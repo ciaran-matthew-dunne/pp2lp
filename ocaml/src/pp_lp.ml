@@ -120,6 +120,46 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
     Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
     pp_exp ~env buf e2;
     Buffer.add_string buf "))"
+  | Range (e1, e2) ->
+    Buffer.add_string buf "(eapp interval (";
+    pp_exp ~env buf e1;
+    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+    pp_exp ~env buf e2;
+    Buffer.add_string buf "))"
+  | Maplet (e1, e2) ->
+    Buffer.add_string buf "(";
+    pp_exp ~env buf e1;
+    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+    pp_exp ~env buf e2;
+    Buffer.add_string buf ")"
+  | Inverse e ->
+    Buffer.add_string buf "(eapp inverse ";
+    pp_exp ~env buf e;
+    Buffer.add_string buf ")"
+  | DomRestrict (e1, e2) ->
+    Buffer.add_string buf "(eapp dom_restrict (";
+    pp_exp ~env buf e1;
+    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+    pp_exp ~env buf e2;
+    Buffer.add_string buf "))"
+  | RanRestrict (e1, e2) ->
+    Buffer.add_string buf "(eapp ran_restrict (";
+    pp_exp ~env buf e1;
+    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+    pp_exp ~env buf e2;
+    Buffer.add_string buf "))"
+  | SetLit es ->
+    (* {a,b,c} ↦ right-fold of set_cons pairs over set_empty *)
+    let rec fold = function
+      | [] -> Buffer.add_string buf "set_empty"
+      | e :: rest ->
+        Buffer.add_string buf "(eapp set_cons (";
+        pp_exp ~env buf e;
+        Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+        fold rest;
+        Buffer.add_string buf "))"
+    in
+    fold es
 
 and pp_exp_args ?(env = []) buf = function
   | [e] -> pp_exp ~env buf e

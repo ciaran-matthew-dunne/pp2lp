@@ -41,7 +41,7 @@
   author       = {{ClearSy System Engineering}},
   title        = {Atelier {B}: The {Predicate Prover} (Reference Manual, Annexe~A)},
   howpublished = {\url{https://www.atelierb.eu/}},
-  note         = {VERIFY edition and exact title},
+  % TODO(authors): VERIFY edition and exact title before submission.
 }
 
 % ---- LambdaPi / Dedukti / λΠ-calculus modulo rewriting --------------
@@ -89,6 +89,143 @@
   year      = {2021},
   publisher = {Schloss Dagstuhl -- Leibniz-Zentrum f{\"u}r Informatik},
   doi       = {10.4230/LIPIcs.FSCD.2021.20},
+}
+
+% ---- Related: verifying / certifying Atelier B's proof machinery ----
+% Entries below verified 2026-06-12 against DBLP / Springer / HAL.
+
+@inproceedings{cirstea1998elan,
+  author    = {Horatiu Cirstea and Claude Kirchner},
+  title     = {Using Rewriting and Strategies for Describing the {B} Predicate Prover},
+  booktitle = {Proceedings of the {CADE-15} Workshop on Strategies in Automated Deduction},
+  address   = {Lindau, Germany},
+  pages     = {23--34},
+  year      = {1998},
+  note      = {HAL: inria-00098715},
+}
+
+@inproceedings{jacquel2011bcare,
+  author    = {M{\'e}lanie Jacquel and Karim Berkani and David Delahaye and Catherine Dubois},
+  title     = {Verifying {B} Proof Rules Using Deep Embedding and Automated Theorem Proving},
+  booktitle = {Software Engineering and Formal Methods ({SEFM} 2011)},
+  editor    = {Gilles Barthe and Alberto Pardo and Gerardo Schneider},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {7041},
+  publisher = {Springer},
+  pages     = {253--268},
+  year      = {2011},
+  doi       = {10.1007/978-3-642-24690-6_18},
+}
+
+@phdthesis{jacquel2013phd,
+  author    = {M{\'e}lanie Jacquel},
+  title     = {Automatisation des preuves pour la v{\'e}rification des r{\`e}gles de l'{Atelier B}},
+  school    = {Conservatoire National des Arts et M{\'e}tiers},
+  address   = {Paris, France},
+  year      = {2013},
+  note      = {Th\`ese 2013CNAM0860; TEL: tel-00840484},
+}
+
+@inproceedings{bware2014,
+  author    = {David Delahaye and Catherine Dubois and Claude March{\'e} and David Mentr{\'e}},
+  title     = {The {BWare} Project: Building a Proof Platform for the Automated Verification of {B} Proof Obligations},
+  booktitle = {Abstract State Machines, Alloy, {B}, {TLA}, {VDM}, and {Z} ({ABZ} 2014)},
+  editor    = {Yamine A{\"i}t Ameur and Klaus-Dieter Schewe},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {8477},
+  publisher = {Springer},
+  pages     = {290--293},
+  year      = {2014},
+  doi       = {10.1007/978-3-662-43652-3_26},
+}
+
+@inproceedings{bury2015bset,
+  author    = {Guillaume Bury and David Delahaye and Damien Doligez and
+               Pierre Halmagrand and Olivier Hermant},
+  title     = {Automated Deduction in the {B} Set Theory using Typed Proof
+               Search and Deduction Modulo},
+  booktitle = {{LPAR-20}: 20th International Conferences on Logic for
+               Programming, Artificial Intelligence and Reasoning ---
+               Short Presentations},
+  editor    = {Ansgar Fehnker and Annabelle McIver and Geoff Sutcliffe and
+               Andrei Voronkov},
+  series    = {EPiC Series in Computing},
+  volume    = {35},
+  publisher = {EasyChair},
+  pages     = {42--58},
+  year      = {2015},
+  doi       = {10.29007/14v7},
+}
+
+@inproceedings{trelat2025smt,
+  author    = {Vincent Tr{\'e}lat},
+  title     = {Safely Encoding {B} Proof Obligations in {SMT-LIB}},
+  booktitle = {Rigorous State-Based Methods ({ABZ} 2025)},
+  editor    = {Michael Leuschel and Fuyuki Ishikawa},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {15728},
+  publisher = {Springer},
+  pages     = {52--69},
+  year      = {2025},
+  doi       = {10.1007/978-3-031-94533-5_4},
+}
+
+@incollection{lecomte2024provingb,
+  author    = {Thierry Lecomte},
+  title     = {Proving {B} with {Atelier B}},
+  booktitle = {The Application of Formal Methods: Essays Dedicated to Jim
+               Woodcock on the Occasion of His Retirement},
+  editor    = {Simon Foster and Augusto Sampaio},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {14900},
+  publisher = {Springer},
+  pages     = {329--345},
+  year      = {2024},
+  doi       = {10.1007/978-3-031-67114-2_13},
+}
+
+@misc{stolze2024dedukti,
+  author       = {Claude Stolze and Olivier Hermant and Romain Guillaum{\'e}},
+  title        = {Towards Formalization and Sharing of {Atelier B} Proofs
+                  with {Dedukti}},
+  year         = {2024},
+  howpublished = {HAL preprint hal-04398119},
+  url          = {https://hal.science/hal-04398119},
+}
+
+@misc{deharbe2022pog,
+  author       = {D{\'e}harbe, David},
+  title        = {Proof obligations from the {B} formal method},
+  year         = {2022},
+  howpublished = {Zenodo dataset},
+  doi          = {10.5281/zenodo.7050797},
+  note         = {5\,434 \texttt{.pog} files from 36 industrial and academic
+                  {Atelier B} projects},
+}
+
+% ---- Logical frameworks / Isabelle ----------------------------------
+
+@article{harper1993lf,
+  author    = {Robert Harper and Furio Honsell and Gordon D. Plotkin},
+  title     = {A Framework for Defining Logics},
+  journal   = {Journal of the {ACM}},
+  volume    = {40},
+  number    = {1},
+  pages     = {143--184},
+  year      = {1993},
+  doi       = {10.1145/138027.138060},
+}
+
+@article{sledgehammer,
+  author    = {Jasmin Christian Blanchette and Sascha B{\"o}hme and
+               Lawrence C. Paulson},
+  title     = {Extending {Sledgehammer} with {SMT} Solvers},
+  journal   = {Journal of Automated Reasoning},
+  volume    = {51},
+  number    = {1},
+  pages     = {109--128},
+  year      = {2013},
+  doi       = {10.1007/s10817-013-9278-5},
 }
 
 % ---- Related: SMT proof reconstruction in LP / Lean -----------------

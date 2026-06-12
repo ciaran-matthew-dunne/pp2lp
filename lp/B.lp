@@ -310,6 +310,12 @@ constant symbol eapp : τ ι → τ ι → τ ι;
 constant symbol set_image : τ ι;
 constant symbol inter : τ ι;
 constant symbol union : τ ι;
+constant symbol interval : τ ι;   // B's a..b (apero / EGALITE replays)
+constant symbol inverse : τ ι;    // relational inverse r~
+constant symbol dom_restrict : τ ι;  // domain restriction S <| r
+constant symbol ran_restrict : τ ι;  // range restriction r |> T
+constant symbol set_cons : τ ι;   // set extension {a,b,…}: cons cell …
+constant symbol set_empty : τ ι;  // … over the empty set {}
 
 // Pair projections: PP's `_pj1(p)` / `_pj2(p)` (the components of a pair
 // `p`), applied via `eapp`.  Uninterpreted — proofs use them purely

@@ -15,18 +15,27 @@ rule token = parse
   | eof { EOF }
   (* punctuation *)
   | ',' { COMMA }
+  | ".." { DOTDOT }   (* interval a..b — must precede '.' (maximal munch) *)
   | '.' { PERIOD }
   | ':' { COLON }
   | '(' { LPAREN }
   | ')' { RPAREN }
   | '[' { LSQ }
   | ']' { RSQ }
+  | '{' { LBRACE }
+  | '}' { RBRACE }
+  | '~' { TILDE }
   (* angle brackets and comparison — longest match handles <=>/<=/<  *)
   | "<=>" { IFF }
   | "<="  { LEQ }
   | '<'   { LANGLE }
   | '>'   { RANGLE }
-  (* FIN/sequents *)
+  (* FIN/sequents.  "|->" (maplet) must precede "|-" (turnstile): maximal
+     munch otherwise lexes `x|->y` as TURNSTILE RANGLE.  "<|"/"|>" are B's
+     domain/range restriction (apero equality-prover annotations). *)
+  | "|->" { MAPLET }
+  | "<|"  { DOMRESTR }
+  | "|>"  { RANRESTR }
   | "|-"  { TURNSTILE }
   | "|"   { PIPE }
   | "Hyp" { HYP }

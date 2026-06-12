@@ -6,9 +6,10 @@
 %token <int> NATURAL
 
 %token EOF
-%token PERIOD COMMA COLON
+%token PERIOD COMMA COLON DOTDOT MAPLET TILDE DOMRESTR RANRESTR
 %token LPAREN RPAREN
 %token LSQ RSQ
+%token LBRACE RBRACE
 %token LANGLE RANGLE
 
 %token HYP TURNSTILE PIPE FIN
@@ -25,6 +26,8 @@
 %right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
 %left UNION
 %left INTER
+%left MAPLET DOMRESTR RANRESTR  (* B-Book: set-operator level, looser than .. *)
+%left DOTDOT        (* B-Book: .. looser than +/- — e-f..g+f = (e-f)..(g+f) *)
 %left PLUS MINUS
 %left TIMES          (* coefficient binds tighter than +/- : 2*x + y = (2*x) + y *)
 %nonassoc UMINUS
@@ -62,6 +65,20 @@ exp:
   { SetImage (e1, e2) }
   | e1 = exp; INTER; e2 = exp
   { Inter (e1, e2) }
+  | e1 = exp; DOTDOT; e2 = exp
+  { Range (e1, e2) }
+  | e1 = exp; MAPLET; e2 = exp
+  { Maplet (e1, e2) }
+  | e1 = exp; DOMRESTR; e2 = exp
+  { DomRestrict (e1, e2) }
+  | e1 = exp; RANRESTR; e2 = exp
+  { RanRestrict (e1, e2) }
+  | e = exp; TILDE
+  { Inverse e }
+  | LBRACE; es = exp_seq; RBRACE
+  { SetLit es }
+  | LBRACE; RBRACE
+  { SetLit [] }
   | e1 = exp; UNION; e2 = exp
   { Union (e1, e2) }
 exp_seq:

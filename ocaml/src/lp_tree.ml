@@ -16,7 +16,6 @@ type binder_ty = Tau_i | Pi_pred of proj_env * Syntax_pp.prd
    handed to [Pp_lp] only when the printer runs. *)
 type term =
   | Hole
-  | Trust
   | Name of string                    (* an LP identifier *)
   | App of term * term list           (* application (f a b …), parenthesised *)
   | Expl of term                      (* @t — pass implicit arguments explicitly *)
@@ -56,7 +55,6 @@ let pp_binder_ty buf = function
 
 let rec pp_term buf = function
   | Hole -> Buffer.add_char buf '_'
-  | Trust -> Buffer.add_string buf "trust"
   | Name name -> Buffer.add_string buf name
   | App (head, args) ->
     Buffer.add_char buf '(';

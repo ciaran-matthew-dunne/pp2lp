@@ -1,1 +1,0 @@
-Flag(FileOn("p13_conjunction_impl.res")) & Set(Valid.1 | Rule(Implication | ((p or q => r) <=> ((p => r) & (q => r))) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p or q => r) <=> ((p => r) & (q => r)) | nn))

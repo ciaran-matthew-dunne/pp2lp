@@ -1,72 +1,265 @@
-% ── eval.tex · §5 · STATUS: skeleton (expand) ───────────────────────
-% Tool + coverage + benchmarks. The table reads numbers from
-% results-data.tex — never hard-code a benchmark number in this file.
+% ── eval.tex · §3 ───────────────────────
+% Table + prose read numbers from results-data.tex — never hard-code a
+% benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
 
-\subsection{The tool}
+The core of
 \tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}} % TODO: confirm URL
-is an OCaml program. An \texttt{ocamllex} lexer and a Menhir parser read a
-replay; \texttt{rule\_db.ml} holds all rule metadata (arity, suffix
-decoding, phantom predicate) and is the single source of truth;
-\texttt{proof\_tree.ml} rebuilds the tree; and \texttt{translate.ml}
-dispatches each rule shape to its emission. The rule encodings live in
-\texttt{lp/rules/} and are checked once by \lp, independently of any proof.
-% TODO(loc): report tool size + B.lp/rules line counts.
+is an OCaml program of about 4\,400 lines behind a thin command-line
+driver; the rule library of \autoref{sec:encoding} is another 4\,300
+lines of \lp.
+%
+A single module holds all rule metadata — arity, argument kinds, and a
+\emph{typed} emission strategy per rule — and is the single source of
+truth: the emitter dispatches on this variant with an exhaustive match,
+so adding a rule without deciding its emission is a compile-time error,
+and an unknown rule name in a replay is a runtime error rather than a
+silent skip.
 
-\subsection{Coverage}
-\tool{} encodes \numRulesCovered{} of \pp's roughly \numRulesSpec{}
-specified rules. Only \numRulesNotImpl{} remain unimplemented---the
-\rn{NRM27}--\rn{NRM30} family of arithmetic \emph{normalisation} rules,
-which \pp{} discharges by dispatching to its internal arithmetic solver;
-because the solver's reasoning is not recorded in the trace, these steps
-have no checkable justification to reconstruct. A pre-commit audit
-confirms that the only declared axiom is \texttt{B.lp}'s \(\trust\), and
-that no emitted proof closes a goal with a bare \(\refine\,\trust\)
-(\autoref{sec:trust}).
+\subsection{From a Replay to a \lp{} Proof}\label{sec:pipeline}
 
-\subsection{Benchmarks}
-We exercise \tool{} on four suites (\autoref{tab:results}). \texttt{og} is
-a curated smoke-test floor; \texttt{synth} is a set of targeted
-feature tests; and \texttt{prv} is \ab's own PRV proof corpus, with
-\texttt{prv-no-arith} its non-arithmetic subset. Each entry is
-\emph{emitted} by \tool{} and then \emph{checked} by \texttt{lambdapi
-check}; ``pass'' means both succeed.
+% --- pipeline figure ------------------------------------------------
+\begin{boxfigure}{fig:pipeline}{%
+		The \tool{} pipeline. \pp, instrumented, emits a \trace{} of the
+		rules it applied; the \textsc{replay} utility expands this into a
+		\replay{} annotating each step with its intermediate goal; \tool{}
+		rebuilds the proof tree and emits an \lpf{} tactic script, which
+		\lp{} checks against the soundness-proved rule library.}
+	\centering
+	\alttext{Pipeline diagram with two dashed groups. Left, Atelier B: a
+		formula file (.but) maps via PP to a .trace, then via REPLAY to a
+		.replay carrying rule and goal lines. An arrow labelled pp2lp maps
+		the .replay into the right group, LambdaPi, where the emitted .lp
+		file depends on the soundness-proved B.lp and rules/ library; a
+		downward arrow labelled lambdapi check yields a tick-or-cross
+		verdict.}{%
+		\input{fig-pipeline.tex}}
+\end{boxfigure}
+% --------------------------------------------------------------------
+
+The pipeline (\autoref{fig:pipeline}) has three stages.
+
+\paragraph{Parse.}
+A lexer and a Menhir-generated parser read the replay's bracketed rule
+lines and formula annotations into a flat list of
+(rule, argument, formula) records.
+
+\paragraph{Rebuild the proof tree.}
+\tool{} reconstructs the proof tree directly from the replay, consuming
+the prefix stream and using each rule's declared arity to attach the
+right number of child subproofs.
+%
+This is where the format's two irregularities (\autoref{sec:pp-syntax})
+are handled: phantom normalisation lines are filtered out, and the
+result chain that precedes a branching quantifier is reassembled into
+that rule's first argument.
+%
+A mismatch — an arity that does not consume the stream exactly — is
+reported with the residual stack.
+
+\paragraph{Emit a tactic script.}
+Each obligation becomes one \texttt{opaque symbol} whose statement is
+the goal and whose body is a tactic script: each tree node is a
+$\refine\;\rn{RULE}\,\ldots$ against the encoded lemma, composed in tree
+order (\autoref{fig:reconstruct}).
+%
+Rules that discharge against a hypothesis receive their
+$\Prf$-argument by hypothesis lookup; rules that introduce an antecedent
+or a binder push an \texttt{assume}; result chains are emitted as
+explicit $\Res$ terms and passed to their branching rule; and solver
+side-conditions get freshly generated proof terms
+(\autoref{sec:enc-rules}).
+%
+\lp{} then type-checks the symbol, which closes the loop: \pp's verdict
+is now backed by an independently checked proof.
+%
+The emitted file carries no comments, but the engine records a table
+mapping every line to the replay step and \pp{} goal that produced it;
+when a check fails, the report shows the offending \lp{} line, the
+replay step it came from, and the rule lemma's signature side by side.
+
+% --- reconstruction figure ------------------------------------------
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.47\linewidth}\centering
+    {\footnotesize\bfseries \pp{} proof replay}\\[3pt]
+\begin{codePP}
+[OPR1(1)] <delta_pa = TRUE
+   => not(a and not(a))>
+[AND2] <not(a and not(a))>
+[IMP4] <a => not(not(a))>
+[NOT2] <not(not(a))>
+[AXM3] <a>
+\end{codePP}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.49\linewidth}\centering
+    {\footnotesize\bfseries emitted \lp{} (verbatim)}\\[3pt]
+\begin{codeLP}
+opaque symbol zp_noncontra
+  (a : Prop) (delta_pa : τ ι) :
+  π (delta_pa = BTRUE
+     ⇒ ¬ ($\bigwedge$ (∎ ∷ a ∷ ¬ a))) ≔
+begin
+  assume a delta_pa;
+  assume _h1; try rewrite _h1;
+  refine AND2 _;
+  refine IMP4 _;
+  assume _h2;
+  refine NOT2 _;
+  refine AXM3 _h2
+end;
+\end{codeLP}
+  \end{minipage}
+  \caption{Reconstruction of the benchmark \texttt{zp\_noncontra},
+    $\lnot(a \land \lnot a)$.
+    Each replay line maps to one \refine{} of the corresponding rule
+    lemma; the conjunction is the snoc-list $\bwand$ of
+    \autoref{sec:enc-formulas}.
+    The $\mathtt{delta\_pa} = \mathtt{TRUE}$ premise is a definedness
+    flag added by our goal generator; \rn{OPR1} introduces it and
+    rewrites with it.}
+  \label{fig:reconstruct}
+\end{figure}
+% --------------------------------------------------------------------
+
+\subsection{Benchmarks}\label{sec:bench}
+
+We exercise \tool{} on three suites (\autoref{tab:results}).
+%
+\texttt{og} is a fixed set of \ogReplayed{} replays that served as the
+initial development corpus.
+%
+\texttt{prv} is \ab's rule-validation corpus: each goal is an added
+proof rule submitted to \pp{} for validation, the prover's primary
+industrial role (\autoref{sec:intro}).
+%
+\texttt{claude} is a synthetic stress and coverage suite of
+\claudeGoals{} goals, authored with the help of an LLM-based coding
+agent (Claude): it spans every rule family, proof sizes from one to
+over 400 replay lines, and deliberately probes shapes that previous
+versions of the pipeline mishandled.
 
 \begin{table}[t]
   \centering
-  \caption{Reconstruction by suite. Numbers are a snapshot of \texttt{main}
-    (the tool and this paper are developed together and will change up to
-    submission); the single source is \texttt{results-data.tex}. ``Pass''
-    = emitted and independently \lp-checked.}
+  \caption{Results per suite. \emph{Goals} are inputs to the upstream
+    \pp/\textsc{replay} toolchain (\texttt{og} has no goal files: its
+    replays are checked in); \emph{Replays} are the complete replays
+    that toolchain produces (\autoref{sec:limits} accounts for the
+    losses); \emph{Verified} are replays \tool{} translates and \lp{}
+    type-checks.}
   \label{tab:results}
-  \begin{tabular}{l r r l}
+  \begin{tabular}{l r r r}
     \toprule
-    Suite                  & Pass        & Total      & Character\\
+    Suite           & Goals        & Replays         & Verified \\
     \midrule
-    \texttt{og}            & \ogPass     & \ogTot     & smoke-test floor\\
-    \texttt{prv-no-arith}  & \pvnaPass   & \pvnaTot   & non-arithmetic \ab{} subset\\
-    \texttt{synth}         & \synthPass  & \synthTot  & targeted feature tests\\
-    \texttt{prv}           & \prvPass    & \prvTot    & full \ab{} PRV corpus\\
+    \texttt{og}     & ---          & \ogReplayed     & \ogPass \\
+    \texttt{prv}    & \prvGoals    & \prvReplayed    & \prvPass \\
+    \texttt{claude} & \claudeGoals & \claudeReplayed & \claudePass \\
+    \midrule
+    total           &              & \allReplayed    & \allPass \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The non-arithmetic core reconstructs completely: \texttt{og}
-(\ogPass/\ogTot) and \texttt{prv-no-arith} (\pvnaPass/\pvnaTot) pass in
-full. On the complete \texttt{prv} corpus (\prvPass/\prvTot) the gap is
-concentrated, as expected, in arithmetic: the unimplemented
-normalisation rules above, together with proofs whose instantiation steps
-use \pp's three-argument \rn{INST\_FINAL} form, which the parser does not
-yet accept. Crucially, the failures we see are coverage and parsing gaps,
-not soundness disagreements---no proof that \pp{} accepts and \tool{}
-emits is \emph{rejected} by \lp{} on semantic grounds.
-% TODO: confirm INST_FINAL framing; break out synth failure causes.
+Every replay the upstream toolchain produces is reconstructed and
+type-checked: \allPass{} proofs, with no failures.
+%
+\numRulesFired{} of the \numRulesCovered{} encoded rules fire in some
+replay.
+%
+Re-emitting and re-checking the full corpus takes \benchWallAll{} of
+wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
+%
+No emitted proof appeals to the \texttt{trust} oracle — the corpus
+contains zero occurrences, enforced by an audit gate — so each checked
+obligation rests only on the axiomatic base of \autoref{sec:trust}.
 
-\subsection{Limitations}
-The principal limitation is arithmetic normalisation that bottoms out in
-\pp's closed-source solver (\rn{NRM27}--\rn{NRM30}); reconstructing it
-would require either an arithmetic decision procedure on \(\El\,\iota\) or
-a richer trace from \pp. Some set-theoretic surface syntax and the
-three-piece \rn{INST\_FINAL} argument form are not yet parsed. These bound
-coverage on \texttt{prv}; none affects the soundness of what is
-reconstructed.
+\subsection{Limitations and Discussion}\label{sec:limits}
+
+\paragraph{Upstream replay losses.}
+The gap between goals and replays in \autoref{tab:results} is upstream
+of \tool: for some provable goals the \textsc{replay} utility omits the
+final continuation of a branching quantifier, and for others it aborts
+mid-file.
+%
+Both defects are detected at generation time and the affected goals
+dropped loudly.
+%
+They are not random: set-extensionality and equality-prover-heavy goals
+are disproportionately affected — no complete \rn{EGALITE} replay can be
+produced from our goal suites, so that emission path is validated
+against a hand-completed replay — which means the suites under-test
+exactly the rules the equality prover would exercise.
+
+\paragraph{Spec mismatches.}
+Encoding every rule against the specification turns the encoding into an
+executable test of that document, and it does not always pass: \rn{NRM20}
+records its pinned equality at a different conjunct position than
+specified, and \rn{OPR1}'s chain form does not follow the result schema
+laid out for it.
+%
+\tool{} implements the observed behaviour; we believe such discrepancies
+are themselves a useful by-product for the maintainers of \pp.
+
+\paragraph{Engine partiality.}
+A few replay shapes are recognised but rejected: substitution rules
+pinning a binder beyond the third slot of a compound binder, and the
+chain forms of two arithmetic rules that no producible trace exercises.
+%
+All of these fail loudly at emission; none silently degrade.
+
+\paragraph{Raw proof obligations.}
+We also probed \pp{} on raw industrial obligations from the public
+\texttt{apero} dataset~\cite{deharbe2022pog}, translating its POG format
+into \pp's rule-validation input.
+%
+A sampled obligation carries a median of roughly 1\,700 hypothesis
+predicates; \pp{} nonetheless proved every convertible obligation with
+at most fifty hypotheses, most sampled goals even with all hypotheses
+removed, and some thousand-hypothesis obligations given tens of seconds.
+%
+The bottleneck for certification is again the toolchain around \pp: the
+replay utility lost 86 of the 124 traces \pp{} produced on our sample,
+and the surviving replays use surface forms no synthetic goal had
+reached (strict comparisons, tuple memberships, relational inverse,
+sequents inside annotations); 14 of them verify end-to-end today,
+including the first machine-produced replays exercising the equality
+store.
+
+\paragraph{Use of AI.}
+The \texttt{claude} suite was authored by an LLM agent that also helped
+develop the tool, so there is a risk of the suite drifting toward what
+the pipeline already handles.
+%
+We mitigate this in two ways: the suite is goal-level only (the agent
+cannot influence which rules \pp{} applies), and the real-world
+\texttt{og} and \texttt{prv} suites gate every change.
+
+\subsection{Conclusion and Future Work}\label{sec:conclusion}
+
+We have presented \tool, which independently re-checks \ab's Predicate
+Prover by reconstructing its proofs in \lp.
+%
+Unlike approaches that postulate each rule as an axiom, every \pp{} rule
+is encoded as a symbol whose body \emph{proves} the rule sound against a
+small axiomatic base, and the reconstructed corpus — including \ab's own
+rule-validation suite, arithmetic included — type-checks without a
+single appeal to an oracle.
+%
+The most direct future work is upstream: repairing the \textsc{replay}
+utility's truncations would recover the dropped goals, in particular the
+equality-prover fragment.
+%
+On the encoding side, the \numRulesTrust{} remaining postulated chain
+lemmas can be eliminated by deriving the binder-regrouping isomorphisms
+over tuples.
+%
+Finally, this work folds \pp{} into the \dedukti{} interoperability
+ecosystem: a natural next step within the ICSPA project is exporting
+checked \ab{} proofs to set-theory-based assistants such as TLA$^+$'s
+TLAPS, Isabelle/ZF, and Megalodon.
+
+\subsubsection*{Acknowledgements.}
+This work is supported by the ANR project ICSPA
+(ANR-21-CE25-0015) in collaboration with CLEARSY.
+% TODO: confirm grant number and any additional acknowledgements.

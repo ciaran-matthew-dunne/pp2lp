@@ -1,1 +1,0 @@
-Flag(FileOn("q17_forall_const.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => y = z)) & _delta_e(s) & _delta_e(y) & _delta_e(z) | ? | ? | !x.(x: s => y = z) | nn))

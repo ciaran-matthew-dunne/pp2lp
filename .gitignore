@@ -7,19 +7,11 @@ bench/results/
 
 # Per-suite inputs/outputs.
 # Tracked: lp/bench/og/*.trace + *.replay (og has no .but, traces are source)
-#          lp/bench/{prv,prv-no-arith,synth,nrm_test}/**/*.but
+#          lp/bench/{prv,claude}/**/*.but
 # Generated artifacts (.trace/.replay) for any suite with .but inputs
 # are reproducible via `pp2lp gen`, so they're ignored.
 lp/bench/prv/**/*.trace
 lp/bench/prv/**/*.replay
-lp/bench/prv-no-arith/**/*.trace
-lp/bench/prv-no-arith/**/*.replay
-lp/bench/synth/**/*.trace
-lp/bench/synth/**/*.replay
-lp/bench/nrm_test/**/*.trace
-lp/bench/nrm_test/**/*.replay
-lp/bench/gemini/**/*.trace
-lp/bench/gemini/**/*.replay
 lp/bench/claude/**/*.trace
 lp/bench/claude/**/*.replay
 
@@ -31,6 +23,12 @@ lp/bench/**/*.lpo
 lp/bench/**/*.tmp
 lp/bench/**/*.goal
 lp/bench/**/*.res
+
+# apero suite — generated from the CLEARSY POG corpus (Zenodo
+# 10.5281/zenodo.7050797) via `pp2lp gen apero`; the dataset lives outside
+# git (vendor/apero/pog is a symlink) and the suite dirs are reproducible.
+vendor/apero/
+lp/bench/apero/
 
 # Experimental / scratch
 lp/quant_test.lp

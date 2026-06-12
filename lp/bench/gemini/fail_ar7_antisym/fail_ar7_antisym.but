@@ -1,1 +1,0 @@
-Flag(FileOn("fail_ar7_antisym.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(-x + y <= 0 & x - y <= 0 => x = y)) | ? | ? | !x.!y.(-x + y <= 0 & x - y <= 0 => x = y) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("prop_distrib.res")) & Set(Valid.1 | Rule(Implication | (a & (b or c) <=> (a & b) or (a & c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a & (b or c) <=> (a & b) or (a & c) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("a13_add_both.res")) & Set(Valid.1 | Rule(Implication | (x <= y & z <= w => x + z <= y + w) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | x <= y & z <= w => x + z <= y + w | nn))

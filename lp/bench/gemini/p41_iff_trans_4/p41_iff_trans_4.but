@@ -1,1 +1,0 @@
-Flag(FileOn("p41_iff_trans_4.res")) & Set(Valid.1 | Rule(Implication | ((p <=> q) & (q <=> r) & (r <=> s) => (p <=> s)) & _delta_p(p) & _delta_p(q) & _delta_p(r) & _delta_p(s) | ? | ? | (p <=> q) & (q <=> r) & (r <=> s) => (p <=> s) | nn))

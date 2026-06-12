@@ -1,1 +1,0 @@
-Flag(FileOn("nrm19_in_ran.res")) & Set(Valid.1 | Rule(Implication | (y: ran(f)) & _delta_e(y) & _delta_e(f) | ? | ? | y: ran(f) | nn))

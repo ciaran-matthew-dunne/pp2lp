@@ -1,1 +1,0 @@
-Flag(FileOn("nrm2_const_ante.res")) & Set(Valid.1 | Rule(Implication | (!x.(a: t => x: s)) & _delta_e(a) & _delta_e(t) & _delta_e(s) | ? | ? | !x.(a: t => x: s) | nn))

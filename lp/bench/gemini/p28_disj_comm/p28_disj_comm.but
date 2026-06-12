@@ -1,1 +1,0 @@
-Flag(FileOn("p28_disj_comm.res")) & Set(Valid.1 | Rule(Implication | (p or q <=> q or p) & _delta_p(p) & _delta_p(q) | ? | ? | p or q <=> q or p | nn))

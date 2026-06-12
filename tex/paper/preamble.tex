@@ -47,8 +47,8 @@
   comment=[l]{//},
   alsoletter={_},
   keywords={symbol, rule, with, assert, require, open, type,
-            begin, end, assume, refine, have, rewrite, apply,
-            admit, admitted, simplify, reflexivity, symmetry},
+            begin, end, assume, refine, have, rewrite, apply, try,
+            induction, admit, admitted, simplify, reflexivity, symmetry},
   keywords=[2]{constant, sequential, opaque, injective},
   keywords=[3]{TYPE, Prop, Set},
   sensitive=true,
@@ -74,6 +74,7 @@
     {⊤}{{$⊤$}}1  {⊥}{{$⊥$}}1  {→}{{$→$}}1  {↦}{{$↦$}}1  {ϵ}{{$∈$}}1
     {♢}{{$\diamondsuit$}}1  {♡}{{$\heartsuit$}}1
     {∷}{{$\mathbin{::}$}}1  {𝕃}{{$\mathbb{L}$}}1  {≔}{{$\coloneqq$}}1  {∈}{{$∈$}}1
+    {∎}{{$∎$}}1  {ρ}{{$ρ$}}1
     {≤}{{$≤$}}1  {≪}{{$≪$}}1  {≠}{{$≠$}}1  {∀}{{$∀$}}1  {∃}{{$∃$}}1
     {𝟎}{{$\mathbf{0}$}}1  {𝟏}{{$\mathbf{1}$}}1  {⨾}{{$\mathbin{;}$}}1
     {(}{{\lmark{(}}}1  {)}{{\lmark{)}}}1
@@ -113,6 +114,7 @@
   \def\sectionautorefname{Section}%
   \def\subsectionautorefname{Section}%
   \def\subsubsectionautorefname{Section}%
+  \def\paragraphautorefname{Section}%
   \def\figureautorefname{Figure}%
   \def\tableautorefname{Table}%
 }

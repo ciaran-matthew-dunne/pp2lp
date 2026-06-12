@@ -1,1 +1,0 @@
-Flag(FileOn("bool_conj_expr.res")) & Set(Valid.1 | Rule(Implication | (x = TRUE & y = FALSE) & _delta_e(x) & _delta_e(y) | ? | ? | x = TRUE & y = FALSE | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("a14_neg_neg.res")) & Set(Valid.1 | Rule(Implication | (not(x <= y) => y + 1 <= x) & _delta_e(x) & _delta_e(y) | ? | ? | not(x <= y) => y + 1 <= x | nn))

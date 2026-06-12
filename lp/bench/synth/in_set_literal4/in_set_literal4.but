@@ -1,1 +1,0 @@
-Flag(FileOn("in_set_literal4.res")) & Set(Valid.1 | Rule(Implication | (w: {x,y,z,w}) & _delta_e(w) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | w: {x,y,z,w} | nn))

@@ -161,8 +161,13 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// XST1–XST4: compound↔nested conversions for `??` — HOAS-identity at
-// the value level; res_tm propagates via a trusted equality bridge.
+// XST1–4 are the chain form of the existential regroupement
+// `∃x·∃y·P ↦ ∃(x,y)·P` (§A.8) — NOT a HOAS identity.  As with ALL1–4 (All.lp) the
+// merge is done at the AST level by `flatten_binds` (the `binder_merge` skip in
+// rule_db.ml), so they are never emitted and the `res_tm` bridge is left as
+// `trust`.  Eliminable via the `??`-currying equality (propExt over
+// compound_to_nested_∃ / nested_to_compound_∃) if a merge ever needs emitting in
+// a Res chain.
 // XST5–XST6 and XST51/XST61: Schema 1 passthrough.
 // XST7_1: Schema 1 via the `xst7_eq` bridge.
 // XST8_1: special — chain-shaped, see below.

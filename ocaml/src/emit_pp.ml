@@ -4,10 +4,12 @@ open Syntax_pp
 let exp_prec = function
   | Union _ -> 1
   | Inter _ -> 2
-  | AOp _ -> 3
-  | Neg _ -> 4
-  | SetImage _ -> 5
-  | App _ | Var _ | Nat _ -> 6
+  | Maplet _ | DomRestrict _ | RanRestrict _ -> 3   (* B-Book: set-op level *)
+  | Range _ -> 4              (* B-Book: .. looser than +/- *)
+  | AOp _ -> 5
+  | Neg _ -> 6
+  | SetImage _ | Inverse _ -> 7
+  | App _ | Var _ | Nat _ | SetLit _ -> 8
 
 (* ---- Expression → PP text ---- *)
 
@@ -48,7 +50,32 @@ let rec exp_to_pp_buf ?(parent_prec=0) buf e =
   | Union (e1, e2) ->
     exp_to_pp_buf ~parent_prec:prec buf e1;
     Buffer.add_string buf "\\/";
-    exp_to_pp_buf ~parent_prec:(prec+1) buf e2);
+    exp_to_pp_buf ~parent_prec:(prec+1) buf e2
+  | Range (e1, e2) ->
+    exp_to_pp_buf ~parent_prec:prec buf e1;
+    Buffer.add_string buf "..";
+    exp_to_pp_buf ~parent_prec:(prec+1) buf e2
+  | Maplet (e1, e2) ->
+    exp_to_pp_buf ~parent_prec:prec buf e1;
+    Buffer.add_string buf "|->";
+    exp_to_pp_buf ~parent_prec:(prec+1) buf e2
+  | DomRestrict (e1, e2) ->
+    exp_to_pp_buf ~parent_prec:prec buf e1;
+    Buffer.add_string buf "<|";
+    exp_to_pp_buf ~parent_prec:(prec+1) buf e2
+  | RanRestrict (e1, e2) ->
+    exp_to_pp_buf ~parent_prec:prec buf e1;
+    Buffer.add_string buf "|>";
+    exp_to_pp_buf ~parent_prec:(prec+1) buf e2
+  | Inverse e1 ->
+    exp_to_pp_buf ~parent_prec:prec buf e1;
+    Buffer.add_char buf '~'
+  | SetLit es ->
+    Buffer.add_char buf '{';
+    List.iteri (fun i e ->
+      if i > 0 then Buffer.add_char buf ',';
+      exp_to_pp_buf ~parent_prec:0 buf e) es;
+    Buffer.add_char buf '}');
   if needs_parens then Buffer.add_char buf ')'
 
 (* ---- Predicate → PP text ---- *)

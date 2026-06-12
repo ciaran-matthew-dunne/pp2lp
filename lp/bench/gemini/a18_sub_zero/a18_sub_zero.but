@@ -1,1 +1,0 @@
-Flag(FileOn("a18_sub_zero.res")) & Set(Valid.1 | Rule(Implication | (x - 0 = x) & _delta_e(x) | ? | ? | x - 0 = x | nn))

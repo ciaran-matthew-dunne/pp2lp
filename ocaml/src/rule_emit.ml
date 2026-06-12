@@ -44,11 +44,11 @@ let dynamic_value_args ctx rule arg =
 let metadata_extra_args rule =
   match Rule_db.emit rule with
   | Rule_db.Ar9 ->
-    (* AR9 (F) : π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R).
-       After the F expression (a dynamic value arg) comes the solver-confirmed
-       equality E = F — supply `trust` for it; the Seq slot (the F ≤ 𝟎 ⇒ R
-       continuation) is the remaining hole. *)
-    [L.Trust]
+    (* AR9's real dispatch (in [tactic_for_rule]) supplies the E = F equality as
+       `eq_refl` (E ≡ F on every occurrence) and never reaches this generic
+       metadata path.  If it ever does, fail rather than emit `trust`. *)
+    failwith "rule_emit: AR9 reached the generic metadata path (no F value arg) \
+              — refusing to emit trust for the E = F equality"
   | Rule_db.Witness_hyp -> [L.Hole; L.Hole]
   (* Ar4/Ar5_6/Ar7_8 build their own args in [tactic_for_rule] and never
      reach the generic path, so they need no metadata here. *)
@@ -66,7 +66,12 @@ let slot_hole_args rule =
   let trust_cons = Rule_db.emit rule = Rule_db.Trust_cons in
   Rule_db.slots rule
   |> List.map (function
-    | Rule_db.Con -> if trust_cons then L.Trust else L.Hole
+    | Rule_db.Con ->
+      if trust_cons then
+        failwith (Printf.sprintf
+          "rule_emit: %s (Trust_cons) has an unproven Con side-condition \
+           — refusing to emit trust" rule)
+      else L.Hole
     | Rule_db.Seq | Rule_db.Res -> L.Hole)
 
 let default_rule_args ctx rule arg =
@@ -299,7 +304,12 @@ let tactic_for_rule ctx rule arg anno children =
        the goal's `¬(V = b)` / `¬(b = V)` (BOOL31/32 vs BOOL41/42).  When V is a
        bound tuple slot, discharge from an injected `Π u, prj k u ϵ BOOL` typing
        premise applied to the in-scope tuple; when PP concretised V to a boolean
-       literal, from the `b*_in_bool` axiom.  Otherwise trust (no regression). *)
+       literal, from the `b*_in_bool` axiom.  No source ⇒ fail (never trust). *)
+    let no_bool_typing () =
+      failwith (Printf.sprintf
+        "rule_emit: %s `V ϵ BOOL` side-condition — V has no injected typing \
+         premise or boolean literal, refusing to emit trust" rule)
+    in
     let con =
       match goal_of_anno anno with
       | Some (Binary (Imp, Unary (Not, Eq (a, b)), _)) ->
@@ -308,9 +318,10 @@ let tactic_for_rule ctx rule arg anno children =
         (match v_exp with
          | Var ("TRUE" | "VRAI") -> L.Name "btrue_in_bool"
          | Var ("FALSE" | "FAUX") -> L.Name "bfalse_in_bool"
-         | Var v -> Option.value ~default:L.Trust (bool_typing_term ctx v)
-         | _ -> L.Trust)
-      | _ -> L.Trust
+         | Var v -> (match bool_typing_term ctx v with
+                     | Some t -> t | None -> no_bool_typing ())
+         | _ -> no_bool_typing ())
+      | _ -> no_bool_typing ()
     in
     L.Refine (L.Name rule, [con; L.Hole])
   | Rule_db.Ar10 ->
@@ -324,7 +335,8 @@ let tactic_for_rule ctx rule arg anno children =
        let qt = pred_term ctx q in
        L.Refine (L.Expl (L.Name "AR10"),
          [L.Hole; qt; L.Hole; L.App (L.Name "eq_refl", [qt]); L.Hole])
-     | _ -> L.Refine (L.Name rule, [L.Trust; L.Hole]))
+     | _ -> failwith "rule_emit: AR10 without a Q (solveur result) argument \
+                      — refusing to emit trust for the P = Q equality")
   | Rule_db.Nrm20 | Rule_db.Nrm21 ->
     (* NRM20 pins a binder by an `x = E` conjunct, NRM21 by `E = x`.  PP may
        pin *any* binder (not only the leading one), the equality may sit at
@@ -481,7 +493,7 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Ar2 ->
     (* AR2 leaf: `(a ≤ b) ⇒ R` with `a > b`.  `a > b ≡ ¬(a≤b)`; transport
        `prove_gt_zero (a−b)` (a−b cancels to a positive literal) back along
-       `sub_leq_eq`.  Trust if a−b isn't a positive-literal cancellation. *)
+       `sub_leq_eq`.  Fail (never trust) if a−b isn't a positive-literal cancellation. *)
     let env = proj_env_of_ctx ctx in
     let gen =
       match goal_of_anno anno with
@@ -497,7 +509,10 @@ let tactic_for_rule ctx rule arg anno children =
           (prove_gt_zero env (AOp (Sub, a, b)))
       | _ -> None
     in
-    (match gen with Some t -> t | None -> L.Refine (L.Name rule, [L.Trust]))
+    (match gen with
+     | Some t -> t
+     | None -> failwith "rule_emit: AR2 — a − b is not a positive-literal \
+                         cancellation (prove_gt_zero failed), refusing to emit trust")
   | Rule_db.Ar5_6 ->
     (* AR5 [a R] : π (a ≪ 𝟎) → … → π ((—a ≤ 𝟎) ⇒ R) — the antisymmetry-to-zero:
        given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.
@@ -513,7 +528,8 @@ let tactic_for_rule ctx rule arg anno children =
     let con =
       match Option.bind bound (find_hyp_by_pred ctx) with
       | Some h -> L.Name h
-      | None -> L.Trust
+      | None -> failwith "rule_emit: AR5/AR6 — the matching `≤ 𝟎` bound \
+                          hypothesis is not in scope, refusing to emit trust"
     in
     L.Refine (L.Name rule, [con; L.Hole])
   | Rule_db.Ar4 ->
@@ -541,9 +557,12 @@ let tactic_for_rule ctx rule arg anno children =
      | Some t -> t
      | None ->
        match find_leq_zero_hyp ctx with
-       | Some (f, h) -> L.Refine (L.Name rule, [exp_term ctx f; L.Name h; L.Trust])
+       | Some _ ->
+         failwith "rule_emit: AR4 — an `F ≤ 𝟎` hyp is in scope but its \
+                   `(E+F) > 𝟎` proof didn't generate (prove_gt_zero failed), \
+                   refusing to emit trust"
        | None ->
-         failwith "translate: AR4 needs an in-scope `F ≤ 𝟎` hypothesis, none found \
+         failwith "rule_emit: AR4 needs an in-scope `F ≤ 𝟎` hypothesis, none found \
                    (the solver's F is not recorded in the replay)")
   | Rule_db.Ar7_8 ->
     (* AR7/AR8 need the solver's witness (the `a` in `a + c = 𝟎`), which PP

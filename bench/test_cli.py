@@ -117,7 +117,7 @@ else:
 
 # ── resolver: suite enumeration (powers the "available: …" recovery hint) ────
 suites = pp._suite_names()
-check("suite_names lists og + synth", "og" in suites and "synth" in suites)
+check("suite_names lists og + claude", "og" in suites and "claude" in suites)
 check("suite_names skips dotfiles/__pycache__", not any(s.startswith((".", "_")) for s in suites))
 
 print(f"\n{'ALL PASS' if not _fails else f'{len(_fails)} FAILED'}")

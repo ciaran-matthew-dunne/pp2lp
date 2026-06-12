@@ -52,22 +52,28 @@ type emit =
 type rule_info = {
   arity: arity option;       (* None = phantom (skipped during trace processing). *)
   emit: emit;                (* how to build the rule's refine arguments *)
-  hoas_identity: bool;       (* rule is absorbed by LP's HOAS — skip in emit *)
+  hoas_identity: bool;       (* transformation is LP-definitional (ALL6: ¬Q ≡ Q⇒⊥);
+                                parent and child goals convert, so skip to the child. *)
+  binder_merge: bool;        (* quantifier-regrouping rule (ALL1–4 / XST1–4, §A.7–8):
+                                skipped in the main tree because [Syntax_pp.flatten_binds]
+                                pre-merges the binders at the AST level — NOT because it is
+                                LP-definitional.  See the §A.7 note + [Translate.tree]. *)
   intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
   binds_var: bool;           (* rule introduces a tuple binder via `assume` (ALL8) *)
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit=Default) ?(hoas_identity=false)
+  let r ?(emit=Default) ?(hoas_identity=false) ?(binder_merge=false)
         ?(intro_antecedent=false) ?(binds_var=false) name arity =
     Hashtbl.replace t name
-      { arity = Some arity; emit; hoas_identity; intro_antecedent; binds_var }
+      { arity = Some arity; emit; hoas_identity; binder_merge;
+        intro_antecedent; binds_var }
   in
   let phantom name =
     Hashtbl.replace t name
-      { arity = None; emit = Default;
-        hoas_identity = false; intro_antecedent = false; binds_var = false }
+      { arity = None; emit = Default; hoas_identity = false;
+        binder_merge = false; intro_antecedent = false; binds_var = false }
   in
   let leaf   = Arity [] in
   let pass   = Arity [Seq] in
@@ -108,21 +114,29 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AXM7" leaf;
   r "AXM8" leaf ~emit:Axm8;
   r "AXM9" leaf ~emit:Witness_hyp;
-  (* §A.7 Universal quantification *)
-  r "ALL1" pass ~hoas_identity:true;
-  r "ALL2" pass ~hoas_identity:true;
-  r "ALL3" pass ~hoas_identity:true;
-  r "ALL4" pass ~hoas_identity:true;
+  (* §A.7 Universal quantification.
+     ALL1–4 are quantifier *regroupement* (§A.7): they merge `∀x·∀y·P` into the
+     compound `∀(x,y)·P`.  Marked [binder_merge], NOT [hoas_identity]: they are not
+     LP-definitional.  The merge is performed at the AST level by
+     [Syntax_pp.flatten_binds] (so the goal already carries one compound `Tuple n`
+     binder), and the rule is then skipped — see [Translate.tree] for why we keep the
+     LP merge lemma off the emitter's path.  ALL6 *is* LP-definitional
+     (¬Q ≡ Q⇒⊥) → genuine [hoas_identity]. *)
+  r "ALL1" pass ~binder_merge:true;
+  r "ALL2" pass ~binder_merge:true;
+  r "ALL3" pass ~binder_merge:true;
+  r "ALL4" pass ~binder_merge:true;
   r "ALL5" pass;
   r "ALL6" pass ~hoas_identity:true;
   r "ALL7" branch;
   r "ALL8" pass ~binds_var:true;
   r "ALL9" pass ~intro_antecedent:true;
-  (* §A.8 Existential quantification *)
-  r "XST1" pass ~hoas_identity:true;
-  r "XST2" pass ~hoas_identity:true;
-  r "XST3" pass ~hoas_identity:true;
-  r "XST4" pass ~hoas_identity:true;
+  (* §A.8 Existential quantification.  XST1–4 are the existential regroupement,
+     handled exactly like ALL1–4 ([binder_merge], via flatten_binds). *)
+  r "XST1" pass ~binder_merge:true;
+  r "XST2" pass ~binder_merge:true;
+  r "XST3" pass ~binder_merge:true;
+  r "XST4" pass ~binder_merge:true;
   r "XST5" pass;
   r "XST51" pass;
   r "XST6" pass;
@@ -339,5 +353,6 @@ let lookup_flag f name =
   match lookup name with Some r -> f r | None -> false
 
 let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
+let is_binder_merge = lookup_flag (fun r -> r.binder_merge)
 let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
 let binds_var = lookup_flag (fun r -> r.binds_var)

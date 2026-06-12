@@ -1,34 +1,38 @@
 \begin{tikzpicture}[
-    node distance=7mm and 12mm,
-    box/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
-                align=center, inner sep=4pt, minimum height=7mm,
-                minimum width=13mm, text=lpFg, draw=lpBoxFr},
-    kernel/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
-                align=center, inner sep=4pt, minimum height=7mm,
-                text=lpType, draw=lpType},
-    arr/.style={-{Stealth[length=5pt]}, semithick, color=lpPunct},
-    dep/.style={-{Stealth[length=4pt]}, dashed, color=lpPunct},
-    lbl/.style={font=\scriptsize\sffamily, text=lpFg},
+    item/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
+                 align=center, inner sep=4pt, minimum height=6.5mm,
+                 minimum width=13mm, text=lpFg},
+    arr/.style={-{Stealth[length=5pt]}, thick, color=lpPunct},
+    dep/.style={-{Stealth[length=4pt]}, dashed, thick, color=lpPunct},
+    tool/.style={font=\scriptsize\ttfamily, text=lpFg},
+    lbl/.style={font=\scriptsize, text=lpFg},
+    note/.style={font=\scriptsize\itshape, text=lpPunct},
+    world/.style={dashed, thick, rounded corners=6pt, inner sep=6pt},
   ]
-  \node[box] (but) {.but};
-  \node[box, right=of but]    (trace)  {.trace};
-  \node[box, right=of trace]  (replay) {.replay};
-  \node[box, right=of replay] (lp)     {.lp};
-  \node[right=10mm of lp]     (chk)
-       {{\color{lpModifier}$\checkmark$}\,/\,{\color{lpKeyword}$\times$}};
+  % ── Atelier B: formula → trace → replay ──────────────────────────────
+  \node[item, draw=lpModifier] (but)    at (0,0)   {.but};
+  \node[item, draw=lpModifier] (trace)  at (2.5,0) {.trace};
+  \node[item, draw=lpModifier] (replay) at (5.0,0) {.replay};
+  \node[note, below=3pt of but]    (butnote)    {formula};
+  \node[note, below=3pt of replay] (replaynote) {rule + goal lines};
+  \draw[arr] (but)   -- node[lbl, above] {\pp}             (trace);
+  \draw[arr] (trace) -- node[lbl, above] {\textsc{replay}} (replay);
+  \node[world, draw=lpModifier,
+        fit=(but)(trace)(replay)(butnote)(replaynote)] (abbox) {};
+  \node[lbl, text=lpModifier] at (2.5,0.85) {\ab};
 
-  \draw[arr] (but)    -- node[lbl, above] {\pp}              (trace);
-  \draw[arr] (trace)  -- node[lbl, above] {REPLAY}          (replay);
-  \draw[arr] (replay) -- node[lbl, above] {\texttt{pp2lp}}  (lp);
-  \draw[arr] (lp)     -- node[lbl, above] {\texttt{lambdapi}} (chk);
-
-  % The soundness-proved encoding the emitted proof links against.
-  \node[kernel, below=9mm of lp]
-       (kernel) {\texttt{B.lp} + \texttt{rules/}\\soundness-proved};
+  % ── LambdaPi: emitted proof + soundness-proved rule library ──────────
+  \node[item, draw=lpType] (lp) at (8.3,0) {.lp};
+  \node[item, draw=lpType] (kernel) at (8.3,-1.1)
+       {B.lp + rules/\\{\normalfont\itshape soundness-proved}};
   \draw[dep] (kernel) -- (lp);
+  \node[world, draw=lpType, fit=(lp)(kernel)] (lpbox) {};
+  \node[lbl, text=lpType] at (8.3,0.85) {\lp};
 
-  \node[lbl, text=lpPunct, font=\scriptsize\itshape, below=2pt of but]
-       {formula};
-  \node[lbl, text=lpPunct, font=\scriptsize\itshape, below=2pt of replay]
-       {rule + goal lines};
+  % ── pp2lp: replay → lp;  lambdapi: lp bundle → verdict ──────────────
+  \draw[arr] (replay) -- (lp);
+  \node[tool, above] at ($(abbox.east |- 0,0)!0.5!(lpbox.west |- 0,0)$) {\tool};
+  \node[lbl] (chk) at (8.3,-2.45)
+       {{\color{lpModifier}$\checkmark$}\,/\,{\color{lpKeyword}$\times$}};
+  \draw[arr] (lpbox) -- node[tool, right] {lambdapi check} (chk);
 \end{tikzpicture}

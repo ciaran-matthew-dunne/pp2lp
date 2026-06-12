@@ -1,1 +1,0 @@
-Flag(FileOn("prop_excluded_middle.res")) & Set(Valid.1 | Rule(Implication | (a or not(a)) & _delta_p(a) | ? | ? | a or not(a) | nn))

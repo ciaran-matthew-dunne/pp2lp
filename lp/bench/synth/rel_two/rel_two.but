@@ -1,1 +1,0 @@
-Flag(FileOn("rel_two.res")) & Set(Valid.1 | Rule(Implication | (r: s <-> t & q: t <-> u) & _delta_e(r) & _delta_e(s) & _delta_e(t) & _delta_e(q) & _delta_e(u) | ? | ? | r: s <-> t & q: t <-> u | nn))

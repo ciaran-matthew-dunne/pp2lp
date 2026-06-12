@@ -1,1 +1,0 @@
-Flag(FileOn("conj_two_universals.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: u => x: a & x: b & x: c) & !y.(y: v => y: p & y: q & y: r)) & _delta_e(u) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(v) & _delta_e(p) & _delta_e(q) & _delta_e(r) | ? | ? | !x.(x: u => x: a & x: b & x: c) & !y.(y: v => y: p & y: q & y: r) | nn))

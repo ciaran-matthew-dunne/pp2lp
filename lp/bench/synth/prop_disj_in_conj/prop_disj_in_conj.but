@@ -1,1 +1,0 @@
-Flag(FileOn("prop_disj_in_conj.res")) & Set(Valid.1 | Rule(Implication | ((a or b) & c) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a or b) & c | nn))

@@ -60,8 +60,14 @@ val slots : string -> kind list
 (** The rule's emit strategy ([Default] for unknown names). *)
 val emit : string -> emit
 
-(** Is the rule absorbed by LP's HOAS (skipped in emit)? *)
+(** Is the rule's transformation LP-definitional (e.g. ALL6: ¬Q ≡ Q⇒⊥), so that
+    parent and child goals convert and emit can skip to the child? *)
 val is_hoas_identity : string -> bool
+
+(** Is the rule a quantifier-regrouping merge (ALL1–4 / XST1–4)?  Such rules are
+    skipped in the main tree — not because they are LP-definitional, but because
+    [Syntax_pp.flatten_binds] pre-merges the binders at the AST level. *)
+val is_binder_merge : string -> bool
 
 (** Does the rule introduce an antecedent hypothesis (IMP4, ALL9, AR12)? *)
 val intro_antecedent : string -> bool

@@ -1,1 +1,0 @@
-Flag(FileOn("p32_iff_refl.res")) & Set(Valid.1 | Rule(Implication | (p <=> p) & _delta_p(p) | ? | ? | p <=> p | nn))

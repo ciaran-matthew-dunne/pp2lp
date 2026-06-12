@@ -1,1 +1,0 @@
-Flag(FileOn("s22_in_union_l.res")) & Set(Valid.1 | Rule(Implication | (x: s => x: s \/ t) & _delta_e(x) & _delta_e(s) & _delta_e(t) | ? | ? | x: s => x: s \/ t | nn))

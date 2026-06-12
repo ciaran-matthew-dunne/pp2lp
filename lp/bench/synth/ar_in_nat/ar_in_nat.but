@@ -1,1 +1,0 @@
-Flag(FileOn("ar_in_nat.res")) & Set(Valid.1 | Rule(Implication | (n: NAT) & _delta_e(n) | ? | ? | n: NAT | nn))

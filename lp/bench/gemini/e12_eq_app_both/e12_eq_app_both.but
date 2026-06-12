@@ -1,1 +1,0 @@
-Flag(FileOn("e12_eq_app_both.res")) & Set(Valid.1 | Rule(Implication | (x = y & f = g => f(x) = g(y)) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(g) | ? | ? | x = y & f = g => f(x) = g(y) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("s26_empty_in_pow.res")) & Set(Valid.1 | Rule(Implication | ({} : POW(s)) & _delta_e(s) | ? | ? | {} : POW(s) | nn))

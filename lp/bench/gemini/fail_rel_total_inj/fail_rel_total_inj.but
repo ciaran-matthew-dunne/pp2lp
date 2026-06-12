@@ -1,1 +1,0 @@
-Flag(FileOn("fail_rel_total_inj.res")) & Set(Valid.1 | Rule(Implication | (f: s >-> t) & _delta_e(f) & _delta_e(s) & _delta_e(t) | ? | ? | f: s >-> t | nn))

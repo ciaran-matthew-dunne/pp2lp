@@ -17,7 +17,6 @@ type binder_ty = Tau_i | Pi_pred of proj_env * Syntax_pp.prd
 
 type term =
   | Hole
-  | Trust
   | Name of string                    (* an LP identifier *)
   | App of term * term list           (* application (f a b …), parenthesised *)
   | Expl of term                      (* @t — pass implicit arguments explicitly *)

@@ -1,1 +1,0 @@
-Flag(FileOn("q5_forall_impl_comm.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => p => x: t) <=> (p => !x.(x: s => x: t))) & _delta_e(s) & _delta_e(p) & _delta_e(t) | ? | ? | !x.(x: s => p => x: t) <=> (p => !x.(x: s => x: t)) | nn))
