@@ -124,7 +124,18 @@ _ERROR_RULES = [
 ]
 
 
+# Engine emit failures carry a stable `E_CODE: message` prefix at the raise
+# site (ocaml/src/errors.ml), so classify by that first.  The message-regex
+# above stays the fallback for the exception-based parse/tree channel
+# (Bad_replay, which dual-classifies to E_REPLAY_TRUNCATED) and for old logs.
+_CODE_PREFIX = re.compile(
+    r"\bE_(?:UNKNOWN_RULE|ARITY|DISPATCH|TREE_BUILD|PARSE|INS|EMIT)(?=:)")
+
+
 def classify_error(text: str) -> str:
+    m = _CODE_PREFIX.search(text)
+    if m:
+        return m.group(0)
     for rx, code in _ERROR_RULES:
         if rx.search(text):
             return code

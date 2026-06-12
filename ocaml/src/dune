@@ -7,7 +7,7 @@
  (name pp2lp)
  (libraries unix)
  (modules
-   syntax_pp lexer parser parse_replay
+   errors syntax_pp lexer parser parse_replay
    pp_lp emit_pp free_vars
    rule_db proof_tree
    lp_tree arith_proofs emit_ctx rule_emit translate

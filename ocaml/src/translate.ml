@@ -135,10 +135,10 @@ and tree_dispatch ctx = function
          | Some g -> Emit_pp.prd_to_pp g
          | None -> "(no annotation)"
        in
-       failwith (Printf.sprintf
+       Errors.fail "E_INS"
          "INS contradiction search failed — no (universal hyp \xc3\x97 witness) \
           discharges every conjunct\n  goal: %s\n%s"
-         goal (ins_diagnostic ctx)))
+         goal (ins_diagnostic ctx))
   | P.Apply { rule; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Egalite ->
     (* EGALITE (the equality-prover terminal): PP rewrites the store's hyps
@@ -332,9 +332,9 @@ and default ctx rule arg anno children =
                        can't be reconstructed")
         | None -> failwith "translate: NRM29 has no goal annotation")
      | other ->
-       failwith (Printf.sprintf
+       Errors.fail "E_DISPATCH"
          "translate: %s trust-free dispatch unsupported — no corpus trace \
-          exercises it (only NRM29 is wired)" other))
+          exercises it (only NRM29 is wired)" other)
   | [c], Rule_db.Ar7_8 ->
     (* AR7/AR8.  The child IMP4 introduces the solver antisymmetry equality,
        recorded bare-variable-first (`b = a`); its sides give a (= rhs) and
@@ -426,9 +426,9 @@ and default ctx rule arg anno children =
       let right = scoped_hyps ctx (fun () -> tree ctx c1) in
       L.Branches (tactic, left, right)
     | _ ->
-      failwith (Printf.sprintf
+      Errors.fail "E_DISPATCH"
         "translate: %s arity %d unsupported"
-        rule (List.length children))
+        rule (List.length children)
 
 and branching ctx rule anno chain_node cont =
   (* Pass the Res chain as an *explicit term* (`refine ALL7 (λ v, …) _`)
@@ -658,9 +658,9 @@ and chain_term ctx node : L.term =
        loud rather than refine against a now-absent lemma.  Re-derivable via the
        compound↔nested currying route (the curried base ALL3 is the precedent)
        should a merge ever need emitting inside a Res chain. *)
-    failwith (Printf.sprintf
-      "E_DISPATCH: %s chain form unsupported — binder merges are pre-flattened \
-       (flatten_binds); the trust-bodied _1 lemma was removed 2026-06-12" rule)
+    Errors.fail "E_DISPATCH"
+      "%s chain form unsupported — binder merges are pre-flattened \
+       (flatten_binds); the trust-bodied _1 lemma was removed 2026-06-12" rule
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP4"
          && (match goal_of_anno anno with
@@ -714,9 +714,9 @@ and chain_term ctx node : L.term =
          (dynamic_value_args ctx rule arg @ slot_hole_args rule)
          [left; right])
   | P.Apply { rule; children; _ } ->
-    failwith (Printf.sprintf
+    Errors.fail "E_DISPATCH"
       "translate: chain %s arity %d unsupported"
-      rule (List.length children))
+      rule (List.length children)
 
 (* The BOOL31/32/41/42 emit accumulates its `V ϵ BOOL` typing premises into
    [ctx.bool_typings] as it fires (it needs the in-scope tuple binder, only

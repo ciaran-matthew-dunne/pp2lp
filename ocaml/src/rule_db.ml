@@ -314,7 +314,7 @@ let is_phantom name =
     (* Unknown rules must NOT be silently filtered: that's how stack
        residual / "trace left N nodes" errors get swallowed.  Surface
        it as a tree-build error pointing at the offending rule. *)
-    failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+    Errors.fail "E_UNKNOWN_RULE" "rule_db: unknown rule %S" name
 
 (** Number of children the rule has in the proof tree
     (= number of [Seq] + [Res] slots).  [Con] slots are inline LP args
@@ -330,7 +330,7 @@ let rule_arity name =
       List.length
         (List.filter (function Seq | Res -> true | Con -> false) slots)
     | Some { arity = None; _ } -> -1
-    | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+    | None -> Errors.fail "E_UNKNOWN_RULE" "rule_db: unknown rule %S" name
 
 let is_branching name =
   match lookup name with
@@ -343,7 +343,7 @@ let slots name =
   else match lookup name with
   | Some { arity = Some (Arity slots); _ } -> slots
   | Some { arity = None; _ } -> []
-  | None -> failwith (Printf.sprintf "rule_db: unknown rule %S" name)
+  | None -> Errors.fail "E_UNKNOWN_RULE" "rule_db: unknown rule %S" name
 
 (** The rule's emit strategy (defaults to [Default] for unknown names,
     which never reach the emitter — phantoms are filtered earlier). *)

@@ -116,6 +116,19 @@ if eng.exists() and rep.exists():
 else:
     print("  skip  engine contract test (build the engine first)")
 
+# ── contract: a failure carries a stable E_*: prefix the CLI classifies ──────
+if eng.exists():
+    bad = write_tmp("[BOGUSRULE] <a => b>\n", ".replay")
+    r = subprocess.run([str(eng), "emit", "--map", "/dev/null", str(bad)],
+                       cwd=ROOT, capture_output=True, text=True)
+    bad.unlink()
+    check("unknown rule → E_UNKNOWN_RULE: prefix on stderr",
+          r.returncode != 0 and "E_UNKNOWN_RULE:" in r.stderr)
+    check("classify_error reads the prefix (engine↔CLI contract)",
+          pp.classify_error(r.stderr) == "E_UNKNOWN_RULE")
+else:
+    print("  skip  E_* prefix contract (build the engine first)")
+
 # ── resolver: suite enumeration (powers the "available: …" recovery hint) ────
 suites = pp._suite_names()
 check("suite_names lists og + claude", "og" in suites and "claude" in suites)
