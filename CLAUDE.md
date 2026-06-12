@@ -55,11 +55,14 @@ parallel; shared `lp/` objects compile once up front. Per-trace outcome is
 `✓` / `⚠` / `✗`; exit non-zero iff any trace fails. A failing suite run ends
 with a histogram of failures by error code.
 
-Child-process caps (env-tunable, 0 disables): `PP2LP_CHECK_TIMEOUT` (60 s),
-`PP2LP_EMIT_TIMEOUT` (30 s), `PP2LP_CHECK_MEM_GB` (4 GiB `RLIMIT_AS`). They
-keep a runaway goal from taking down the host. `pp2lp gen` shells out to the
-vendored Atelier B tools (`krt`, `vendor/atelierb/<plat>/REPLAY.kin`); you
-never call them directly.
+Child-process caps (env-tunable, 0 disables): `PP2LP_CHECK_TIMEOUT`,
+`PP2LP_EMIT_TIMEOUT`, and `PP2LP_GEN_TIMEOUT` (krt PP/REPLAY) all default to
+10 s (the slowest prv trace needs ~7.4 s; tighter defaults turn prv red);
+`PP2LP_CHECK_MEM_GB` (4 GiB `RLIMIT_AS`). They keep a runaway goal from
+taking down the host; the one-off shared-library warm-up compile is exempt
+(120 s) so a cold `.lpo` cache can't re-open the parallel write race.
+`pp2lp gen` shells out to the vendored Atelier B tools (`krt`,
+`vendor/atelierb/<plat>/REPLAY.kin`); you never call them directly.
 
 ## Gates
 

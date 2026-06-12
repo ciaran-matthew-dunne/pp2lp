@@ -35,8 +35,9 @@ BENCH = ROOT / "lp" / "bench"
 RESULTS_DIR = ROOT / "bench" / "results"
 
 # ── Safety caps for child processes (env-tunable; 0 disables) ──────────────
-CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "60"))   # lambdapi, s
-EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "30"))     # engine emit, s
+CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "10"))   # lambdapi, s
+EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "10"))     # engine emit, s
+GEN_TIMEOUT = float(os.environ.get("PP2LP_GEN_TIMEOUT", "10"))       # krt PP/REPLAY, s
 CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
 
 # ── Colour ─────────────────────────────────────────────────────────────────
@@ -84,15 +85,16 @@ def _child_limits(timeout: float):
     return apply
 
 
-def _run_lambdapi(args):
+def _run_lambdapi(args, timeout=CHECK_TIMEOUT):
     """Run `lambdapi check <args>` under the standard safety caps: wall-clock
-    CHECK_TIMEOUT, RLIMIT_AS/CPU via _child_limits, and its own session group
-    so a runaway child can't take down the host.  The single place those caps
-    are wired — callers handle FileNotFoundError / TimeoutExpired."""
+    `timeout` (per-goal CHECK_TIMEOUT by default), RLIMIT_AS/CPU via
+    _child_limits, and its own session group so a runaway child can't take
+    down the host.  The single place those caps are wired — callers handle
+    FileNotFoundError / TimeoutExpired."""
     return subprocess.run(["lambdapi", "check", *args],
                           capture_output=True, text=True,
-                          timeout=CHECK_TIMEOUT or None,
-                          preexec_fn=_child_limits(CHECK_TIMEOUT),
+                          timeout=timeout or None,
+                          preexec_fn=_child_limits(timeout),
                           start_new_session=True)
 
 
@@ -803,7 +805,11 @@ def _warm_shared_cache() -> None:
     if not shared:
         return
     try:
-        _run_lambdapi(["-c", "-w", *shared])
+        # The one-off serial library compile is exempt from the per-goal
+        # CHECK_TIMEOUT: cold (post `*.lpo`-purge) it takes far longer than a
+        # single goal, and timing out here would resurrect the very .lpo write
+        # race this warm-up exists to prevent.
+        _run_lambdapi(["-c", "-w", *shared], timeout=max(120.0, CHECK_TIMEOUT))
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass        # a missing/slow lambdapi resurfaces per-trace in the workers below
 
@@ -864,7 +870,7 @@ def find_kin(hints):
 _KRT_LIVE: set = set()
 
 
-def run_krt(krt, kin, goal_file, cwd, timeout=120.0, timer="R45", patterns=_SATURATION):
+def run_krt(krt, kin, goal_file, cwd, timeout=GEN_TIMEOUT, timer="R45", patterns=_SATURATION):
     """Run a krt kernel under the standard child caps — wall-clock `timeout`,
     RLIMIT_AS (PP2LP_CHECK_MEM_GB) + RLIMIT_CPU via _child_limits, and its own
     session group — so a runaway PP/REPLAY can't take down the host."""
