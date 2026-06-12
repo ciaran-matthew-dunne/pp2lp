@@ -173,6 +173,7 @@ ocaml/src/             the engine (each core module has a .mli):
   syntax_pp.ml           PP AST + flatten_binds + the shared exp traversal
   pp_lp.ml / emit_pp.ml  AST → LP source / AST → PP surface (diagnostics)
   lp_tree.ml / emit_lp.ml  LP term/tactic tree → symbol + header
+  errors.ml              `E_*`-coded failwith helper (CLI classifies by prefix)
   free_vars.ml, lexer.mll, parser.mly, reconstruct.ml, bin/main.ml
 ocaml/test/            golden tests: replay → .lp diffed against committed
                        expectations (dune runtest; `dune promote` to accept)
@@ -215,10 +216,12 @@ goals. The probe is the only artifact written; re-check it directly to
 reproduce.
 
 An emit-side failure prints a stable error code (`E_UNKNOWN_RULE`,
-`E_ARITY`, `E_DISPATCH`, `E_TREE_BUILD`, `E_PARSE`, `E_INS`, …) and a hint;
-codes come from the engine's `E_*:`-prefixed failure messages (one
-convention, see `pp2lp`'s `_ERROR_CODES`). Replay→tree state machine
-tracing: `PP2LP_DEBUG_REPLAY=1`.
+`E_ARITY`, `E_DISPATCH`, `E_TREE_BUILD`, `E_PARSE`, `E_INS`, `E_EMIT`) and a
+hint; the engine tags them at the raise site (`Errors.fail`,
+`ocaml/src/errors.ml`), and `pp2lp`'s `classify_error` reads the `E_*:`
+prefix first, falling back to a message-regex for the parse/tree exception
+channel (`Bad_replay`) and old logs. Replay→tree state machine tracing:
+`PP2LP_DEBUG_REPLAY=1`.
 
 ### Inspecting LP goals / debugging LP rules
 
