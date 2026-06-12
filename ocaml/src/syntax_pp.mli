@@ -64,6 +64,19 @@ val mul_expand : exp -> exp -> exp
     the LP side sees a single Tuple-n binder. *)
 val flatten_binds : prd -> prd
 
+(** The single shallow [exp] traversal: [map_exp f] rebuilds with [f] applied to
+    each immediate sub-expression, [fold_exp f] left-folds [f] over them.  Every
+    structural [exp] walker (substitution, canonicalisation, free-variable
+    collection, matching) is built on these, so the per-constructor enumeration
+    lives in one place. *)
+val map_exp : (exp -> exp) -> exp -> exp
+val fold_exp : ('a -> exp -> 'a) -> 'a -> exp -> 'a
+
+(** First-order matching congruence: [Some] of the paired sub-expressions when
+    the two expressions share constructor, payload, and arity; [None] otherwise.
+    Exhaustive — a new [exp] constructor forces it to be handled. *)
+val exp_congruence : exp -> exp -> (exp * exp) list option
+
 (** Capture-permissive substitution over the PP AST, used to instantiate
     hypothesis-search patterns at chosen witness variables (AXM9, NRM19) and
     to substitute the solver witness for the pinned binder (NRM29). *)

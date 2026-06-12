@@ -83,21 +83,64 @@ let rec flatten_binds = function
    variables (AXM9, NRM19): given the binder's pp-vars and the chosen
    witness's pp-vars, substitute one-for-one and compare structurally
    against in-scope hypotheses. *)
+(* The single shallow [exp] traversal.  [map_exp f e] rebuilds [e] with [f]
+   applied to each immediate sub-expression; [fold_exp f acc e] left-folds [f]
+   over them.  This is the one place that enumerates every [exp] constructor,
+   so a new one forces an update here (warning 8 is fatal) and every walker
+   built on top — [subst_exp], [Emit_ctx.canon_exp], [Free_vars] — stays
+   complete instead of silently dropping it. *)
+let map_exp f = function
+  | Var _ | Nat _ as e -> e
+  | App (g, args) -> App (g, List.map f args)
+  | AOp (o, a, b) -> AOp (o, f a, f b)
+  | Neg e -> Neg (f e)
+  | SetImage (a, b) -> SetImage (f a, f b)
+  | Inter (a, b) -> Inter (f a, f b)
+  | Union (a, b) -> Union (f a, f b)
+  | Range (a, b) -> Range (f a, f b)
+  | Maplet (a, b) -> Maplet (f a, f b)
+  | Inverse e -> Inverse (f e)
+  | SetLit es -> SetLit (List.map f es)
+  | DomRestrict (a, b) -> DomRestrict (f a, f b)
+  | RanRestrict (a, b) -> RanRestrict (f a, f b)
+
+let fold_exp f acc = function
+  | Var _ | Nat _ -> acc
+  | App (_, args) -> List.fold_left f acc args
+  | AOp (_, a, b) | SetImage (a, b) | Inter (a, b) | Union (a, b)
+  | Range (a, b) | Maplet (a, b) | DomRestrict (a, b) | RanRestrict (a, b) ->
+    f (f acc a) b
+  | Neg e | Inverse e -> f acc e
+  | SetLit es -> List.fold_left f acc es
+
+(* Structural congruence for first-order matching: [Some] of the paired
+   sub-expressions when [a] and [b] share the same constructor, payload, and
+   arity; [None] otherwise (the leaves [Var]/[Nat] included — the matcher
+   discriminates those itself).  Exhaustive, so a new constructor forces an
+   update here too rather than silently failing to match. *)
+let exp_congruence a b : (exp * exp) list option =
+  match a, b with
+  | Var _, _ | Nat _, _ -> None
+  | App (f, xs), App (g, ys) when f = g && List.length xs = List.length ys ->
+    Some (List.combine xs ys)
+  | AOp (o, a1, a2), AOp (o', b1, b2) when o = o' -> Some [ (a1, b1); (a2, b2) ]
+  | Neg a1, Neg b1 -> Some [ (a1, b1) ]
+  | Inverse a1, Inverse b1 -> Some [ (a1, b1) ]
+  | SetImage (a1, a2), SetImage (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | Inter (a1, a2), Inter (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | Union (a1, a2), Union (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | Range (a1, a2), Range (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | Maplet (a1, a2), Maplet (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | DomRestrict (a1, a2), DomRestrict (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | RanRestrict (a1, a2), RanRestrict (b1, b2) -> Some [ (a1, b1); (a2, b2) ]
+  | SetLit xs, SetLit ys when List.length xs = List.length ys ->
+    Some (List.combine xs ys)
+  | (App _ | AOp _ | Neg _ | Inverse _ | SetImage _ | Inter _ | Union _
+    | Range _ | Maplet _ | DomRestrict _ | RanRestrict _ | SetLit _), _ -> None
+
 let rec subst_exp env = function
   | Var s -> (try List.assoc s env with Not_found -> Var s)
-  | Nat n -> Nat n
-  | App (f, args) -> App (f, List.map (subst_exp env) args)
-  | AOp (op, e1, e2) -> AOp (op, subst_exp env e1, subst_exp env e2)
-  | Neg e -> Neg (subst_exp env e)
-  | SetImage (e1, e2) -> SetImage (subst_exp env e1, subst_exp env e2)
-  | Inter (e1, e2) -> Inter (subst_exp env e1, subst_exp env e2)
-  | Range (e1, e2) -> Range (subst_exp env e1, subst_exp env e2)
-  | Maplet (e1, e2) -> Maplet (subst_exp env e1, subst_exp env e2)
-  | Inverse e -> Inverse (subst_exp env e)
-  | SetLit es -> SetLit (List.map (subst_exp env) es)
-  | DomRestrict (e1, e2) -> DomRestrict (subst_exp env e1, subst_exp env e2)
-  | RanRestrict (e1, e2) -> RanRestrict (subst_exp env e1, subst_exp env e2)
-  | Union (e1, e2) -> Union (subst_exp env e1, subst_exp env e2)
+  | e -> map_exp (subst_exp env) e
 
 let rec subst_prd env = function
   | Lift e -> Lift (subst_exp env e)

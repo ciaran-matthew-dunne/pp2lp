@@ -389,19 +389,7 @@ let canon_binder = function
 
 let rec canon_exp env = function
   | Var s -> (match List.assoc_opt s env with Some n -> Var n | None -> Var s)
-  | Nat n -> Nat n
-  | App (f, args) -> App (f, List.map (canon_exp env) args)
-  | AOp (op, a, b) -> AOp (op, canon_exp env a, canon_exp env b)
-  | Neg e -> Neg (canon_exp env e)
-  | SetImage (a, b) -> SetImage (canon_exp env a, canon_exp env b)
-  | Inter (a, b) -> Inter (canon_exp env a, canon_exp env b)
-  | Union (a, b) -> Union (canon_exp env a, canon_exp env b)
-  | Range (a, b) -> Range (canon_exp env a, canon_exp env b)
-  | Maplet (a, b) -> Maplet (canon_exp env a, canon_exp env b)
-  | Inverse a -> Inverse (canon_exp env a)
-  | SetLit es -> SetLit (List.map (canon_exp env) es)
-  | DomRestrict (a, b) -> DomRestrict (canon_exp env a, canon_exp env b)
-  | RanRestrict (a, b) -> RanRestrict (canon_exp env a, canon_exp env b)
+  | e -> map_exp (canon_exp env) e
 
 let rec canon_prd depth env = function
   | Lift e -> Lift (canon_exp env e)
@@ -472,14 +460,15 @@ let match_pattern vars pat_prd tgt_prd : (string * exp) list option =
     | Var v, Var v' -> if v <> v' then ok := false
     | Var _, _ -> ok := false
     | Nat n, Nat n' -> if n <> n' then ok := false
-    | App (f, a), App (f', a') when f = f' && List.length a = List.length a' ->
-      List.iter2 me a a'
-    | AOp (o, a, b), AOp (o', a', b') when o = o' -> me a a'; me b b'
-    | Neg a, Neg a' -> me a a'
-    | SetImage (a, b), SetImage (a', b') -> me a a'; me b b'
-    | Inter (a, b), Inter (a', b') -> me a a'; me b b'
-    | Union (a, b), Union (a', b') -> me a a'; me b b'
-    | _ -> ok := false
+    (* Every other shape: congruent iff same head, payload, and arity.  Going
+       through [exp_congruence] covers the Range/Maplet/Inverse/SetLit/
+       DomRestrict/RanRestrict operators the old hand-rolled cases silently
+       dropped (`_ -> ok := false`), and is exhaustive so a new constructor
+       can't reintroduce that gap. *)
+    | _ ->
+      (match exp_congruence pat tgt with
+       | Some pairs -> List.iter (fun (p, t) -> me p t) pairs
+       | None -> ok := false)
   in
   let rec mp pat tgt =
     if !ok then match pat, tgt with
