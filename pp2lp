@@ -1355,37 +1355,78 @@ def gen_replays(suite, krt, force=False):
     here = BENCH / suite
     traces = sorted(here.glob("*/*.trace"))
     ok = fail = skip = dropped = 0
-    for tr in traces:
-        stem, d = tr.stem, tr.parent
-        replay = d / f"{stem}.replay"
-        if not force and replay.exists() and replay.stat().st_mtime >= tr.stat().st_mtime:
-            skip += 1; continue
-        goal = d / f"{stem}.replay.goal"
-        goal.write_text(f'Flag(FileOn("{stem}.replay.res")) & ("{tr}")')
-        okk, out, _r = run_krt(krt, replay_kin, goal.name, str(d),
-                               patterns=_SATURATION + _REPLAY_EXTRA)
-        goal.unlink(missing_ok=True)
-        (d / f"{stem}.replay.res").unlink(missing_ok=True)
-        misc = d / stem
-        if misc.is_file() and misc.suffix == "":
-            misc.unlink()
-        if not (okk and out and len(out) > 10):
-            fail += 1; continue
-        replay.write_text(out)
-        # Hygiene: a REPLAY-truncated replay (the tool dropped the ALL7/XST8
-        # continuation) can't be emitted — drop it from the suite, loudly.  Other
-        # emit failures are real bugs and kept, to surface at `run` time.
-        probe = emit(replay, d / f"{stem}.lp")
-        (d / f"{stem}.lp").unlink(missing_ok=True)
-        if not probe["ok"] and (probe.get("error") or {}).get("code") == "E_REPLAY_TRUNCATED":
-            replay.unlink(missing_ok=True)
-            hint = ("prune it from goals.txt"
-                    if (BENCH / suite / "goals.txt").exists() else "upstream REPLAY loss")
-            print(yellow(f"  ⚠ dropped {stem}: truncated replay "
-                         f"(REPLAY dropped the ALL7/XST8 continuation; {hint})"))
-            dropped += 1
-        else:
-            ok += 1
+    done, t0 = 0, time.time()
+    last_line = last_tty = 0.0
+
+    def _line(stem):
+        el = (time.time() - t0) / 60
+        return (f"replays {done}/{len(traces)} · {ok} ok · {dropped} dropped · "
+                f"{fail} failed · {skip} up-to-date · {el:.0f}m · {stem}")
+
+    def progress(stem, force_draw=False):
+        nonlocal last_tty, last_line
+        now = time.time()
+        if IS_TTY:
+            if force_draw or now - last_tty >= 0.2:    # throttle terminal rewrites
+                sys.stdout.write("\r\033[K  " + dim(_line(stem)))
+                sys.stdout.flush()
+                last_tty = now
+        elif now - last_line >= 60:                    # piped/nohup: one line a minute
+            print("  " + _line(stem), flush=True)
+            last_line = now
+
+    def clear_progress():
+        if IS_TTY:
+            sys.stdout.write("\r\033[K")
+            sys.stdout.flush()
+
+    try:
+        for tr in traces:
+            stem, d = tr.stem, tr.parent
+            done += 1
+            replay = d / f"{stem}.replay"
+            if not force and replay.exists() and replay.stat().st_mtime >= tr.stat().st_mtime:
+                skip += 1
+                progress(stem)
+                continue
+            progress(stem, force_draw=True)   # the name on screen is the one running
+            goal = d / f"{stem}.replay.goal"
+            goal.write_text(f'Flag(FileOn("{stem}.replay.res")) & ("{tr}")')
+            okk, out, _r = run_krt(krt, replay_kin, goal.name, str(d),
+                                   patterns=_SATURATION + _REPLAY_EXTRA)
+            goal.unlink(missing_ok=True)
+            (d / f"{stem}.replay.res").unlink(missing_ok=True)
+            misc = d / stem
+            if misc.is_file() and misc.suffix == "":
+                misc.unlink()
+            if not (okk and out and len(out) > 10):
+                fail += 1; continue
+            # tmp+rename: an interrupt must not leave a half-written replay that
+            # a resume would then skip as up-to-date.
+            tmp = d / f"{stem}.replay.tmp"
+            tmp.write_text(out)
+            tmp.replace(replay)
+            # Hygiene: a REPLAY-truncated replay (the tool dropped the ALL7/XST8
+            # continuation) can't be emitted — drop it from the suite, loudly.  Other
+            # emit failures are real bugs and kept, to surface at `run` time.
+            probe = emit(replay, d / f"{stem}.lp")
+            (d / f"{stem}.lp").unlink(missing_ok=True)
+            if not probe["ok"] and (probe.get("error") or {}).get("code") == "E_REPLAY_TRUNCATED":
+                replay.unlink(missing_ok=True)
+                hint = ("prune it from goals.txt"
+                        if (BENCH / suite / "goals.txt").exists() else "upstream REPLAY loss")
+                clear_progress()
+                print(yellow(f"  ⚠ dropped {stem}: truncated replay "
+                             f"(REPLAY dropped the ALL7/XST8 continuation; {hint})"))
+                dropped += 1
+            else:
+                ok += 1
+    except KeyboardInterrupt:
+        clear_progress()
+        print(yellow(f"  replays: interrupted at {done}/{len(traces)} — the stage is "
+                     f"incremental; rerun `pp2lp gen {suite} --only replays` to resume"))
+        sys.exit(130)
+    clear_progress()
     return ok, fail, skip, dropped
 
 
