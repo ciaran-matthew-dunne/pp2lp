@@ -19,6 +19,10 @@
 %token FORALL0 FORALL1 FORALL2 EXISTS
 
 %nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
+%nonassoc RPAREN    (* > LIFT_EXP: in `( exp )` shift into the exp-in-parens
+                       rule rather than reducing raw_prd -> exp first.  Both
+                       derivations yield the same AST (Lift exp); declaring
+                       RPAREN makes menhir's default-shift explicit. *)
 %nonassoc COMMA
 %left IMP           (* PP spec priority 3: => *)
 %left OR AND        (* PP spec priority 2: and, or (same level, left-assoc) *)
@@ -32,6 +36,10 @@
 %left TIMES          (* coefficient binds tighter than +/- : 2*x + y = (2*x) + y *)
 %nonassoc UMINUS
 %nonassoc LSQ
+%nonassoc TILDE     (* highest: postfix inverse binds tighter than every
+                       operator — r~[s] = (r~)[s], -x~ = -(x~), a<|b~ = a<|(b~).
+                       The `exp TILDE` rule inherits this precedence, so each
+                       `exp OP exp . TILDE` state shifts (applies ~ first). *)
 
 %start <line option> line_eof
 %%
