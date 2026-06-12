@@ -1,0 +1,50 @@
+; Golden tests — pin the emitter's replay→.lp output so refactors that must be
+; behaviour-preserving (e.g. the arith_proofs split, the single exp traversal)
+; show up as a diff.  Six og replays span the rule families: 01 propositional,
+; 03 arithmetic (AR10), 04 conjunction (AND5), 18 branching+Res-chain (ALL7/
+; STOP_1/NRM), 21 curried-ALL3 + NRM, 26 OPR equality rewrite.  Each <n>.replay
+; fixture is emitted with `main emit` and diffed against the committed
+; <n>.expected.lp.  Regenerate after an *intentional* emitter change with:
+;     dune promote      (after `dune runtest` reports the diff)
+
+(rule
+ (deps ../bin/main.exe 01.replay)
+ (action
+  (with-stdout-to 01.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 01.replay))))
+(rule (alias runtest) (action (diff 01.expected.lp 01.actual.lp)))
+
+(rule
+ (deps ../bin/main.exe 03.replay)
+ (action
+  (with-stdout-to 03.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 03.replay))))
+(rule (alias runtest) (action (diff 03.expected.lp 03.actual.lp)))
+
+(rule
+ (deps ../bin/main.exe 04.replay)
+ (action
+  (with-stdout-to 04.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 04.replay))))
+(rule (alias runtest) (action (diff 04.expected.lp 04.actual.lp)))
+
+(rule
+ (deps ../bin/main.exe 18.replay)
+ (action
+  (with-stdout-to 18.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 18.replay))))
+(rule (alias runtest) (action (diff 18.expected.lp 18.actual.lp)))
+
+(rule
+ (deps ../bin/main.exe 21.replay)
+ (action
+  (with-stdout-to 21.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 21.replay))))
+(rule (alias runtest) (action (diff 21.expected.lp 21.actual.lp)))
+
+(rule
+ (deps ../bin/main.exe 26.replay)
+ (action
+  (with-stdout-to 26.actual.lp
+   (run ../bin/main.exe emit --map /dev/null 26.replay))))
+(rule (alias runtest) (action (diff 26.expected.lp 26.actual.lp)))
