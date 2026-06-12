@@ -39,8 +39,9 @@ let dynamic_value_args ctx rule arg =
   | _, _ -> []
 
 (* Proof arguments the LP signature needs *before* the slot holes —
-   solver side-conditions the replay doesn't carry, supplied as `trust`,
-   and the witness/hyp pair placeholders. *)
+   solver side-conditions the replay doesn't carry (now generated in
+   [tactic_for_rule] or failed loud — never `trust`), and the witness/hyp
+   pair placeholders. *)
 let metadata_extra_args rule =
   match Rule_db.emit rule with
   | Rule_db.Ar9 ->
@@ -60,8 +61,9 @@ let metadata_extra_args rule =
   | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10
   | Rule_db.Bool_split -> []
 
-(* Holes for the rule's derivation slots; Con slots become `trust` for
-   the [Trust_cons] strategy (solver-confirmed side conditions). *)
+(* Holes for the rule's derivation slots.  A Con slot under the [Trust_cons]
+   strategy has no generated proof, so it fails loud rather than emit `trust`
+   (the historical fallback, removed 2026-06-12). *)
 let slot_hole_args rule =
   let trust_cons = Rule_db.emit rule = Rule_db.Trust_cons in
   Rule_db.slots rule
@@ -518,7 +520,7 @@ let tactic_for_rule ctx rule arg anno children =
        given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.
        AR6 is the mirror (antecedent `a ≤ 𝟎`, bound `—a ≤ 𝟎`).  That bound is
        PP's solver fact, but it's the matching `≤ 𝟎` hypothesis in scope — find
-       it; trust only if absent.  The Seq slot is the continuation child. *)
+       it; fail loud if absent (never trust).  The Seq slot is the continuation child. *)
     let bound =
       match base rule, goal_of_anno anno with
       | "AR5", Some (Binary (Imp, Leq (Neg a, Nat 0), _)) -> Some (Leq (a, Nat 0))
@@ -538,7 +540,7 @@ let tactic_for_rule ctx rule arg anno children =
        `𝟏 − a` normalisation, so E = `𝟏 − F` for the cancelling hyp F and
        `E + F = 𝟏`; then `(E+F) > 𝟎 = ¬((E+F) ≤ 𝟎)` is `one_not_leq_zero`
        transported along the generated `(E+F) = 𝟏` — no trust.  Pick the F≤𝟎 hyp
-       that cancels; fall back to the first F≤𝟎 hyp + trust if none does. *)
+       that cancels; fail loud if none does (never trust). *)
     let env = proj_env_of_ctx ctx in
     let e_opt = match goal_of_anno anno with
       | Some (Binary (Imp, Leq (e, Nat 0), _)) -> Some e | _ -> None in

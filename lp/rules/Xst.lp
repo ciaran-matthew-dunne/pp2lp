@@ -161,36 +161,16 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// XST1–4 are the chain form of the existential regroupement
-// `∃x·∃y·P ↦ ∃(x,y)·P` (§A.8) — NOT a HOAS identity.  As with ALL1–4 (All.lp) the
-// merge is done at the AST level by `flatten_binds` (the `binder_merge` skip in
-// rule_db.ml), so they are never emitted and the `res_tm` bridge is left as
-// `trust`.  Eliminable via the `??`-currying equality (propExt over
-// compound_to_nested_∃ / nested_to_compound_∃) if a merge ever needs emitting in
-// a Res chain.
+// The chain forms of the §A.8 existential regroupement `∃x·∃y·P ↦ ∃(x,y)·P`
+// (XST1_1–XST4_1) were removed 2026-06-12.  As with ALL1–4 (All.lp) the merge is
+// pre-flattened at the AST level by `flatten_binds` (the `binder_merge` skip in
+// rule_db.ml), so they were never emitted and their `res_tm` bridge was only a
+// `trust` placeholder.  Re-derivable via the `??`-currying equality (propExt
+// over the compound↔nested directions) if a merge ever needs emitting in a Res
+// chain.  The chain dispatch now fails loud on these shapes (Translate.chain_term).
 // XST5–XST6 and XST51/XST61: Schema 1 passthrough.
 // XST7_1: Schema 1 via the `xst7_eq` bridge.
 // XST8_1: special — chain-shaped, see below.
-
-symbol XST1_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  (r : Res (¬ (`?? v : Tuple (+1 n), P v) ⇒ R))
-  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
-
-symbol XST2_1 [n] [P : Tuple (+1 n) → Prop]
-  (r : Res (¬ (`?? v : Tuple (+1 n), P v)))
-  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)))
-  ≔ mk_1 (res_tm r) trust;
-
-symbol XST3_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  (r : Res ((`?? v : Tuple (+1 n), P v) ⇒ R))
-  : Res ((`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
-
-symbol XST4_1 [n] [P : Tuple (+1 n) → Prop]
-  (r : Res (`?? v : Tuple (+1 n), P v))
-  : Res (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
-  ≔ mk_1 (res_tm r) trust;
 
 symbol XST5_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`!! v, ¬ (P v)) ⇒ R))

@@ -5,7 +5,7 @@
    keyed on base names; the suffix helpers below decode the variants. *)
 
 (** Kind of a derivation slot in a rule's signature.
-    - [Con]: side-condition proof (e.g. a [trust] arg or a solver lemma).
+    - [Con]: side-condition proof (a solver lemma or generated proof).
       Filled inline in the LP application; not a child in the proof tree.
     - [Seq]: sequent derivation — a regular proof-tree child.
     - [Res]: result derivation — a chain child.  Currently the first
@@ -23,7 +23,8 @@ type arity = Arity of kind list
     dangling tag silently fell through to a wrong default. *)
 type emit =
   | Default        (* generic: one hole per derivation slot *)
-  | Trust_cons     (* every Con slot filled with `trust` (solver side-conditions) *)
+  | Trust_cons     (* Con-slot solver side-conditions with no generated proof:
+                      emit fails loud rather than `trust` (AR13; unfired) *)
   | Hyp_search     (* find an in-scope hyp by goal-derived predicate (AXM1-6, EAXM1/2) *)
   | Witness_hyp    (* find a (witness, hyp) pair, children dropped (AXM9, NRM19) *)
   | Ins            (* universal-instantiation contradiction search *)

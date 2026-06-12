@@ -231,8 +231,9 @@ end;
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
 // AR9_1 below uses leq_zero_eq to bridge the solver-supplied
-// equality. Other AR rules use `trust` for the propositional equality
-// since the chain emit doesn't thread the solver side-conditions.
+// equality. Other AR_1 forms are proven outright or bridge the equality with
+// a generated proof (AR3'_1); shapes the chain emit can't thread fail loud —
+// none emit `trust`.
 
 // (E ≤ E) ⇒ R ≡ R — the antecedent is always true (leq_refl).  Mirrors evr3_eq.
 opaque symbol ar1_eq [E : τ ι] [R : Prop] : π (((E ≤ E) ⇒ R) = R) ≔

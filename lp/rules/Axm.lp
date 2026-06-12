@@ -102,7 +102,7 @@ end;
 // prove the consequent, and `prop_eq_top` turns that into the `= ⊤` the
 // Σ-typed `Res` (via `mk_0`) demands.  The emitter's chain path supplies
 // the evidence (`Translate.chain_term`); when it can't recover the hyp it
-// falls back to `trust`, so no shape regresses.
+// fails loud (no `trust` fallback).
 
 // AXM7_1: the one AXM_N_1 whose proof is unconditional — `P ⇒ P` is always
 // propositionally `⊤` (stdlib `⇒_idem`), no hyp needed.

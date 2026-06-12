@@ -11,10 +11,8 @@ require open
   Stdlib.List Stdlib.Nat
   Stdlib.Tactic;
 
-// ---- Trusted arithmetic oracle ----
-// Used to fill computable arithmetic facts (solver-confirmed)
-// that we cannot yet prove from axioms.
-opaque symbol trust [P : Prop] : π P ≔ begin admit end;
+// The `trust` arithmetic oracle was removed 2026-06-12: the engine cannot emit
+// it — every solver side-condition is now generated or fails loud.
 
 // ---- Domain constants ----
 

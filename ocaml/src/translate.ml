@@ -340,7 +340,7 @@ and default ctx rule arg anno children =
        recorded bare-variable-first (`b = a`); its sides give a (= rhs) and
        b (= lhs).  AR7's bound hyp is `(c+b) = (b−a) ≤ 𝟎`, AR8's is `(a−b) ≤ 𝟎`
        — recover it from scope (directly or term-reordered) as a real proof via
-       [leaf_evidence]; only the solver fact `a+c = 𝟎` is `trust`.  a/b/c are
+       [leaf_evidence]; the solver fact `a+c = 𝟎` is generated, no trust.  a/b/c are
        inferred from that hyp proof and the goal, so the explicit value slot is
        a hole, and the `hR` slot is filled by the child continuation.  If the
        hyp isn't recoverable, fall through to the explicit AR7/AR8 failure. *)
@@ -649,16 +649,18 @@ and chain_term ctx node : L.term =
                     scope")
      | _ ->
        failwith "translate: IMP5_1 expected an implication annotation")
-  | P.Apply { rule; children = [c]; _ }
-    when base rule = "ALL3"
-         && (match c with
-             | P.Apply { anno = canno; _ } ->
-               (match goal_of_anno canno with
-                | Some (Binary (Imp, Bind (_, _, _), _)) -> true
-                | _ -> false)) ->
-    (* Chain form of the curried ALL3 merge (see `branch_cont`): P is inferred
-       from the result type `!! w, !! y, P w y`, so no explicit predicate. *)
-    L.App (L.Name "ALL3_1", [chain_term ctx c])
+  | P.Apply { rule; _ }
+    when Rule_db.is_binder_merge rule || base rule = "ALL5" ->
+    (* Primed binder-merge chain rule (ALL1_1–ALL5_1 / XST1_1–XST4_1).  PP's
+       §A.7–8 regroupement is pre-flattened at the AST level (flatten_binds),
+       so these chain shapes are never produced by the corpus; their LP lemmas
+       were only trust-bodied placeholders and were removed 2026-06-12.  Fail
+       loud rather than refine against a now-absent lemma.  Re-derivable via the
+       compound↔nested currying route (the curried base ALL3 is the precedent)
+       should a merge ever need emitting inside a Res chain. *)
+    failwith (Printf.sprintf
+      "E_DISPATCH: %s chain form unsupported — binder merges are pre-flattened \
+       (flatten_binds); the trust-bodied _1 lemma was removed 2026-06-12" rule)
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP4"
          && (match goal_of_anno anno with
@@ -684,9 +686,9 @@ and chain_term ctx node : L.term =
      | _ -> assert false)
   | P.Apply { rule; arg; children = [c]; _ } ->
     (* Mirror the main-tree arg bundle: dynamic value args, then the solver
-       side-condition metadata (AR9's `trust` for `E = F`), then slot holes.
-       The chain path used to drop the metadata, so AR9_1 emitted without its
-       `trust` and left the `he` goal unfilled ("missing subproofs"). *)
+       side-condition metadata (AR9's `E = F` equality, as `eq_refl`), then slot
+       holes.  The chain path used to drop the metadata, so AR9_1 emitted without
+       that equality and left the `he` goal unfilled ("missing subproofs"). *)
     app (chain_emit_name rule)
       (plug rule
          (dynamic_value_args ctx rule arg

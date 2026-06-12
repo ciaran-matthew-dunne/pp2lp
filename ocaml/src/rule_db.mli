@@ -4,7 +4,7 @@
    internal; only the queries below are exposed. *)
 
 (** Kind of a derivation slot in a rule's signature.
-    - [Con]: side-condition proof (a `trust` arg or solver lemma), filled
+    - [Con]: side-condition proof (a solver lemma or generated proof), filled
       inline in the LP application; not a proof-tree child.
     - [Seq]: sequent derivation — a regular proof-tree child.
     - [Res]: result-chain child (the first slot of branching ALL7/XST8). *)

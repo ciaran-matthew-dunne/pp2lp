@@ -146,46 +146,19 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// ALL1–4 are the chain (Res-typed) form of the quantifier *regroupement*
-// `∀x·∀y·P ↦ ∀(x,y)·P` (§A.7).  They are NOT a HOAS identity: the merge is done
-// at the AST level by the emitter's `flatten_binds` (the `binder_merge` skip in
-// rule_db.ml), so in practice neither the base nor the `_1` form is ever emitted.
-// Being unexercised, the `res_tm` equality bridge is left as `trust`.  It is
-// eliminable — the compound↔nested currying `Tuple (+1 n) ≅ Tuple n × Tuple 1` is
-// provable by `propExt` over the two directions the base ALL1–4 already contain
-// (forward = ALL4, backward = nested_to_compound) — should a merge ever need
-// emitting inside a Res chain.  Same story for ALL5_1.
+// The chain (Res-typed) forms of the §A.7–8 quantifier regroupement
+// `∀x·∀y·P ↦ ∀(x,y)·P` (ALL1_1–ALL5_1) were removed 2026-06-12.  The merge is
+// pre-flattened at the AST level by the emitter's `flatten_binds` (the
+// `binder_merge` skip in rule_db.ml), so neither the base nor the `_1` form is
+// ever emitted, and their `res_tm` bridge was only a `trust` placeholder.  They
+// are re-derivable — the compound↔nested currying `Tuple (+1 n) ≅ Tuple n ×
+// Tuple 1` is provable by `propExt` over the two directions the base ALL1–4
+// already contain (forward = ALL4, backward = nested_to_compound), the curried
+// base ALL3 being the worked precedent — should a merge ever need emitting
+// inside a Res chain.  The chain dispatch now fails loud on these shapes
+// (Translate.chain_term).
 // ALL6: Schema 1 — passthrough through `¬P ≡ P ⇒ ⊥` (a genuine HOAS identity).
 // ALL7' / ALL8' / ALL9': special cases (see spec §8.13).
-
-symbol ALL1_1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  (r : Res (¬ (`!! v : Tuple (+1 n), P v) ⇒ R))
-  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
-
-symbol ALL2_1 [n] [P : Tuple (+1 n) → Prop]
-  (r : Res (¬ (`!! v : Tuple (+1 n), P v)))
-  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)))
-  ≔ mk_1 (res_tm r) trust;
-
-// ALL3_1: chain form of the curried ALL3 (P inferable from the result type).
-// trust: the compound↔nested equality's reconstruction direction needs a
-// tuple-append lemma — deferred with the other bare-rule conversions.  This
-// path (an ALL3 merge inside a Res chain) is unexercised by the corpus.
-symbol ALL3_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
-  (r : Res ((`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
-  : Res ((`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
-
-symbol ALL4_1 [n] [P : Tuple (+1 n) → Prop]
-  (r : Res (`!! v : Tuple (+1 n), P v))
-  : Res (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y))
-  ≔ mk_1 (res_tm r) trust;
-
-symbol ALL5_1 [n] [P : Tuple n → Prop] [R : Prop]
-  (r : Res (`!! v, ¬ (P v) ⇒ R))
-  : Res (¬ (`!! v, P v) ⇒ R)
-  ≔ mk_1 (res_tm r) trust;
 
 symbol ALL6_1 [n] [P : Tuple n → Prop]
   (r : Res ((`!! v, P v) ⇒ ⊥))

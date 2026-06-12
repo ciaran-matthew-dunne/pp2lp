@@ -13,14 +13,14 @@ val pred_term : Emit_ctx.ctx -> prd -> Lp_tree.term
 val exp_term : Emit_ctx.ctx -> exp -> Lp_tree.term
 
 (* Value/hole arguments the generic (non-tree-expanding) rules take: the
-   rule's PP-side value arg ([dynamic_value_args]) and the holes/`trust` for
-   its derivation slots ([slot_hole_args]). *)
+   rule's PP-side value arg ([dynamic_value_args]) and the holes for its
+   derivation slots ([slot_hole_args]). *)
 val dynamic_value_args : Emit_ctx.ctx -> string -> arg option -> Lp_tree.term list
 val slot_hole_args : string -> Lp_tree.term list
 
 (* Solver side-condition args the LP signature needs before its slot holes
-   (e.g. AR9's `trust` for `E = F`).  The main-tree path bundles this into
-   the rule's args; the Res-chain path must include it too. *)
+   (e.g. AR9's `E = F` equality, supplied as `eq_refl`).  The main-tree path
+   bundles this into the rule's args; the Res-chain path must include it too. *)
 val metadata_extra_args : string -> Lp_tree.term list
 
 (* AND5: locate the implication conjunct [j] whose antecedent is matched by
