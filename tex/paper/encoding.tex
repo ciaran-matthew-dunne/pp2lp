@@ -3,11 +3,12 @@
 
 \subsection{The Predicate Prover}\label{sec:pp-syntax}
 
-\pp{} proves sequents $H \seq P$, where $H$ is a list of hypothesis
-predicates and $P$ a goal predicate, over the first-order fragment of B's
-logic.
+Syntax for the \emph{predicates} and \emph{expressions} of \pp{} are
+given as follows:
 %
-Its formulas are built from \emph{expressions} and \emph{predicates}:
+% do we really have n-ary function applications?
+% do we really have n-ary membership?
+% is this the full grammar for predicates/expressions?
 \begin{align*}
   E, F &\Coloneqq x \mid n \mid E \mapsto F \mid f(E_1,\ldots,E_k)
          \mid E + F \mid E - F \mid -E \\
@@ -19,21 +20,22 @@ Its formulas are built from \emph{expressions} and \emph{predicates}:
 \end{align*}
 where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's
 pairing, and $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
-\emph{vector} of variables.
+list of variables.
 %
-An expression standing alone is an atom (this is how propositional
-variables appear).
+The quantifiers $\Dia$ and $\Hrt$ are universal quantifiers idiosyncratic
+to \pp's normalisation procedure; semantically both are $\forall$ and differ
+only in the role they play during proof search.
 %
-$\Dia$ and $\Hrt$ (the spec's \texttt{forall} and \texttt{forall2}) are
-$n$-ary universal quantifiers that \pp's normalisation introduces on the
-goal and hypothesis side respectively; semantically both are $\forall$ —
-they differ only in the role they play during proof search.
-%
+% nonsense sentence? maybe its worth explaining the pre-processing step.
+% although its clear that some set-theory stuff remain as function/relation
+% symbols, but the rules don't deal with them in any meaningful way.
 The set-theoretic surface of B (powersets, intervals, relational
 operators, \ldots) reaches \pp{} as applications of function symbols;
 \pp{} reasons about them through its normalisation and equality rules,
 not through their set-theoretic definitions.
 
+% we need to formally introduce sequents and results here before
+% discussing the rules.
 \pp's inference rules are specified in the annex of its internal
 specification~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
 families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
@@ -44,10 +46,14 @@ families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
 \rn{ARITH} and \rn{EGALITE}), and normalisation and instantiation
 (\rn{NRM1--30}, \rn{INS}).
 %
-A rule application consumes the current sequent and produces zero, one,
-or two premise sequents, possibly under side-conditions (``$P$ occurs in
-$H$'', ``the arithmetic solver refutes the hypotheses'', \ldots).
+Each rule application reduces the current goal to zero, one,
+or two premises, possibly under computational side-conditions
+(``$P$ occurs in the list of hypotheses $H$'',
+ ``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
 
+%  everything here is kind of filler and has already been said.
+% we should show an example replay (involving ALL7) and how it
+% corresponds to an 'abstract derivation'.
 How \pp{} \emph{finds} a proof is irrelevant here: we consume its
 replays.
 %
@@ -68,11 +74,13 @@ branching quantifier (\rn{ALL7}, \rn{XST8}) is emitted \emph{before}
 the branch rule itself, and phantom normalisation markers are
 interleaved throughout.
 %
+% the notion of 'phantom' is useless jargon. remove.
 The first non-phantom annotation is the overall goal.
 
+% result should be explained earlier.
 The \texttt{\_1} (\emph{result-form}) variants deserve explanation, as
 they shape the encoding.
-%
+% i prefer the framing that results/sequents are just different
 Inside a normalisation chain a rule does not close a sequent: it
 transforms a formula and passes the \emph{result} on.
 %
@@ -82,7 +90,8 @@ single transformed formula, or the combination of the results of its two
 children.
 
 \subsection{\lp}\label{sec:lp}
-
+% we should have a grammar to mirror what we showed for PP.
+% for the lambdapi commands, we should use the same syntax highlighting we used in eo2lp
 \lp~\cite{hondet:hal-02981561} is a proof assistant for the
 \lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
 logical framework~\cite{assaf2023dedukti}: a dependently-typed
@@ -103,26 +112,27 @@ during unification, and the definition of an \texttt{opaque} symbol is
 sealed once type-checked.
 %
 A definition may be given as a proof script (\texttt{begin} \ldots{}
-\texttt{end}) whose tactics — \texttt{assume}, \texttt{refine},
-\texttt{rewrite}, \texttt{have}, \texttt{induction} — elaborate to a
-term that the kernel re-checks, so the tactic layer adds nothing to the
-trusted base.
+\texttt{end}) whose tactics --- \texttt{assume}, \texttt{refine},
+\texttt{rewrite}, \texttt{have}, \texttt{induction} --- ultimately
+elaborate to a proof term that the kernel re-checks, so the tactic layer
+adds nothing to the trusted base.
 
-We build on \lp's standard library~\cite{Blanqui2021}: a Tarski-style
-universe $\Setu$ with $\El : \Setu \to \mathsf{TYPE}$ mapping each set
-code to its type of inhabitants, and a type $\Prop$ of propositions with
-$\Prf : \Prop \to \mathsf{TYPE}$ mapping each proposition to its type of
-proofs (the library also provides the code $o : \Setu$ with
+We build on \lp's standard library~\cite{Blanqui2021}: object-level types are
+encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \mathsf{TYPE}$
+mapping each set code to its type of inhabitants, and a type $\Prop$ of
+propositions with $\Prf : \Prop \to \mathsf{TYPE}$ mapping each proposition
+to its type of proofs (the library also provides the code $o : \Setu$ with
 $\El\,o ↪ \Prop$).
 %
 Connectives and quantifiers are the standard impredicative encodings;
 on top of these we assume the library's classical axioms — excluded
 middle and propositional extensionality.
 
-\subsection{Encoding Formulas}\label{sec:enc-formulas}
+\subsection{Encoding PP's Predicates and Expressions}\label{sec:enc-formulas}
 
 The encoding is shallow.
-%
+% the explanation of the `o` set code is in the previous section when
+% it naturally falls alongside the explanation of the `ι` set code.
 All B expressions inhabit a single domain: a set code $\iota$, so an
 expression is a term of type $\El\,\iota$ and a predicate is a term of
 type $\Prop$.
@@ -182,30 +192,30 @@ end;
 \end{codeLP}
 
 \paragraph{Compound binders.}
+%  this is NOT true. PP doesn't regroup quantifiers.
+% some rules do this regrouping but really we are just explaining that PP
+% distinguishes between ∀ (x,y), P and ∀ x, ∀ y, P
 \pp{} regroups consecutive quantifiers — $\forall x \cdot \forall y
 \cdot P$ becomes $\forall (x,y) \cdot P$ — and its quantifier rules
 manipulate the compound binder as a unit.
 %
-We mirror this with an inductive type $\Tuple\,n$ of $n$-tuples over
-$\El\,\iota$ (with projections $\prj$), and \emph{rigid} $n$-ary
-quantifiers
+We mirror this with an inductive dependent type $\Tuple : ℕ → \TYPE$
+with projections $\prj [n] : \Tuple\,n → \El\,\iota$, and quantifiers
 $\allI, \xstI : (\Tuple\,n \to \Prop) \to \Prop$
-whose introduction and elimination principles are axiomatised bridges to
+whose introduction and elimination principles are axiomatized bridges to
 the $\Pi$-types of \lp{} (e.g.\
 $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
 of their own.
 %
-Rigidity — no rewrite rule unfolds $\allI$ to nested $\forall$ — is
-essential: if the quantifier reduced away, the surface form would vanish
-from goals before any rule lemma could address it, and inferring the
-implicit predicate $P$ at rule applications would require inverting the
-reduction, a higher-order unification problem \lp{} does not attempt.
+% we probably don't need to make this point but it's useful to have:
+% -------------------------------------------------------------------
+% No rewrite rule unfolds $\allI$ to nested $\forall$: if the quantifier
+% reduced away, the surface form would vanish from goals before any rule
+% lemma could address it, and inferring the
+% implicit predicate $P$ at rule applications would require inverting the
+% reduction, a higher-order unification problem \lp{} does not attempt.
 %
-The translator performs \pp's regrouping itself while building the goal,
-so the \lp{} goal always carries one compound binder and the regrouping
-rules (\rn{ALL1--4}, \rn{XST1--4}) are consumed without emitting
-anything.
 
 \subsection{Encoding Rules}\label{sec:enc-rules}
 
@@ -216,37 +226,18 @@ The encoding of a rule's statement is positional: the conclusion sequent
 $H \seq P$ appears as $\Prf\,P$; a premise that extends the hypotheses,
 $H, P \seq Q$, appears as the function type $\Prf\,P \to \Prf\,Q$; and a
 side-condition ``$P$ occurs in $H$'' becomes an explicit argument of
-type $\Prf\,P$, which the emitter supplies by looking the hypothesis up
-in scope.
+type $\Prf\,P$, which our translation tool supplies by looking the hypothesis
+up in scope.
 %
 For example, \rn{IMP4} (``to prove $P \Rightarrow Q$, assume $P$ and
 prove $Q$'') and the discharge rule \rn{AXM1} (``$\lnot P$ occurs in
-$H$, so $P \Rightarrow Q$ holds'') are
+$H$, so $P \Rightarrow Q$ holds'') have the following type signatures:
 \[
   \rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
   \qquad
   \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q),
 \]
-each an \texttt{opaque symbol} with a short tactic proof, type-checked
-once when the rule library is built.
 
-\paragraph{Solver side-conditions.}
-Some rules are licensed not by a structural premise but by a verdict of
-\pp's arithmetic solver or equality prover: \rn{AR4} requires
-$(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
-\rn{ARITH} terminal closes a goal because the accumulated
-$\leq$-hypotheses are contradictory.
-%
-The corresponding lemmas take these facts as explicit $\Prf$-arguments,
-and \tool{} \emph{generates} the witnessing proof at emission time: a
-nonnegative (Farkas-style) combination of the $\leq \mathbf{0}$
-hypotheses refuting the \rn{ARITH} goal, equality-transport chains for
-the equality prover, and permutation proofs from the group axioms
-wherever \pp{} recorded a sum in a different association order than the
-lemma needs.
-%
-There is no fallback oracle: when a witnessing proof cannot be
-generated, emission fails loudly (\autoref{sec:trust}).
 
 \paragraph{Result chains.}
 To encode the result-form (\texttt{\_1}) rules we package a
@@ -279,6 +270,27 @@ opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
 where the proof transports each instance along the chain's equality
 ($\mathsf{res\_eq}$).
 
+\paragraph{Solver side-conditions.}
+% we should actually give an example of a on-the-fly generated proof terms.
+Some rules are licensed not by a structural premise but by a verdict of
+\pp's arithmetic solver or equality prover: \rn{AR4} requires
+$(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
+\rn{ARITH} terminal closes a goal because the accumulated
+$\leq$-hypotheses are contradictory.
+%
+The corresponding lemmas take these facts as explicit $\Prf$-arguments,
+and \tool{} \emph{generates} the witnessing proof at emission time: a
+nonnegative (Farkas-style) combination of the $\leq \mathbf{0}$
+hypotheses refuting the \rn{ARITH} goal, equality-transport chains for
+the equality prover, and permutation proofs from the group axioms
+wherever \pp{} recorded a sum in a different association order than the
+lemma needs.
+%
+There is no fallback oracle: when a witnessing proof cannot be
+generated, emission fails loudly (\autoref{sec:trust}).
+
+% the whole following subsection is probably not needed.
+% we are not saying anything other than 'we proved everything'.
 \subsection{The Trusted Base}\label{sec:trust}
 A reconstructed proof type-checks against: the \lp{} kernel; the
 standard library with its classical axioms; the B domain axioms of
