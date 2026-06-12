@@ -64,13 +64,15 @@ a complete, independently checkable proof.
 %
 We evaluate our tool on benchmark suites containing rule validations
 from real-world \ab{} use and a large synthetic suite of goals generated
-by Claude Opus 4.8: every proof the upstream toolchain can replay —
-\allReplayed{} in total — is reconstructed and type-checked, using no
-unproved assumption beyond a small, fixed axiomatic base.
+by Claude Opus 4.8.
 %
-We additionally probe \tool{} on raw proof obligations from real-world
-\ab{} developments, where the chief obstacle turns out to be upstream
-replay loss rather than reconstruction (\autoref{sec:limits}).
+Every proof accepted by the replay utility (\allReplayed{} in total) is
+reconstructed and type-checked, using no unproved assumption beyond a small,
+fixed axiomatic base.
+%
+% We additionally probe \tool{} on raw proof obligations from real-world
+% \ab{} developments, where the chief obstacle turns out to be upstream
+% replay loss rather than reconstruction (\autoref{sec:limits}).
 
 \paragraph{Related Work.}
 This work is carried out within the ANR project ICSPA (\emph{Interoperable
@@ -115,15 +117,13 @@ BCARe framework of Jacquel et~al.~\cite{jacquel2011bcare,
 jacquel2015sosym} works over such an embedding to verify the rules
 added by users to \ab's rule base.
 %
-None of these efforts checks the deductions the shipped prover
+None of these efforts checks the deductions that \pp{}
 actually performs on a given obligation.
 %
-\tool{} targets exactly that gap: each \pp{} run is re-checked, proof by
-proof, against rule lemmas that are themselves proved sound.
+Our work targets exactly that gap: each \pp{} run is re-checked
+against rule lemmas that are themselves proved sound.
 %
-The approaches compose — rule-level validation justifies \emph{adding} a
-rule, and proof reconstruction justifies each \emph{use} the prover
-makes of it.
+
 %
 The BWare project~\cite{bware2014} took a different route to the same
 trust concern: it discharged B proof obligations with external provers
@@ -133,17 +133,13 @@ formally verifying its output.
 %
 In the same spirit, Trélat~\cite{trelat2025smt} gives a provably sound
 encoding of B proof obligations into SMT-LIB, as does
-Defourné~\cite{defourne2025scp} for TLA$^+$ obligations: the
-translation towards the external solver is verified once and for all,
-but the solver's verdict must still be taken on faith or reconstructed.
+Defourné~\cite{defourne2025scp} for TLA$^+$ obligations.
 %
 Closest to our setting, Stolze et~al.~\cite{stolze2024dedukti} export
-\ab{} proof \emph{obligations} to \dedukti{} at corpus scale and report
-preliminary experiments in reconstructing their proofs, towards sharing
-\ab{} proofs across the \dedukti{} ecosystem.
+\ab{} proof \emph{obligations} to \dedukti{} and report
+preliminary experiments towards sharing \ab{} proofs across the
+\dedukti{} ecosystem.
 %
-\tool{} supplies the proofs themselves: \pp's own traces direct a
-reconstruction against lemmas that correspond to \pp's inference rules.
 % TODO(authors): confirm with Hermant/D\'eharbe who built the trace
 % instrumentation and REPLAY before claiming any tooling lineage from
 % stolze2024dedukti in print.  Public evidence points to Atelier B
