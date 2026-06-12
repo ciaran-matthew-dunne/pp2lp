@@ -1,0 +1,1 @@
+Flag(FileOn("nrm21_rev_pair.res")) & Set(Valid.1 | Rule(Implication | (!(x,y).(a = x & y: b => x,y: c)) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | !(x,y).(a = x & y: b => x,y: c) | nn))

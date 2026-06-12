@@ -1,0 +1,1 @@
+Flag(FileOn("gemini_dom_defined.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: dom(f) => f(x): t)) & _delta_e(f) & _delta_e(t) | ? | ? | !x.(x: dom(f) => f(x): t) | nn))
