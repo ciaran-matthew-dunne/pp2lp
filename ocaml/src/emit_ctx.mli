@@ -105,20 +105,9 @@ val find_ectr56 : ctx -> prd -> (string * string * string * bool) option
    expressions; built from the in-scope binders.  Mirrors [Rule_emit.pp_env_of]. *)
 val proj_env_of_ctx : ctx -> Lp_tree.proj_env
 
-(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
-   multiset (— pushed to leaves), built from `add_comm`/`add_assoc`/`opp_add`/
-   `neg_neg`; None if unsupported or the multisets differ.  Used to bridge an
-   arithmetic-reorder/normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
-val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
-
-(* `π (e = 𝟎)` when [e]'s signed atoms cancel to the empty multiset (e.g.
-   `—a + a`).  [prove_sum_eq … (Nat 0)] can't — `𝟎` is the atom `0`, not the
-   empty list — so this chains normalise/sort/cancel straight to `lfold [] ≡ 𝟎`.
-   Used by the trust-free NRM29 dispatch for the substituted cancelling bounds. *)
-val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
-
-(* `π (e > 𝟎)` when [e] cancels to a positive literal (AR4's `(E+F) > 𝟎`). *)
-val prove_gt_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
+(* The sum-equality / sum-zero / positivity provers moved to [Arith_proofs]
+   (they are ctx-free).  [find_arith_contradiction] below stays as a thin ctx
+   wrapper over the Farkas search there. *)
 
 (* Proof of a single `≤ 𝟎` (or ⊤) leaf from the in-scope hyps: a direct
    match (up to alpha / binder-kind) or, failing that, an arithmetic-reorder

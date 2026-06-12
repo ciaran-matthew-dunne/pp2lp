@@ -508,7 +508,7 @@ let tactic_for_rule ctx rule arg anno children =
                         [ L.App (L.Name "sub_leq_eq",
                             [exp_term ctx a; exp_term ctx b]) ]) ]);
                   gt ]) ]))
-          (prove_gt_zero env (AOp (Sub, a, b)))
+          (Arith_proofs.prove_gt_zero env (AOp (Sub, a, b)))
       | _ -> None
     in
     (match gen with
@@ -551,7 +551,7 @@ let tactic_for_rule ctx rule arg anno children =
           | Leq (f, Nat 0) ->
             Option.map (fun h_gt ->
               L.Refine (L.Name rule, [exp_term ctx f; L.Name name; h_gt]))
-              (prove_gt_zero env (AOp (Add, e, f)))
+              (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
           | _ -> None) ctx.hyps
       | None -> None
     in

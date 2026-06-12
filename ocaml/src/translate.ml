@@ -57,7 +57,7 @@ let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
     Option.map
       (fun eqpf -> L.App (L.Name "ar3f_eq",
         [ L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf ]))
-      (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+      (Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
   | Unary (Not, p) ->
     Option.map (fun c -> L.App (L.Name "not_cong", [c]))
       (ar3f_cong ctx env p a_exp r_exp)
@@ -281,7 +281,7 @@ and default ctx rule arg anno children =
           (fun eqpf ->
             L.Refine (L.Name "AR3'",
               [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole]))
-          (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+          (Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
       | _ -> None
     in
     let tactic =
@@ -382,7 +382,7 @@ and default ctx rule arg anno children =
            in
            (match ac with
             | Some ac ->
-              (match prove_sum_zero env ac with
+              (match Arith_proofs.prove_sum_zero env ac with
                | Some t -> t
                | None -> failwith "translate: AR7/AR8 chain — prove_sum_zero \
                                    failed for the `(a+c)=𝟎` cancellation, \
@@ -623,7 +623,7 @@ and chain_term ctx node : L.term =
           (fun eqpf ->
             L.App (L.Name "AR3'_1",
               [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; chain_term ctx c]))
-          (prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+          (Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
       | _ -> None
     in
     (match bridged with
