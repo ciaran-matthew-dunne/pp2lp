@@ -1,334 +1,329 @@
 # CLAUDE.md
 
-Maintainer notes for **pp2lp** — translates Atelier B Predicate Prover
-(PP) proof replays to Lambdapi for independent type-checking.
+Maintainer notes for **pp2lp** — translates Atelier B Predicate Prover (PP)
+proof replays to Lambdapi for independent type-checking.
 
 Round trip: `formula → PP → .trace → REPLAY → .replay → pp2lp → .lp → lambdapi check`.
 
-One command does everything: **`pp2lp run`** (the executable `./pp2lp` at the
-repo root). It builds the OCaml engine, emits Lambdapi, type-checks it, and
-reports — for a whole suite (exit non-zero if any benchmark fails) or one trace
-(a detailed per-trace report). The OCaml binary under `ocaml/_build/` is an
-internal engine; you drive `./pp2lp`.
+One command does everything: **`./pp2lp`** at the repo root. It builds the
+OCaml engine, emits Lambdapi, type-checks it, and reports. The OCaml binary
+under `ocaml/_build/` is an internal engine; you drive `./pp2lp`.
 
-The generated `.lp` has no comments. The engine instead writes a table mapping
-each `.lp` line to the PP rule, replay line, and goal that produced it. On a
-lambdapi error, `pp2lp` looks the line up and shows three things side by side:
-the `.lp` at the error, the `.replay` step it came from, and the matching
-`lp/rules/` lemma.
+If anything in this file disagrees with the code, the code wins — fix this
+file in the same commit.
+
+## Ground rules
+
+- **Never `git clean` under `lp/bench` or at the repo root.** The bench tree
+  holds ~1 GB of gitignored generated artifacts (`.trace`/`.replay`/`.lp`)
+  that take hours of PP/REPLAY time to regenerate. For stale-object errors
+  the fix is `find lp -name '*.lpo' -delete` (object caches are cheap).
+- **`pp2lp gen` rewrites suites.** `gen <suite>` wipes every benchmark dir
+  not in that suite's source of truth (goals.txt / checked-in `.but`s),
+  tracked orphans included. Run it only when the task *is* corpus
+  generation, never as a debugging reflex.
+- **`tex/` is the LPAR-26 paper, not the tool.** Don't touch it, `notes.md`,
+  `admin/`, `doc/`, or `vendor/` unless explicitly asked.
+- Stage by explicit path (`git add <paths>`); never `git add -A`/`-u` or
+  `commit -a` — the working tree routinely carries the maintainer's
+  in-flight edits. Commit messages: plain prose, no Co-Authored-By, no
+  Claude/Anthropic attribution. Don't push unless asked.
+- og / prv / claude must be green at every commit (counts under Gates).
+- Probe files (`*_probe.lp`, `*.probe.lp` outside `lp/bench`) are scratch —
+  delete them when done.
 
 ## Commands
 
 ```
 pp2lp run                       # check the og suite
 pp2lp run claude                # check a suite (any ✗ ⇒ exit 1)
-pp2lp run og/01                 # check one trace; a failure shows snippet panels
-pp2lp run claude/x --lp-debug=u # also probe lambdapi (debug +u) → a .lp.debug panel
+pp2lp run og/01                 # one trace; a failure shows snippet panels
+pp2lp run apero --filter 'ap_0016'   # subset of a suite by name regex
+pp2lp run claude/x --lp-debug=u # also probe lambdapi (debug +u) → .lp.debug panel
 pp2lp run og --json             # machine output (also bench/results/og.json)
 pp2lp run og -q                 # summary only (suppress failure windows)
 
 pp2lp gen claude                # (re)gen .but/.trace/.replay via krt (PP/REPLAY)
 pp2lp gen prv --only replays    # one stage only (buts,traces,replays)
 pp2lp gen apero                 # convert+prove the CLEARSY POG corpus (see Suites)
+
+pp2lp audit                     # static pre-commit gate (see Gates); --full adds suites
 ```
 
 `run` auto-builds the engine first (`--no-build` to skip). Suites run in
-parallel (shared `lp/` objects are compiled once up front, so a cold run doesn't
-race); per-trace outcome is `✓` / `⚠` / `✗`, exit status non-zero iff any trace
-fails. Suites: `og` (default), `prv`, `claude`, `apero` (not a clean gate).
+parallel; shared `lp/` objects compile once up front. Per-trace outcome is
+`✓` / `⚠` / `✗`; exit non-zero iff any trace fails. A failing suite run ends
+with a histogram of failures by error code.
 
-Child-process caps (env-tunable, 0 disables): `PP2LP_CHECK_TIMEOUT` (60s),
-`PP2LP_EMIT_TIMEOUT` (30s), `PP2LP_CHECK_MEM_GB` (4 GiB `RLIMIT_AS`). They keep a
-runaway goal (e.g. `x: NAT` membership) from taking down the host — it fails
-fast rather than hanging.
+Child-process caps (env-tunable, 0 disables): `PP2LP_CHECK_TIMEOUT` (60 s),
+`PP2LP_EMIT_TIMEOUT` (30 s), `PP2LP_CHECK_MEM_GB` (4 GiB `RLIMIT_AS`). They
+keep a runaway goal from taking down the host. `pp2lp gen` shells out to the
+vendored Atelier B tools (`krt`, `vendor/atelierb/<plat>/REPLAY.kin`); you
+never call them directly.
 
-`pp2lp run` shells out to the engine (`ocaml/_build/default/bin/main.exe emit`)
-and `lambdapi`; `pp2lp gen` shells out to Atelier B's `krt` +
-`vendor/atelierb/<plat>/REPLAY.kin`. You never call them directly.
+## Gates
+
+The feedback ladder, fastest first — climb only as far as the change demands:
+
+| gate                                   | time    | catches                                  |
+|----------------------------------------|---------|------------------------------------------|
+| `cd ocaml && dune build`               | seconds | type/exhaustiveness errors (warn 8 fatal) |
+| `cd ocaml && dune runtest`             | seconds | emitter output drift (golden replay→.lp) |
+| `./pp2lp audit`                        | seconds | invariants below + both test files       |
+| `./pp2lp run og -q`                    | ~3 s    | end-to-end smoke (30 traces)             |
+| `./pp2lp run prv -q && pp2lp run claude -q` | ~5 min | full regression (70 + 1207 traces)  |
+| apero                                  | n/a     | **not a gate** — the open frontier       |
+
+`pp2lp audit` checks: no `admit` anywhere in `lp/` (no exceptions); no
+`trust` token in any emitted `lp/bench` `.lp`; no stray probe files; no
+generated parser artifacts in `ocaml/src/`; `bench/test_cli.py` passes
+(includes the axiom-inventory check and the OCaml↔Python contract); `dune
+runtest` passes.
+
+Pre-commit minimum: `./pp2lp audit && ./pp2lp run og -q`. Run prv + claude
+too whenever `ocaml/` or `lp/` (non-bench) changed.
+
+Green counts (updated 2026-06-12): **og 30 ✓, prv 70 ✓, claude 1207 ✓**
+(claude checks 1207 of 1284 goals; the rest are gen-time REPLAY drops).
+
+## Invariants
+
+- **Zero admits.** `lp/` contains no `admit` and no postulated oracle. The
+  historical `trust` axiom and the 9 unreachable binder-reshape `_1` lemmas
+  that used it were removed 2026-06-12; re-adding `trust` for a frontier
+  experiment is one line in `B.lp`, but it must not survive a commit.
+- **The trusted base is exactly the axiom-inventory allowlist** enforced by
+  `bench/test_cli.py`: every bodyless `π`-typed `symbol` in `lp/B.lp` (the
+  B-Book set/arithmetic/BOOL primitives), the eight quantifier bridges in
+  `lp/Quant.lp` (`pi_to_!!`, `!!_to_pi`, `pi_to_??_intro`, `pi_to_??_elim`,
+  and the `♢`/`♡` pairs), and ConjList's `⋀`/`Res` interface. Nothing else.
+  A new bodyless symbol anywhere else fails the audit.
+- **The engine cannot emit `trust`.** `Lp_tree.term` has no such
+  constructor; every solver side-condition, BOOL-membership, AXM-evidence,
+  or AR-cancellation that can't be *generated* fails loud with a stable
+  `E_*`-coded message instead.
+- **Emit dispatch is typed and exhaustive.** Rules carry a `Rule_db.emit`
+  variant; the match in `rule_emit.ml`/`translate.ml` is exhaustive with
+  warning 8 fatal, so adding a rule *forces* a dispatch arm.
 
 ## Mental model
 
-PP is Atelier B's automated first-order prover. A `.but` file (formula + flags)
-becomes a `.trace` (postorder), then REPLAY turns that into a `.replay`: sequent
-proof nodes prefix-style (rule before child subproofs), and the result-chain
-child of a branching quantifier (ALL7 / XST8) emitted *before* the branch rule.
-Each line carries the per-rule formula annotation PP saw.
+PP is Atelier B's automated first-order prover. A `.but` file (formula +
+flags) becomes a `.trace` (postorder), then REPLAY turns that into a
+`.replay`: sequent proof nodes prefix-style (rule before child subproofs),
+and the result-chain child of a branching quantifier (ALL7/XST8) emitted
+*before* the branch rule. Each line carries the per-rule formula annotation
+PP saw.
 
 `pp2lp` parses the replay, rebuilds the tree (`proof_tree.ml`), and emits an
 `opaque symbol` whose body is a tactic script — each PP rule becomes a
-`refine RULE …` against a lemma in `lp/rules/`. Lambdapi type-checks the symbol.
+`refine RULE …` against a lemma in `lp/rules/`. Lambdapi type-checks the
+symbol. The generated `.lp` has no comments; the engine instead writes a
+provenance map (lp line → PP rule, replay line, goal) that the CLI joins
+into failure reports.
 
 Three rule shapes, decoded by `Rule_db.strip_suffix` / `is_primed`:
 
-- **base** — `[AND2]`. Plain LP refine.
-- **`_1` primed** — `[AND2_1]`. Inside a Res-typed equality chain preceding a
-  branching quantifier.
-
-Branching rules (`ALL7`, `XST8`) are two-child: a Res-typed chain plus a
-continuation under the bound variable.
+- **base** — `[AND2]`. Plain LP refine in the main sequent proof.
+- **`_1` primed** — `[AND2_1]`. Inside a Res-typed equality chain preceding
+  a branching quantifier. Chains are emitted as explicit *terms*
+  (`refine ALL7 (λ v, …) _`), not tactic blocks — see `translate.ml`'s
+  header for why.
+- **branching** — ALL7 / XST8: two children, a Res chain plus a
+  continuation under the bound variable.
 
 **Binder merging is done at the AST level, not by an LP rule.** PP regroups
 adjacent same-quantifier binders — `∀x·∀y·P ↦ ∀(x,y)·P` (spec §A.7–8,
-"regroupement des quantifications"; plus an *aplatissement* to one flat tuple
-`a,b,c,d` when the merged vars are themselves compound) — via the merge rules
-ALL1–4 / XST1–4. `pp2lp` performs that merge in `Syntax_pp.flatten_binds` (and
-mirrors the aplatissement with `Tuple`'s `++`/`take`/`drop`), so the goal already
-carries one compound `Tuple n` binder and the merge rule is *skipped*
-(`Rule_db.is_binder_merge`, consumed at `Translate.tree`). This is **not** a HOAS
-identity (the nested and compound forms are not LP-definitionally equal): it is a
-deliberate skip that keeps the (compound-tuple-encoded) merge lemmas off the
-emitter's path — they type-check only with the predicate given *explicitly* (`P`
-sits at a non-pattern position `P (w ⨾ prj 0 y)` lambdapi cannot invert).
-**ALL3 is the exception**: re-encoded *curried* (`!! w, !! y, P w y`, All.lp), so
-`P` is a pattern and `branch_cont` emits `refine ALL3 _` for real (P inferred, no
-explicit predicate) when a branch continuation's nested antecedent escapes
-flattening — `take`/`drop` give the renderer's slot order, so the old `ALL3R` is
-gone.  Currying the other merge rules would drop their `flatten_binds` dependence
-too.  The `_1` chain forms of the non-curried merges never fire, so their `trust`
-bridges are dead code (eliminable — see Admits/trust).
+"regroupement des quantifications", plus an *aplatissement* to one flat
+tuple) — via merge rules ALL1–4 / XST1–4. `pp2lp` performs that merge in
+`Syntax_pp.flatten_binds` (mirroring the aplatissement with `Tuple`'s
+`++`/`take`/`drop`), so the goal already carries one compound `Tuple n`
+binder and the merge rule is *skipped* (`Rule_db.is_binder_merge`, consumed
+at `Translate.tree`). This is **not** a HOAS identity (only ALL6 is) — it is
+a deliberate skip: the compound-tuple-encoded merge lemmas put the predicate
+at a non-pattern position lambdapi cannot invert. **ALL3 is the exception**:
+re-encoded *curried* (`!! w, !! y, P w y` — All.lp) so P is a pattern, and
+`branch_cont` emits `refine ALL3 _` for real when a branch continuation's
+nested antecedent escapes flattening. The chain (`_1`) forms of the binder
+merges are unsupported by design and fail loud at emit; the eventual real
+fix is currying the remaining merge rules and deleting `flatten_binds`
+(blocked on an inductive tuple-append — see git log around 2026-06-11).
+
+The `Res` encoding (ConjList.lp): a normalisation chain's value is
+`Res t` = a snoc list of surviving conjuncts plus a proof `t = conj list`.
+`mk_1` wraps single results, `mk_0` discharged (⊤) ones, `concat` merges
+lists and erases interior ⊤s. `⋀` is the n-ary conjunction over the same
+lists; its four eliminators are part of the trusted base.
 
 ## Source layout
 
-The OCaml pipeline (`ocaml/src/`, core modules carry `.mli`):
-`parse_replay.ml` (.replay → rules) → `rule_db.ml` (rule metadata + the typed
-`emit` dispatch key) → `proof_tree.ml` (rules → tree) → `translate.ml` (tree →
-lp_tree walker: sequence/assume/branch, main + Res-chain, 
-`prov_of`) → `rule_emit.ml` (per-rule `refine`, exhaustive emit match) →
-`pp_lp.ml` (PP AST → LP source). Supporting: `lexer.mll`/`parser.mly`,
-`syntax_pp.ml`/`emit_pp.ml` (PP AST), `free_vars.ml`, `emit_ctx.ml`
-(hyp/witness/INS searches), `lp_tree.ml`, `emit_lp.ml` (symbol + header),
-`reconstruct.ml` (top-level glue). CLI entry: `ocaml/bin/main.ml emit`.
-
 ```
+pp2lp                  the single CLI (Python, one file): run, gen, audit.
+ocaml/src/             the engine (each core module has a .mli):
+  parse_replay.ml        .replay → rule lines
+  rule_db.ml             rule metadata + the typed emit-dispatch key
+  proof_tree.ml          rule lines → tree (replay-native state machine)
+  translate.ml           tree → lp_tree walker: sequence/assume/branch,
+                         main proof vs Res-chain (chain_term)
+  rule_emit.ml           per-rule refine construction (exhaustive match)
+  emit_ctx.ml            mutable ctx + hyp/witness/INS/ECTR searches
+  arith_proofs.ml        generated arithmetic proofs: sum normalisation,
+                         cancellation, Farkas combinations (prove_sum_eq,
+                         prove_gt_zero, find_arith_contradiction, …)
+  syntax_pp.ml           PP AST + flatten_binds + the shared exp traversal
+  pp_lp.ml / emit_pp.ml  AST → LP source / AST → PP surface (diagnostics)
+  lp_tree.ml / emit_lp.ml  LP term/tactic tree → symbol + header
+  free_vars.ml, lexer.mll, parser.mly, reconstruct.ml, bin/main.ml
+ocaml/test/            golden tests: replay → .lp diffed against committed
+                       expectations (dune runtest; `dune promote` to accept)
 lp/
-  lambdapi.pkg       package_name = pp2lp
-  B.lp               B-Book primitives + the intentional `trust` axiom (line 17)
-  ConjList.lp        n-ary conjunction (⋀) abstraction layer
-  Rules.lp / Quant.lp   require-open aggregator; quantifier helpers (!! ?? ♢ ♡)
-  rules/*.lp         per-section rule lemmas (All, Arith, Axm, Bool, Conj, Disj,
-                     Eq, Equiv, Impl, Neg, Nrm, Res, TrueFalse, Xst)
-  bench/<suite>/<name>/   per-benchmark: <name>.{but,trace,replay,lp,lpo}
-                     (.lp/.lpo/.lp.* gitignored; og's .trace/.replay tracked)
-
-pp2lp                the single CLI (Python): emit, check, gen, audit, debug.
-bench/               test_cli.py (CLI self-tests) + results/ (JSON, gitignored)
-vendor/atelierb/<plat>/REPLAY.kin   vendored Atelier B REPLAY tool (used by gen)
-doc/                 pp-spec-full.pdf (PP spec, ch. 1–10) +
-                     pp-spec-rules.pdf (rule-recap annex). Both gitignored.
+  lambdapi.pkg           package_name = pp2lp
+  B.lp                   B-Book primitives — the axiomatic base
+  ConjList.lp            ⋀ snoc lists + Res (see Mental model)
+  Quant.lp               Tuple n machinery + !! ?? ♢ ♡ and their bridges
+  Rules.lp               require-open aggregator for lp/rules/*
+  rules/*.lp             per-section rule lemmas (All, Arith, Axm, Bool,
+                         Conj, Disj, Eq, Equiv, Impl, Neg, Nrm, Res,
+                         TrueFalse, Xst)
+  bench/<suite>/<name>/  per-benchmark inputs/artifacts (see Suites)
+bench/                 test_cli.py (CLI self-tests + repo contract checks)
+                       + results/ (per-run JSON, gitignored)
+vendor/atelierb/       vendored REPLAY.kin per platform (used by gen)
+vendor/apero/pog/      the CLEARSY POG dataset (gitignored, see Suites)
+doc/                   PP spec PDFs (gitignored): pp-spec-full, pp-spec-rules
+tex/                   the paper — off limits (see Ground rules)
 ```
 
 ## Workflows
 
 ### Debugging a failing trace
 
-Suite results **stream live** in completion order. On a TTY, passes only advance
-a single in-place `done/total` counter (no scrollback flood at suite scale) and
-failures unfold their full **failure window**; redirected/piped, each pass is one
-compact `✓ name` line. `-q` suppresses the stream (summary line only, clean gate).
+Suite results stream live in completion order; failures unfold a **failure
+window** — one numbered snippet per related file, headed `filename:position`
+with the relevant line marked `>`:
 
-The failure window is one numbered snippet per related file, each headed by
-`filename:position` with the relevant line marked `>`:
-- the **`<name>.probe.lp`** at the error — a persisted, re-checkable copy of the
-  emitted `.lp` with `print;` spliced into the failing tactic — followed by a
-  prettified **`goal state`** panel (the hypotheses + `⊢ goal` lambdapi was on);
+- the **`<name>.probe.lp`** at the error — a persisted, re-checkable copy of
+  the emitted `.lp` with `print;` spliced into the failing tactic — followed
+  by a prettified **goal state** panel (hypotheses + `⊢ goal`);
 - the `.replay` step that produced it;
 - the failing rule's `lp/rules/*.lp` signature.
 
-`--lp-debug=CODE` additionally turns on `debug +CODE` in that same probe run and
-surfaces the cleaned, prettified `[tag]` trace (`u`=unification, `r`=rewrite,
-`t`=tactics, `w`=whnf; bare ⇒ `u`). Avoid `i` — type inference crashes
-lambdapi's printer on our HO goals. The probe is the only artifact written
-(`<name>.probe.lp`, gitignored); re-check it directly to reproduce the state.
+`--lp-debug=CODE` adds `debug +CODE` to that probe run and shows the cleaned
+`[tag]` trace (`u`=unification, `r`=rewrite, `t`=tactics, `w`=whnf; bare ⇒
+`u`). **Avoid `i`** — type inference crashes lambdapi's printer on our HO
+goals. The probe is the only artifact written; re-check it directly to
+reproduce.
 
-An emit-side `Failure` → `translate.ml` / `proof_tree.ml` / `parse_replay.ml`;
-the report prints a stable error code (`E_UNKNOWN_RULE`, `E_ARITY`, `E_DISPATCH`,
-`E_TREE_BUILD`, `E_PARSE`, …) and a hint. Replay→tree state machine:
-`PP2LP_DEBUG_REPLAY=1`.
+An emit-side failure prints a stable error code (`E_UNKNOWN_RULE`,
+`E_ARITY`, `E_DISPATCH`, `E_TREE_BUILD`, `E_PARSE`, `E_INS`, …) and a hint;
+codes come from the engine's `E_*:`-prefixed failure messages (one
+convention, see `pp2lp`'s `_ERROR_CODES`). Replay→tree state machine
+tracing: `PP2LP_DEBUG_REPLAY=1`.
 
 ### Inspecting LP goals / debugging LP rules
 
-Use the **sibling-probe** convention — a `lp/rules/Foo_probe.lp` that
-`require open`s the module and `print`s/`compute`s the lemma, then `lambdapi
-check` it. To inspect a proof's mid-state, copy the emitted `NAME.lp` and insert
+Sibling-probe convention: a `lp/rules/Foo_probe.lp` that `require open`s the
+module and `print`s/`compute`s the lemma, then `lambdapi check` it. To
+inspect a proof mid-state, copy the emitted `NAME.lp` and insert
 `print; proofterm;` before a tactic — or use `--lp-debug=u`. **Delete probe
-files when done.** Clear stale artifacts with `git clean -Xf lp/bench bench/results`.
+files when done.**
 
-### Adding a corpus trace
+### Adding a corpus goal
 
-1. Drop `lp/bench/SUITE/name/name.but` (or add a line to a suite's `goals.txt`).
-2. `pp2lp gen SUITE` — runs PP/REPLAY (krt); a truncated replay is dropped here,
-   with a warning.
-3. `pp2lp run SUITE/name` — emit + type-check.
+1. Add a line to `lp/bench/claude/goals.txt` (`name | kind | goal`) — the
+   suite's single source of truth; loose `.but` files get wiped on gen.
+   Kinds: `prop`/`expr` self-promote the goal as a hypothesis; `bprop`/
+   `bexpr` (bare) make PP genuinely prove it (this is what fires the
+   equality-prover rules). `#` existentials are allowed in goals.
+2. `pp2lp gen claude` — runs PP/REPLAY; goals PP can't prove or REPLAY
+   truncates are dropped loudly.
+3. `pp2lp run claude/name`.
 
-### Pre-commit audit
+### Adding / teaching a new PP rule
 
-1. `pp2lp run og` must pass (30 ✓, exit 0).
-2. `rg -n '\badmit\b' lp/ | rg -v 'B.lp:17'` — must print nothing. Only the
-   `trust` axiom at `lp/B.lp:17` may be an admit.
-3. `rg '\btrust\b' lp/bench --glob '*.lp'` — must print nothing.  The engine
-   *cannot* emit `trust` (the `Lp_tree.term` type has no `Trust` constructor —
-   every would-be fallback `failwith`s instead).  A hit would mean one of the 9
-   static `_1` lemmas that still bodies `trust` (the binder-reshape ones) fired.
-4. No stray probe files (`*_probe.lp`, `*_test.lp`, `*_dbg.lp`) under `lp/`.
+1. `ocaml/src/rule_db.ml`: add the rule (arity / phantom / binder_merge /
+   hoas_identity) and pick or add an `emit` strategy constructor.
+2. The exhaustive match then *forces* dispatch arms in `rule_emit.ml` (or
+   `translate.ml` if the rule shapes the tree).
+3. The LP lemma goes in the matching `lp/rules/*.lp`; spec recap is
+   `doc/pp-spec-rules.pdf` (§8 for rule schemas, §A.7–8 for binder rules).
+4. Gate ladder bottom-up; add a golden test if the rule changes emission.
 
-All suites are clean gates (any ✗ ⇒ exit 1; goals the upstream tools cannot
-replay are dropped at gen time — see Known broken).
+### Apero triage (the open frontier)
 
-## Known broken
+apero is huge and **not a clean gate** — work it in families, never
+wholesale:
 
-All suites are green: `og` (30), `prv` (70), `claude` (1207 checked of 1284
-goals — the rest are gen-time REPLAY drops). The synth/nrm_test/gemini suites
-were retired into `claude` (their distinctive goals merged). Residuals:
+1. `pp2lp run apero --filter '<family>' --json -q` on a bounded subset;
+   never iterate over the full suite in a loop.
+2. Group failures by the error-code histogram, pick one code/family.
+3. Known frontier families are listed under Known broken — check there
+   before treating a failure as a regression. A regression is a code
+   appearing on a benchmark family that previously passed, or any og/prv/
+   claude breakage.
+4. `lp/bench/apero/.gen_ledger.json` is the gen pass's content-hash ledger
+   (dedupe + resume); never edit it. The dataset lives at
+   `PP2LP_APERO_POG` (default `vendor/apero/pog`); `PP2LP_APERO_TIMER`
+   (default R45) and `PP2LP_GEN_JOBS` tune the PP pass.
 
-- **Chain AR7_1/AR8_1.** Not exercised by any current suite (those goals are
-  dropped at gen time); would still fail at tree-build — the result-chain has no
-  STOP_1 leaf seed and an AR9_1/AR7_1 same-formula pair the one-node-per-line
-  postfix model can't place. Replay-format work in `proof_tree.ml`.
-- **apero frontiers (2026-06-12, from the first industrial-PO pass).**
-  Chain-nested branching: `XST8_1 expected a result-chain child but stack is
-  empty` (≈21 of the first 53 complete replays) — same `proof_tree.ml`
-  replay-format family as AR7_1/AR8_1.  AR2 over symbolic bounds: apero's
-  `a > b` side-conditions come from interval hypotheses, not positive-literal
-  cancellations, so `prove_gt_zero` refuses (≈16 replays) — needs the
-  in-scope-bound evidence route AR5/6 use.  Plus `FIN_INS(…)` /
-  `__INSTANCIATION(…)` lines (novel INS-evidence markers, likely *useful* —
-  they record the very witnesses the emitter currently searches for) in some
-  projects' replays.
-- **REPLAY losses (upstream).** Two failure modes, both detected and dropped
-  at gen time as `E_REPLAY_TRUNCATED`: the tool omits the final ALL7/XST8
-  continuation (~50 goal shapes: set-extensionality, equality-prover-heavy
-  proofs, literal-constant pins `#x.(x = 5)`, arith-pinned existentials), or
-  it writes `**** impossible case in rplMainX ****` mid-file. In particular
-  no complete EGALITE replay can currently be produced — the EGALITE emit
+## Suites
+
+- **og** — 30 traces, the baseline smoke test. `.trace`/`.replay` checked in
+  (no `.but`; traces are the source of truth). Also the golden-test fixtures.
+- **prv** — Atelier B PRV corpus, 70 green. `.but` checked in;
+  `.trace`/`.replay` generated.
+- **claude** — the synthetic pipeline-stress suite, generated from
+  `goals.txt` (source of truth; 1284 goals, 1207 checked — the rest are
+  gen-time REPLAY drops). Spans every rule family, proof sizes 1→416 replay
+  lines, and probes the failure frontier on purpose; inline notes flag each
+  known blocker. `.but` checked in (generation output, kept for diffing).
+- **apero** — raw industrial proof obligations from CLEARSY's open POG
+  corpus (Zenodo 10.5281/zenodo.7050797: 5434 `.pog` files, 36 projects).
+  There is no Atelier B path from `.pog` to PP, so `pp2lp gen apero` renders
+  each obligation into PP's own rule-validator input (same `.but` shape as
+  prv) and runs PP, fused and streamed: a benchmark dir materialises only
+  when PP proves the goal; the ledger makes the pass resumable (`--force`
+  resets). The whole suite is gitignored — reproducible from the dataset.
+
+## Known broken / frontiers
+
+- **Chain-nested branching** (`XST8_1 expected a result-chain child but
+  stack is empty`) — the largest apero family (~21 of the first 53 complete
+  replays) and the same replay-format class as AR7_1/AR8_1 (result-chain
+  with no STOP_1 seed). Start: `proof_tree.ml` (the Res-mode stack machine).
+- **AR2 over symbolic bounds** — apero side-conditions `a > b` come from
+  interval hypotheses, not positive-literal cancellations, so
+  `prove_gt_zero` refuses (~16 replays). Start: the in-scope-bound evidence
+  route AR5/6 use (`rule_emit.ml`, `emit_ctx.ml`).
+- **`FIN_INS(…)` / `__INSTANCIATION(…)` replay lines** — novel INS-evidence
+  markers in some apero projects, likely *useful* (they record the witnesses
+  the emitter currently searches for). Start: `parse_replay.ml` + the INS
+  search in `emit_ctx.ml`.
+- **REPLAY losses (upstream).** Detected and dropped at gen as
+  `E_REPLAY_TRUNCATED`: the tool omits the final ALL7/XST8 continuation
+  (set-extensionality, equality-prover-heavy proofs, literal-constant pins,
+  arith-pinned existentials) or writes `**** impossible case in rplMainX ****`
+  mid-file. No complete EGALITE replay can currently be produced — that emit
   path is validated against a hand-completed minimal replay.
-- **NRM20/21 pin slot ≥ 3.** The substitution lemmas cover pin slots 0/1/2
-  (after tail rotation); a trace pinning the fourth-or-later binder fails
-  loudly. Same for NRM26 drops at slot ≥ 3 that aren't the last-listed.
-- **BOOL11-52 unreachable end-to-end.** Under the self-proof harness they
-  prove in one AXM8 step, and under the bare kinds (`bprop`/`bexpr`, no
-  goal-as-hypothesis) PP cannot prove `bool()` round-trips at all — a PP
-  limitation, not a harness artifact.  The bare kinds did unlock EGALITE
-  (generated replays now cover it), EAXM1/31/32, AR5 and EQV2; still
-  unfired: BOOL*, EAXM2/91/92, EQC1/2, EIMP5*, ECTR5/6, EVR11, NRM16-18,
-  NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61 (105/138 rule_db names
-  fire — AR7 and XST61 joined via swapped-antisymmetry / or-right shapes).
-
-Fixed 2026-06-11 (see git log): chain-form AXM*_1 trust elimination.  The
-Res-form `_1` AXM rules are Schema 0 (§8.13: result VRAI, which the spec
-requires to be *equivalent to the consequent* — here modulo the hypotheses H
-the side-condition asserts), and were blanket `mk_0 trust`.  Each now takes the
-same hyp evidence its base rule looks up, reuses the (verified) base proof, and
-wraps it `mk_0 ∘ prop_eq_top` (a new `π P → π (P = ⊤)` bridge in `Res.lp`).  The
-chain emitter (`translate.ml chain_term`) recovers the hyp from scope —
-`expected_hyp_pred` + `leaf_evidence` for AXM1-6, the conjunct extraction
-(factored as `Rule_emit.axm8_extraction`) for AXM8 — and falls back to `trust`
-only when the hyp isn't in scope (no regression).  33/45 corpus AXM*_1 sites are
-now trust-free; the 12 residual are all `AXM3_1` inside a chain-local `IMP4_1`
-(the antisymmetry `−x+y ≤ 𝟎` step the AR7_1/AR8_1 frontier owns).  AXM7_1 was
-already unconditional (`⇒_idem`); AXM9_1 stays `trust` (the documented ALL7/XST8
-HO-unification frontier).  Two untested `z5_anti_*_use` probes were dropped from
-the claude goals.txt — their constant-membership consequent routes through the
-base-AXM9 existential frontier, not the AR chain they were hunting.
-
-Fixed 2026-06-10, second wave (see git log): suite extended 525 → 1058
-checked proofs (1120-line goals.txt; rule firings 91 → 98 base names).  The
-new probes surfaced and fixed: Farkas multiplier cap raised 4 → 8
-(`fk_mult5/6`); pin/drop slot-2 forms (`rm2`/`tuple_insert2` + NRM20P2/
-NRM21P2/NRM26M2 — 4-binder reorders drop middle slots); NRM22/NRM23 tail
-rotation (mid-list pins in 1-binder blocks, NRM23 generalised to NRM23G's
-list form); `prj 0 (tuple_prepend …)` commute rules (witness searches
-against prepend-normalised hyps left stuck constraints); `𝟎` flattens to no
-atom in the sum-equality engine (PP's `1 − 0 → 1` fold), which exposed and
-fixed wrong `concat` base cases for empty atom lists; `impossible case in
-rplMainX` classified as a REPLAY loss for the gen-time drop.
-
-Fixed 2026-06-10 (see git log): `[ARITH] <FAUX>` solver terminal — generated
-Farkas combination over the `≤ 𝟎` hyps (`add_leq_zero` chain + `prove_sum_eq`
-+ `one_not_leq_zero`, no trust; `zero_leq_one`/`leq_plus_one` close constants
-≥ 2); `[EGALITE]` equality-prover terminal — the child re-promotes the
-equality-rewritten hyps, each discharged by an `ind_eq` transport
-(`eq_rewrite_evidence`); literal folding in `prove_sum_eq`/`flatten_signed`
-(small literals unfold to 𝟏-atoms, so PP's `1+9→10` AR3/AR3_F folds get real
-equality proofs instead of silent fallbacks); positional NRM26
-(S/M/prepend variants picked by the dropped binder's slot, from the
-annotation diff); NRM20/21 generalised — tail-position pinning equalities,
-dependent witnesses over the remaining tuple (`#x.#y.(x = y)`), RHS
-orientation pinning non-leading binders, and mid-list/head equalities bubbled
-to the tail with generated `conj_swap_last2`/`conj_init_cong` chains.
-
-Fixed 2026-06-09 (see git log): unary numeral OOM (big literals now emit as
-decimal, parsed via Stdlib.Nat's builtins + B.lp's `int_lit` coercion — never
-force whnf of a big `int_lit`); EQS2 reshaped to the spec's `FAUX ⇒ R` premise
-with emitter-supplied `eql_set` store evidence; ECTR1–6 argument synthesis;
-mid-list `⊤` erasure (`mk_0` discharged leaves + `concat` ⊤-rules); explicit
-`Res`-term branching emission (chains passed as `refine ALL7 (λ v, …) _`);
-ALL3R for chain-side nested-binder merges; explicit `@AXM9_1`/`IMP5_1`
-arguments.
-
-PP emits a few identifiers with a leading `_` (`_eql_set`, `_pj1`, `_pj2`); the
-lexer treats `_` as a valid identifier-start and the emitter maps them to their
-LP names (`eql_set`, `pj1`/`pj2` — `pp_lp.ml`). A bad token there used to skip the
-`_` char-by-char (a warning per occurrence); engine stderr `warning:` lines are
-folded with a `(×N)` count so they never bury the real error.
+- **NRM20/21 pin slot ≥ 3** (and NRM26 drops at slot ≥ 3 that aren't
+  last-listed): substitution lemmas cover slots 0/1/2 after tail rotation;
+  later slots fail loudly. Start: `rule_emit.ml` Nrm20/21 dispatch +
+  `lp/rules/Nrm.lp`.
+- **BOOL11–52 unreachable end-to-end** — under self-proof they collapse to
+  one AXM8; under bare kinds PP can't prove `bool()` round-trips at all (a
+  PP limitation). Rule firings overall: 105/138 rule_db names fire; still
+  unfired: BOOL*, EAXM2/91/92, EQC1/2, EIMP5*, ECTR5/6, EVR11, NRM16–18,
+  NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61.
 
 ## PP limitations (when authoring goals)
 
-- **BOOL membership**: PP can't reason about `a: BOOL` abstractly. Use
+- **BOOL membership**: PP can't reason about `a: BOOL` abstractly; use
   `btrue`/`bfalse` only as concrete terms in equalities.
-- **Cascaded `=>`** is left-associative: `(p=>q) => (r=>s) => g` parses as
-  `((p=>q) => (r=>s)) => g`. Use `and` for independent hypotheses.
-- **Set-theoretic surface**: `eql_set`, pair decomposition, and HO set operators
-  aren't in the goal-formula syntax.
-- **Arithmetic**: AR1–AR13 reduce to `B.lp`'s integer primitives; some emitted
-  proofs carry `trust` for solver-level conjuncts.
-
-## Admits / trust
-
-- **`lp/B.lp:17` — `symbol trust : π P`.** Intentional; the only declared
-  `axiom`/`admit` in `lp/`.
-- **Where trust remains (2026-06-11).** **The corpus is trust-free — 0 tokens
-  in any emitted proof** (down from 5628 in 372 proofs).  Everything is
-  generated: BOOL membership via injected `V ϵ BOOL` typing premises
-  (`Bool_split`); AR9/AR10 are `eq_refl` (identity `solveur`); AR2's `a > b` /
-  AR4's `(E+F)>𝟎` from `prove_gt_zero` (+ `sub_leq_eq`); AR5/6 from the in-scope
-  bound; AR7/AR8's `(a+c)=𝟎` from `prove_sum_zero`; AXM9 from a derived witness;
-  and the AXM3 chain-antisymmetry frontier closed by `IMP4_1U` (below).  The
-  emitter **cannot** emit `trust` at all — `Lp_tree.term` has no `Trust`
-  constructor, so every would-be solver/evidence fallback `failwith`s instead.
-  - **AXM3 chain antisymmetry (the old frontier), closed.** Per §8.8, IMP4 is
-    one of the two rules that *change the hypotheses* (IMP4' mounts P into H);
-    AXM3 reads it back.  pp2lp's chain `IMP4_1` consumed its child as a closed
-    term, never binding P, so a chain-local `AXM3_1` had no `π P`.  `IMP4_1U
-    [P Q R] (f : π P → π (Q = R))` (Impl.lp) binds it — R is inferred since
-    `res_ts` reduces through `mk_0`/`concat` independent of the hyp — and the
-    emitter packages `IMP4_1U (λ hp, res_eq child)`, pushing the antecedent into
-    `ctx.hyps` so the AXM's existing `leaf_evidence` finds it.  No new `Res`
-    type; uses `imp_cong_r_under` (Res.lp).
-  - **Static rule lemmas: 9 binder-reshape `_1`** — `ALL1/2/4/5_1`, `ALL3_1`,
-    `XST1–4_1`.  Chain forms of the quantifier merge (§A.7–8); dead code because
-    `flatten_binds` does the merge at the AST level (the `binder_merge` skip — see
-    Mental model).  Eliminable via the `!!`/`??`-currying iso (`Tuple (+1 n) ≅
-    Tuple n × Tuple 1`).  **ALL3 itself is now curried** (`!! w, !! y, P w y`):
-    its base is proven + emitted for real (`refine ALL3 _`, no explicit P, in
-    branch continuations — the old `ALL3R`/`ALL3R_1` are gone); only its chain
-    `ALL3_1` stays `trust` (the compound→nested reconstruction needs a
-    tuple-append, deferred with the other rules).  Every other `_1` lemma is
-    trust-free: the
-    Schema-0 / hyp-driven ones (AXM, EAXM, ECTR, BOOL11/12, AR2/4/13, EVR11,
-    INS) take their evidence as a parameter and reuse the verified base rule;
-    the connective passthroughs (EAXM31/32/91/92, EIMP, EQC, EQS, XST5/51/61,
-    FX1, AR3/12, BOOL31/32/41/42) use a proven transformation equality.
-- **Schema-0 result bridge.** A trust-free `_1` whose result is ⊤ (§8.13
-  schema n0) reuses its verified base rule wrapped `mk_0 (prop_eq_top …)`
-  (`Res.lp`); a Schema-1 passthrough uses `mk_1 (res_tm r) (eq_trans <law>
-  (res_eq r))` with the connective law (`ar1_eq`, `ar3f_eq`, `xst6_eq`,
-  `eq_comm_prop`, the `*_eq` family).
-- **Unsupported shapes / missing evidence.** `rule_emit.ml` / `translate.ml`
-  `failwith` rather than emit `trust` — the emitter **cannot** produce trust at
-  all (`Lp_tree.term` has no `Trust` constructor; every solver side-condition,
-  BOOL-membership, AXM-evidence, or AR-cancellation that can't be generated fails
-  loud). New shapes get an explicit `emit` constructor in `rule_db.ml` plus its
-  dispatch arm.
+- **Cascaded `=>`** is left-associative: use `and` for independent
+  hypotheses.
+- **Set-theoretic surface**: `eql_set`, pair decomposition, and HO set
+  operators aren't in the goal-formula syntax.
+- **Arithmetic**: AR1–AR13 reduce to `B.lp`'s integer primitives.
 
 ## Replay format
 
@@ -341,79 +336,42 @@ folded with a `(×N)` count so they never bury the real error.
  [STOP_NORM] / [NRM] …     phantom
 ```
 
-Main sequent proof is prefix-style (rule before children). The result-chain
-child of a branching quantifier is emitted *before* the branch rule (postfix
-within the chain). The first non-phantom line's annotation is the overall goal.
-`Rule_db.is_phantom` filters phantoms; `Proof_tree.build` reconstructs the tree
-replay-natively. Unknown rule names raise.
+Main proof is prefix-style; a branching quantifier's result-chain child is
+emitted *before* the branch rule. The first non-phantom line's annotation is
+the overall goal. `Rule_db.is_phantom` filters phantoms; unknown rule names
+raise. PP emits a few `_`-prefixed identifiers (`_eql_set`, `_pj1`, `_pj2`);
+the lexer accepts them and the emitter maps them to LP names.
+
+## LP gotchas (repo-specific)
+
+- A bare numeral ≥ 1 in a rewrite-rule *pattern* is a **wildcard**, not the
+  literal — spell slot 1 as `+1 0`.
+- Never force whnf of a big `int_lit` (decimal numerals exist precisely to
+  keep big literals folded).
+- `sequential` rule blocks are order-sensitive (the ⊤-erasure rules in
+  ConjList must precede the general cons rule).
+- Stale `.lpo` after a lambdapi upgrade or lp/ edit storm:
+  `find lp -name '*.lpo' -delete`.
 
 ## Common errors
 
-| Error                                                  | Where                              | Fix                                                                |
-|--------------------------------------------------------|------------------------------------|--------------------------------------------------------------------|
-| `rule_db: unknown rule "X"`                            | `proof_tree.ml`/`rule_db.ml`       | Add `X` to `rule_db.ml` (arity / phantom / hoas_identity).        |
-| `rule_db: X unsupported arity N`                       | `proof_tree.ml`                    | Review the rule's slot kinds in `rule_db.ml`.                      |
-| `translate: X arity N unsupported`                     | `translate.ml`                     | New rule shape needs a dispatch arm.                               |
-| `tree-build error: replay left N unconsumed rule lines`| `proof_tree.ml`                    | An earlier rule has the wrong arity; `PP2LP_DEBUG_REPLAY=1` traces the build. |
-| `tree-build error: X expected a child but stack is empty` | `proof_tree.ml`                 | Wrong arity for an earlier rule.                                   |
-| `parse error in PATH: …`                               | `parser.mly` / `parse_replay.ml`   | Bad replay line; inspect the column reported.                      |
-| `File X.lpo is incompatible with current binary`       | lambdapi                           | `git clean -Xf lp/bench`.                                          |
-| `package X cannot be mapped under the library root`    | lambdapi                           | Missing `lambdapi.pkg`. `lp/lambdapi.pkg` covers the whole package. |
-
-## Suites
-
-- **og** — 30 traces checked in, the baseline smoke test. No `.but` files (the
-  traces are the source of truth).
-- **prv** — Atelier B PRV corpus. `.but` checked in; `.trace`/`.replay`
-  gitignored. Green (70 ✓).
-- **apero** — raw industrial proof obligations from CLEARSY's open POG corpus
-  (Zenodo 10.5281/zenodo.7050797: 5434 `.pog` XML files, 36 Atelier B
-  projects).  There is no Atelier B path from `.pog` to PP (the modern
-  proof-mechanism drivers all target SMT/TPTP), so `pp2lp gen apero` renders
-  each obligation — full hypothesis set, as stated — into PP's own
-  rule-validator input (the same `.but` shape as prv) and runs PP on it,
-  fused and streamed: a benchmark dir materialises only when PP proves the
-  goal, and a content-hash ledger (`.gen_ledger.json`) dedupes the very
-  repetitive corpus and makes the pass resumable (`--force` resets).
-  Dataset path: `PP2LP_APERO_POG` (default `vendor/apero/pog`, a gitignored
-  symlink); `PP2LP_APERO_TIMER` (default R45) and `PP2LP_GEN_JOBS` tune the
-  PP pass.  The whole suite is gitignored — fully reproducible from the
-  dataset.  NOT yet a clean gate: it deliberately surfaces open frontiers
-  (chain-nested XST8_1 tree shapes, AR2 evidence over symbolic bounds, …).
-- **claude** — the single synthetic suite (the old synth/nrm_test/gemini suites
-  were retired into it). Generated from a `goals.txt` (`name | kind | goal`) by
-  `pp2lp gen claude`: each goal is proved from itself plus inferred
-  `_delta_{e,p}` hypotheses; the generator is binder-aware (bound `!x`/`#x` vars
-  get no delta). **`goals.txt` is the source of truth** — generation rewrites
-  *every* benchmark dir, so add goals there, not as loose files; removing a goal
-  removes its dir. A hand-authored *pipeline stress / coverage* suite: it spans
-  every rule family + proof sizes 1→416 replay lines and probes the failure
-  frontier on purpose, plus the merged sections — systematic `nrm*` NRM-rule
-  coverage (the old nrm_test) and `gemini_*` compound / multi-hypothesis goals.
-  1207 checked of 1284 goals (the rest are gen-time REPLAY drops, below).
-  Goal kinds: `prop`/`expr` self-promote the goal as a hypothesis;
-  `bprop`/`bexpr` (bare) don't — PP must genuinely prove the formula, which
-  is what makes the equality-prover rules (EGALITE, EAXM*) fire. ~75 more
-  goals in goals.txt can't be replayed — PP can't prove some bare forms,
-  and REPLAY truncates or corrupts others; gen drops them, loudly.
-  Used to find bugs; inline notes flag each known blocker and finding.
-  **`#` existentials are allowed** in goals.txt (the comment splitter no
-  longer eats `#x`).
-
-## Commits
-
-No `Co-Authored-By`. No Claude / Anthropic attribution.
+| Error                                                  | Where                        | Fix                                                       |
+|--------------------------------------------------------|------------------------------|-----------------------------------------------------------|
+| `E_UNKNOWN_RULE` (`rule_db: unknown rule "X"`)          | `rule_db.ml`                 | Add `X` to rule_db (arity / phantom / flags).             |
+| `E_ARITY` / `E_DISPATCH`                                | `proof_tree.ml`/`translate.ml` | Review the rule's slot kinds / add the dispatch arm.    |
+| `E_TREE_BUILD` (`unconsumed rule lines`, `expected a child`) | `proof_tree.ml`         | An earlier rule has the wrong arity; `PP2LP_DEBUG_REPLAY=1`. |
+| `E_PARSE`                                               | `parser.mly`/`parse_replay.ml` | Bad replay line; inspect the reported column.           |
+| `File X.lpo is incompatible with current binary`        | lambdapi                     | `find lp -name '*.lpo' -delete`.                          |
+| `package X cannot be mapped under the library root`     | lambdapi                     | Missing `lambdapi.pkg`; `lp/lambdapi.pkg` covers the package. |
+| dune: `file present in source tree` (parser.ml/.conflicts) | menhir promotion          | `rm -f ocaml/src/parser.ml ocaml/src/parser.conflicts`.   |
 
 ## Where to start
 
-- New PP rule in a replay: `ocaml/src/rule_db.ml` (add the rule + its `emit`
-  strategy; the exhaustive match in `rule_emit.ml` then *forces* a dispatch arm).
-- Emit bug — pick the layer:
-  - wrong `refine` arguments → `ocaml/src/rule_emit.ml`;
-  - wrong tree structure (sequence/assume/branch, main vs Res-chain) →
-    `ocaml/src/translate.ml`;
-  - hypothesis / witness / INS search → `ocaml/src/emit_ctx.ml`.
-- LP-side proof gap: `lp/rules/*.lp` (the rule lemmas) + the rule recap in
-  `doc/pp-spec-rules.pdf`.
-- Replay format itself: top of `parse_replay.ml` + `proof_tree.ml`.
-- The CLI / loop tooling: `./pp2lp` (one self-contained Python file).
+- New PP rule in a replay → `rule_db.ml` (the exhaustive match forces the
+  rest).
+- Wrong `refine` arguments → `rule_emit.ml`. Wrong tree structure (sequence/
+  assume/branch, main vs chain) → `translate.ml`. Hypothesis / witness / INS
+  search → `emit_ctx.ml`. Generated arithmetic proofs → `arith_proofs.ml`.
+- LP-side proof gap → `lp/rules/*.lp` + `doc/pp-spec-rules.pdf`.
+- Replay format itself → `parse_replay.ml` + `proof_tree.ml`.
+- CLI / harness → `./pp2lp` (one Python file) + `bench/test_cli.py`.
