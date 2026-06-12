@@ -367,15 +367,3 @@ itself generated from the group axioms.
 The same machinery produces equality-transport chains for the equality
 prover, and permutation proofs wherever \pp{} recorded a sum in a
 different association order than the lemma needs.
-
-\paragraph{The trusted base.}
-A reconstructed proof type-checks against exactly: the \lp{} kernel, the
-standard library with its classical axioms, the B domain axioms of
-\autoref{sec:enc-formulas}, the structural interfaces of $\bwand$ and
-$\Res$, and the quantifier bridges.
-%
-Everything else, the rule library included, is a theorem.
-%
-Nor can the translator smuggle in an assumption: its term grammar has no
-constructor for an oracle, so a side-condition for which no witnessing
-proof can be generated is a hard failure rather than a silent axiom.
