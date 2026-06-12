@@ -93,6 +93,21 @@ check("collapse leaves singletons untouched", pp._collapse(["a", "b"]) == ["a", 
 check("clip leaves short strings", pp._clip("abc", 10) == "abc")
 check("clip truncates long strings", pp._clip("x" * 20, 10) == "x" * 9 + "…")
 
+# ── classify_error: E_*: prefix wins, regex is the fallback ─────────────────
+check("classify reads the E_*: prefix", pp.classify_error("/t.replay: E_DISPATCH: x") == "E_DISPATCH")
+check("classify falls back to the regex", pp.classify_error("replay left 3 unconsumed rule lines") == "E_TREE_BUILD")
+check("classify defaults to E_EMIT", pp.classify_error("some unrecognised failure") == "E_EMIT")
+
+# ── _failure_histogram: counts per error code over failed goals ─────────────
+_goals = [{"status": "ok"},
+          {"status": "emit_fail", "error": {"code": "E_DISPATCH"}},
+          {"status": "lp_fail", "error": {"code": "E_LP_CHECK"}},
+          {"status": "emit_fail", "error": {"code": "E_DISPATCH"}},
+          {"status": "warn"}]
+_hist = pp._failure_histogram(_goals)
+check("histogram counts per code", _hist == {"E_DISPATCH": 2, "E_LP_CHECK": 1})
+check("histogram ignores ok/warn goals", sum(_hist.values()) == 3)
+
 # ── _rule_signature: pull a rule's type from lp/rules/ ─────────────────────
 # _rule_signature returns (path, start_line, end_line) into lp/rules/*.lp.
 sig = pp._rule_signature("NRM14")

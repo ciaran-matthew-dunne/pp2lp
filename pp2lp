@@ -670,6 +670,12 @@ def cmd_run(args) -> int:
         return 0 if res["status"] in ("ok", "warn") else 1
 
     # ── suite: parallel emit+check, strict gate ──
+    if getattr(args, "filter", None):
+        rx = re.compile(args.filter)
+        target = [r for r in target if rx.search(r.stem)]
+        if not target:
+            sys.exit(f"pp2lp: --filter {args.filter!r} matched no benchmark "
+                     f"in suite {suite!r}")
     return _run_suite(args, suite, target)
 
 
@@ -720,6 +726,16 @@ class _Stream:
             sys.stdout.flush()
 
 
+def _failure_histogram(goals: list[dict]) -> dict:
+    """Counts per error code over the failed goals (emit_fail / lp_fail)."""
+    hist: dict[str, int] = {}
+    for g in goals:
+        if g["status"] in ("emit_fail", "lp_fail"):
+            code = (g.get("error") or {}).get("code") or "E_EMIT"
+            hist[code] = hist.get(code, 0) + 1
+    return hist
+
+
 def _run_suite(args, suite: str, replays: list[Path]) -> int:
     t_start = time.monotonic()
     # human run: stream each result live (completion order); -q and --json don't.
@@ -737,6 +753,7 @@ def _run_suite(args, suite: str, replays: list[Path]) -> int:
                 "ok": sum(r["status"] == "ok" for r in ordered),
                 "warn": sum(r["status"] == "warn" for r in ordered),
                 "fail": len(failures), "failures": failures, "wall_ms": elapsed,
+                "by_code": _failure_histogram(ordered),
                 "emit_ms": sum(r["emit_ms"] for r in ordered),
                 "check_ms": sum(r["check_ms"] for r in ordered), "goals": ordered}
 
@@ -765,6 +782,12 @@ def _print_summary(artifact: dict) -> None:
         parts.append(f"{red(len(failures))} ✗")
     breakdown = dim(f"emit {fmt_ms(artifact['emit_ms'])} / check {fmt_ms(artifact['check_ms'])}")
     print(f"{suite}  {'  '.join(parts)}  {dim(fmt_ms(artifact['wall_ms']))}  {breakdown}")
+    if failures:
+        hist = artifact.get("by_code") or {}
+        tally = "  ".join(f"{code}×{n}" for code, n in
+                          sorted(hist.items(), key=lambda kv: (-kv[1], kv[0])))
+        if tally:
+            print(f"  {red('✗ by code:')} {tally}")
 
 
 # ── shared suite evaluation ────────────────────────────────────────────────
@@ -1456,6 +1479,74 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             sys.exit(f"pp2lp: unknown --gen stage {st!r} (buts|traces|replays)")
 
 
+# ── audit: the single static pre-commit gate ───────────────────────────────
+def _grep_lp(root: Path, pattern: str) -> list[str]:
+    """`file:line: text` for every line under [root]'s *.lp matching [pattern]
+    (whole-file pre-filter, so non-matching files cost one regex search)."""
+    rx, hits = re.compile(pattern), []
+    for f in sorted(root.rglob("*.lp")):
+        try:
+            text = f.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if not rx.search(text):
+            continue
+        for i, line in enumerate(text.splitlines(), 1):
+            if rx.search(line):
+                hits.append(f"{rel(f)}:{i}: {line.strip()[:78]}")
+    return hits
+
+
+def cmd_audit(args) -> int:
+    lp, src, ocaml = ROOT / "lp", ROOT / "ocaml" / "src", ROOT / "ocaml"
+    checks = []   # (label, ok, detail-lines)
+
+    admits = _grep_lp(lp, r"\badmit\b")
+    checks.append(("no `admit` anywhere in lp/ (no exceptions)", not admits, admits))
+
+    trusts = _grep_lp(lp / "bench", r"\btrust\b")
+    checks.append(("no `trust` token in emitted lp/bench *.lp", not trusts, trusts))
+
+    strays = [rel(f) for f in sorted(lp.rglob("*"))
+              if f.is_file() and "bench" not in f.relative_to(lp).parts
+              and f.name.endswith((".probe.lp", "_probe.lp", "_test.lp", "_dbg.lp"))]
+    checks.append(("no stray probe/_test/_dbg files under lp/ (outside bench)",
+                   not strays, strays))
+
+    debris = [rel(p) for p in (src / "parser.ml", src / "parser.conflicts") if p.exists()]
+    checks.append(("no generated parser.ml/.conflicts in ocaml/src", not debris, debris))
+
+    tc = subprocess.run([sys.executable, str(ROOT / "bench" / "test_cli.py")],
+                        capture_output=True, text=True)
+    checks.append(("bench/test_cli.py passes", tc.returncode == 0,
+                   [] if tc.returncode == 0
+                   else (tc.stdout.strip().splitlines() + tc.stderr.strip().splitlines())[-6:]))
+
+    rt = subprocess.run(["dune", "runtest"], cwd=ocaml, capture_output=True, text=True)
+    checks.append(("dune runtest passes (golden emitter tests)", rt.returncode == 0,
+                   [] if rt.returncode == 0 else rt.stderr.strip().splitlines()[-6:]))
+
+    print(bold("pp2lp audit"))
+    failed = sum(not ok for _, ok, _ in checks)
+    for label, ok, detail in checks:
+        print(f"  {green('ok  ') if ok else red('FAIL')}  {label}")
+        for d in detail[:8]:
+            print(dim(f"        {d}"))
+
+    if args.full:
+        print(dim("  ── --full: suites (og/prv/claude) ──"))
+        for suite in ("og", "prv", "claude"):
+            rc = subprocess.run([sys.executable, str(ROOT / "pp2lp"), "run", suite, "-q"]).returncode
+            failed += rc != 0
+            print(f"  {green('ok  ') if rc == 0 else red('FAIL')}  suite {suite}")
+
+    if failed:
+        print(red(f"\naudit: {failed} check(s) FAILED"))
+        return 1
+    print(green("\naudit: all checks passed"))
+    return 0
+
+
 # ── argparse ───────────────────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
@@ -1478,6 +1569,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "avoid i — it crashes lambdapi's printer on our HO goals")
     r.add_argument("--json", action="store_true", help="machine-readable output")
     r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
+    r.add_argument("--filter", metavar="REGEX", default=None,
+                   help="restrict a suite run to benchmark names matching REGEX "
+                        "(composes with --json/-q)")
 
     g = sub.add_parser("gen", help="(re)generate suite inputs via Atelier B krt",
                        description="run PP/REPLAY (krt) to (re)build a suite's "
@@ -1492,6 +1586,16 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--force", action="store_true",
                    help="regenerate even when an output is newer than its input")
     g.add_argument("-q", "--quiet", action="store_true", help="suppress per-stage detail")
+
+    a = sub.add_parser("audit", help="static pre-commit gate (admit/trust scans, stray "
+                                     "probes, parser debris, test_cli, runtest)",
+                       description="the single static pre-commit gate: no `admit` in lp/, "
+                                   "no `trust` token in emitted lp/bench, no stray "
+                                   "probe/_test/_dbg files under lp/, no generated "
+                                   "parser.ml/.conflicts in ocaml/src, and bench/test_cli.py "
+                                   "+ dune runtest pass.  --full additionally runs the suites.")
+    a.add_argument("--full", action="store_true",
+                   help="additionally run the og/prv/claude suites")
     return p
 
 
@@ -1502,6 +1606,8 @@ def main(argv=None) -> int:
         return cmd_run(args)
     if args.cmd == "gen":
         return cmd_gen(args)
+    if args.cmd == "audit":
+        return cmd_audit(args)
     parser.print_help(sys.stderr)
     return 2
 
