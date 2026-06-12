@@ -25,14 +25,10 @@ lp/bench/**/*.goal
 lp/bench/**/*.res
 
 # apero suite — generated from the CLEARSY POG corpus (Zenodo
-# 10.5281/zenodo.7050797) via `pp2lp gen apero`; the dataset lives outside
-# git (vendor/apero/pog is a symlink) and the suite dirs are reproducible.
+# 10.5281/zenodo.7050797) via `pp2lp gen apero`; the dataset itself lives
+# at vendor/apero/pog (gitignored) and the suite dirs are reproducible.
 vendor/apero/
 lp/bench/apero/
-
-# Experimental / scratch
-lp/quant_test.lp
-ocaml-new/
 
 # Local environment
 .envrc
