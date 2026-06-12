@@ -19,13 +19,12 @@
 % ════════════════════════════════════════════════════════════════════
 
 % ---- Rule coverage -------------------------------------------------
-% rule_db.ml: 138 rule entries + 3 phantoms (FIN/STOP_NORM/NRM).
+% rule_db.ml: 138 rule entries + 3 markers (FIN/STOP_NORM/NRM).
+% The 9 trust-bodied regrouping chain lemmas were REMOVED 2026-06-12;
+% the library now contains no postulated rule at all.
 \newcommand{\numRulesCovered}{138}   % distinct rule entries in rule_db.ml
 \newcommand{\numRulesSpec}{140}      % rules in PP spec Annexe A (approx.)
 \newcommand{\numRulesFired}{105}     % rule_db names exercised by some replay
-\newcommand{\numRulesTrust}{9}       % _1 lemmas still bodied by trust (all
-                                     % quantifier-regrouping chain forms;
-                                     % unreachable — see encoding.tex)
 
 % ---- og (checked-in traces; the baseline) --------------------------
 \newcommand{\ogReplayed}{30}
@@ -44,6 +43,16 @@
 % ---- aggregate ------------------------------------------------------
 \newcommand{\allReplayed}{1307}      % 30 + 70 + 1207
 \newcommand{\allPass}{1307}
+
+% ---- apero probe (raw industrial POs; frontier, not a gate) ---------
+% Numbers from the 2026-06-12 sampling study (eval.tex §Raw proof
+% obligations).  A full-corpus gen pass has since materialised ~7.1k
+% PP-proved benchmarks under lp/bench/apero; refresh these once a
+% full-suite verification run is done.
+\newcommand{\aperoMedianHyps}{1\,700}% median hypothesis count (approx.)
+\newcommand{\aperoSampleTraces}{124} % traces PP produced on the sample
+\newcommand{\aperoSampleLost}{86}    % of those, lost by REPLAY
+\newcommand{\aperoSampleVerified}{14}% sample replays verified end-to-end
 
 % ---- timing (cold-emit run, 2026-06-12: rm *.lp/*.lpo, run all) -----
 % Machine: 13th-gen Intel i9-13950HX laptop (32 hw threads), 32 GiB.

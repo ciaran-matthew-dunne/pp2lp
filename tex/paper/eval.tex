@@ -4,8 +4,8 @@
 \section{Implementation and Evaluation}\label{sec:eval}
 
 The core of
-\tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}} % TODO: confirm URL
-is an OCaml program of about 4\,400 lines behind a thin command-line
+\tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
+is an OCaml program of about 4\,600 lines behind a Python command-line
 driver; the rule library of \autoref{sec:encoding} is another 4\,300
 lines of \lp.
 %
@@ -50,7 +50,7 @@ the prefix stream and using each rule's declared arity to attach the
 right number of child subproofs.
 %
 This is where the format's two irregularities (\autoref{sec:pp-syntax})
-are handled: phantom normalisation lines are filtered out, and the
+are handled: normalisation markers are filtered out, and the
 result chain that precedes a branching quantifier is reassembled into
 that rule's first argument.
 %
@@ -134,8 +134,8 @@ proof rule submitted to \pp{} for validation, the prover's primary
 industrial role (\autoref{sec:intro}).
 %
 \texttt{claude} is a synthetic stress and coverage suite of
-\claudeGoals{} goals, authored with the help of an LLM-based coding
-agent (Claude): it spans every rule family, proof sizes from one to
+\claudeGoals{} goals, authored by an LLM-based coding agent
+(Claude Opus 4.8): it spans every rule family, proof sizes from one to
 over 400 replay lines, and deliberately probes shapes that previous
 versions of the pipeline mishandled.
 
@@ -170,9 +170,9 @@ replay.
 Re-emitting and re-checking the full corpus takes \benchWallAll{} of
 wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
 %
-No emitted proof appeals to the \texttt{trust} oracle — the corpus
-contains zero occurrences, enforced by an audit gate — so each checked
-obligation rests only on the axiomatic base of \autoref{sec:trust}.
+No emitted proof appeals to any oracle (\autoref{sec:enc-rules}), so
+each checked obligation rests only on the axiomatic base; an audit gate
+over the emitted corpus enforces this at every commit.
 
 \subsection{Limitations and Discussion}\label{sec:limits}
 
@@ -204,27 +204,29 @@ are themselves a useful by-product for the maintainers of \pp.
 \paragraph{Engine partiality.}
 A few replay shapes are recognised but rejected: substitution rules
 pinning a binder beyond the third slot of a compound binder, and the
-chain forms of two arithmetic rules that no producible trace exercises.
+result forms of two arithmetic rules that no replay in our suites
+exercises.
 %
 All of these fail loudly at emission; none silently degrade.
 
 \paragraph{Raw proof obligations.}
-We also probed \pp{} on raw industrial obligations from the public
-\texttt{apero} dataset~\cite{deharbe2022pog}, translating its POG format
-into \pp's rule-validation input.
+We also probed \pp{} on raw industrial obligations from CLEARSY's
+public proof-obligation dataset~\cite{deharbe2022pog}, translating its
+POG format into \pp's rule-validation input.
 %
-A sampled obligation carries a median of roughly 1\,700 hypothesis
-predicates; \pp{} nonetheless proved every convertible obligation with
-at most fifty hypotheses, most sampled goals even with all hypotheses
-removed, and some thousand-hypothesis obligations given tens of seconds.
+A sampled obligation carries a median of roughly \aperoMedianHyps{}
+hypothesis predicates; \pp{} nonetheless proved every convertible
+obligation with at most fifty hypotheses, most sampled goals even with
+all hypotheses removed, and some thousand-hypothesis obligations given
+tens of seconds.
 %
 The bottleneck for certification is again the toolchain around \pp: the
-replay utility lost 86 of the 124 traces \pp{} produced on our sample,
-and the surviving replays use surface forms no synthetic goal had
-reached (strict comparisons, tuple memberships, relational inverse,
-sequents inside annotations); 14 of them verify end-to-end today,
-including the first machine-produced replays exercising the equality
-store.
+replay utility lost \aperoSampleLost{} of the \aperoSampleTraces{}
+traces \pp{} produced on our sample, and the surviving replays use
+surface forms no synthetic goal had reached (strict comparisons, tuple
+memberships, relational inverse, sequents inside annotations);
+\aperoSampleVerified{} of them verify end-to-end today, including the
+first machine-produced replays exercising the equality store.
 
 \paragraph{Use of AI.}
 The \texttt{claude} suite was authored by an LLM agent that also helped
@@ -250,9 +252,11 @@ The most direct future work is upstream: repairing the \textsc{replay}
 utility's truncations would recover the dropped goals, in particular the
 equality-prover fragment.
 %
-On the encoding side, the \numRulesTrust{} remaining postulated chain
-lemmas can be eliminated by deriving the binder-regrouping isomorphisms
-over tuples.
+On the encoding side, the binder-regrouping rules are currently
+consumed at the syntax level rather than emitted
+(\autoref{sec:enc-formulas}); deriving the regrouping isomorphisms over
+tuples would let \tool{} emit them like any other rule and drop its one
+syntax-level normalisation.
 %
 Finally, this work folds \pp{} into the \dedukti{} interoperability
 ecosystem: a natural next step within the ICSPA project is exporting

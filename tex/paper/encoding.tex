@@ -3,12 +3,8 @@
 
 \subsection{The Predicate Prover}\label{sec:pp-syntax}
 
-Syntax for the \emph{predicates} and \emph{expressions} of \pp{} are
+The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
 given as follows:
-%
-% do we really have n-ary function applications?
-% do we really have n-ary membership?
-% is this the full grammar for predicates/expressions?
 \begin{align*}
   E, F &\Coloneqq x \mid n \mid E \mapsto F \mid f(E_1,\ldots,E_k)
          \mid E + F \mid E - F \mid -E \\
@@ -18,24 +14,41 @@ given as follows:
          \mid P \Leftrightarrow Q
          \mid \mathcal{Q}\,\vec{x} \cdot P
 \end{align*}
-where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's
-pairing, and $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
-list of variables.
+where $x$ ranges over identifiers, $n$ over numerals, $f$ over function
+symbols, $\mapsto$ is B's pairing, membership relates a tuple of
+expressions to an expression, and an expression standing alone is an
+atom (this is how propositional variables appear).
+%
+A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
+list of variables, and the list forms a single \emph{compound} binder:
+$\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
+\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
+latter into the former during proof search.
 %
 The quantifiers $\Dia$ and $\Hrt$ are universal quantifiers idiosyncratic
 to \pp's normalisation procedure; semantically both are $\forall$ and differ
 only in the role they play during proof search.
-%
-% nonsense sentence? maybe its worth explaining the pre-processing step.
-% although its clear that some set-theory stuff remain as function/relation
-% symbols, but the rules don't deal with them in any meaningful way.
-The set-theoretic surface of B (powersets, intervals, relational
-operators, \ldots) reaches \pp{} as applications of function symbols;
-\pp{} reasons about them through its normalisation and equality rules,
-not through their set-theoretic definitions.
 
-% we need to formally introduce sequents and results here before
-% discussing the rules.
+Although B is a set-theoretic formalism, \pp{} itself proves formulas of
+first-order logic with linear arithmetic: a pre-processing pass reduces
+the set theory of a proof obligation to first-order formulas over
+membership before \pp{} sees it.
+%
+The set-theoretic operators that survive this reduction (intervals,
+relational operators, \ldots) reach \pp{} as uninterpreted function
+symbols: \pp{} has no set-theory rules, and such terms are only ever
+copied, compared for equality, or instantiated.
+
+\pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
+hypothesis predicates and $P$ a goal predicate.
+%
+Alongside sequents, its proofs manipulate a second judgment form: during
+normalisation a rule does not close a sequent but transforms a formula
+and passes on its \emph{result}, the conjunction of the formula's
+surviving conjuncts.
+%
+We write $P \yields Q$ for ``$P$ normalises with result $Q$''.
+%
 \pp's inference rules are specified in the annex of its internal
 specification~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
 families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
@@ -46,96 +59,144 @@ families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
 \rn{ARITH} and \rn{EGALITE}), and normalisation and instantiation
 (\rn{NRM1--30}, \rn{INS}).
 %
-Each rule application reduces the current goal to zero, one,
-or two premises, possibly under computational side-conditions
+A rule in sequent form reduces the current goal to zero, one, or two
+premises, possibly under computational side-conditions
 (``$P$ occurs in the list of hypotheses $H$'',
  ``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
-
-%  everything here is kind of filler and has already been said.
-% we should show an example replay (involving ALL7) and how it
-% corresponds to an 'abstract derivation'.
-How \pp{} \emph{finds} a proof is irrelevant here: we consume its
-replays.
 %
+For a rule in result form, the specification (\S 8.13) prescribes one of
+three schemas: its result is the constant true (the formula is
+discharged), a single transformed formula, or the combination of the
+results of the rule's two children.
+
 \pp{} can be instrumented to record a compact \trace{} of the rules it
 applied; a companion utility (\textsc{replay}) re-runs the proof and
 expands the trace into a \replay{} that annotates every step with the
-formula it was applied to:
-\begin{codePP}
-[RULE] <formula>        rule application + the goal it rewrote or closed
-[RULE(a)] <formula>     rule argument (hypothesis, subscript, predicate)
-[RULE_1] <formula>      result-form variant, inside a normalisation chain
-[RULE_n] <formula>      n-ary variant binding n variables
-[FIN(P)], [STOP_NORM]   phantom normalisation markers
-\end{codePP}
+formula it was applied to.
+%
+Each replay line carries a bracketed rule name and that formula;
+result-form applications bear the suffix \texttt{\_1}, and a rule
+argument (a hypothesis subscript, a binder count, a predicate) may
+follow the name in parentheses.
+%
 The main proof is recorded prefix-style (a rule precedes its
-subproofs), with two irregularities: the \emph{result chain} feeding a
-branching quantifier (\rn{ALL7}, \rn{XST8}) is emitted \emph{before}
-the branch rule itself, and phantom normalisation markers are
-interleaved throughout.
+subproofs), with two irregularities: the chain of result-form steps
+feeding a branching quantifier (\rn{ALL7}, \rn{XST8}) is emitted
+\emph{before} the branch rule itself, and normalisation markers
+(\texttt{FIN}, \texttt{STOP\_NORM}, \texttt{NRM}) that carry no proof
+content are interleaved throughout.
 %
-% the notion of 'phantom' is useless jargon. remove.
-The first non-phantom annotation is the overall goal.
+The annotation of the first non-marker line is the overall goal.
+%
+\autoref{fig:replay} shows a complete replay from our benchmark suite
+next to the derivation it denotes.
 
-% result should be explained earlier.
-The \texttt{\_1} (\emph{result-form}) variants deserve explanation, as
-they shape the encoding.
-% i prefer the framing that results/sequents are just different
-Inside a normalisation chain a rule does not close a sequent: it
-transforms a formula and passes the \emph{result} on.
-%
-The specification (\S 8.13) assigns every result-form rule one of three
-schemas: its result is the constant true (the formula is discharged), a
-single transformed formula, or the combination of the results of its two
-children.
+% --- replay/derivation figure ----------------------------------------
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.40\linewidth}
+\begin{codePP}
+[ALL2] <not(!x.!y.not(x = x))>
+[ALL6] <not(!(x,y).not(x = x))>
+[STOP_1] <FAUX>
+[EVR2_1] <not(x = x)>
+[ALL7(1)] <!(x,y).not(x = x) => FAUX>
+[FIN(FAUX)] <$\ldots$>
+[NRM1] <forall(x,y).FAUX => FAUX>
+[STOP_NORM] <FAUX => FAUX>
+[NRM] <forall(x,y).FAUX => FAUX>
+[FIN(FAUX => FAUX)] <$\ldots$>
+[AXM7] <FAUX => FAUX>
+\end{codePP}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.57\linewidth}
+    \footnotesize
+    \begin{mathpar}
+      \inferrule*[Right=\rn{ALL2}]{
+        \inferrule*[Right=\rn{ALL6}]{
+          \inferrule*[Right=\rn{ALL7}]{
+            \inferrule*[Right=\rn{EVR2\_1}]{
+              \inferrule*[Right=\rn{STOP\_1}]{ }{\bot \yields \bot}}
+            {\lnot(x = x) \yields \bot}
+            \\
+            \inferrule*[Right=\rn{NRM1}]{
+              \inferrule*[Right=\rn{AXM7}]{ }{\seq \bot \Rightarrow \bot}}
+            {\seq (\Dia (x,y) \cdot \bot) \Rightarrow \bot}}
+          {\seq (\forall (x,y) \cdot \lnot(x = x)) \Rightarrow \bot}}
+        {\seq \lnot \forall (x,y) \cdot \lnot(x = x)}}
+      {\seq \lnot \forall x \cdot \forall y \cdot \lnot(x = x)}
+    \end{mathpar}
+  \end{minipage}
+  \caption{Benchmark \texttt{og/22}: a replay (left; \texttt{FIN}
+    annotations elided) and the derivation it denotes (right), reading
+    \texttt{!} as $\forall$, \texttt{forall} as $\Dia$, \texttt{FAUX}
+    as $\bot$, and \texttt{=>} as $\Rightarrow$.
+    Each non-marker line is one rule application, in prefix order
+    except for the result chain (\rn{STOP\_1}, \rn{EVR2\_1}), which is
+    emitted before the \rn{ALL7} that consumes it.
+    \rn{ALL2} regroups the nested binders into a compound one,
+    \rn{ALL6} unfolds the negation, and \rn{ALL7} replaces the body of
+    the universal antecedent by the chain's result before \rn{NRM1} and
+    \rn{AXM7} close the proof.}
+  \label{fig:replay}
+\end{figure}
+% ---------------------------------------------------------------------
 
 \subsection{\lp}\label{sec:lp}
-% we should have a grammar to mirror what we showed for PP.
-% for the lambdapi commands, we should use the same syntax highlighting we used in eo2lp
+
 \lp~\cite{hondet:hal-02981561} is a proof assistant for the
 \lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
-logical framework~\cite{assaf2023dedukti}: a dependently-typed
-$\lambda$-calculus whose conversion is generated by $\beta$ together
-with user-declared rewrite rules.
+logical framework~\cite{assaf2023dedukti}.
+%
+Its terms are those of a dependently-typed $\lambda$-calculus,
+\[
+  t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
+        \mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
+\]
+where $c$ ranges over declared constants; conversion is generated by
+$\beta$ together with user-declared rewrite rules, and types are
+identified up to conversion.
 %
 A development is a sequence of declarations.
 %
-\texttt{symbol} introduces a typed constant, with explicit
+\lpkw{symbol} introduces a typed constant, with explicit
 $(x : A)$ and implicit $[x : A]$ parameters and an optional definition;
-\texttt{rule} $\ell ↪ r$ adds a rewrite rule over pattern variables
+\lpkw{rule} $\ell ↪ r$ adds a rewrite rule over pattern variables
 \texttt{\$x}, checked for subject reduction at declaration time;
-\texttt{inductive} generates constructors and a recursor.
+\lpkw{inductive} generates constructors and a recursor.
 %
-Modifiers refine a symbol's status: \texttt{constant} symbols admit no
-rewrite rule at their head, \texttt{injective} symbols may be inverted
-during unification, and the definition of an \texttt{opaque} symbol is
+Modifiers refine a symbol's status: \lpmod{constant} symbols admit no
+rewrite rule at their head, \lpmod{injective} symbols may be inverted
+during unification, and the definition of an \lpmod{opaque} symbol is
 sealed once type-checked.
 %
-A definition may be given as a proof script (\texttt{begin} \ldots{}
-\texttt{end}) whose tactics --- \texttt{assume}, \texttt{refine},
-\texttt{rewrite}, \texttt{have}, \texttt{induction} --- ultimately
+A definition may be given as a proof script (\lpkw{begin} \ldots{}
+\lpkw{end}) whose tactics --- \lpkw{assume}, \lpkw{refine},
+\lpkw{rewrite}, \lpkw{have}, \lpkw{induction} --- ultimately
 elaborate to a proof term that the kernel re-checks, so the tactic layer
 adds nothing to the trusted base.
 
 We build on \lp's standard library~\cite{Blanqui2021}: object-level types are
-encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \mathsf{TYPE}$
+encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \TYPE$
 mapping each set code to its type of inhabitants, and a type $\Prop$ of
-propositions with $\Prf : \Prop \to \mathsf{TYPE}$ mapping each proposition
-to its type of proofs (the library also provides the code $o : \Setu$ with
-$\El\,o ↪ \Prop$).
+propositions with $\Prf : \Prop \to \TYPE$ mapping each proposition
+to its type of proofs.
 %
 Connectives and quantifiers are the standard impredicative encodings;
 on top of these we assume the library's classical axioms — excluded
 middle and propositional extensionality.
 
-\subsection{Encoding PP's Predicates and Expressions}\label{sec:enc-formulas}
+\subsection{Encoding \pp's Predicates and Expressions}\label{sec:enc-formulas}
 
 The encoding is shallow.
-% the explanation of the `o` set code is in the previous section when
-% it naturally falls alongside the explanation of the `ι` set code.
+%
 All B expressions inhabit a single domain: a set code $\iota$, so an
 expression is a term of type $\El\,\iota$ and a predicate is a term of
 type $\Prop$.
+%
+The library's code $o : \Setu$, with $\El\,o ↪ \Prop$, lets predicates
+also occur where set elements are expected; the conjunction lists below
+rely on this.
 %
 The kernel file \texttt{B.lp} declares the domain constants —
 $\mapsto$ (pairing), $\epsilon$ (membership), $\mathsf{BOOL}$ with
@@ -156,8 +217,8 @@ formalisation of $\mathbb{Z}$.
 Numerals are decimal literals of the library's $\mathbb{N}$, coerced
 into the domain by an embedding that \lp{} inserts automatically.
 %
-Every other operator (set operators, projections, \ldots) is an
-uninterpreted constant.
+Every other operator — the set-theoretic surface of
+\autoref{sec:pp-syntax} included — is an uninterpreted constant.
 
 \paragraph{$n$-ary conjunction.}
 \pp{} treats $\land$ as left-associative and its rules address a
@@ -192,21 +253,24 @@ end;
 \end{codeLP}
 
 \paragraph{Compound binders.}
-%  this is NOT true. PP doesn't regroup quantifiers.
-% some rules do this regrouping but really we are just explaining that PP
-% distinguishes between ∀ (x,y), P and ∀ x, ∀ y, P
-\pp{} regroups consecutive quantifiers — $\forall x \cdot \forall y
-\cdot P$ becomes $\forall (x,y) \cdot P$ — and its quantifier rules
-manipulate the compound binder as a unit.
+\pp{} distinguishes the compound binder $\forall (x,y) \cdot P$ from the
+nested $\forall x \cdot \forall y \cdot P$ (\autoref{sec:pp-syntax}),
+and its quantifier rules manipulate a compound binder as a unit.
 %
 We mirror this with an inductive dependent type $\Tuple : ℕ → \TYPE$
 with projections $\prj [n] : \Tuple\,n → \El\,\iota$, and quantifiers
 $\allI, \xstI : (\Tuple\,n \to \Prop) \to \Prop$
-whose introduction and elimination principles are axiomatized bridges to
+whose introduction and elimination principles are axiomatised bridges to
 the $\Pi$-types of \lp{} (e.g.\
 $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
 of their own.
+%
+The regrouping rules (\rn{ALL1--4}, \rn{XST1--4}) need no \lp{}
+counterpart: our translation regroups binders itself while building the
+goal, so the \lp{} goal always carries one compound binder and these
+rules are consumed without emitting anything (\rn{ALL2} in
+\autoref{fig:replay} is an instance).
 %
 % we probably don't need to make this point but it's useful to have:
 % -------------------------------------------------------------------
@@ -235,21 +299,20 @@ $H$, so $P \Rightarrow Q$ holds'') have the following type signatures:
 \[
   \rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
   \qquad
-  \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q),
+  \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
 \]
 
-
 \paragraph{Result chains.}
-To encode the result-form (\texttt{\_1}) rules we package a
-normalisation result as a dependent record: for a formula $t$,
-$\Res\,t$ pairs the list $ts$ of surviving conjuncts with a proof of
+To encode the rules' result forms we package the judgment
+$t \yields \bwand ts$ as a record: a value of type $\Res\,t$ pairs the
+list $ts$ of surviving conjuncts with a proof of
 $\Prf\,(t = \mathsf{conj}\,ts)$, where $\mathsf{conj}$ folds a list
 back into a formula.
 %
-The three specification schemas map directly onto its constructors: a
-discharged formula is the empty list with a proof of $t = \top$; a
-transformation reuses a proved equality law (for example, \rn{NOT2}'s
-chain form is
+The three specification schemas (\autoref{sec:pp-syntax}) map directly
+onto its constructors: a discharged formula is the empty list with a
+proof of $t = \top$; a transformation reuses a proved equality law (for
+example, \rn{NOT2}'s result form is
 $\mathsf{mk_1}\,(\restm\,r)\,(\mathsf{eq\_trans}\ \texttt{¬¬-law}\
 (\mathsf{res\_eq}\,r))$); and a combination concatenates the two
 children's lists, justified by a concatenation law for $\mathsf{conj}$.
@@ -258,9 +321,9 @@ The $\top$-erasure rewrite rules on $\bwand$ and on list concatenation
 make the combined result reduce to exactly the conjuncts \pp{} records —
 discharged conjuncts disappear in any position, mirroring \pp.
 %
-A branching quantifier consumes a chain.
+A branching quantifier consumes a chain of such steps.
 %
-\rn{ALL7} normalises the body of a universal hypothesis pointwise and
+\rn{ALL7} normalises the body of a universal antecedent pointwise and
 continues under the normalised form:
 \begin{codeLP}
 opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
@@ -269,9 +332,17 @@ opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
 \end{codeLP}
 where the proof transports each instance along the chain's equality
 ($\mathsf{res\_eq}$).
+%
+Chains are emitted as explicit terms rather than tactic steps; for the
+replay of \autoref{fig:replay} the whole emitted proof is
+\begin{codeLP}
+refine ALL7 (λ v, EVR2_1 STOP_1) _;  refine NRM1 _;  refine AXM7
+\end{codeLP}
+— \rn{ALL2} emits nothing (\autoref{sec:enc-formulas}), and neither does
+\rn{ALL6}, since $\lnot P$ and $P \Rightarrow \bot$ are definitionally
+equal in the encoding.
 
 \paragraph{Solver side-conditions.}
-% we should actually give an example of a on-the-fly generated proof terms.
 Some rules are licensed not by a structural premise but by a verdict of
 \pp's arithmetic solver or equality prover: \rn{AR4} requires
 $(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
@@ -279,34 +350,32 @@ $(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
 $\leq$-hypotheses are contradictory.
 %
 The corresponding lemmas take these facts as explicit $\Prf$-arguments,
-and \tool{} \emph{generates} the witnessing proof at emission time: a
-nonnegative (Farkas-style) combination of the $\leq \mathbf{0}$
-hypotheses refuting the \rn{ARITH} goal, equality-transport chains for
-the equality prover, and permutation proofs from the group axioms
-wherever \pp{} recorded a sum in a different association order than the
-lemma needs.
+and \tool{} \emph{generates} the witnessing proof at emission time.
 %
-There is no fallback oracle: when a witnessing proof cannot be
-generated, emission fails loudly (\autoref{sec:trust}).
+For \rn{ARITH} the witness is a nonnegative (Farkas-style) combination
+of the $\leq \mathbf{0}$ hypotheses: with
+$h_1 : \Prf\,(x \leq \mathbf{0})$ and
+$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ in scope, the
+emitted refutation is
+\begin{codeLP}
+one_not_leq_zero (leq_subst_l e (add_leq_zero _ _ (add_leq_zero _ _ h2 h1) h1))
+\end{codeLP}
+which sums the hypotheses to $\mathbf{1} \leq \mathbf{0}$; the equality
+$e : \Prf\,(\mathbf{1} = (\mathbf{1}-(x+x))+x+x)$ justifying the sum is
+itself generated from the group axioms.
+%
+The same machinery produces equality-transport chains for the equality
+prover, and permutation proofs wherever \pp{} recorded a sum in a
+different association order than the lemma needs.
 
-% the whole following subsection is probably not needed.
-% we are not saying anything other than 'we proved everything'.
-\subsection{The Trusted Base}\label{sec:trust}
-A reconstructed proof type-checks against: the \lp{} kernel; the
-standard library with its classical axioms; the B domain axioms of
-\autoref{sec:enc-formulas}; the structural interface of $\bwand$; and
-the quantifier bridges.
+\paragraph{The trusted base.}
+A reconstructed proof type-checks against exactly: the \lp{} kernel, the
+standard library with its classical axioms, the B domain axioms of
+\autoref{sec:enc-formulas}, the structural interfaces of $\bwand$ and
+$\Res$, and the quantifier bridges.
 %
-Everything else is a theorem.
+Everything else, the rule library included, is a theorem.
 %
-Of the \numRulesCovered{} rules in the library, every rule that can
-occur in a replay carries a soundness proof; the \numRulesTrust{}
-remaining chain forms of the regrouping rules are still stated with a
-postulated oracle (\texttt{trust}), but they are unreachable — the
-translator regroups binders at the syntax level, so no replay path emits
-them.
-%
-The emitter is incapable of producing a proof that mentions
-\texttt{trust} at all: its term grammar has no such constructor, so any
-side-condition it cannot prove is a hard failure rather than a silent
-axiom.
+Nor can the translator smuggle in an assumption: its term grammar has no
+constructor for an oracle, so a side-condition for which no witnessing
+proof can be generated is a hard failure rather than a silent axiom.

@@ -28,7 +28,13 @@
 % Rule names, e.g. \rn{AND2}, \rn{ALL7}.
 \newcommand{\rn}[1]{\textsf{#1}}
 
+% Inline LP keywords / modifiers, matching the listings colours (preamble).
+\newcommand{\lpkw}[1]{\textcolor{lpKeyword}{\bfseries\texttt{#1}}}
+\newcommand{\lpmod}[1]{\textcolor{lpModifier}{\texttt{#1}}}
+
 % ── Logic / B-Book primitives (math mode) ─────────────────────────────
+\newcommand{\TYPE}{\mathsf{TYPE}}
+\newcommand{\KIND}{\mathsf{KIND}}
 \newcommand{\Prf}{\pi}                     % proof-of:  π P
 \newcommand{\El}{\tau}                     % type coercion:  τ ι
 \newcommand{\Prop}{\mathsf{Prop}}
