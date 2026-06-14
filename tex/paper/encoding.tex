@@ -6,7 +6,7 @@
 The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
 given as follows:
 \begin{align*}
-  E, F &\Coloneqq x \mid n \mid E \mapsto F \mid f(E_1,\ldots,E_k)
+  E, F &\Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
          \mid E + F \mid E - F \mid -E \\
   P, Q &\Coloneqq E \mid E = F \mid E \leq F
          \mid E_1,\ldots,E_k \in F
@@ -14,14 +14,12 @@ given as follows:
          \mid P \Leftrightarrow Q
          \mid \mathcal{Q}\,\vec{x} \cdot P
 \end{align*}
-where $x$ ranges over identifiers, $n$ over numerals, $f$ over function
-symbols, $\mapsto$ is B's pairing, membership relates a tuple of
-expressions to an expression, and an expression standing alone is an
-atom (this is how propositional variables appear).
+where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
+function application $F(E_1,\ldots,E_k)$ applies an expression $F$ to the arguments $E_1,\ldots,E_k$,
+membership relates a tuple of expressions to an expression.
 %
 A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
-list of variables, and the list forms a single \emph{compound} binder:
-$\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
+list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
 \cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
 latter into the former during proof search.
 %
@@ -30,66 +28,60 @@ to \pp's normalisation procedure; semantically both are $\forall$ and differ
 only in the role they play during proof search.
 
 Although B is a set-theoretic formalism, \pp{} itself proves formulas of
-first-order logic with linear arithmetic: a pre-processing pass reduces
+first-order logic with linear arithmetic: a pre-processing step reduces
 the set theory of a proof obligation to first-order formulas over
 membership before \pp{} sees it.
 %
-The set-theoretic operators that survive this reduction (intervals,
-relational operators, \ldots) reach \pp{} as uninterpreted function
-symbols: \pp{} has no set-theory rules, and such terms are only ever
+The set-theoretic operators that survive this reduction (e.g., intervals,
+relational operators) reach \pp{} as uninterpreted function symbols:
+\pp{} has no set-theory rules, and such terms are only ever
 copied, compared for equality, or instantiated.
 
 \pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
 hypothesis predicates and $P$ a goal predicate.
-%
-Alongside sequents, its proofs manipulate a second judgment form: during
-normalisation a rule does not close a sequent but transforms a formula
-and passes on its \emph{result}, the conjunction of the formula's
-surviving conjuncts.
-%
-We write $P \yields Q$ for ``$P$ normalises with result $Q$''.
+% 130 97
+Alongside sequents, its proofs manipulate a second judgment form
+known as \emph{result}: we write $(H \seq P) \yields Q$ for
+``$P$ normalises to result $Q$ under hypotheses $H$''.
 %
 \pp's inference rules are specified in the annex of its internal
-specification~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
+documentation~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
 families — propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
 \rn{NOT}), hypothesis discharge (\rn{AXM1--9}), quantifiers
-(\rn{ALL1--9}, \rn{XST1--8}), equality and the equality prover
+(\rn{ALL1--9}, \rn{XST1--8}), equality
 (\rn{EQL}, \rn{EAXM}, \rn{EQC}, \rn{ECTR}, \ldots), booleans
-(\rn{BOOL}), linear arithmetic (\rn{AR1--13} plus the solver terminals
-\rn{ARITH} and \rn{EGALITE}), and normalisation and instantiation
-(\rn{NRM1--30}, \rn{INS}).
+(\rn{BOOL}), linear arithmetic (\rn{AR1--13}),
+and normalisation (\rn{NRM1--30}).
 %
-A rule in sequent form reduces the current goal to zero, one, or two
+Each rule reduces the current goal to zero, one, or two
 premises, possibly under computational side-conditions
 (``$P$ occurs in the list of hypotheses $H$'',
  ``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
 %
-For a rule in result form, the specification (\S 8.13) prescribes one of
-three schemas: its result is the constant true (the formula is
-discharged), a single transformed formula, or the combination of the
-results of the rule's two children.
+% For a rule with a result conclusion, the specification prescribes
+% one of three schemas: its result is the constant true (the formula is
+% discharged), a single transformed formula, or the combination of the
+% results of the rule's two children.
 
-\pp{} can be instrumented to record a compact \trace{} of the rules it
-applied; a companion utility (\textsc{replay}) re-runs the proof and
-expands the trace into a \replay{} that annotates every step with the
-formula it was applied to.
+As dicussed in \autoref{sec:intro}, \pp{} is instrumented to record a
+\trace{} file of the rules it applied; a companion utility re-runs the
+proof and expands the trace into a \replay{} file that annotates every
+step with the goal it was applied to.
 %
-Each replay line carries a bracketed rule name and that formula;
-result-form applications bear the suffix \texttt{\_1}, and a rule
-argument (a hypothesis subscript, a binder count, a predicate) may
-follow the name in parentheses.
+Each replay line carries a rule name possibly an argument
+that follows the name in parentheses.
 %
 The main proof is recorded prefix-style (a rule precedes its
 subproofs), with two irregularities: the chain of result-form steps
-feeding a branching quantifier (\rn{ALL7}, \rn{XST8}) is emitted
-\emph{before} the branch rule itself, and normalisation markers
+feeding a rule with a result premise (i.e., \rn{ALL7}, \rn{XST8}) is
+emitted \emph{before} the branch rule itself, and normalisation markers
 (\texttt{FIN}, \texttt{STOP\_NORM}, \texttt{NRM}) that carry no proof
 content are interleaved throughout.
 %
 The annotation of the first non-marker line is the overall goal.
 %
-\autoref{fig:replay} shows a complete replay from our benchmark suite
-next to the derivation it denotes.
+\autoref{fig:replay} shows a replay from our benchmark suite
+and the derivation it denotes.
 
 % --- replay/derivation figure ----------------------------------------
 \begin{figure}[t]
@@ -145,25 +137,27 @@ next to the derivation it denotes.
 \subsection{\lp}\label{sec:lp}
 
 \lp~\cite{hondet:hal-02981561} is a proof assistant for the
-\lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
-logical framework~\cite{assaf2023dedukti}.
+Cousineau and Dowek's \lpcmr~\cite{CousineauDowek}, the calculus
+underlying the \dedukti{} logical framework~\cite{assaf2023dedukti}.
 %
 Its terms are those of a dependently-typed $\lambda$-calculus,
 \[
   t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
         \mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
 \]
-where $c$ ranges over declared constants; conversion is generated by
-$\beta$ together with user-declared rewrite rules, and types are
-identified up to conversion.
+where $x$ ranges over variables, $c$ ranges over declared constants,
+and terms are identified up to $\alpha$-equivalence.
+The conversion relation $\Equiv$ is generated by $\beta$-equivalence
+together with user-declared rewrite rules.
+% the full definition of the typing relation is given in the appendix...
 %
-A development is a sequence of declarations.
+A $\lp{}$ development is a sequence of declarations.
 %
-\lpkw{symbol} introduces a typed constant, with explicit
+The \lpkw{symbol} command introduces a typed constant, with explicit
 $(x : A)$ and implicit $[x : A]$ parameters and an optional definition;
 \lpkw{rule} $\ell ↪ r$ adds a rewrite rule over pattern variables
-\texttt{\$x}, checked for subject reduction at declaration time;
-\lpkw{inductive} generates constructors and a recursor.
+\texttt{\$x}, checked for type-preservation at declaration time;
+\lpkw{inductive} generates an inductive type with constructors and a recursor.
 %
 Modifiers refine a symbol's status: \lpmod{constant} symbols admit no
 rewrite rule at their head, \lpmod{injective} symbols may be inverted
@@ -171,10 +165,9 @@ during unification, and the definition of an \lpmod{opaque} symbol is
 sealed once type-checked.
 %
 A definition may be given as a proof script (\lpkw{begin} \ldots{}
-\lpkw{end}) whose tactics --- \lpkw{assume}, \lpkw{refine},
-\lpkw{rewrite}, \lpkw{have}, \lpkw{induction} --- ultimately
-elaborate to a proof term that the kernel re-checks, so the tactic layer
-adds nothing to the trusted base.
+\lpkw{end}) whose tactics (e.g., \lpkw{assume}, \lpkw{refine},
+\lpkw{rewrite}, \lpkw{have}, \lpkw{induction}) ultimately
+elaborate to a proof term that the kernel re-checks.
 
 We build on \lp's standard library~\cite{Blanqui2021}: object-level types are
 encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \TYPE$
@@ -182,20 +175,18 @@ mapping each set code to its type of inhabitants, and a type $\Prop$ of
 propositions with $\Prf : \Prop \to \TYPE$ mapping each proposition
 to its type of proofs.
 %
-Connectives and quantifiers are the standard impredicative encodings;
-on top of these we assume the library's classical axioms — excluded
-middle and propositional extensionality.
 
 \subsection{Encoding \pp's Predicates and Expressions}\label{sec:enc-formulas}
 
-The encoding is shallow.
+The encoding is shallow, and we assume the library's classical axioms
+for excluded middle and propositional extensionality.
 %
 All B expressions inhabit a single domain: a set code $\iota$, so an
 expression is a term of type $\El\,\iota$ and a predicate is a term of
 type $\Prop$.
 %
 The library's code $o : \Setu$, with $\El\,o ↪ \Prop$, lets predicates
-also occur where set elements are expected; the conjunction lists below
+also occur where `set' elements are expected; the conjunction lists below
 rely on this.
 %
 The kernel file \texttt{B.lp} declares the domain constants —
@@ -211,48 +202,46 @@ discreteness axioms $\mathbf{0} \leq \mathbf{1}$,
 $\lnot(\mathbf{1} \leq \mathbf{0})$ and
 $\lnot(x \leq \mathbf{0}) \Rightarrow \mathbf{1} \leq x$).
 %
-This is just enough to \emph{derive} \pp's arithmetic rules; it is not a
-formalisation of $\mathbb{Z}$.
+This is just enough to \emph{derive} \pp's arithmetic rules;
+it is not a set-theoretic formalisation of $\mathbb{Z}$
+(e.g., as equivalence classes of pairs of natural numbers).
 %
 Numerals are decimal literals of the library's $\mathbb{N}$, coerced
 into the domain by an embedding that \lp{} inserts automatically.
 %
-Every other operator — the set-theoretic surface of
-\autoref{sec:pp-syntax} included — is an uninterpreted constant.
+Every other operator --- the set-theoretic operators of
+\autoref{sec:pp-syntax} included --- is an uninterpreted constant.
 
-\paragraph{$n$-ary conjunction.}
-\pp{} treats $\land$ as left-associative and its rules address a
-conjunction through its \emph{last} conjunct and the remainder; worse,
-when a normalisation step discharges a conjunct, \pp{} silently drops it
-from every formula it subsequently records.
+\paragraph{List-based Conjunction.}
+Most of \pp{}'s rules treat $\land$ as left-associative, so pattern
+matching $p \land q \land r$ gives $(p \land q)$ as the first conjunct
+and $r$ as the second.
 %
-Encoding $\land$ binarily would therefore force proofs to rewrite
-associativity and unit collapses at nearly every step.
+However, some rules peel the leftmost conjunct, and some
+act on conjuncts from arbitrary positions.
 %
-Instead, a conjunction is a \emph{snoc list}: an inductive type
-$\mathbb{L}^{*}$ with empty list $∎$ and right append $∷$, and an
-injective operator $\bwand : \mathbb{L}^{*}\,o \to \Prop$ with the
+For the sake of flexibility, we use a list-based encoding of conjunction:
+an inductive type $\mathbb{L}^{*}$ with empty list $∎$ and right append $∷$,
+and an injective operator $\bwand : \mathbb{L}^{*}\,o \to \Prop$ with the
 rewrite rules
-$\bwand(∎ ∷ P) ↪ P$ and
-$\bwand(ps ∷ \top) ↪ \bwand ps$
-(a singleton conjunction \emph{is} its conjunct; discharged conjuncts
-erase).
+$\bwand(∎ ∷ \texttt{\$p}) ↪ \$p$ and
+$\bwand(\$ps ∷ \top) ↪ \bwand{\$ps}$.
 %
-Its structural interface — introduction, and elimination of the last
-conjunct and of the remainder — is axiomatised.
+Note that the connection to standard binary conjunction is
+not given by rewrite rules: it is axiomatised separately,
+and used only in the soundness proofs for \pp{}'s inference rules.
 %
-\pp's conjunction rules then become single structural matches; for
-example (\texttt{lp/rules/Conj.lp}):
+For example, \texttt{lp/rules/Conj.lp} defines the $\rn{AND2}$ rule:
 \begin{codeLP}
-opaque symbol AND2 [ps : $\mathbb{L}^{*}$ o] [P : Prop]
-  : π ($\bigwedge$ ps ⇒ ¬ P) → π (¬ $\bigwedge$ (ps ∷ P)) ≔
+opaque symbol AND2 [ps : $\mathbb{L}^{*}$ o] [p : Prop]
+  : π ($\bigwedge$ ps ⇒ ¬ p) → π (¬ $\bigwedge$ (ps ∷ p)) ≔
 begin
-  assume ps P h1 hc;
+  assume ps p h1 hc;
   refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
 end;
 \end{codeLP}
 
-\paragraph{Compound binders.}
+\paragraph{Compound Binders.}
 \pp{} distinguishes the compound binder $\forall (x,y) \cdot P$ from the
 nested $\forall x \cdot \forall y \cdot P$ (\autoref{sec:pp-syntax}),
 and its quantifier rules manipulate a compound binder as a unit.
@@ -266,11 +255,11 @@ $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
 of their own.
 %
-The regrouping rules (\rn{ALL1--4}, \rn{XST1--4}) need no \lp{}
-counterpart: our translation regroups binders itself while building the
-goal, so the \lp{} goal always carries one compound binder and these
-rules are consumed without emitting anything (\rn{ALL2} in
-\autoref{fig:replay} is an instance).
+% The regrouping rules (\rn{ALL1--4}, \rn{XST1--4}) need no \lp{}
+% counterpart: our translation regroups binders itself while building the
+% goal, so the \lp{} goal always carries one compound binder and these
+% rules are consumed without emitting anything (\rn{ALL2} in
+% \autoref{fig:replay} is an instance).
 %
 % we probably don't need to make this point but it's useful to have:
 % -------------------------------------------------------------------
@@ -282,7 +271,7 @@ rules are consumed without emitting anything (\rn{ALL2} in
 %
 
 \subsection{Encoding Rules}\label{sec:enc-rules}
-
+%
 Each \pp{} rule is a \lp{} symbol whose type states the rule and whose
 body \emph{proves} it.
 %
