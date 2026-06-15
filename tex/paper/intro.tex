@@ -1,4 +1,6 @@
 % ── intro.tex · §1 ──────────────────────────────
+% other kinds of proof obligations. well-definedness, overflow, constants.
+%
 \section{Introduction}\label{sec:intro}
 
 The \bmethod~\cite{abrial1996bbook} is a formal method for developing software
@@ -14,8 +16,9 @@ line~14 was developed in B~\cite{behm1999meteor}.
 \ab~\cite{clearsy_atelierb} is a software package supporting the method,
 developed and distributed by CLEARSY.
 %
+% well-definedness conditions.
 For every machine and refinement step, it generates \emph{proof obligations}
-(i.e., sequents whose validity establishes that an invariant
+(e.g., sequents whose validity establishes that an invariant
        is preserved or a refinement is correct)
 and discharges them with automated provers, leaving the remainder to
 interactive proof.
@@ -51,9 +54,12 @@ We encode each \pp{} inference rule as a \lp{} symbol whose type captures
 the rule's premises and conclusion, and whose body is a proof that
 demonstrates the correctness of the rule with respect to classical logic
 and basic set theory.
-
+% and arithmetic?
+% some PP inference rules just correspond to tactics.
 %
-To achieve this, \pp{} is instrumented to record a compact \emph{trace} listing
+
+% 'achieve this' implies
+Fortunately, \pp{} is instrumented to record a compact \emph{trace} listing
 the inference rules it applied during a proof; another utility expands this
 trace into a \emph{replay} that annotates each step with the rule applied and
 the intermediate goal it was applied to.
@@ -91,6 +97,7 @@ TLA$^+$~\cite{grieu2025eventbtla}.
 The work presented here complements these approaches, since \pp{} is
 used in Rodin.
 
+% TODO()
 The reduction of proof checking to type checking originates with the
 Edinburgh Logical Framework~\cite{harper1993lf}, whose underlying
 calculus is the dependently-typed $\lambda\Pi$-calculus.
@@ -104,21 +111,23 @@ work: SMT proofs have been reconstructed in
 \lp~\cite{coltellacci2026acta} — including proofs of TLAPS obligations,
 TLA$^+$'s proof system~\cite{coltellacci2023abz} — and in
 Lean~\cite{mohamed25leansmt}.
+% LEO-III, Zenon Modulo, why3, hammers
 %GB: some words on hammer-like tools?
 
 Confidence in \ab's proof machinery has been pursued from several
 directions.
 %
+% strategies != rewrite rules.
 Cirstea and Kirchner formalised \pp's inference rules as rewriting
 strategies in ELAN~\cite{cirstea1998elan}; their encoding re-implements
 the prover's first-order core, but covers neither arithmetic nor any
 soundness argument for the rules themselves.
 %
 Jaeger and Dubois~\cite{jaeger2007trustb} asked the trust question
-directly, giving a deep embedding of B's logic in Coq (BiCoq); the
-BCARe framework of Jacquel et~al.~\cite{jacquel2011bcare,
-jacquel2015sosym} works over such an embedding to verify the rules
-added by users to \ab's rule base.
+directly, giving a deep embedding of B's logic in Rocq (BiCoq);
+the BCARe framework of Jacquel et~al.~\cite{jacquel2011bcare, jacquel2015sosym}
+works over a similar embedding to verify the rules added by users
+to \ab's rule base.
 %
 None of these efforts checks the deductions that \pp{}
 actually performs on a given obligation.
@@ -126,6 +135,7 @@ actually performs on a given obligation.
 Our work targets exactly that gap: each \pp{} run is re-checked
 against rule lemmas that are themselves proved sound.
 %
+% Trelat BeeR.
 
 %
 The BWare project~\cite{bware2014} took a different route to the same
@@ -133,15 +143,14 @@ trust concern: it discharged B proof obligations with external provers
 --- notably Zenon Modulo, whose proofs are checked by
 \dedukti~\cite{bury2015bset} --- thereby replacing \pp{} rather than
 formally verifying its output.
-%
+% Terlat Barrel
 In the same spirit, Trélat~\cite{trelat2025smt} gives a provably sound
 encoding of B proof obligations into SMT-LIB, as does
 Defourné~\cite{defourne2025scp} for TLA$^+$ obligations.
 %
 Closest to our setting, Stolze et~al.~\cite{stolze2024dedukti} export
-\ab{} proof \emph{obligations} to \dedukti{} and report
-preliminary experiments towards sharing \ab{} proofs across the
-\dedukti{} ecosystem.
+\ab{} proof \emph{obligations} to \dedukti{} and report preliminary
+experiments towards sharing \ab{} proofs across the \dedukti{} ecosystem.
 %
 % TODO(authors): confirm with Hermant/D\'eharbe who built the trace
 % instrumentation and REPLAY before claiming any tooling lineage from

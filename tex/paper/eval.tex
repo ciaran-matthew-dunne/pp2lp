@@ -2,6 +2,7 @@
 % Table + prose read numbers from results-data.tex — never hard-code a
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
+% .but files not explained.
 % --- pipeline figure ------------------------------------------------
 \begin{boxfigure}{fig:pipeline}{%
 		The \tool{} pipeline. \pp, instrumented, emits a \trace{} of the
@@ -159,15 +160,12 @@ replay.
 %
 Re-emitting and re-checking the full corpus takes \benchWallAll{} of
 wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
-%
-No emitted proof appeals to any oracle (\autoref{sec:enc-rules}), so
-each checked obligation rests only on the axiomatic base; a pre-commit
-audit over the emitted corpus enforces this.
+
 
 \subsection{Conclusion and Future Work}\label{sec:conclusion}
 
-We have presented \tool, which independently re-checks \ab's Predicate
-Prover by reconstructing its proofs in \lp.
+We have presented \tool, which checks \ab's Predicate Prover by
+reconstructing its proofs in \lp.
 %
 Unlike approaches that postulate each rule as an axiom, every \pp{} rule
 is encoded as a symbol whose body \emph{proves} the rule sound against a
