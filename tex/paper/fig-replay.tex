@@ -30,7 +30,9 @@
 	\caption{Benchmark \texttt{og/22}: a replay (left; \texttt{FIN}
 		annotations elided) and the derivation it denotes (right), reading
 		\texttt{!} as $\forall$, \texttt{forall} as $\Dia$, \texttt{FAUX}
-		as $\bot$, and \texttt{=>} as $\Rightarrow$.
+		as $\bot$, and \texttt{=\parbox{0em}{}>} % hack to
+                                % avoid the replacement
+                as $\Rightarrow$.
 		Each non-marker line is one rule application, in prefix order
 		except for the result derivation (\rn{STOP\_1}, \rn{EVR2\_1}), which is
 		emitted before the \rn{ALL7} that consumes it.
