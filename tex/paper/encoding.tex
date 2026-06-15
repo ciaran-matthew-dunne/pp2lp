@@ -64,6 +64,7 @@ A rule whose conclusion is a \emph{result} computes its list by one of
 three schemas: the empty list (the formula is discharged), a singleton
 $[Q]$ (a single transformed formula), or the concatenation of its two
 premises' lists (a combination).
+%%GB: Shall we say that to each "classical" rule corresponds a "result" rule, computed as follow except some special cases?
 %
 For instance, \rn{AND4} introduces a conjunct, and its result form
 \rn{AND4\_1} (the combination schema) concatenates the two premises'
@@ -95,6 +96,7 @@ beneath the post-normalisation universal $\Dia$ thus:
 We encode the result judgment as a dedicated \lp{} type, and the rules
 that produce and consume it as functions over that type, in
 \autoref{sec:enc-rules}.
+%GB: a small word on XST8?
 
 As dicussed in \autoref{sec:intro}, \pp{} is instrumented to record a
 \trace{} file of the rules it applied; a companion utility re-runs the
@@ -240,6 +242,7 @@ the $\Pi$-types of \lp{} (e.g.\
 $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
 of their own.
+%GB: why bridges and not rewrite rules?
 %
 % we probably dont need the following text but its useful to have:
 % -----------------------------------------------------------------
@@ -331,6 +334,7 @@ their children's lists into the single flat list $[P_3, P_2, P_1]$, which
 \rn{ALL7} conjoins.  Combining the results eagerly with $\land$ would
 instead mirror the proof's nesting as $P_3 \land (P_2 \land P_1)$; the list
 defers and flattens the conjunction.
+%% TODO: something is missing here
 {\small
 \[
   \rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
