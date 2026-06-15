@@ -6,13 +6,13 @@
 The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
 given as follows:
 \begin{align*}
-  E, F &\Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
-         \mid E + F \mid E - F \mid -E \\
-  P, Q &\Coloneqq E \mid E = F \mid E \leq F
-         \mid E_1,\ldots,E_k \in F
-         \mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
-         \mid P \Leftrightarrow Q
-         \mid \mathcal{Q}\,\vec{x} \cdot P
+	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
+	\mid E + F \mid E - F \mid -E                                     \\
+	P, Q & \Coloneqq E \mid E = F \mid E \leq F
+	\mid E_1,\ldots,E_k \in F
+	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
+	\mid P \Leftrightarrow Q
+	\mid \mathcal{Q}\,\vec{x} \cdot P
 \end{align*}
 where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
 function application $F(E_1,\ldots,E_k)$ applies an expression $F$ to the arguments $E_1,\ldots,E_k$,
@@ -20,7 +20,7 @@ membership relates a tuple of expressions to an expression.
 %
 A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
 list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
-\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
+	\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
 latter into the former during proof search.
 %
 The quantifiers $\Dia$ and $\Hrt$ are universal quantifiers idiosyncratic
@@ -40,9 +40,11 @@ copied, compared for equality, or instantiated.
 \pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
 hypothesis predicates and $P$ a goal predicate.
 % 130 97
-Alongside sequents, its proofs manipulate a second judgment form
-known as \emph{result}: we write $(H \seq P) \yields Q$ for
-``$P$ normalises to result $Q$ under hypotheses $H$''.
+Alongside sequents, its proofs manipulate a second judgment, the
+\emph{result}: we write $(H \seq P) \yields [Q_1, \ldots, Q_n]$ for
+``under $H$, $P$ normalises to the list of predicates
+$[Q_1, \ldots, Q_n]$'', whose conjunction --- taken only when the list is
+consumed, by \rn{ALL7}/\rn{XST8} below --- is the normal form of $P$.
 %
 \pp's inference rules are specified in the annex of its internal
 documentation~\cite{pp_spec}: roughly \numRulesSpec{} rules, grouped by
@@ -56,12 +58,43 @@ and normalisation (\rn{NRM1--30}).
 Each rule reduces the current goal to zero, one, or two
 premises, possibly under computational side-conditions
 (``$P$ occurs in the list of hypotheses $H$'',
- ``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
+``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
 %
-% For a rule with a result conclusion, the specification prescribes
-% one of three schemas: its result is the constant true (the formula is
-% discharged), a single transformed formula, or the combination of the
-% results of the rule's two children.
+A rule whose conclusion is a \emph{result} computes its list by one of
+three schemas: the empty list (the formula is discharged), a singleton
+$[Q]$ (a single transformed formula), or the concatenation of its two
+premises' lists (a combination).
+%
+For instance, \rn{AND4} introduces a conjunct, and its result form
+\rn{AND4\_1} (the combination schema) concatenates the two premises'
+lists:
+\begin{center}
+  \begin{prooftree}
+    \hypo{H \seq Q} \hypo{H \seq P}
+    \infer2[\rn{AND4}]{H \seq P \land Q}
+  \end{prooftree}
+  \qquad
+  \begin{prooftree}
+    \hypo{(H \seq Q) \yields R_1} \hypo{(H \seq P) \yields R_2}
+    \infer2[\rn{AND4\_1}]{(H \seq P \land Q) \yields R_1 \app R_2}
+  \end{prooftree}
+\end{center}
+%
+Two rules, \rn{ALL7} and \rn{XST8}, instead \emph{consume} a result:
+\rn{ALL7} normalises the body of a universal antecedent pointwise to a
+list $R_1,\ldots,R_n$ and continues a subproof under its conjunction
+beneath the post-normalisation universal $\Dia$ thus:
+\begin{center}
+  \begin{prooftree}
+    \hypo{(H \seq P) \yields [R_1,\ldots,R_n]}
+    \hypo{H \seq (\Dia x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow G}
+    \infer2[\rn{ALL7}]{H \seq (\forall x \cdot P) \Rightarrow G}
+  \end{prooftree}
+\end{center}
+%
+We encode the result judgment as a dedicated \lp{} type, and the rules
+that produce and consume it as functions over that type, in
+\autoref{sec:enc-rules}.
 
 As dicussed in \autoref{sec:intro}, \pp{} is instrumented to record a
 \trace{} file of the rules it applied; a companion utility re-runs the
@@ -71,67 +104,20 @@ step with the goal it was applied to.
 Each replay line carries a rule name possibly an argument
 that follows the name in parentheses.
 %
+An example replay and its proof tree are shown in \autoref{fig:replay}.
+%
 The main proof is recorded prefix-style (a rule precedes its
-subproofs), with two irregularities: the chain of result-form steps
+subproofs), with two irregularities: the result derivation
 feeding a rule with a result premise (i.e., \rn{ALL7}, \rn{XST8}) is
-emitted \emph{before} the branch rule itself, and normalisation markers
+emitted \emph{before} that rule itself, and normalisation markers
 (\texttt{FIN}, \texttt{STOP\_NORM}, \texttt{NRM}) that carry no proof
 content are interleaved throughout.
 %
 The annotation of the first non-marker line is the overall goal.
 %
-\autoref{fig:replay} shows a replay from our benchmark suite
-and the derivation it denotes.
 
 % --- replay/derivation figure ----------------------------------------
-\begin{figure}[t]
-  \centering
-  \begin{minipage}[c]{0.40\linewidth}
-\begin{codePP}
-[ALL2] <not(!x.!y.not(x = x))>
-[ALL6] <not(!(x,y).not(x = x))>
-[STOP_1] <FAUX>
-[EVR2_1] <not(x = x)>
-[ALL7(1)] <!(x,y).not(x = x) => FAUX>
-[FIN(FAUX)] <$\ldots$>
-[NRM1] <forall(x,y).FAUX => FAUX>
-[STOP_NORM] <FAUX => FAUX>
-[NRM] <forall(x,y).FAUX => FAUX>
-[FIN(FAUX => FAUX)] <$\ldots$>
-[AXM7] <FAUX => FAUX>
-\end{codePP}
-  \end{minipage}\hfill
-  \begin{minipage}[c]{0.57\linewidth}
-    \footnotesize
-    \begin{mathpar}
-      \inferrule*[Right=\rn{ALL2}]{
-        \inferrule*[Right=\rn{ALL6}]{
-          \inferrule*[Right=\rn{ALL7}]{
-            \inferrule*[Right=\rn{EVR2\_1}]{
-              \inferrule*[Right=\rn{STOP\_1}]{ }{\bot \yields \bot}}
-            {\lnot(x = x) \yields \bot}
-            \\
-            \inferrule*[Right=\rn{NRM1}]{
-              \inferrule*[Right=\rn{AXM7}]{ }{\seq \bot \Rightarrow \bot}}
-            {\seq (\Dia (x,y) \cdot \bot) \Rightarrow \bot}}
-          {\seq (\forall (x,y) \cdot \lnot(x = x)) \Rightarrow \bot}}
-        {\seq \lnot \forall (x,y) \cdot \lnot(x = x)}}
-      {\seq \lnot \forall x \cdot \forall y \cdot \lnot(x = x)}
-    \end{mathpar}
-  \end{minipage}
-  \caption{Benchmark \texttt{og/22}: a replay (left; \texttt{FIN}
-    annotations elided) and the derivation it denotes (right), reading
-    \texttt{!} as $\forall$, \texttt{forall} as $\Dia$, \texttt{FAUX}
-    as $\bot$, and \texttt{=>} as $\Rightarrow$.
-    Each non-marker line is one rule application, in prefix order
-    except for the result chain (\rn{STOP\_1}, \rn{EVR2\_1}), which is
-    emitted before the \rn{ALL7} that consumes it.
-    \rn{ALL2} regroups the nested binders into a compound one,
-    \rn{ALL6} unfolds the negation, and \rn{ALL7} replaces the body of
-    the universal antecedent by the chain's result before \rn{NRM1} and
-    \rn{AXM7} close the proof.}
-  \label{fig:replay}
-\end{figure}
+\input{fig-replay.tex}
 % ---------------------------------------------------------------------
 
 \subsection{\lp}\label{sec:lp}
@@ -140,10 +126,10 @@ and the derivation it denotes.
 Cousineau and Dowek's \lpcmr~\cite{CousineauDowek}, the calculus
 underlying the \dedukti{} logical framework~\cite{assaf2023dedukti}.
 %
-Its terms are those of a dependently-typed $\lambda$-calculus,
+The term syntax is given as follows:
 \[
-  t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
-        \mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
+	t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
+	\mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
 \]
 where $x$ ranges over variables, $c$ ranges over declared constants,
 and terms are identified up to $\alpha$-equivalence.
@@ -151,7 +137,7 @@ The conversion relation $\Equiv$ is generated by $\beta$-equivalence
 together with user-declared rewrite rules.
 % the full definition of the typing relation is given in the appendix...
 %
-A $\lp{}$ development is a sequence of declarations.
+A \lp{} development is a sequence of declarations.
 %
 The \lpkw{symbol} command introduces a typed constant, with explicit
 $(x : A)$ and implicit $[x : A]$ parameters and an optional definition;
@@ -224,8 +210,8 @@ For the sake of flexibility, we use a list-based encoding of conjunction:
 an inductive type $\mathbb{L}^{*}$ with empty list $∎$ and right append $∷$,
 and an injective operator $\bwand : \mathbb{L}^{*}\,o \to \Prop$ with the
 rewrite rules
-$\bwand(∎ ∷ \texttt{\$p}) ↪ \$p$ and
-$\bwand(\$ps ∷ \top) ↪ \bwand{\$ps}$.
+$\bwand(∎ ∷ \texttt{\$p}) ↪ \texttt{\$p}$ and
+$\bwand(\texttt{\$ps} ∷ \top) ↪ \bwand{\texttt{\$ps}}$.
 %
 Note that the connection to standard binary conjunction is
 not given by rewrite rules: it is axiomatised separately,
@@ -234,10 +220,10 @@ and used only in the soundness proofs for \pp{}'s inference rules.
 For example, \texttt{lp/rules/Conj.lp} defines the $\rn{AND2}$ rule:
 \begin{codeLP}
 opaque symbol AND2 [ps : $\mathbb{L}^{*}$ o] [p : Prop]
-  : π ($\bigwedge$ ps ⇒ ¬ p) → π (¬ $\bigwedge$ (ps ∷ p)) ≔
+    : π ($\bigwedge$ ps ⇒ ¬ p) → π (¬ $\bigwedge$ (ps ∷ p)) ≔
 begin
-  assume ps p h1 hc;
-  refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
+    assume ps p h1 hc;
+    refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
 end;
 \end{codeLP}
 
@@ -255,11 +241,13 @@ $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$ with bridges
 of their own.
 %
+% we probably dont need the following text but its useful to have:
+% -----------------------------------------------------------------
 % The regrouping rules (\rn{ALL1--4}, \rn{XST1--4}) need no \lp{}
-% counterpart: our translation regroups binders itself while building the
-% goal, so the \lp{} goal always carries one compound binder and these
-% rules are consumed without emitting anything (\rn{ALL2} in
-% \autoref{fig:replay} is an instance).
+% counterpart: \tool{} regroups binders itself while building the goal, so
+% the \lp{} goal always carries one compound binder and these rules are
+% consumed without emitting anything (\rn{ALL2} in \autoref{fig:replay} is
+% an instance).
 %
 % we probably don't need to make this point but it's useful to have:
 % -------------------------------------------------------------------
@@ -286,73 +274,101 @@ For example, \rn{IMP4} (``to prove $P \Rightarrow Q$, assume $P$ and
 prove $Q$'') and the discharge rule \rn{AXM1} (``$\lnot P$ occurs in
 $H$, so $P \Rightarrow Q$ holds'') have the following type signatures:
 \[
-  \rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
-  \qquad
-  \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
+	\rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
+	\qquad
+	\rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
 \]
 
-\paragraph{Result chains.}
-To encode the rules' result forms we package the judgment
-$t \yields \bwand ts$ as a record: a value of type $\Res\,t$ pairs the
-list $ts$ of surviving conjuncts with a proof of
-$\Prf\,(t = \mathsf{conj}\,ts)$, where $\mathsf{conj}$ folds a list
-back into a formula.
-%
-The three specification schemas (\autoref{sec:pp-syntax}) map directly
-onto its constructors: a discharged formula is the empty list with a
-proof of $t = \top$; a transformation reuses a proved equality law (for
-example, \rn{NOT2}'s result form is
-$\mathsf{mk_1}\,(\restm\,r)\,(\mathsf{eq\_trans}\ \texttt{¬¬-law}\
-(\mathsf{res\_eq}\,r))$); and a combination concatenates the two
-children's lists, justified by a concatenation law for $\mathsf{conj}$.
-%
-The $\top$-erasure rewrite rules on $\bwand$ and on list concatenation
-make the combined result reduce to exactly the conjuncts \pp{} records —
-discharged conjuncts disappear in any position, mirroring \pp.
-%
-A branching quantifier consumes a chain of such steps.
-%
-\rn{ALL7} normalises the body of a universal antecedent pointwise and
-continues under the normalised form:
-\begin{codeLP}
-opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
-  (ρ : Π v : Tuple n, Res (P v))
-  : π ((`$\diamondsuit$ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔ $\ldots$
-\end{codeLP}
-where the proof transports each instance along the chain's equality
-($\mathsf{res\_eq}$).
-%
-Chains are emitted as explicit terms rather than tactic steps; for the
-replay of \autoref{fig:replay} the whole emitted proof is
-\begin{codeLP}
-refine ALL7 (λ v, EVR2_1 STOP_1) _;  refine NRM1 _;  refine AXM7
-\end{codeLP}
-— \rn{ALL2} emits nothing (\autoref{sec:enc-formulas}), and neither does
-\rn{ALL6}, since $\lnot P$ and $P \Rightarrow \bot$ are definitionally
-equal in the encoding.
 
-\paragraph{Solver side-conditions.}
-Some rules are licensed not by a structural premise but by a verdict of
-\pp's arithmetic solver or equality prover: \rn{AR4} requires
-$(E+F) > \mathbf{0}$ for terms \pp{} already believes positive, and the
-\rn{ARITH} terminal closes a goal because the accumulated
-$\leq$-hypotheses are contradictory.
+\paragraph{Result Derivations.}
+A result derivation (\autoref{sec:pp-syntax}) produces a list of
+predicates; we encode it as the type $\Res\,P$, whose value carries that
+list (a snoc list $\mathbb{L}^{*}$) with a proof that $P$ equals the
+conjunction $\mathsf{conj}$ of the list:
+\begin{align*}
+  \Res &: \El\,o \to \TYPE \\
+  \mathsf{mk\_res}\,(ts : \mathbb{L}^{*}\,o) &: \Prf\,(t = \mathsf{conj}\,ts) \to \Res\,t \\
+  \mathsf{res\_ts}\,(\mathsf{mk\_res}\,ts\,h) &↪ ts \\
+  \mathsf{res\_eq}\,(\mathsf{mk\_res}\,ts\,h) &↪ h \\
+  \restm\,r &≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)
+\end{align*}
+\noindent A result-form rule (suffixed \texttt{\_1} in replays) is a
+\lp{} function over $\Res$ values: \rn{AND4\_1} concatenates its two
+children's lists, and \rn{ALL7} takes a per-instance result derivation
+$\rho$ and continues under the conjunction ($\restm$) of its result.
+\begin{codeLPmulti}
+\begin{lstlisting}[style=lp]
+symbol AND4_1 [ps : $\mathbb{L}^{*}$ o] [p : Prop]
+    (r1 : Res p) (r2 : Res ($\bigwedge$ ps)) : Res ($\bigwedge$ (ps ∷ p))
+  ≔ mk_res (concat (res_ts r1) (res_ts r2)) (...);
+\end{lstlisting}
+\listsep
+\begin{lstlisting}[style=lp]
+opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
+    (ρ : Π v : Tuple n, Res (P v))
+    : π ((`$\diamondsuit$ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔ ...
+\end{lstlisting}
+\end{codeLPmulti}
+
+\noindent For example, consider the result derivation below, for the body
+$P_1 \land P_2 \land P_3$ with each conjunct kept at a \rn{STOP\_1} leaf:
+\begin{center}\footnotesize
+\ebproofset{separation=1em}%
+\begin{prooftree}
+  \infer0[\rn{STOP\_1}]{(\seq P_3) \yields [P_3]}
+  \infer0[\rn{STOP\_1}]{(\seq P_2) \yields [P_2]}
+  \infer0[\rn{STOP\_1}]{(\seq P_1) \yields [P_1]}
+  \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2) \yields [P_2, P_1]}
+  \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2 \land P_3) \yields [P_3, P_2, P_1]}
+  \hypo{}
+  \ellipsis{}{\seq (\Dia x \cdot P_3 \land P_2 \land P_1) \Rightarrow G}
+  \infer2[\rn{ALL7}]{\seq (\forall x \cdot P_1 \land P_2 \land P_3) \Rightarrow G}
+\end{prooftree}
+\end{center}
+The example demonstrates why results are lists rather than conjunctions:
+the two nested \rn{AND4\_1} steps concatenate
+their children's lists into the single flat list $[P_3, P_2, P_1]$, which
+\rn{ALL7} conjoins.  Combining the results eagerly with $\land$ would
+instead mirror the proof's nesting as $P_3 \land (P_2 \land P_1)$; the list
+defers and flattens the conjunction.
+{\small
+\[
+  \rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
+\]}%
+of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$.
+Its continuation antecedent $\restm\,(\rho\,v)$ then $\beta$-reduces,
+eliminating the result combinators ($\rho$ the derivation above,
+$v$ elided):
+\begin{align*}
+  \restm\,(\rho\,v)
+    &≡ \mathsf{conj}\,(\mathsf{res\_ts}\,(\rho\,v)) \\
+    &≡ \mathsf{conj}\,(\mathsf{concat}\,(∎ ∷ P_3)\,(\mathsf{concat}\,(∎ ∷ P_2)\,(∎ ∷ P_1))) \\
+    &≡ \mathsf{conj}\,(\mathsf{concat}\,(∎ ∷ P_3)\,(∎ ∷ P_2 ∷ P_1)) \\
+    &≡ \mathsf{conj}\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) \;≡\; P_3 \land P_2 \land P_1 .
+\end{align*}
+
+
+\paragraph{Arithmetic Side-conditions.}
+Some rules invoke \pp's arithmetic solver or equality prover:
+\rn{AR4} requires $(E+F) > \mathbf{0}$ for terms \pp{} already believes
+positive, and the \rn{ARITH} terminal closes a goal because the
+accumulated $\leq$-hypotheses are contradictory.
 %
 The corresponding lemmas take these facts as explicit $\Prf$-arguments,
-and \tool{} \emph{generates} the witnessing proof at emission time.
+and \tool{} \emph{generates} the witnessing proof at translation time.
 %
-For \rn{ARITH} the witness is a nonnegative (Farkas-style) combination
-of the $\leq \mathbf{0}$ hypotheses: with
+For \rn{ARITH} the witness is a nonnegative (Farkas-style~\cite{schrijver1986})
+combination of the $\leq \mathbf{0}$ hypotheses. For example, with
 $h_1 : \Prf\,(x \leq \mathbf{0})$ and
-$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ in scope, the
-emitted refutation is
-\begin{codeLP}
-one_not_leq_zero (leq_subst_l e (add_leq_zero _ _ (add_leq_zero _ _ h2 h1) h1))
-\end{codeLP}
-which sums the hypotheses to $\mathbf{1} \leq \mathbf{0}$; the equality
-$e : \Prf\,(\mathbf{1} = (\mathbf{1}-(x+x))+x+x)$ justifying the sum is
-itself generated from the group axioms.
+$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ in scope, summing
+$h_2 + h_1 + h_1$ along the generated equality
+$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ refutes
+$\mathbf{1} \leq \mathbf{0}$:
+\[
+  \mathsf{one\_not\_leq\_zero}\,\bigl(\mathsf{leq\_subst\_l}\ e\
+    (\mathsf{add\_leq\_zero}\ \_\ \_\ (\mathsf{add\_leq\_zero}\ \_\ \_\ h_2\ h_1)\ h_1)\bigr)
+  : \Prf\,\bot .
+\]
 %
-The same machinery produces equality-transport chains for the equality
-prover, and permutation proofs wherever \pp{} recorded a sum in a
-different association order than the lemma needs.
+Permutation proofs are generated likewise whenever \pp{} records a sum in
+a different association order than a lemma expects.

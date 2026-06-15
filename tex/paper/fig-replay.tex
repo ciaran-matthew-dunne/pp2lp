@@ -1,0 +1,42 @@
+\begin{figure}[t]
+	\centering
+	\begin{minipage}[c]{0.40\linewidth}
+		\begin{codePP}
+[ALL2] <not(!x.!y.not(x = x))>
+[ALL6] <not(!(x,y).not(x = x))>
+[STOP_1] <FAUX>
+[EVR2_1] <not(x = x)>
+[ALL7(1)] <!(x,y).not(x = x) => FAUX>
+[FIN(FAUX)] <$\ldots$>
+[NRM1] <forall(x,y).FAUX => FAUX>
+[STOP_NORM] <FAUX => FAUX>
+[NRM] <forall(x,y).FAUX => FAUX>
+[FIN(FAUX => FAUX)] <$\ldots$>
+[AXM7] <FAUX => FAUX>
+		\end{codePP}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.57\linewidth}
+		\centering\footnotesize
+		\begin{prooftree}
+			\infer0[\rn{STOP\_1}]{(\seq \bot) \yields \bot}
+			\infer1[\rn{EVR2\_1}]{(\seq \lnot(x = x)) \yields \bot}
+			\infer0[\rn{AXM7}]{\seq \bot \Rightarrow \bot}
+			\infer1[\rn{NRM1}]{\seq (\Dia (x,y) \cdot \bot) \Rightarrow \bot}
+			\infer2[\rn{ALL7}]{\seq (\forall (x,y) \cdot \lnot(x = x)) \Rightarrow \bot}
+			\infer1[\rn{ALL6}]{\seq \lnot \forall (x,y) \cdot \lnot(x = x)}
+			\infer1[\rn{ALL2}]{\seq \lnot \forall x \cdot \forall y \cdot \lnot(x = x)}
+		\end{prooftree}
+	\end{minipage}
+	\caption{Benchmark \texttt{og/22}: a replay (left; \texttt{FIN}
+		annotations elided) and the derivation it denotes (right), reading
+		\texttt{!} as $\forall$, \texttt{forall} as $\Dia$, \texttt{FAUX}
+		as $\bot$, and \texttt{=>} as $\Rightarrow$.
+		Each non-marker line is one rule application, in prefix order
+		except for the result derivation (\rn{STOP\_1}, \rn{EVR2\_1}), which is
+		emitted before the \rn{ALL7} that consumes it.
+		\rn{ALL2} regroups the nested binders into a compound one,
+		\rn{ALL6} unfolds the negation, and \rn{ALL7} replaces the
+		universal antecedent's body by its normal form before \rn{NRM1} and
+		\rn{AXM7} close the proof.}
+	\label{fig:replay}
+\end{figure}

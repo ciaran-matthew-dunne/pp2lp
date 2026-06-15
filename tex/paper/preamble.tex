@@ -18,7 +18,7 @@
 
 \usepackage{booktabs}
 \usepackage{array}
-\usepackage{mathpartir}
+\usepackage{ebproof}   % clean proof trees (reserves label space, no clipping)
 \usepackage{tikz}
 \usetikzlibrary{positioning, calc, fit, arrows.meta}
 \usepackage[most]{tcolorbox}
@@ -106,6 +106,22 @@
   left=4pt, right=4pt, top=2pt, bottom=2pt,
   before skip=\medskipamount, after skip=\medskipamount,
 }
+
+% ── Multi-part listing box (after eo2lp) ──────────────────────────────
+% A plain tcolorbox holding several lstlisting blocks joined by \listsep,
+% a frame-coloured rule spanning the full inner width (the −4pt kern and
+% +8pt cancel the 4pt left/right padding so it meets the box edges).
+\newcommand{\listboxsetup}{\topsep=0pt \partopsep=0pt \parsep=0pt \parskip=0pt}
+\newcommand{\listsep}{%
+  \vspace{-\baselineskip}\vspace{6pt}%
+  \noindent\kern-4pt\textcolor{lpBoxFr}{\rule{\dimexpr\linewidth+8pt}{0.3pt}}\par%
+  \vspace{2pt}%
+}
+\newenvironment{codeLPmulti}{%
+  \begin{tcolorbox}[enhanced, colback=lpBoxBg, colframe=lpBoxFr, arc=1pt,
+    boxrule=0.4pt, left=4pt, right=4pt, top=2pt, bottom=2pt,
+    before skip=\medskipamount, after skip=\medskipamount]\listboxsetup
+}{\end{tcolorbox}}
 
 % Springer/EPiC-style alt-text shim (no-op in PDF; documents figures).
 \providecommand{\alttext}[2]{#2}

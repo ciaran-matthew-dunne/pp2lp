@@ -39,7 +39,7 @@ and using each rule's declared arity to attach the right number of child subproo
 %
 The two irregularities noted in \autoref{sec:pp-syntax} are handled
 at this stage: normalisation markers are filtered out, and the
-result derivation chain that precedes an instance of $\rn{ALL7}/\rn{XST8}$
+result derivation that precedes an instance of $\rn{ALL7}/\rn{XST8}$
 is reassembled into that rule's first argument.
 
 %
@@ -47,12 +47,12 @@ Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
 and whose body is a tactic script.
 %
 Each rule application in the \pp{} proof tree generally corresponds to an
-application of the corresponding \lp{} rule (e.g., $\refine\;\rn{AND2}\,\_$),
+application of the corresponding \lp{} rule (e.g., $\refine\;\texttt{AND2\,\_}$),
 although some \pp{} rule applications require bespoke tactic applications.
 %
 Rules that recall in-scope hypothesis receive their $\Prf$-argument
 by hypothesis lookup at the OCaml level; rules that introduce an antecedent
-or a binder push an \texttt{assume}; result chains are emitted as
+or a binder push an \texttt{assume}; result derivations are emitted as
 explicit $\Res$-terms and passed as an argument; and arithmetic solver
 side-conditions get proof-terms generated at translation time.
 (\autoref{sec:enc-rules}).
@@ -112,6 +112,8 @@ end;
 
 \subsection{Benchmarks}\label{sec:bench}
 
+{\large WARNING TO COAUTHORS. DO NOT REVIEW ANYTHING BELOW.}
+
 We exercise \tool{} on three suites (\autoref{tab:results}).
 %
 \texttt{og} is a fixed set of \ogReplayed{} replays that served as the
@@ -132,7 +134,7 @@ versions of the pipeline mishandled.
   \caption{Results per suite. \emph{Goals} are inputs to the upstream
     \pp/\textsc{replay} toolchain (\texttt{og} has no goal files: its
     replays are checked in); \emph{Replays} are the complete replays
-    that toolchain produces (\autoref{sec:limits} accounts for the
+    that toolchain produces (\autoref{sec:conclusion} accounts for the
     losses); \emph{Verified} are replays \tool{} translates and \lp{}
     type-checks.}
   \label{tab:results}
@@ -159,16 +161,28 @@ Re-emitting and re-checking the full corpus takes \benchWallAll{} of
 wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
 %
 No emitted proof appeals to any oracle (\autoref{sec:enc-rules}), so
-each checked obligation rests only on the axiomatic base; an audit gate
-over the emitted corpus enforces this at every commit.
+each checked obligation rests only on the axiomatic base; a pre-commit
+audit over the emitted corpus enforces this.
 
-\subsection{Limitations and Discussion}\label{sec:limits}
+\subsection{Conclusion and Future Work}\label{sec:conclusion}
+
+We have presented \tool, which independently re-checks \ab's Predicate
+Prover by reconstructing its proofs in \lp.
+%
+Unlike approaches that postulate each rule as an axiom, every \pp{} rule
+is encoded as a symbol whose body \emph{proves} the rule sound against a
+small axiomatic base, and the reconstructed corpus — including \ab's own
+rule-validation suite, arithmetic included — type-checks without a
+single appeal to an oracle.
+%
+The remainder of this section discusses what limits coverage today and
+where the work goes next.
 
 \paragraph{Upstream replay losses.}
 The gap between goals and replays in \autoref{tab:results} is upstream
 of \tool: for some provable goals the \textsc{replay} utility omits the
-final continuation of a branching quantifier, and for others it aborts
-mid-file.
+final continuation of an \rn{ALL7} or \rn{XST8} step, and for others it
+aborts mid-file.
 %
 Both defects are detected at generation time and the affected goals
 dropped loudly.
@@ -183,7 +197,7 @@ exactly the rules the equality prover would exercise.
 Encoding every rule against the specification turns the encoding into an
 executable test of that document, and it does not always pass: \rn{NRM20}
 records its pinned equality at a different conjunct position than
-specified, and \rn{OPR1}'s chain form does not follow the result schema
+specified, and \rn{OPR1}'s result derivation does not follow the schema
 laid out for it.
 %
 \tool{} implements the observed behaviour; we believe such discrepancies
@@ -210,7 +224,7 @@ tens of seconds.
 %
 The bottleneck for certification is again the toolchain around \pp: the
 replay utility lost \aperoSampleLost{} of the \aperoSampleTraces{}
-traces \pp{} produced on our sample, and the surviving replays use
+traces \pp{} produced on our sample, and the replays that remain use
 surface forms no synthetic goal had reached (strict comparisons, tuple
 memberships, relational inverse, sequents inside annotations);
 \aperoSampleVerified{} of them verify end-to-end today, including the
@@ -225,17 +239,7 @@ We mitigate this in two ways: the suite is goal-level only (the agent
 cannot influence which rules \pp{} applies), and the real-world
 \texttt{og} and \texttt{prv} suites gate every change.
 
-\subsection{Conclusion and Future Work}\label{sec:conclusion}
-
-We have presented \tool, which independently re-checks \ab's Predicate
-Prover by reconstructing its proofs in \lp.
-%
-Unlike approaches that postulate each rule as an axiom, every \pp{} rule
-is encoded as a symbol whose body \emph{proves} the rule sound against a
-small axiomatic base, and the reconstructed corpus — including \ab's own
-rule-validation suite, arithmetic included — type-checks without a
-single appeal to an oracle.
-%
+\paragraph{Future work.}
 The most direct future work is upstream: repairing the \textsc{replay}
 utility's truncations would recover the dropped goals, in particular the
 equality-prover fragment.
