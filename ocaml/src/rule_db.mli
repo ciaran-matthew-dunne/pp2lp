@@ -69,6 +69,11 @@ val is_hoas_identity : string -> bool
     [Syntax_pp.flatten_binds] pre-merges the binders at the AST level. *)
 val is_binder_merge : string -> bool
 
+(** Does the rule have a Res-chain [_1] lemma in [lp/rules]?  PP emits NRM rules
+    unprimed even inside result chains; the emitter primes only the ones flagged
+    here and fails loud on the rest rather than emit an undefined symbol. *)
+val has_chain_form : string -> bool
+
 (** Does the rule introduce an antecedent hypothesis (IMP4, ALL9, AR12)? *)
 val intro_antecedent : string -> bool
 

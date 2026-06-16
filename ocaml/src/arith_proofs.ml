@@ -11,8 +11,9 @@ open Syntax_pp
 module L = Lp_tree
 
 let is_atom_exp = function
-  | Var _ | Nat _ | App _ | SetImage _ | Inter _ | Union _ | Range _
-  | Maplet _ | Inverse _ | SetLit _ | DomRestrict _ | RanRestrict _ -> true
+  | Var _ | Nat _ | BigNat _ | App _ | EApp _ | SetOp _ | SetImage _ | Inter _
+  | Union _ | Range _ | Maplet _ | Inverse _ | SetLit _ | DomRestrict _
+  | RanRestrict _ | BoolOf _ | Compr _ -> true
   | AOp _ | Neg _ -> false
 
 (* Numeric literals 2 ≤ k ≤ [lit_unfold_max] flatten to k copies of the
@@ -245,10 +246,12 @@ let prove_sum_zero env e : L.term option =
     else None
   | None -> None
 
-(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] cancels to a positive literal k:
-   `¬(k ≤ 𝟎)` (one_not_leq_zero for k=1; for k≥2, `𝟏 ≤ k ≤ 𝟎` is absurd via the
-   chained `leq_plus_one`), transported along the generated `e = k`.  Used by
-   AR4, whose `(E+F) > 𝟎` premise has `E + F` cancelling to a literal. *)
+(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] cancels to a positive literal c.
+   Witness for `¬(c ≤ 𝟎)`: while the literal unfolds (c ≤ [lit_unfold_max]) the
+   unary `one_not_leq_zero`/`leq_plus_one` chain (`𝟏 ≤ c ≤ 𝟎` absurd); past the
+   cap — apero's interval/NAT bounds reach MAXINT (2³¹) — B.lp's folded
+   `lit_pos` gives an O(1) proof with no `int_lit` whnf.  Transported along the
+   generated `e = c`.  Used by AR2 (`a − b`) and AR4 (`E + F`). *)
 let prove_gt_zero env e : L.term option =
   let rec one_leq_lit c =                         (* π (𝟏 ≤ c·𝟏), c ≥ 1 *)
     if c <= 1 then L.App (L.Name "leq_refl", [ L.Exp (env, Nat 1) ])
@@ -267,18 +270,39 @@ let prove_gt_zero env e : L.term option =
               [ L.Exp (env, Nat 1); L.Exp (env, Nat c); L.Exp (env, Nat 0);
                 one_leq_lit c; L.Name "_hk" ]) ]))
   in
-  let rec try_k k =
-    if k > 8 then None
-    else match prove_sum_eq env e (Nat k) with
-      | Some eqpf ->
-        Some (L.App (L.Name "=\xe2\x87\x92",        (* =⇒ : π (A = B) → π A → π B *)
-          [ L.App (L.Name "eq_sym",
-              [ L.App (L.Name "not_cong",
-                  [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
-            lit_not_leq_zero k ]))
-      | None -> try_k (k + 1)
+  let positive_lit c =                            (* π (¬(int_lit c ≤ 𝟎)), c ≥ 1 *)
+    if c <= lit_unfold_max then lit_not_leq_zero c       (* unary, matches the
+       printer's 𝟏-sum rendering of `Nat c` while it unfolds *)
+    else L.App (L.Name "lit_pos", [ L.Name (string_of_int (c - 1)) ])
+                                                  (* O(1); past the cap `Nat c`
+       renders as a folded decimal = `int_lit c`, so `lit_pos (c−1)` lines up.
+       The arg is a BARE ℕ literal (numeral text, no int_lit coercion). *)
   in
-  try_k 1
+  (* The value [e] cancels to, when it is a positive literal — either k copies
+     of the 𝟏-atom or a single folded literal past [lit_unfold_max].  Read off
+     the reduced multiset (so symbolic cancellation like `x + 3 − x` still
+     lands on 3), then transport the matching positivity proof back along the
+     generated `e = c`.  No cap: handles MAXINT-scale literals. *)
+  let pos_lit_value l =
+    if l <> [] && List.for_all (fun (a, s) -> a = Nat 1 && s = 1) l
+    then Some (List.length l)
+    else match l with [ (Nat m, 1) ] when m > 1 -> Some m | _ -> None
+  in
+  match normalize env e with
+  | Some (atoms, _) ->
+    let reduced, _ = reduce_cancel env (List.sort compare atoms) in
+    (match pos_lit_value reduced with
+     | Some c ->
+       (match prove_sum_eq env e (Nat c) with
+        | Some eqpf ->
+          Some (L.App (L.Name "=\xe2\x87\x92",        (* =⇒ : π (A = B) → π A → π B *)
+            [ L.App (L.Name "eq_sym",
+                [ L.App (L.Name "not_cong",
+                    [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
+              positive_lit c ]))
+        | None -> None)
+     | None -> None)
+  | None -> None
 
 (* ---- ARITH: Farkas-style linear-combination contradiction ----
 

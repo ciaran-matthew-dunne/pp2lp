@@ -25,9 +25,15 @@ rule token = parse
   | '{' { LBRACE }
   | '}' { RBRACE }
   | '~' { TILDE }
-  (* angle brackets and comparison — longest match handles <=>/<=/<  *)
+  | ';' { SEMI }      (* relational composition r;s *)
+  | '%' { PERCENT }   (* set-builder / lambda %(x).(P|E) *)
+  | "/:" { NOTMEM }   (* not-member  x /: S *)
+  (* angle brackets and comparison — longest match handles <=>/<=/<:/<+/<  *)
   | "<=>" { IFF }
   | "<="  { LEQ }
+  | "<:"  { SUBSET }    (* subset  S <: T *)
+  | "<+"  { OVERRIDE }  (* relational override r <+ s *)
+  | "-->" { TFUN }      (* total-function space S --> T *)
   | '<'   { LANGLE }
   | '>'   { RANGLE }
   (* FIN/sequents.  "|->" (maplet) must precede "|-" (turnstile): maximal
@@ -49,6 +55,7 @@ rule token = parse
   (* arithmetic *)
   | '+'   { PLUS }
   | '-'   { MINUS }
+  | "**"  { POWER }   (* exponentiation a**b (must precede '*') *)
   | '*'   { TIMES }   (* PP renders a folded sum n·x as `n*x` (coefficient form) *)
   (* set operators *)
   | "/\\" { INTER }
@@ -58,8 +65,16 @@ rule token = parse
   | '!'        { FORALL0 }
   | "forall"   { FORALL1 }
   | "forall2"  { FORALL2 }
+  (* aggregate binder + the apero instantiation marker (keywords before the
+     general `symbol` rule; equal-length ties resolve to the earliest rule) *)
+  | "SIGMA"           { SIGMA }
+  | "bool"            { BOOLOP }
+  | "__INSTANCIATION" { INSTANCIATION }
   (* literals *)
   | symbol as s  { SYMBOL s }
-  | natural as i { NATURAL (int_of_string i) }
+  | natural as i
+      { match int_of_string_opt i with
+        | Some n -> NATURAL n
+        | None -> BIGNATURAL i }   (* 2⁶⁴ uint64 bounds overflow native int *)
   | [' ' '\t' '\r'] { token lexbuf }
   | _ as c { Printf.eprintf "warning: skipping unexpected char '%c'\n" c; token lexbuf }

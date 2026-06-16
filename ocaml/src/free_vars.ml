@@ -11,8 +11,14 @@ let empty_fv = { prop_vars = SS.empty; exp_vars = SS.empty }
    `eql_set`), and the pair projections (`_pj1` / `_pj2`, rendered to the B.lp
    primitives `pj1` / `pj2` by pp_lp). *)
 let reserved =
-  SS.of_list ["VRAI"; "TRUE"; "FAUX"; "FALSE";
-              "_eql_set"; "eql_set"; "_pj1"; "_pj2"; "pj1"; "pj2"]
+  SS.of_list (["VRAI"; "TRUE"; "FAUX"; "FALSE";
+              "_eql_set"; "eql_set"; "_pj1"; "_pj2"; "pj1"; "pj2";
+              (* uninterpreted set-theory operators declared in B.lp *)
+              "total_func"; "overriding"; "relcomp"; "prod"; "subset"; "power";
+              (* PP-internal spellings of meta-ops (renamed by the emitter) *)
+              "_sz"; "_func"]
+              (* B built-in operators (card, dom, …) reference the B.lp globals *)
+              @ meta_ops)
 
 let rec collect_exp_fv bound fv = function
   | Var s when SS.mem s bound || SS.mem s reserved -> fv
@@ -21,11 +27,15 @@ let rec collect_exp_fv bound fv = function
     let fv = if SS.mem f bound || SS.mem f reserved then fv
              else { fv with exp_vars = SS.add f fv.exp_vars } in
     List.fold_left (collect_exp_fv bound) fv args
+  | BoolOf pred -> collect_prd_fv bound fv pred
+  | Compr (_, xs, pred, value) ->   (* bound vars scope over predicate + value *)
+    let bound' = List.fold_left (fun s x -> SS.add x s) bound xs in
+    collect_exp_fv bound' (collect_prd_fv bound' fv pred) value
   (* every other shape (literal, the binary/unary set & arithmetic operators,
      set literals) just recurses uniformly over its sub-expressions *)
   | e -> fold_exp (collect_exp_fv bound) fv e
 
-let rec collect_prd_fv bound fv = function
+and collect_prd_fv bound fv = function
   | Lift (Var s) when SS.mem s bound ->
     { fv with exp_vars = SS.add s fv.exp_vars }
   | Lift (Var s) when SS.mem s reserved -> fv
@@ -46,5 +56,7 @@ let rec collect_prd_fv bound fv = function
     collect_exp_fv bound (collect_exp_fv bound fv e1) e2
   | Mem (es, e) ->
     collect_exp_fv bound (List.fold_left (collect_exp_fv bound) fv es) e
+  | Rel (_, es) ->
+    List.fold_left (collect_exp_fv bound) fv es
 
 let free_vars_of_prd p = collect_prd_fv SS.empty empty_fv p

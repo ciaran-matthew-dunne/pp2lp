@@ -649,6 +649,23 @@ and chain_term ctx node : L.term =
                     scope")
      | _ ->
        failwith "translate: IMP5_1 expected an implication annotation")
+  | P.Apply { rule; anno; children = [c]; _ }
+    when base rule = "NRM2" ->
+    (* NRM2_1 (hp : π P) (r : Res ((♢v, Q v) ⇒ S)) : Res ((♢v, P ⇒ Q v) ⇒ S).
+       PP's chain NRM2 weakens the ♢-body by its *v-free* antecedent P; that is
+       sound only with a proof of P, so recover one from scope — the same leaf
+       search the AXM chain forms use — and pass it as the first argument. *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, Bind (_, _, Binary (Imp, p, _)), _)) ->
+       (match leaf_evidence ctx [] p with
+        | Some hp ->
+          L.App (L.Name (chain_emit_name rule), [hp; chain_term ctx c])
+        | None ->
+          Errors.fail "E_EMIT"
+            "NRM2_1: no in-scope evidence for the v-free ♢-body hypothesis")
+     | _ ->
+       Errors.fail "E_EMIT"
+         "NRM2_1: expected a (♢v, P ⇒ Q v) ⇒ S chain annotation")
   | P.Apply { rule; _ }
     when Rule_db.is_binder_merge rule || base rule = "ALL5" ->
     (* Primed binder-merge chain rule (ALL1_1–ALL5_1 / XST1_1–XST4_1).  PP's

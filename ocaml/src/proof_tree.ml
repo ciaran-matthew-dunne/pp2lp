@@ -79,7 +79,15 @@ let make_node ~src_line rule arg anno children =
 let pop_res rule stack =
   match stack with
   | [] ->
-    bad "%s expected a result-chain child but stack is empty" rule
+    (* A well-formed result chain always carries one sub-result per child slot
+       of every combine rule (arities are correct — e.g. OR3/ALL7/XST8 = 2), so
+       an empty stack here means REPLAY dropped result-chain nodes when
+       serialising the .trace.  Verified across the apero corpus: every such
+       failure has strictly fewer chain nodes in the .replay than in the
+       .trace.  Phrase it as truncation so `pp2lp gen` drops the benchmark
+       (classify_error → E_REPLAY_TRUNCATED), same as the leaf-missing case. *)
+    bad "%s result-chain child missing (stack empty) — REPLAY truncated the chain"
+      rule
   | x :: rest -> x, rest
 
 let pop_res_children rule modes stack =

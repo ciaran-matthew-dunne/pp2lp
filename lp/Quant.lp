@@ -37,6 +37,13 @@ symbol prj [n] (k : ℕ) (_ : Tuple n) : τ ι;
 rule prj (+1 $n) ($t ⨾ _) ↪ prj $n $t
 with prj 0       (_ ⨾ $x) ↪ $x;
 
+// Set-builder / aggregate binders: %(xs).(P | E) and SIGMA(xs).(P | E).
+// Uninterpreted — the predicate and value are carried as `Tuple n`-indexed
+// functions (the bound vars project from the tuple), so the comprehension
+// type-checks without committing to a semantics.
+constant symbol set_lambda [n] : (Tuple n → Prop) → (Tuple n → τ ι) → τ ι;
+constant symbol sigma [n] : (Tuple n → Prop) → (Tuple n → τ ι) → τ ι;
+
 // Canonical inhabitant of `Tuple n` — every slot filled with `inh`.
 // Used when a rule needs a witness tuple but its predicate is
 // independent of the tuple's contents.

@@ -9,7 +9,7 @@ let exp_prec = function
   | AOp _ -> 5
   | Neg _ -> 6
   | SetImage _ | Inverse _ -> 7
-  | App _ | Var _ | Nat _ | SetLit _ -> 8
+  | App _ | EApp _ | SetOp _ | Var _ | Nat _ | BigNat _ | SetLit _ | BoolOf _ | Compr _ -> 8
 
 (* ---- Expression → PP text ---- *)
 
@@ -20,8 +20,23 @@ let rec exp_to_pp_buf ?(parent_prec=0) buf e =
   (match e with
   | Var s -> Buffer.add_string buf s
   | Nat n -> Buffer.add_string buf (string_of_int n)
+  | BigNat s -> Buffer.add_string buf s
   | App (f, args) ->
     Buffer.add_string buf f;
+    Buffer.add_char buf '(';
+    List.iteri (fun i a ->
+      if i > 0 then Buffer.add_char buf ',';
+      exp_to_pp_buf ~parent_prec:0 buf a) args;
+    Buffer.add_char buf ')'
+  | EApp (f, args) ->
+    exp_to_pp_buf ~parent_prec:prec buf f;
+    Buffer.add_char buf '(';
+    List.iteri (fun i a ->
+      if i > 0 then Buffer.add_char buf ',';
+      exp_to_pp_buf ~parent_prec:0 buf a) args;
+    Buffer.add_char buf ')'
+  | SetOp (name, args) ->
+    Buffer.add_string buf name;
     Buffer.add_char buf '(';
     List.iteri (fun i a ->
       if i > 0 then Buffer.add_char buf ',';
@@ -75,7 +90,23 @@ let rec exp_to_pp_buf ?(parent_prec=0) buf e =
     List.iteri (fun i e ->
       if i > 0 then Buffer.add_char buf ',';
       exp_to_pp_buf ~parent_prec:0 buf e) es;
-    Buffer.add_char buf '}');
+    Buffer.add_char buf '}'
+  | BoolOf pred ->
+    Buffer.add_string buf "bool(";
+    prd_to_pp_buf ~parens:false buf pred;
+    Buffer.add_char buf ')'
+  | Compr (op, xs, pred, value) ->
+    Buffer.add_string buf (match op with
+      | "set_lambda" -> "%" | "sigma" -> "SIGMA" | s -> s);
+    Buffer.add_char buf '(';
+    List.iteri (fun i x ->
+      if i > 0 then Buffer.add_char buf ',';
+      Buffer.add_string buf x) xs;
+    Buffer.add_string buf ").(";
+    prd_to_pp_buf ~parens:false buf pred;
+    Buffer.add_char buf '|';
+    exp_to_pp_buf ~parent_prec:0 buf value;
+    Buffer.add_char buf ')');
   if needs_parens then Buffer.add_char buf ')'
 
 (* ---- Predicate → PP text ---- *)
@@ -98,6 +129,10 @@ and prd_to_pp_buf ?(parens=true) buf p =
     exp_to_pp_buf ~parent_prec:0 buf e
   | Unary (Not, p1) ->
     Buffer.add_string buf "not(";
+    prd_to_pp_buf ~parens:false buf p1;
+    Buffer.add_char buf ')'
+  | Unary (Instanciation, p1) ->
+    Buffer.add_string buf "__INSTANCIATION(";
     prd_to_pp_buf ~parens:false buf p1;
     Buffer.add_char buf ')'
   | Binary (bop, p1, p2) ->
@@ -124,6 +159,13 @@ and prd_to_pp_buf ?(parens=true) buf p =
       exp_to_pp_buf ~parent_prec:0 buf a) es;
     Buffer.add_char buf ':';
     exp_to_pp_buf ~parent_prec:0 buf e
+  | Rel (name, args) ->
+    Buffer.add_string buf name;
+    Buffer.add_char buf '(';
+    List.iteri (fun i a ->
+      if i > 0 then Buffer.add_char buf ',';
+      exp_to_pp_buf ~parent_prec:0 buf a) args;
+    Buffer.add_char buf ')'
   | Bind (binder, xs, body) ->
     let qsym = match binder with
       | Bang -> "!"

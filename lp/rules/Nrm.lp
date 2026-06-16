@@ -637,13 +637,40 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// Per discussion, no NRM_1 rules are emitted in the current corpus.
-// NRM1_1 is the lone exception — it strips a constant ♢-binder via
-// `nrm1_eq`, mirroring NRM1's role at the chain level.
+// PP leaves NRM rules *unprimed* in the first-normalisation chain (unlike
+// ALL7/ALL9/STOP/IMP), so the emitter primes a chain-context `NRM<k>` to
+// `NRM<k>_1` (`Emit_ctx.chain_emit_name`).  Each chain form lifts the base
+// rule's premise→conclusion implication to a `Res`-to-`Res` map through a
+// bridge equality `nrm<k>_eq : conclusion = premise`; the body is the uniform
+// `mk_1 (res_tm r) (eq_trans (@nrm<k>_eq …) (res_eq r))`.  Every NRM rule that
+// can appear in a Res chain needs one (see CLAUDE.md: emitting an undefined
+// `NRM<k>_1` shows up as a lambdapi "Unknown symbol", not a fail-loud emit).
 
 symbol NRM1_1 [n] [P Q : Prop]
   (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));
+
+// NRM2 bridge (evidence form).  PP's chain NRM2 weakens the ♢-body by a v-free
+// hypothesis P (`(♢v·Q v) ⇒ S  ↦  (♢v·(P⇒Q v)) ⇒ S`), sound only given a proof
+// of P: under `hp : π P` the body equivalence `(P⇒Q v) ⟺ Q v` holds, lifted
+// under the ♢ by `!!_cong`.  Unlike the unconditional nrmK_eq bridges this
+// takes `hp`, so the emitter must supply it (translate.ml NRM2 chain dispatch).
+opaque symbol nrm2_eq [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop] (hp : π P)
+  : π (((`♢ v, P ⇒ Q v) ⇒ S) = ((`♢ v, Q v) ⇒ S)) ≔
+begin
+  assume n P Q S hp;
+  have hbody : Π v, π ((P ⇒ Q v) = (Q v))
+    { assume v; refine propExt _ _ (λ hpq, hpq hp) (λ hq _, hq) };
+  have hpred : π ((`♢ v, P ⇒ Q v) = (`♢ v, Q v))
+    { refine eq_trans (♢_eq_!! (λ v, P ⇒ Q v))
+        (eq_trans (!!_cong hbody) (eq_sym (♢_eq_!! (λ v, Q v)))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM2_1 — chain (Res) form of NRM2, via the evidence-form `nrm2_eq` above.
+symbol NRM2_1 [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop] (hp : π P)
+  (r : Res ((`♢ v, Q v) ⇒ S)) : Res ((`♢ v, P ⇒ Q v) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm2_eq n P Q S hp) (res_eq r));
 
 // NRM14_1 — chain (Res) form of NRM14.  PP leaves NRM rules *unprimed* in the
 // first-normalisation chain (unlike ALL7/ALL9/STOP/IMP), so the emitter maps a

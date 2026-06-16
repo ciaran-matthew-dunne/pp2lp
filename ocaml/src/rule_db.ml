@@ -61,20 +61,27 @@ type rule_info = {
                                 LP-definitional.  See the §A.7 note + [Translate.tree]. *)
   intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
   binds_var: bool;           (* rule introduces a tuple binder via `assume` (ALL8) *)
+  chain_form: bool;          (* has a Res-chain `_1` lemma in lp/rules.  PP emits NRM
+                                rules unprimed even inside result chains, so the emitter
+                                primes them ([Emit_ctx.chain_emit_name]).  Set ONLY where
+                                the `<name>_1` Res lemma actually exists — an unset NRM
+                                rule reached in a chain fails loud (E_DISPATCH) instead of
+                                emitting an undefined symbol lambdapi only catches later. *)
 }
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
   let r ?(emit=Default) ?(hoas_identity=false) ?(binder_merge=false)
-        ?(intro_antecedent=false) ?(binds_var=false) name arity =
+        ?(intro_antecedent=false) ?(binds_var=false) ?(chain_form=false) name arity =
     Hashtbl.replace t name
       { arity = Some arity; emit; hoas_identity; binder_merge;
-        intro_antecedent; binds_var }
+        intro_antecedent; binds_var; chain_form }
   in
   let phantom name =
     Hashtbl.replace t name
       { arity = None; emit = Default; hoas_identity = false;
-        binder_merge = false; intro_antecedent = false; binds_var = false }
+        binder_merge = false; intro_antecedent = false; binds_var = false;
+        chain_form = false }
   in
   let leaf   = Arity [] in
   let pass   = Arity [Seq] in
@@ -163,9 +170,12 @@ let rules : (string, rule_info) Hashtbl.t =
   r "ARITH" leaf ~emit:Arith;
   r "EGALITE" pass ~emit:Egalite;
   (* §A.12 Normalisation *)
-  r "NRM1" pass;
-  r "NRM2" pass;
-  r "NRM3" pass;
+  (* ~chain_form marks the NRM rules with a Res-chain `_1` lemma in lp/rules/Nrm.lp.
+     PP emits all NRM rules unprimed in chains; the emitter primes only these and
+     fails loud on the rest (keep in sync with the `symbol NRM<k>_1` set). *)
+  r "NRM1" pass ~chain_form:true;
+  r "NRM2" pass ~chain_form:true;   (* evidence-form NRM2_1 + translate.ml dispatch *)
+  r "NRM3" pass ~chain_form:true;
   r "NRM4" pass;
   r "NRM5" pass;
   r "NRM6" pass;
@@ -174,18 +184,18 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM9" pass;
   r "NRM10" pass;
   r "NRM11" pass;
-  r "NRM12" pass;
-  r "NRM13" pass;
-  r "NRM14" pass;
-  r "NRM15" pass;
+  r "NRM12" pass ~chain_form:true;
+  r "NRM13" pass ~chain_form:true;
+  r "NRM14" pass ~chain_form:true;
+  r "NRM15" pass ~chain_form:true;
   r "NRM16" leaf;
   r "NRM17" pass;
   r "NRM18" pass;
   r "NRM19" pass ~emit:Witness_hyp;
   r "NRM20" (Arity [Con; Seq]) ~emit:Nrm20;
   r "NRM21" (Arity [Con; Seq]) ~emit:Nrm21;
-  r "NRM22" pass ~emit:Nrm22;
-  r "NRM23" pass ~emit:Nrm23;
+  r "NRM22" pass ~emit:Nrm22 ~chain_form:true;
+  r "NRM23" pass ~emit:Nrm23 ~chain_form:true;
   r "NRM24" pass;
   r "NRM25" pass;
   r "NRM26" pass ~emit:Nrm26;
@@ -357,3 +367,4 @@ let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
 let is_binder_merge = lookup_flag (fun r -> r.binder_merge)
 let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
 let binds_var = lookup_flag (fun r -> r.binds_var)
+let has_chain_form = lookup_flag (fun r -> r.chain_form)

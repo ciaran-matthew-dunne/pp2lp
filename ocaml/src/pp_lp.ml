@@ -39,139 +39,6 @@ let wrap buf need f =
   f ();
   if need then Buffer.add_char buf ')'
 
-(* ---- Expression pretty-printing (shallow encoding) ----
-
-   `env` maps PP variable names bound by an enclosing compound binder to
-   their tuple-projection rendering `(k, v)` — emitted as `(prj k v)`.
-   Compound binders `Bind (_, xs, body)` are rendered as
-   `(\`!! v : Tuple n, body)` with each `xs.(k)` substituted by
-   `prj k v` at emission time, matching the n-ary quantifier kernel
-   exposed by `lp/Quant.lp`. Inner binders shadow outer bindings. *)
-
-let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
-  match e with
-  | Var s when List.mem_assoc s env ->
-    let (k, v) = List.assoc s env in
-    Buffer.add_string buf "(prj ";
-    Buffer.add_string buf (string_of_int k);
-    Buffer.add_char buf ' ';
-    pp_ident buf v;
-    Buffer.add_char buf ')'
-  | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
-  | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
-  | Var s -> pp_ident buf s
-  | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 *)
-  | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 *)
-  | Nat n when n > 64 ->
-    (* Bare decimal literal: parsed positionally (O(digits)) via
-       Stdlib.Nat's builtins, coerced ℕ → τ ι by B.lp's `int_lit`
-       coercion.  The unary render below is ~n text nodes — 2³¹ for
-       NAT-membership's MAXINT.  Constraint: identical occurrences
-       compare syntactically, but whnf of a big `int_lit` diverges
-       (the int_lit rules are unary) — no proof may force it. *)
-    Buffer.add_char buf '(';
-    Buffer.add_string buf (string_of_int n);
-    Buffer.add_char buf ')'
-  | Nat n ->
-    Buffer.add_char buf '(';
-    for _ = 1 to n - 1 do
-      Buffer.add_string buf "\xf0\x9d\x9f\x8f + "
-    done;
-    Buffer.add_string buf "\xf0\x9d\x9f\x8f";
-    Buffer.add_char buf ')'
-  | App (f, args) ->
-    (* PP writes the pair projections as `_pj1`/`_pj2`; the LP primitives (B.lp)
-       are `pj1`/`pj2` — map them, mirroring the `_eql_set` → `eql_set` case. *)
-    let f = match f with "_pj1" -> "pj1" | "_pj2" -> "pj2" | s -> s in
-    Buffer.add_string buf "(eapp ";
-    pp_ident buf f;
-    Buffer.add_char buf ' ';
-    pp_exp_args ~env buf args;
-    Buffer.add_char buf ')'
-  | AOp (Add, e1, e2) ->
-    wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 ~env buf e1;
-      Buffer.add_string buf " + ";
-      pp_exp ~min_bp:7 ~env buf e2)
-  | AOp (Sub, e1, e2) ->
-    wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 ~env buf e1;
-      Buffer.add_string buf " - ";
-      pp_exp ~min_bp:7 ~env buf e2)
-  | Neg e1 ->
-    wrap buf (7 < min_bp) (fun () ->
-      Buffer.add_string buf "\xe2\x80\x94 "; (* — *)
-      pp_exp ~min_bp:8 ~env buf e1)
-  | SetImage (e1, e2) ->
-    Buffer.add_string buf "(eapp set_image (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | Inter (e1, e2) ->
-    Buffer.add_string buf "(eapp inter (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | Union (e1, e2) ->
-    Buffer.add_string buf "(eapp union (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | Range (e1, e2) ->
-    Buffer.add_string buf "(eapp interval (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | Maplet (e1, e2) ->
-    Buffer.add_string buf "(";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf ")"
-  | Inverse e ->
-    Buffer.add_string buf "(eapp inverse ";
-    pp_exp ~env buf e;
-    Buffer.add_string buf ")"
-  | DomRestrict (e1, e2) ->
-    Buffer.add_string buf "(eapp dom_restrict (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | RanRestrict (e1, e2) ->
-    Buffer.add_string buf "(eapp ran_restrict (";
-    pp_exp ~env buf e1;
-    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-    pp_exp ~env buf e2;
-    Buffer.add_string buf "))"
-  | SetLit es ->
-    (* {a,b,c} ↦ right-fold of set_cons pairs over set_empty *)
-    let rec fold = function
-      | [] -> Buffer.add_string buf "set_empty"
-      | e :: rest ->
-        Buffer.add_string buf "(eapp set_cons (";
-        pp_exp ~env buf e;
-        Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-        fold rest;
-        Buffer.add_string buf "))"
-    in
-    fold es
-
-and pp_exp_args ?(env = []) buf = function
-  | [e] -> pp_exp ~env buf e
-  | e :: rest ->
-    Buffer.add_char buf '(';
-    pp_exp ~env buf e;
-    List.iter (fun e' ->
-      Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
-      pp_exp ~env buf e') rest;
-    Buffer.add_char buf ')'
-  | [] -> failwith "pp_exp_args: empty argument list (malformed App/Mem)"
-
 (* ---- Conjunction helpers ----
 
    [conj_leaves] walks both children of an And tree, collecting every
@@ -194,8 +61,6 @@ let rec conj_children_left = function
   | Binary (And, l, r) -> conj_children_left l @ [r]
   | p -> [p]
 
-(* ---- Predicate pretty-printing (shallow encoding) ---- *)
-
 (* Shared header for an n-ary `Bind`: the quantifier symbol, the arity, the
    LP tuple-variable name, and the env extended so each PP var maps to its
    projection slot in that tuple.  Both the inline ([pp_prd]) and block
@@ -213,7 +78,166 @@ let binder_header binder xs env =
   let env' = List.mapi (fun k x -> (x, (k, v_name))) xs @ env in
   (qsym, n, v_name, env')
 
-let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
+(* ---- Expression pretty-printing (shallow encoding) ----
+
+   `env` maps PP variable names bound by an enclosing compound binder to
+   their tuple-projection rendering `(k, v)` — emitted as `(prj k v)`.
+   Compound binders `Bind (_, xs, body)` are rendered as
+   `(\`!! v : Tuple n, body)` with each `xs.(k)` substituted by
+   `prj k v` at emission time, matching the n-ary quantifier kernel
+   exposed by `lp/Quant.lp`. Inner binders shadow outer bindings. *)
+
+let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
+  match e with
+  | Var s when List.mem_assoc s env ->
+    let (k, v) = List.assoc s env in
+    Buffer.add_string buf "(prj ";
+    Buffer.add_string buf (string_of_int k);
+    Buffer.add_char buf ' ';
+    pp_ident buf v;
+    Buffer.add_char buf ')'
+  | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
+  | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
+  | Var s -> pp_ident buf s
+  | BigNat s ->
+    (* Bare decimal literal too big for native int (2⁶⁴ uint64 bounds): same
+       int_lit decimal render as a large [Nat] (see the [n > 64] arm). *)
+    Buffer.add_char buf '(';
+    Buffer.add_string buf s;
+    Buffer.add_char buf ')'
+  | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 *)
+  | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 *)
+  | Nat n when n > 64 ->
+    (* Bare decimal literal: parsed positionally (O(digits)) via
+       Stdlib.Nat's builtins, coerced ℕ → τ ι by B.lp's `int_lit`
+       coercion.  The unary render below is ~n text nodes — 2³¹ for
+       NAT-membership's MAXINT.  Constraint: identical occurrences
+       compare syntactically, but whnf of a big `int_lit` diverges
+       (the int_lit rules are unary) — no proof may force it. *)
+    Buffer.add_char buf '(';
+    Buffer.add_string buf (string_of_int n);
+    Buffer.add_char buf ')'
+  | Nat n ->
+    Buffer.add_char buf '(';
+    for _ = 1 to n - 1 do
+      Buffer.add_string buf "\xf0\x9d\x9f\x8f + "
+    done;
+    Buffer.add_string buf "\xf0\x9d\x9f\x8f";
+    Buffer.add_char buf ')'
+  | App (f, args) ->
+    (* PP writes some primitives `_`-prefixed; map to the B.lp names (mirrors
+       the `_eql_set` → `eql_set` case). *)
+    let f = match f with
+      | "_pj1" -> "pj1" | "_pj2" -> "pj2"
+      | "_sz" -> "sz" | "_func" -> "func" | s -> s in
+    if List.mem f meta_ops then
+      (* A B built-in operator: applied directly, not via eapp (see meta_ops). *)
+      pp_setop ~env buf f args
+    else begin
+      Buffer.add_string buf "(eapp ";
+      pp_ident buf f;
+      Buffer.add_char buf ' ';
+      pp_exp_args ~env buf args;
+      Buffer.add_char buf ')'
+    end
+  | EApp (f, args) ->
+    Buffer.add_string buf "(eapp ";
+    pp_exp ~env buf f;
+    Buffer.add_char buf ' ';
+    pp_exp_args ~env buf args;
+    Buffer.add_char buf ')'
+  | AOp (Add, e1, e2) ->
+    wrap buf (6 < min_bp) (fun () ->
+      pp_exp ~min_bp:6 ~env buf e1;
+      Buffer.add_string buf " + ";
+      pp_exp ~min_bp:7 ~env buf e2)
+  | AOp (Sub, e1, e2) ->
+    wrap buf (6 < min_bp) (fun () ->
+      pp_exp ~min_bp:6 ~env buf e1;
+      Buffer.add_string buf " - ";
+      pp_exp ~min_bp:7 ~env buf e2)
+  | Neg e1 ->
+    wrap buf (7 < min_bp) (fun () ->
+      Buffer.add_string buf "\xe2\x80\x94 "; (* — *)
+      pp_exp ~min_bp:8 ~env buf e1)
+  (* Set-theoretic operators are higher-order symbols (e.g. inter :
+     τι→τι→τι), applied DIRECTLY — `eapp` is only for B-function (set-of-pairs)
+     application (the App/EApp cases above). *)
+  | SetImage (e1, e2) -> pp_setop ~env buf "set_image" [e1; e2]
+  | Inter (e1, e2) -> pp_setop ~env buf "inter" [e1; e2]
+  | Union (e1, e2) -> pp_setop ~env buf "union" [e1; e2]
+  | Range (e1, e2) -> pp_setop ~env buf "interval" [e1; e2]
+  | Inverse e -> pp_setop ~env buf "inverse" [e]
+  | DomRestrict (e1, e2) -> pp_setop ~env buf "dom_restrict" [e1; e2]
+  | RanRestrict (e1, e2) -> pp_setop ~env buf "ran_restrict" [e1; e2]
+  | SetOp (name, args) -> pp_setop ~env buf name args
+  | BoolOf pred ->              (* bool(P) ↦ (bool_of P) *)
+    Buffer.add_string buf "(bool_of ";
+    pp_prd ~env buf pred;
+    Buffer.add_char buf ')'
+  | Maplet (e1, e2) ->          (* genuine ordered pair — the ↦ constructor *)
+    Buffer.add_string buf "(";
+    pp_exp ~env buf e1;
+    Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+    pp_exp ~env buf e2;
+    Buffer.add_string buf ")"
+  | SetLit es ->
+    (* {a,b,c} ↦ right-fold of `set_cons a (… set_empty)` *)
+    let rec fold = function
+      | [] -> Buffer.add_string buf "set_empty"
+      | e :: rest ->
+        Buffer.add_string buf "(set_cons ";
+        pp_exp ~env buf e;
+        Buffer.add_char buf ' ';
+        fold rest;
+        Buffer.add_char buf ')'
+    in
+    fold es
+  | Compr (op, xs, pred, value) ->
+    (* %(xs).(P|E) / SIGMA(xs).(P|E) ↦ (<op> (λ v, P) (λ v, E)); the bound vars
+       project from one `Tuple n` LP variable, like the quantifier kernels. *)
+    let n = List.length xs in
+    let v_name = match xs with x :: _ -> x ^ "_t" | [] -> "v" in
+    let env' = List.mapi (fun k x -> (x, (k, v_name))) xs @ env in
+    let lam tail =
+      Buffer.add_string buf "(\xce\xbb "; (* λ *)
+      pp_ident buf v_name;
+      Buffer.add_string buf " : Tuple ";
+      Buffer.add_string buf (string_of_int n);
+      Buffer.add_string buf ", ";
+      tail ();
+      Buffer.add_char buf ')'
+    in
+    Buffer.add_char buf '(';
+    Buffer.add_string buf op;
+    Buffer.add_char buf ' ';
+    lam (fun () -> pp_prd ~env:env' buf pred);
+    Buffer.add_char buf ' ';
+    lam (fun () -> pp_exp ~env:env' buf value);
+    Buffer.add_char buf ')'
+
+(* A higher-order set operator applied directly: `(name a b …)`, each argument
+   fully parenthesised (default min_bp). *)
+and pp_setop ?(env = []) buf name args =
+  Buffer.add_char buf '(';
+  Buffer.add_string buf name;
+  List.iter (fun a -> Buffer.add_char buf ' '; pp_exp ~env buf a) args;
+  Buffer.add_char buf ')'
+
+and pp_exp_args ?(env = []) buf = function
+  | [e] -> pp_exp ~env buf e
+  | e :: rest ->
+    Buffer.add_char buf '(';
+    pp_exp ~env buf e;
+    List.iter (fun e' ->
+      Buffer.add_string buf " \xe2\x86\xa6 "; (* ↦ *)
+      pp_exp ~env buf e') rest;
+    Buffer.add_char buf ')'
+  | [] -> failwith "pp_exp_args: empty argument list (malformed App/Mem)"
+
+(* ---- Predicate pretty-printing (shallow encoding) ---- *)
+
+and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
   match p with
   | Lift (Var "VRAI") | Lift (Var "TRUE") ->
     Buffer.add_string buf "\xe2\x8a\xa4" (* ⊤ *)
@@ -244,6 +268,9 @@ let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
     wrap buf (35 < min_bp) (fun () ->
       Buffer.add_string buf "\xc2\xac "; (* ¬ *)
       pp_prd ~min_bp:36 ~env buf p1)
+  | Unary (Instanciation, p1) ->
+    (* __INSTANCIATION(P) is logically P — emit transparently. *)
+    pp_prd ~min_bp ~env buf p1
   | Binary (And, _, _) ->
     (* Use [conj_children_left] to preserve right-hand sub-conjunctions
        as nested `⋀` cells: PP treats `a and (b and c)` as a 2-element
@@ -283,6 +310,8 @@ let rec pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
       pp_exp_args ~env buf es;
       Buffer.add_string buf " \xcf\xb5 "; (* ϵ *)
       pp_exp ~min_bp:6 ~env buf e)
+  | Rel (name, args) ->         (* uninterpreted Prop operator, applied directly *)
+    pp_setop ~env buf name args
   | Bind (binder, xs, body) ->
     let qsym, n, v_name, env' = binder_header binder xs env in
     Buffer.add_char buf '(';

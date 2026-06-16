@@ -32,7 +32,6 @@ constant symbol BTRUE : τ ι;
 constant symbol BFALSE : τ ι;
 
 // ---- Domain axioms ----
-
 // Boolean set and axioms
 constant symbol BOOL : τ ι;
 symbol bool_cases (v : τ ι) :
@@ -42,6 +41,7 @@ symbol bool_distinct : π (BTRUE ≠ BFALSE);
 // bool_cases, for BOOL31/32/41/42 splits where PP concretised V to a literal.
 symbol btrue_in_bool : π (BTRUE ϵ BOOL);
 symbol bfalse_in_bool : π (BFALSE ϵ BOOL);
+
 
 // Pair injectivity
 symbol pair_inj (a b c d : τ ι) :
@@ -55,7 +55,7 @@ symbol set_ext (A B : τ ι) :
 
 // ---- Arithmetic on τ ι ----
 // Modeled after Stdlib.Z but on the universal domain τ ι.
-
+type nat;
 symbol NAT : τ ι;
 
 // Constants
@@ -78,6 +78,13 @@ notation - infix left 20;
 // can write bare integer literals (`7`, `12`, …) anywhere a τ ι is
 // expected; Lambdapi inserts the coercion automatically.
 symbol int_lit : ℕ → τ ι;
+// The `int_lit (+1 0) ↪ 𝟏` / `int_lit (+1 $n) ↪ 𝟏 + int_lit $n` overlap at
+// `int_lit 1` is a (benign) unjoinable critical pair, but it is LOAD-BEARING:
+// rule 3 must fire on a *symbolic* successor `$n +1` so that `int_lit (k+1) ↪
+// 𝟏 + int_lit k` reduces under a binder — that definitional step is what makes
+// the inductive `lit_nonneg` (and anything proving over `int_lit (k+1)`) check.
+// Guarding rule 3 to `+1 (+1 $n)` removes the warning but breaks that, so the
+// overlap stays.  Subject reduction holds; all suites are green.
 rule int_lit 0       ↪ 𝟎
 with int_lit (+1 0)  ↪ 𝟏
 with int_lit (+1 $n) ↪ 𝟏 + int_lit $n;
@@ -87,6 +94,9 @@ coerce_rule coerce ℕ (τ ι) $n ↪ int_lit $n;
 // Ordering
 constant symbol ≤ : τ ι → τ ι → Prop;
 notation ≤ infix 5;
+
+
+
 
 symbol > ≔ λ x y, ¬ (x ≤ y);
 notation > infix 5;
@@ -190,6 +200,33 @@ begin
   { refine add_leq_r x 𝟎 y hx }
   { rewrite zero_add y; refine hy }
 end;
+
+// Literal positivity for the AR2/AR4 closer.  `prove_gt_zero` must refute
+// `c ≤ 𝟎` for a positive literal c; the unary chain (leq_plus_one × c) is
+// O(c) and blows up past ~64 (apero hits MAXINT-scale 2³¹).  These give an
+// O(1) witness for any magnitude, the literal staying folded (no diverging
+// whnf): every nat-literal is ≥ 𝟎 (by ℕ-induction), and `𝟏 + (≥𝟎) > 𝟎`.
+opaque symbol pos_add (x : τ ι) : π (𝟎 ≤ x) → π (¬ (𝟏 + x ≤ 𝟎)) ≔
+begin
+  assume x h hk;
+  refine one_not_leq_zero
+    (leq_subst_l (eq_sym (add_zero 𝟏))
+      (leq_trans (𝟏 + 𝟎) (𝟏 + x) 𝟎 (add_leq_l 𝟎 x 𝟏 h) hk))
+end;
+
+opaque symbol lit_nonneg : Π (n : ℕ), π (𝟎 ≤ int_lit n) ≔
+begin
+  induction
+  { refine leq_refl 𝟎 }                          // int_lit 0 ↪ 𝟎
+  { assume k ih;                                  // int_lit (+1 k) ↪ 𝟏 + int_lit k
+    refine leq_trans 𝟎 (int_lit k) (𝟏 + int_lit k) ih _;
+    rewrite add_comm 𝟏 (int_lit k);
+    refine leq_plus_one (int_lit k) }
+end;
+
+// ¬(int_lit (+1 n) ≤ 𝟎): the emitter applies this to a bare ℕ literal.
+symbol lit_pos (n : ℕ) : π (¬ (int_lit (+1 n) ≤ 𝟎)) ≔
+  pos_add (int_lit n) (lit_nonneg n);
 
 // x ≤ y ↔ x − y ≤ 𝟎 (sub_leq is the forward direction; leq_of_sub
 // is the converse). Used by AR3, AR5–AR8, AR13.
@@ -304,24 +341,51 @@ end;
 // eapp f x is the B-method functional application f(x).
 constant symbol eapp : τ ι → τ ι → τ ι;
 
-// Set operations (for set translator)
-constant symbol set_image : τ ι;
-constant symbol inter : τ ι;
-constant symbol union : τ ι;
-constant symbol interval : τ ι;   // B's a..b (apero / EGALITE replays)
-constant symbol inverse : τ ι;    // relational inverse r~
-constant symbol dom_restrict : τ ι;  // domain restriction S <| r
-constant symbol ran_restrict : τ ι;  // range restriction r |> T
-constant symbol set_cons : τ ι;   // set extension {a,b,…}: cons cell …
-constant symbol set_empty : τ ι;  // … over the empty set {}
+// Set-theoretic operators.  These are higher-order symbols of the encoding
+// (NOT B-functions / sets of pairs), so they carry their real arrow types and
+// are applied DIRECTLY — `eapp` is reserved for B-function application (App /
+// EApp).  Uninterpreted: proofs never compute on them.
+constant symbol set_image : τ ι → τ ι → τ ι;    // r[s]   relational image
+constant symbol inter : τ ι → τ ι → τ ι;        // s /\ t
+constant symbol union : τ ι → τ ι → τ ι;        // s \/ t
+constant symbol interval : τ ι → τ ι → τ ι;     // a..b   (apero / EGALITE)
+constant symbol inverse : τ ι → τ ι;            // r~     relational inverse
+constant symbol dom_restrict : τ ι → τ ι → τ ι; // s <| r domain restriction
+constant symbol ran_restrict : τ ι → τ ι → τ ι; // r |> t range restriction
+constant symbol set_cons : τ ι → τ ι → τ ι;     // {a, …} extension cell
+constant symbol set_empty : τ ι;                // {}     empty set
+constant symbol total_func : τ ι → τ ι → τ ι;   // s --> t total functions
+constant symbol overriding : τ ι → τ ι → τ ι;   // r <+ s relational override
+constant symbol relcomp : τ ι → τ ι → τ ι;      // r ; s  relational composition
+constant symbol prod : τ ι → τ ι → τ ι;         // s * t  product (set ×, or ·)
+constant symbol power : τ ι → τ ι → τ ι;        // a ** b exponentiation
+constant symbol subset : τ ι → τ ι → Prop;      // s <: t
+constant symbol lt : τ ι → τ ι → Prop;          // a < t  strict less-than
+constant symbol bool_of : Prop → τ ι;           // bool(P) predicate→BOOL element
+
+// B built-in set/relation operators.  Like the operators above, these are
+// "too big" to be object-level B-functions (sets of pairs): they are applied
+// DIRECTLY, NOT via `eapp` (see Syntax_pp.meta_ops).  All unary except `func`.
+constant symbol card : τ ι → τ ι;        // card(s)   cardinality
+constant symbol dom : τ ι → τ ι;         // dom(r)    domain
+constant symbol ran : τ ι → τ ι;         // ran(r)    range
+constant symbol perm : τ ι → τ ι;        // perm(s)   permutations
+constant symbol iseq : τ ι → τ ι;        // iseq(s)   injective sequences
+constant symbol seq : τ ι → τ ι;         // seq(s)    sequences
+constant symbol seq1 : τ ι → τ ι;        // seq1(s)   non-empty sequences
+constant symbol POW : τ ι → τ ι;         // POW(s)    powerset
+constant symbol POW1 : τ ι → τ ι;        // POW1(s)   non-empty powerset
+constant symbol FIN : τ ι → τ ι;         // FIN(s)    finite subsets
+constant symbol FIN1 : τ ι → τ ι;        // FIN1(s)   non-empty finite subsets
+constant symbol id : τ ι → τ ι;          // id(s)     identity relation
+constant symbol sz : τ ι → τ ι;          // _sz(s)    size
+constant symbol func : τ ι → τ ι → τ ι → τ ι;  // _func(…)  function builder
 
 // Pair projections: PP's `_pj1(p)` / `_pj2(p)` (the components of a pair
-// `p`), applied via `eapp`.  Uninterpreted — proofs use them purely
-// syntactically (membership matching), never computing on them.
+// `p`), applied via `eapp` (object-level — they project an actual pair).
+// Uninterpreted — proofs use them syntactically, never computing on them.
 constant symbol pj1 : τ ι;
 constant symbol pj2 : τ ι;
-constant symbol FIN : τ ι;
-constant symbol card : τ ι;
 
 // ---- PP normalisation quantifiers ----
 // The n-ary ♢ / ♡ live in Quant.lp (tuple-based, alongside `!!` / `??`).

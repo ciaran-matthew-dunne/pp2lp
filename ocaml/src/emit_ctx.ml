@@ -75,12 +75,22 @@ let base = Rule_db.base_of
 (* PP primes most rules inside a first-normalisation chain (ALL7_1, ALL9_1,
    STOP_1, IMP4_1…) but leaves NRM rules *unprimed* (it emits `[NRM14]`, not
    `[NRM14_1]`).  In a Res chain those must be the Res-typed `_1` form, so prime
-   an unprimed NRM rule name when emitting it in `chain_tree`.  Metadata lookups
-   keep using the base name (`base_of "NRM14_1" = "NRM14"`).  Only NRM14_1 has an
-   LP symbol so far; other NRM-in-chain rules fail loud, surfacing the need. *)
+   an unprimed NRM rule name when emitting it.  Metadata lookups keep using the
+   base name (`base_of "NRM14_1" = "NRM14"`).  Only the NRM rules flagged
+   [chain_form] in [Rule_db] actually have a `_1` Res lemma; priming a rule that
+   does not is how an undefined `NRMk_1` reached lambdapi, so refuse it here with
+   a stable code instead of emitting a symbol that doesn't exist. *)
 let chain_emit_name rule =
-  if Rule_db.is_nrm rule && not (Rule_db.is_primed rule)
-  then rule ^ "_1" else rule
+  if Rule_db.is_nrm rule && not (Rule_db.is_primed rule) then
+    if Rule_db.has_chain_form rule then rule ^ "_1"
+    else
+      Errors.fail "E_DISPATCH"
+        "%s appears in a result chain but has no Res-chain `_1` form. PP emits \
+         NRM rules unprimed in chains; the emitter can only prime those with a \
+         `%s_1` lemma in lp/rules/Nrm.lp (flagged ~chain_form in rule_db). Add \
+         that Res lemma + flag, or this occurrence can't be emitted in a chain."
+        rule rule
+  else rule
 
 (* ---- LP proof-term vocabulary + ⋀-list algebra ----
 
@@ -398,6 +408,7 @@ let rec canon_prd depth env = function
   | Mem (es, e) -> Mem (List.map (canon_exp env) es, canon_exp env e)
   | Eq (a, b) -> Eq (canon_exp env a, canon_exp env b)
   | Leq (a, b) -> Leq (canon_exp env a, canon_exp env b)
+  | Rel (op, es) -> Rel (op, List.map (canon_exp env) es)
   | Bind (k, xs, body) ->
     let names = List.mapi (fun i _ -> Printf.sprintf "#%d" (depth + i)) xs in
     let env' = List.map2 (fun x n -> (x, n)) xs names @ env in

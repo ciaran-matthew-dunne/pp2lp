@@ -1,9 +1,17 @@
 %{
   open Syntax_pp
+
+  (* Left-nest a comma-list into pairs: [a]→a, [a;b;c]→((a↦b)↦c).  PP renders
+     a tuple `(a,b,c)` and the sides of a tuple equality `a,b = c,d` this way. *)
+  let pairs = function
+    | [e] -> e
+    | e :: rest -> List.fold_left (fun a b -> Maplet (a, b)) e rest
+    | [] -> assert false
 %}
 
 %token <string> SYMBOL
 %token <int> NATURAL
+%token <string> BIGNATURAL
 
 %token EOF
 %token PERIOD COMMA COLON DOTDOT MAPLET TILDE DOMRESTR RANRESTR
@@ -14,8 +22,9 @@
 
 %token HYP TURNSTILE PIPE FIN
 %token NOT AND OR IMP IFF EQ LEQ
-%token PLUS MINUS TIMES
+%token PLUS MINUS TIMES POWER
 %token INTER UNION
+%token SEMI PERCENT NOTMEM SUBSET OVERRIDE TFUN SIGMA INSTANCIATION BOOLOP
 %token FORALL0 FORALL1 FORALL2 EXISTS
 
 %nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
@@ -30,16 +39,21 @@
 %right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
 %left UNION
 %left INTER
+%left TFUN OVERRIDE SEMI        (* uninterpreted set/relation operators *)
 %left MAPLET DOMRESTR RANRESTR  (* B-Book: set-operator level, looser than .. *)
 %left DOTDOT        (* B-Book: .. looser than +/- — e-f..g+f = (e-f)..(g+f) *)
 %left PLUS MINUS
 %left TIMES          (* coefficient binds tighter than +/- : 2*x + y = (2*x) + y *)
+%right POWER         (* exponentiation binds tighter than * : a*b**2 = a*(b**2) *)
 %nonassoc UMINUS
 %nonassoc LSQ
 %nonassoc TILDE     (* highest: postfix inverse binds tighter than every
                        operator — r~[s] = (r~)[s], -x~ = -(x~), a<|b~ = a<|(b~).
                        The `exp TILDE` rule inherits this precedence, so each
                        `exp OP exp . TILDE` state shifts (applies ~ first). *)
+%nonassoc LPAREN    (* application `f(x)` binds tighter than every operator:
+                       `-x(y)` = `-(x(y))`, `a/\b(c)` = `a/\(b(c))`.  Resolving
+                       the `exp OP exp . LPAREN` states toward shift. *)
 
 %start <line option> line_eof
 %%
@@ -53,8 +67,13 @@ exp:
   { Var x }
   | i = NATURAL
   { Nat i }
-  | x = SYMBOL; LPAREN; es = exp_seq; RPAREN
-  { App (x, es) }
+  | i = BIGNATURAL
+  { BigNat i }
+  (* Function application.  A bare-symbol head keeps the named [App] form
+     (preserves existing emission / free-var handling); any other head
+     (r~(s), {}(s), (r;s)(x)) becomes a general [EApp]. *)
+  | e = exp; LPAREN; es = exp_seq; RPAREN
+  { match e with Var x -> App (x, es) | _ -> EApp (e, es) }
   | FIN; LPAREN; es = exp_seq; RPAREN
   { App ("FIN", es) }
   | e1 = exp; PLUS; e2 = exp
@@ -62,13 +81,30 @@ exp:
   | e1 = exp; MINUS; e2 = exp
   { AOp (Sub, e1, e2) }
   | e1 = exp; TIMES; e2 = exp
-  { mul_expand e1 e2 }
+  { SetOp ("prod", [e1; e2]) }   (* product (set ×, or arithmetic ·) *)
   | MINUS; e = exp %prec UMINUS
   { Neg e }
   (* PP parenthesises compound operands of unary minus (`-(-x)`, `-(2*x)`);
      accept a parenthesised expression in any exp position. *)
   | LPAREN; e = exp; RPAREN
   { e }
+  (* A parenthesised comma-list is a left-nested tuple (pair):
+     `(a,b,c)` = `((a|->b)|->c)`.  Distinct from the singleton above (≥2
+     elements) so it does not clash with the parenthesised-predicate rule. *)
+  | LPAREN; e = exp; COMMA; es = exp_seq; RPAREN
+  { pairs (e :: es) }
+  | e1 = exp; TFUN; e2 = exp
+  { SetOp ("total_func", [e1; e2]) }
+  | e1 = exp; OVERRIDE; e2 = exp
+  { SetOp ("overriding", [e1; e2]) }
+  | e1 = exp; SEMI; e2 = exp
+  { SetOp ("relcomp", [e1; e2]) }
+  | e1 = exp; POWER; e2 = exp
+  { SetOp ("power", [e1; e2]) }
+  | c = comprehension
+  { c }
+  | BOOLOP; LPAREN; p = prd; RPAREN
+  { BoolOf p }   (* bool(P): predicate cast to a BOOL element *)
   | e1 = exp; LSQ; e2 = exp; RSQ
   { SetImage (e1, e2) }
   | e1 = exp; INTER; e2 = exp
@@ -94,6 +130,19 @@ exp_seq:
   { [e] }
   | e = exp; COMMA; es = exp_seq
   { e :: es }
+
+(* Set-builder / aggregate binders: %(x).(P | E), SIGMA(x).(P | E).  The body
+   is always `predicate | value`; the bound vars scope over both. *)
+compr_op:
+  | PERCENT { "set_lambda" }
+  | SIGMA   { "sigma" }
+compr_vars:
+  | LPAREN; xs = var_seq; RPAREN { xs }
+  | x = SYMBOL                   { [x] }
+comprehension:
+  | op = compr_op; xs = compr_vars; PERIOD;
+      LPAREN; p = prd; PIPE; v = exp; RPAREN
+  { Compr (op, xs, p, v) }
 
 binder:
   | FORALL0 { Bang }
@@ -122,12 +171,27 @@ raw_prd:
   { Binary (And,t1,t2) }
   | t1 = prd; OR; t2 = prd
   { Binary (Or,t1,t2) }
-  | e1 = exp; EQ; e2 = exp
-  { Eq (e1, e2) }
+  | es1 = exp_seq; EQ; es2 = exp_seq
+  { Eq (pairs es1, pairs es2) }
+  (* tuple eq `a,b = c,d` = `(a↦b) = (c↦d)`.  One benign shift/reduce conflict:
+     a COMMA right after the RHS is shifted (extends the RHS tuple) rather than
+     reduced (ending the equality).  Shift is correct for every form PP emits —
+     tuple equalities are formula-final, and binder bodies are parenthesised, so
+     the comma never belongs to an enclosing hyps list. *)
   | e1 = exp; LEQ; e2 = exp
   { Leq (e1, e2) }
+  | e1 = exp; LANGLE; e2 = exp
+  { Rel ("lt", [e1; e2]) }   (* strict less-than (uninterpreted).  Only `<`: PP
+                                never emits a strict `>` (which would clash with
+                                the rhs `<…>` closing delimiter). *)
   | es = exp_seq; COLON; e = exp
   { Mem (es,e)}
+  | e1 = exp; SUBSET; e2 = exp
+  { Rel ("subset", [e1; e2]) }
+  | e1 = exp; NOTMEM; e2 = exp
+  { Unary (Not, Mem ([e1], e2)) }
+  | INSTANCIATION; LPAREN; p = prd; RPAREN
+  { Unary (Instanciation, p) }
   | t = binding
   { t }
 
