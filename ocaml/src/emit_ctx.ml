@@ -34,9 +34,19 @@ type ctx = {
      per (arity, slot) a BOOL31/32/41/42 split needs.  [Emit_lp] adds them to
      the symbol header. *)
   mutable bool_typings : (string * string) list;
+  (* Integer-typing premises, same idea: a guarded arithmetic lemma (add_zero /
+     neg_neg / leq_antisym / AR5–8) needs `<atom> ϵ INT` evidence the goal
+     extraction dropped.  Per-(arity,slot) for a bound tuple slot, per-name for
+     a free var; [Emit_lp] adds them to the header. *)
+  mutable int_typings : (string * string) list;
+  (* The goal's free τ ι variables (the emitted symbol's `(x : τ ι)` params).
+     Only these can carry an injected `π (x ϵ INT)` premise; a witness / locally
+     bound var is not in scope at the header, so the emitter refuses it. *)
+  int_free_vars : Free_vars.SS.t;
 }
 
-let create_ctx () = { n = 0; hyps = []; xs = []; bool_typings = [] }
+let create_ctx ?(int_free_vars = Free_vars.SS.empty) () =
+  { n = 0; hyps = []; xs = []; bool_typings = []; int_typings = []; int_free_vars }
 
 let fresh_h ctx pred =
   ctx.n <- ctx.n + 1;
@@ -190,6 +200,62 @@ let bool_typing_term ctx v =
       ctx.bool_typings <- ctx.bool_typings @ [ (name, ty) ];
     Some (L.App (L.Name name, [ L.Name tname ]))
   | None -> None
+
+(* `V ϵ INT` evidence for an integer-typed variable [v]: like [bool_typing_term],
+   a bound tuple slot discharges from a per-(arity,slot) `Π u, prj k u ϵ INT`
+   premise applied to the in-scope tuple; a *free* var (a `(x : τ ι)` symbol
+   param) from a per-name `π (x ϵ INT)` premise.  Both injected into
+   [ctx.int_typings] for [Emit_lp]'s header — morally true (the var IS an
+   integer), exactly the BOOL pattern, not a postulate. *)
+let int_typing_term ctx v : L.term =
+  match find_tuple_slot ctx v with
+  | Some (tname, k, n) ->
+    let name = Printf.sprintf "_it_%d_%d" n k in
+    let ty =
+      Printf.sprintf
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 INT)" n k
+    in
+    if not (List.mem_assoc name ctx.int_typings) then
+      ctx.int_typings <- ctx.int_typings @ [ (name, ty) ];
+    L.App (L.Name name, [ L.Name tname ])
+  | None when not (Free_vars.SS.mem v ctx.int_free_vars) ->
+    (* Not a tuple slot and not a goal free var → a witness / locally bound var.
+       Its `ϵ INT` evidence can't be a header premise (out of scope there), so
+       refuse rather than emit a dangling reference.  A genuine frontier: proving
+       an introduced witness is an integer needs evidence the replay doesn't carry. *)
+    Errors.fail "E_EMIT"
+      "no INT evidence for the witness/bound variable %s (not a goal free \
+       variable, so no header typing premise can name it)" v
+  | None ->
+    (* genuine free integer var: `_iv_<sanitised v> : π (v ϵ INT)`.  ponytail: the
+       sanitised name could in principle collide for two distinct vars, but
+       lambdapi then rejects the duplicate param (loud), never silent. *)
+    let sani = String.map (fun c ->
+      if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+         || (c >= '0' && c <= '9') || c = '_' then c else '_') v in
+    let name = "_iv_" ^ sani in
+    let ty =
+      let b = Buffer.create 32 in
+      Buffer.add_string b "\xcf\x80 ("; (* π ( *)
+      Pp_lp.pp_ident b v;
+      Buffer.add_string b " \xcf\xb5 INT)";
+      Buffer.contents b
+    in
+    if not (List.mem_assoc name ctx.int_typings) then
+      ctx.int_typings <- ctx.int_typings @ [ (name, ty) ];
+    L.Name name
+
+(* The atom resolver [Arith_proofs.int_evidence] defers to (set in [Translate]):
+   an integer-typed atom's `ϵ INT` evidence is its typing premise; a non-variable
+   atom (a B-function image, set operator) in an arithmetic position has no such
+   premise, so fail loud rather than invent one. *)
+let atom_int_evidence ctx e : L.term =
+  match e with
+  | Var v -> int_typing_term ctx v
+  | _ ->
+    Errors.fail "E_EMIT"
+      "no INT evidence for the non-variable arithmetic atom %s"
+      (Emit_pp.prd_to_pp (Lift e))
 
 (* ---- Hyp lookup: derive the needed predicate from the goal ----
 
@@ -525,7 +591,7 @@ let find_axm9_match ctx goal =
          tuple `unit ⨾ σ(u₀) ⨾ … ⨾ σ(uₙ)`. *)
       let env =
         List.concat_map (fun (x, vs) ->
-          List.mapi (fun i v -> (v, (i, x))) vs) ctx.xs
+          List.mapi (fun i v -> (v, L.Proj (i, x))) vs) ctx.xs
       in
       List.find_map (fun (h_name, h_pred) ->
         match axm9_hyp_shape h_pred with
@@ -595,7 +661,7 @@ let collect_conj_leaves = Pp_lp.conj_leaves
    from the in-scope binders; mirrors [Rule_emit.pp_env_of]. *)
 let proj_env_of_ctx ctx : L.proj_env =
   List.concat_map (fun (x_name, pp_vars) ->
-    List.mapi (fun i v -> (v, (i, x_name))) pp_vars) ctx.xs
+    List.mapi (fun i v -> (v, L.Proj (i, x_name))) pp_vars) ctx.xs
 
 (* ---- NRM29 trust-free dispatch: witness + ⊤-normalisation bridge ----
 
@@ -640,7 +706,7 @@ let nrm29_witness_bridge ctx goal : (L.term * L.term) option =
        | None -> None
        | Some w ->
          (* remaining binder vars → `prj k` of a tuple var (after dropping d). *)
-         let env_of v = List.mapi (fun k x -> (x, (k, v))) rest in
+         let env_of v = List.mapi (fun k x -> (x, L.Proj (k, v))) rest in
          let vb = fresh_x_local ctx in
          let b_term = L.Lambda (vb, None, L.Exp (env_of vb, w)) in
          (* per-bound `(lhs[d:=w] ≤ 𝟎) = ⊤`, rendered over a fresh bridge var. *)

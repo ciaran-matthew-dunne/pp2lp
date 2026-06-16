@@ -1,5 +1,5 @@
 // TRUE/FALSE (§A.9) / STOP (§A.10) / INS (§A.11) — shallow encoding
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
 
 // ---- TRUE (§A.9) ----
 

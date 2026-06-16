@@ -22,7 +22,7 @@ module L = Lp_tree
    when the printer runs.  (With no in-scope binder the env is empty.) *)
 let pp_env_of ctx =
   List.concat_map (fun (x_name, pp_vars) ->
-    List.mapi (fun i v -> (v, (i, x_name))) pp_vars
+    List.mapi (fun i v -> (v, L.Proj (i, x_name))) pp_vars
   ) ctx.xs
 
 let pred_term ctx prd = L.Pred (pp_env_of ctx, prd)
@@ -415,7 +415,7 @@ let tactic_for_rule ctx rule arg anno children =
               rule_name ^ (match k with 0 -> "S" | 1 -> "P" | _ -> "P2") in
             let w = fresh_x_local ctx in
             let env' =
-              List.mapi (fun i v -> (v, (i, w))) rvars @ pp_env_of ctx in
+              List.mapi (fun i v -> (v, L.Proj (i, w))) rvars @ pp_env_of ctx in
             let tail_app hole_or_args =
               ( [ L.Lambda (w, None, L.Exp (env', e)) ] @ hole_or_args )
             in
@@ -520,20 +520,25 @@ let tactic_for_rule ctx rule arg anno children =
        given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.
        AR6 is the mirror (antecedent `a ≤ 𝟎`, bound `—a ≤ 𝟎`).  That bound is
        PP's solver fact, but it's the matching `≤ 𝟎` hypothesis in scope — find
-       it; fail loud if absent (never trust).  The Seq slot is the continuation child. *)
-    let bound =
+       it; fail loud if absent (never trust).  The Seq slot is the continuation
+       child.  The leading `hai : π (a ϵ INT)` lets `leq_antisym` recover `a = 𝟎`. *)
+    let a_and_bound =
       match base rule, goal_of_anno anno with
-      | "AR5", Some (Binary (Imp, Leq (Neg a, Nat 0), _)) -> Some (Leq (a, Nat 0))
-      | "AR6", Some (Binary (Imp, Leq (a, Nat 0), _)) -> Some (Leq (Neg a, Nat 0))
+      | "AR5", Some (Binary (Imp, Leq (Neg a, Nat 0), _)) -> Some (a, Leq (a, Nat 0))
+      | "AR6", Some (Binary (Imp, Leq (a, Nat 0), _)) -> Some (a, Leq (Neg a, Nat 0))
       | _ -> None
     in
-    let con =
-      match Option.bind bound (find_hyp_by_pred ctx) with
-      | Some h -> L.Name h
-      | None -> failwith "rule_emit: AR5/AR6 — the matching `≤ 𝟎` bound \
-                          hypothesis is not in scope, refusing to emit trust"
+    let con, hai =
+      match a_and_bound with
+      | Some (a, bound) ->
+        (match find_hyp_by_pred ctx bound with
+         | Some h -> L.Name h, Arith_proofs.int_evidence (proj_env_of_ctx ctx) a
+         | None -> failwith "rule_emit: AR5/AR6 — the matching `≤ 𝟎` bound \
+                             hypothesis is not in scope, refusing to emit trust")
+      | None -> failwith "rule_emit: AR5/AR6 — unexpected goal shape (no `±a ≤ 𝟎` \
+                          antecedent), refusing to emit trust"
     in
-    L.Refine (L.Name rule, [con; L.Hole])
+    L.Refine (L.Name rule, [hai; con; L.Hole])
   | Rule_db.Ar4 ->
     (* AR4 [E R] (F) : π (F ≤ 𝟎) → π ((E + F) > 𝟎) → π ((E ≤ 𝟎) ⇒ R).  A leaf
        deriving ⊥ from a hyp `F ≤ 𝟎` and `(E + F) > 𝟎`.  AR4 follows AR3's
@@ -550,7 +555,9 @@ let tactic_for_rule ctx rule arg anno children =
         List.find_map (fun (name, p) -> match p with
           | Leq (f, Nat 0) ->
             Option.map (fun h_gt ->
-              L.Refine (L.Name rule, [exp_term ctx f; L.Name name; h_gt]))
+              (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
+                 both via the Int.lp `to_int`/`isGt` unification rules. *)
+              L.Refine (L.Name rule, [L.Name name; h_gt]))
               (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
           | _ -> None) ctx.hyps
       | None -> None

@@ -72,7 +72,7 @@ let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
       (ar3f_cong ctx env last a_exp r_exp)
   | Bind (_, vars, body) ->
     let v = fresh_x_local ctx in
-    let env' = List.mapi (fun k var -> (var, (k, v))) vars @ env in
+    let env' = List.mapi (fun k var -> (var, L.Proj (k, v))) vars @ env in
     Option.map (fun c -> L.App (L.Name "!!_cong", [L.Lambda (v, None, c)]))
       (ar3f_cong ctx env' body a_exp r_exp)
   | _ -> None
@@ -392,8 +392,24 @@ and default ctx rule arg anno children =
          | _ -> failwith "translate: AR7/AR8 chain — child annotation isn't the \
                           expected `E = F ⇒ …` equality, refusing to emit trust"
        in
+       (* `hai hbi hci` (a/b/c ϵ INT) for the new guarded AR7/AR8: a = rhs_e,
+          b = lhs_e; c = —a (AR7) or the goal's left summand `c + b` (AR8). *)
+       let int_args =
+         let env = proj_env_of_ctx ctx in
+         match goal_of_anno (P.anno_of c) with
+         | Some (Binary (Imp, Eq (lhs_e, rhs_e), _)) ->
+           let c_exp =
+             if is_ar7 then Neg rhs_e
+             else (match goal_of_anno anno with
+                   | Some (Binary (Imp, Leq (AOp (Add, c_e, _), Nat 0), _)) -> c_e
+                   | _ -> Neg rhs_e)
+           in
+           [ Arith_proofs.int_evidence env rhs_e; Arith_proofs.int_evidence env lhs_e;
+             Arith_proofs.int_evidence env c_exp ]
+         | _ -> [ L.Hole; L.Hole; L.Hole ]
+       in
        let tactic =
-         L.Refine (L.Name (base rule), [value; hb; acc_eq; L.Hole]) in
+         L.Refine (L.Name (base rule), value :: int_args @ [hb; acc_eq; L.Hole]) in
        L.Then (tactic, tree ctx c)
      | None ->
        L.Then (tactic_for_rule ctx rule arg anno children, tree ctx c))
@@ -739,7 +755,11 @@ and chain_term ctx node : L.term =
    [ctx.bool_typings] as it fires (it needs the in-scope tuple binder, only
    known mid-walk); return them alongside the script so [Emit_lp] adds them to
    the symbol header. *)
-let translate (pp_tree : P.pp_tree) : L.t * (string * string) list =
-  let ctx = create_ctx () in
+let translate ?(int_free_vars = Free_vars.SS.empty) (pp_tree : P.pp_tree)
+    : L.t * (string * string) list * (string * string) list =
+  let ctx = create_ctx ~int_free_vars () in
+  (* [Arith_proofs.int_evidence] resolves atomic `ϵ INT` evidence through this
+     ref; bind it to this emission's ctx (single-threaded). *)
+  Arith_proofs.atom_int_ev := atom_int_evidence ctx;
   let script = tree ctx pp_tree in
-  (script, ctx.bool_typings)
+  (script, ctx.bool_typings, ctx.int_typings)

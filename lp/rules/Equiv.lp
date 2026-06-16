@@ -1,5 +1,5 @@
 // Equivalence (§A.4) — shallow encoding
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
 
 // EQV1: H ⊢ P ⇒ (¬Q ⇒ R); H ⊢ ¬P ⇒ (Q ⇒ R) → H ⊢ ¬(P ⇔ Q) ⇒ R
 opaque symbol EQV1 [P Q R]

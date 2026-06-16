@@ -1,6 +1,6 @@
 // Boolean (§A.15) — shallow encoding
 // BTRUE, BFALSE : τ ι with bool_cases (guarded by ϵ BOOL).
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
 
 // ---- BOOL11/12: Context extension ----
 

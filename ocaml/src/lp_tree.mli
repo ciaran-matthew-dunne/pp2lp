@@ -7,9 +7,15 @@
    environment ([proj_env]) it must be rendered under, and is turned into
    Lambdapi concrete syntax by [Pp_lp] at print time, not before. *)
 
-(* A PP variable bound by an enclosing compound (n-ary) binder maps to its
-   (slot, tuple-var) so it renders as `prj slot tuple-var`. *)
-type proj_env = (string * (int * string)) list
+(* How a PP variable bound by an enclosing compound (n-ary) binder renders —
+   [Pp_lp.proj_binding] re-exported with its constructors so proof-side env
+   builders can write [Proj]/[Alias].  [Proj (slot, tuple-var)] → `prj slot
+   tuple-var` (proof context); [Alias name] → the `let`-bound identifier [name]
+   (goal statement). *)
+type proj_binding = Pp_lp.proj_binding =
+  | Proj of int * string
+  | Alias of string
+type proj_env = Pp_lp.proj_env
 
 (* `Pi_pred` annotates a λ-binder with `π (<pred>)` — pins the bound proof's
    type when a metavariable-headed application would leave it undetermined. *)

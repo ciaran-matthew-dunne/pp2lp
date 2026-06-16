@@ -103,3 +103,8 @@ val subst_prd : (string * exp) list -> prd -> prd
 
 (** The predicate carried by a rule annotation ([Simple] / [Fin]). *)
 val prd_of_rhs : rhs -> prd
+
+(** MSB-first binary digits (leading 1) of a positive decimal string, via long
+    division by two so literals past native int are handled.  Used to emit
+    `from_int` ℤ literals in binary [Stdlib.Pos] form. *)
+val pos_bits : string -> int list

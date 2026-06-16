@@ -16,9 +16,11 @@ type ctx = {
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
   mutable bool_typings : (string * string) list;
+  mutable int_typings : (string * string) list;
+  int_free_vars : Free_vars.SS.t;
 }
 
-val create_ctx : unit -> ctx
+val create_ctx : ?int_free_vars:Free_vars.SS.t -> unit -> ctx
 
 (* Allocate a fresh `_hN` / `_xN` and register it in the context.
    [fresh_x_local] allocates a `_xN` *without* registering — for a chain's
@@ -63,6 +65,16 @@ val binder_vars_of : prd -> string list option
    [ctx.bool_typings] and applied to the in-scope tuple ([None] if [v] isn't a
    bound tuple slot). *)
 val bool_typing_term : ctx -> string -> Lp_tree.term option
+
+(* The `V ϵ INT` discharge term for an integer-typed var [v]: a per-(arity,slot)
+   premise (bound tuple slot) or per-name `π (v ϵ INT)` premise (free var),
+   registered in [ctx.int_typings].  A goal free var injects its own premise;
+   a witness / locally bound var (not in [ctx.int_free_vars]) raises [E_EMIT]. *)
+val int_typing_term : ctx -> string -> Lp_tree.term
+
+(* The ctx-side atom resolver bound into [Arith_proofs.atom_int_ev] each
+   emission: a variable atom's `ϵ INT` premise, else a loud failure. *)
+val atom_int_evidence : ctx -> exp -> Lp_tree.term
 
 (* ---- Searches over the context ---- *)
 

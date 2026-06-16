@@ -1,7 +1,7 @@
-// B.lp — Foundation (shallow encoding)
-// Predicates are Prop, expressions are τ ι.
-// ι is the universal domain of B-method set theory.
-// Connectives come from Stdlib.
+// B.lp — B-Book core (shallow encoding): membership, pairs, BOOL, set/relation
+// operators.  Predicates are Prop, expressions are τ ι; ι is the universal
+// domain.  Integer arithmetic lives in Int.lp (the sole Stdlib.Z client); the
+// `Stdlib.Nat` open here is what supplies ℕ (Tuple arities) to downstream modules.
 require open
   Stdlib.Set Stdlib.Prop Stdlib.Bool
   Stdlib.Classic Stdlib.PropExt
@@ -11,13 +11,9 @@ require open
   Stdlib.List Stdlib.Nat
   Stdlib.Tactic;
 
-// The `trust` arithmetic oracle was removed 2026-06-12: the engine cannot emit
-// it — every solver side-condition is now generated or fails loud.
-
 // ---- Domain constants ----
-
-// Inhabitedness (the B-universe is nonempty)
-constant symbol inh : τ ι;
+// Inhabitedness comes from Stdlib.Set's `el : Π a, τ a` ("sets are
+// non-empty") — `el ι : τ ι`; no separate postulate needed.
 
 // Pairs (maplet)
 constant symbol ↦ : τ ι → τ ι → τ ι;
@@ -27,20 +23,44 @@ notation ↦ infix right 6;
 constant symbol ϵ : τ ι → τ ι → Prop;
 notation ϵ infix 5;
 
-// Booleans (as elements of ι)
-constant symbol BTRUE : τ ι;
-constant symbol BFALSE : τ ι;
+// Booleans embedded from Stdlib.Bool.  `from_bool` injects 𝔹 into the domain;
+// `to_bool` is a left inverse (only the two boolean points matter), which makes
+// the injectivity behind `bool_distinct` provable instead of postulated.
+symbol from_bool : 𝔹 → τ ι;
+symbol to_bool : τ ι → τ bool;
+rule to_bool (from_bool $b) ↪ $b;
+
+symbol BTRUE  ≔ from_bool true;
+symbol BFALSE ≔ from_bool false;
 
 // ---- Domain axioms ----
-// Boolean set and axioms
+
+// BTRUE ≠ BFALSE: 𝔹's constructor disjointness (Stdlib `true≠false`) transported
+// through the left inverse — proved, not postulated.
+opaque symbol bool_distinct : π (BTRUE ≠ BFALSE) ≔
+begin assume h; refine true≠false (feq to_bool h) end;
+
+// BOOL is the *range* of from_bool.  Membership of the abstract `ϵ` against it is
+// the one irreducible boolean axiom; the three facts PP uses are derived from it.
 constant symbol BOOL : τ ι;
-symbol bool_cases (v : τ ι) :
-  π (v ϵ BOOL) → π (v = BTRUE ∨ v = BFALSE);
-symbol bool_distinct : π (BTRUE ≠ BFALSE);
-// BTRUE, BFALSE are the elements of BOOL — the (definitional) converse of
-// bool_cases, for BOOL31/32/41/42 splits where PP concretised V to a literal.
-symbol btrue_in_bool : π (BTRUE ϵ BOOL);
-symbol bfalse_in_bool : π (BFALSE ϵ BOOL);
+symbol bool_mem (v : τ ι) : π ((v ϵ BOOL) ⇔ (`∃ b, v = from_bool b));
+
+opaque symbol bool_cases (v : τ ι) :
+  π (v ϵ BOOL) → π (v = BTRUE ∨ v = BFALSE) ≔
+begin
+  assume v hv;
+  refine ∃ₑ (∧ₑ₁ (bool_mem v) hv) (λ b hb, _);
+  rewrite hb;
+  refine ∨ₑ (case_𝔹 b) (λ ht, _) (λ hf, _)
+  { rewrite ht; refine ∨ᵢ₁ (eq_refl BTRUE) }
+  { rewrite hf; refine ∨ᵢ₂ (eq_refl BFALSE) }
+end;
+
+opaque symbol btrue_in_bool : π (BTRUE ϵ BOOL) ≔
+begin refine ∧ₑ₂ (bool_mem BTRUE) (∃ᵢ true (eq_refl BTRUE)) end;
+
+opaque symbol bfalse_in_bool : π (BFALSE ϵ BOOL) ≔
+begin refine ∧ₑ₂ (bool_mem BFALSE) (∃ᵢ false (eq_refl BFALSE)) end;
 
 
 // Pair injectivity
@@ -53,289 +73,6 @@ symbol pair_cong (a b c d : τ ι) :
 symbol set_ext (A B : τ ι) :
   π ((A = B) ⇔ (`∀ x : τ ι, ((x ϵ A) ⇔ (x ϵ B))));
 
-// ---- Arithmetic on τ ι ----
-// Modeled after Stdlib.Z but on the universal domain τ ι.
-type nat;
-symbol NAT : τ ι;
-
-// Constants
-constant symbol 𝟎 : τ ι;
-constant symbol 𝟏 : τ ι;
-
-// Operations. Precedence chosen so `+/−` bind tighter than
-// `≤/=`, matching Stdlib.Nat/Stdlib.Z.
-constant symbol + : τ ι → τ ι → τ ι;
-notation + infix left 20;
-
-constant symbol — : τ ι → τ ι; // unary minus
-notation — prefix 25;
-
-symbol - (x y : τ ι) ≔ x + (— y);
-notation - infix left 20;
-
-// Decimal-literal lift: parse `7` (a ℕ via Stdlib.Nat's builtin) as a
-// τ ι value via `int_lit`. With the coercion rule below, the emitter
-// can write bare integer literals (`7`, `12`, …) anywhere a τ ι is
-// expected; Lambdapi inserts the coercion automatically.
-symbol int_lit : ℕ → τ ι;
-// The `int_lit (+1 0) ↪ 𝟏` / `int_lit (+1 $n) ↪ 𝟏 + int_lit $n` overlap at
-// `int_lit 1` is a (benign) unjoinable critical pair, but it is LOAD-BEARING:
-// rule 3 must fire on a *symbolic* successor `$n +1` so that `int_lit (k+1) ↪
-// 𝟏 + int_lit k` reduces under a binder — that definitional step is what makes
-// the inductive `lit_nonneg` (and anything proving over `int_lit (k+1)`) check.
-// Guarding rule 3 to `+1 (+1 $n)` removes the warning but breaks that, so the
-// overlap stays.  Subject reduction holds; all suites are green.
-rule int_lit 0       ↪ 𝟎
-with int_lit (+1 0)  ↪ 𝟏
-with int_lit (+1 $n) ↪ 𝟏 + int_lit $n;
-
-coerce_rule coerce ℕ (τ ι) $n ↪ int_lit $n;
-
-// Ordering
-constant symbol ≤ : τ ι → τ ι → Prop;
-notation ≤ infix 5;
-
-
-
-
-symbol > ≔ λ x y, ¬ (x ≤ y);
-notation > infix 5;
-
-// ≪ is a PP-internal proof-search marker (prevents AR12 loops); semantically
-// identical to ≤. PP never emits ≪ on the wire, so we alias it here so that
-// rule signatures retaining ≪ (AR5–AR8, AR13) unify with PP's ≤ hypotheses.
-symbol ≪ : τ ι → τ ι → Prop ≔ ≤;
-notation ≪ infix 5;
-
-// Axioms — discretely ordered abelian group on τ ι.
-// (Just enough to prove the §A.14 arithmetic rules; not a full
-// formalisation of ℤ.)
-
-// Order: reflexive, antisymmetric, transitive
-symbol leq_refl (x : τ ι) : π (x ≤ x);
-symbol leq_antisym (x y : τ ι) :
-  π (x ≤ y) → π (y ≤ x) → π (x = y);
-symbol leq_trans (x y z : τ ι) :
-  π (x ≤ y) → π (y ≤ z) → π (x ≤ z);
-
-// Additive abelian group: + is commutative, associative, with
-// identity 𝟎 and inverse —. (— x and add_zero pinned only on
-// the right; the left versions follow from add_comm.)
-symbol add_comm (x y : τ ι) : π (x + y = y + x);
-symbol add_assoc (x y z : τ ι) : π ((x + y) + z = x + (y + z));
-symbol add_zero (x : τ ι) : π (x + 𝟎 = x);
-symbol add_neg (x : τ ι) : π (x + — x = 𝟎);
-
-// Translation invariance: x ≤ y → z + x ≤ z + y
-symbol add_leq_l (x y z : τ ι) : π (x ≤ y) → π (z + x ≤ z + y);
-
-// Discreteness around 0/1: 𝟏 is strictly positive, and there is
-// no integer strictly between 𝟎 and 𝟏.
-symbol one_not_leq_zero : π (¬ (𝟏 ≤ 𝟎));
-symbol discrete (x : τ ι) : π (¬ (x ≤ 𝟎)) → π (𝟏 ≤ x);
-// The other half of "𝟏 is strictly positive" — not derivable from the
-// above in a partial order (one_not_leq_zero only rules out 𝟏 ≤ 𝟎; this
-// asserts the comparison resolves upward).  Used by the ARITH closer to
-// refute `c·𝟏 ≤ 𝟎` for literal sums c ≥ 2.
-symbol zero_leq_one : π (𝟎 ≤ 𝟏);
-
-// ---- Derived lemmas (left-/right- variants of the axioms) ----
-
-// Congruences + ≤-transport used by the emitter's on-the-fly equality
-// proofs: an INS conjunct (or AR3 sub-premise) PP records in a different
-// term order than the rule/universal it feeds is bridged by a generated
-// `add_comm`/`add_assoc`/`opp_add`/`neg_neg` permutation proof (no `trust`).
-// Plain `rewrite` (not AC) so each step is predictable.
-opaque symbol add_congL (b : τ ι) [a a' : τ ι] :
-  π (a = a') → π (a + b = a' + b) ≔
-begin assume b a a' h; rewrite h; reflexivity end;
-
-opaque symbol add_congR (a : τ ι) [b b' : τ ι] :
-  π (b = b') → π (a + b = a + b') ≔
-begin assume a b b' h; rewrite h; reflexivity end;
-
-opaque symbol add_cong [a a' b b' : τ ι] :
-  π (a = a') → π (b = b') → π (a + b = a' + b') ≔
-begin assume a a' b b' ha hb; rewrite ha; rewrite hb; reflexivity end;
-
-opaque symbol leq_subst_l [a b : τ ι] :
-  π (a = b) → π (b ≤ 𝟎) → π (a ≤ 𝟎) ≔
-begin assume a b h hb; rewrite h; refine hb end;
-
-opaque symbol zero_add (x : τ ι) : π (𝟎 + x = x) ≔
-begin
-  assume x; rewrite add_comm 𝟎 x; refine add_zero x
-end;
-
-opaque symbol neg_add (x : τ ι) : π ((— x) + x = 𝟎) ≔
-begin
-  assume x; rewrite add_comm (— x) x; refine add_neg x
-end;
-
-opaque symbol add_leq_r (x y z : τ ι) :
-  π (x ≤ y) → π (x + z ≤ y + z) ≔
-begin
-  assume x y z h;
-  rewrite add_comm x z;
-  rewrite add_comm y z;
-  refine add_leq_l x y z h
-end;
-
-// x ≤ x + 𝟏 (zero_leq_one translated by x).  The ARITH closer chains this
-// to refute a positive-literal sum `(𝟏 + … + 𝟏) ≤ 𝟎`.
-opaque symbol leq_plus_one (x : τ ι) : π (x ≤ x + 𝟏) ≔
-begin
-  assume x;
-  refine leq_trans x (x + 𝟎) (x + 𝟏) _ _
-  { rewrite add_zero x; refine leq_refl x }
-  { refine add_leq_l 𝟎 𝟏 x zero_leq_one }
-end;
-
-// Sum of two non-positives is non-positive.
-opaque symbol add_leq_zero (x y : τ ι) :
-  π (x ≤ 𝟎) → π (y ≤ 𝟎) → π (x + y ≤ 𝟎) ≔
-begin
-  assume x y hx hy;
-  refine leq_trans (x + y) (𝟎 + y) 𝟎 _ _
-  { refine add_leq_r x 𝟎 y hx }
-  { rewrite zero_add y; refine hy }
-end;
-
-// Literal positivity for the AR2/AR4 closer.  `prove_gt_zero` must refute
-// `c ≤ 𝟎` for a positive literal c; the unary chain (leq_plus_one × c) is
-// O(c) and blows up past ~64 (apero hits MAXINT-scale 2³¹).  These give an
-// O(1) witness for any magnitude, the literal staying folded (no diverging
-// whnf): every nat-literal is ≥ 𝟎 (by ℕ-induction), and `𝟏 + (≥𝟎) > 𝟎`.
-opaque symbol pos_add (x : τ ι) : π (𝟎 ≤ x) → π (¬ (𝟏 + x ≤ 𝟎)) ≔
-begin
-  assume x h hk;
-  refine one_not_leq_zero
-    (leq_subst_l (eq_sym (add_zero 𝟏))
-      (leq_trans (𝟏 + 𝟎) (𝟏 + x) 𝟎 (add_leq_l 𝟎 x 𝟏 h) hk))
-end;
-
-opaque symbol lit_nonneg : Π (n : ℕ), π (𝟎 ≤ int_lit n) ≔
-begin
-  induction
-  { refine leq_refl 𝟎 }                          // int_lit 0 ↪ 𝟎
-  { assume k ih;                                  // int_lit (+1 k) ↪ 𝟏 + int_lit k
-    refine leq_trans 𝟎 (int_lit k) (𝟏 + int_lit k) ih _;
-    rewrite add_comm 𝟏 (int_lit k);
-    refine leq_plus_one (int_lit k) }
-end;
-
-// ¬(int_lit (+1 n) ≤ 𝟎): the emitter applies this to a bare ℕ literal.
-symbol lit_pos (n : ℕ) : π (¬ (int_lit (+1 n) ≤ 𝟎)) ≔
-  pos_add (int_lit n) (lit_nonneg n);
-
-// x ≤ y ↔ x − y ≤ 𝟎 (sub_leq is the forward direction; leq_of_sub
-// is the converse). Used by AR3, AR5–AR8, AR13.
-opaque symbol sub_leq (x y : τ ι) :
-  π (x ≤ y) → π (x - y ≤ 𝟎) ≔
-begin
-  assume x y h;
-  // x − y ≡ x + (—y); want x + (—y) ≤ 𝟎.
-  // From x ≤ y, add_leq_r with z := (—y): x + (—y) ≤ y + (—y) = 𝟎.
-  refine leq_trans (x + (— y)) (y + (— y)) 𝟎 _ _
-  { refine add_leq_r x y (— y) h }
-  { rewrite add_neg y; refine leq_refl 𝟎 }
-end;
-
-opaque symbol leq_of_sub (x y : τ ι) :
-  π (x - y ≤ 𝟎) → π (x ≤ y) ≔
-begin
-  assume x y h;
-  // Add y to both sides of (x + (—y)) ≤ 𝟎, then simplify.
-  have h1 : π ((x + (— y)) + y ≤ 𝟎 + y) { refine add_leq_r (x + (— y)) 𝟎 y h };
-  have eq1 : π ((x + (— y)) + y = x) {
-    rewrite add_assoc x (— y) y;
-    rewrite neg_add y;
-    refine add_zero x
-  };
-  have h2 : π (x ≤ 𝟎 + y) { rewrite left eq1; refine h1 };
-  rewrite left zero_add y; refine h2
-end;
-
-// — flips ≤. Used by AR5, AR6.
-opaque symbol neg_leq_zero (a : τ ι) :
-  π (— a ≤ 𝟎) → π (𝟎 ≤ a) ≔
-begin
-  assume a h;
-  refine leq_of_sub 𝟎 a _;
-  simplify;
-  rewrite zero_add (— a); refine h
-end;
-
-// ---- Algebraic identities (group law consequences) ----
-
-// Left cancellation: a + b = a + c ⊢ b = c.
-opaque symbol add_left_cancel (a b c : τ ι) :
-  π (a + b = a + c) → π (b = c) ≔
-begin
-  assume a b c h;
-  rewrite left zero_add b;
-  rewrite left neg_add a;
-  rewrite add_assoc (— a) a b;
-  rewrite h;
-  rewrite left add_assoc (— a) a c;
-  rewrite neg_add a;
-  refine zero_add c
-end;
-
-// —𝟎 = 𝟎 (the generated sum-equality proofs treat 𝟎 as the empty atom list).
-opaque symbol neg_zero : π (— 𝟎 = 𝟎) ≔
-begin
-  rewrite left zero_add (— 𝟎);
-  refine add_neg 𝟎
-end;
-
-// — is involutive: —(—x) = x.
-opaque symbol neg_neg (x : τ ι) : π (— (— x) = x) ≔
-begin
-  assume x;
-  refine add_left_cancel (— x) (— (— x)) x _;
-  rewrite add_neg (— x);
-  symmetry;
-  refine neg_add x
-end;
-
-// Negation distributes over +: —(x + y) = (—x) + (—y).
-opaque symbol opp_add (x y : τ ι) : π (— (x + y) = (— x) + (— y)) ≔
-begin
-  assume x y;
-  refine add_left_cancel (x + y) (— (x + y)) ((— x) + (— y)) _;
-  rewrite add_neg (x + y);
-  // Goal: 𝟎 = (x + y) + ((— x) + (— y))
-  symmetry;
-  // Goal: (x + y) + ((— x) + (— y)) = 𝟎
-  rewrite add_assoc x y ((— x) + (— y));
-  // Goal: x + (y + ((— x) + (— y))) = 𝟎
-  rewrite left add_assoc y (— x) (— y);
-  // Goal: x + ((y + (— x)) + (— y)) = 𝟎
-  rewrite add_comm y (— x);
-  // Goal: x + (((— x) + y) + (— y)) = 𝟎
-  rewrite add_assoc (— x) y (— y);
-  // Goal: x + ((— x) + (y + (— y))) = 𝟎
-  rewrite add_neg y;
-  // Goal: x + ((— x) + 𝟎) = 𝟎
-  rewrite add_zero (— x);
-  // Goal: x + (— x) = 𝟎
-  refine add_neg x
-end;
-
-// Sub-sub: x − (x − y) = y. The key normalisation lemma for AR3 + solver.
-opaque symbol sub_sub (x y : τ ι) : π (x - (x - y) = y) ≔
-begin
-  assume x y;
-  // x − (x − y) = x + —(x + (—y)) = x + ((—x) + (—(—y))) = x + ((—x) + y)
-  //            = (x + (—x)) + y = 𝟎 + y = y.
-  simplify;
-  rewrite opp_add x (— y);
-  rewrite neg_neg y;
-  rewrite left add_assoc x (— x) y;
-  rewrite add_neg x;
-  refine zero_add y
-end;
 
 // ---- Function application ----
 // eapp f x is the B-method functional application f(x).

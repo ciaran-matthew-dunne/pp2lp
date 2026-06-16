@@ -13,6 +13,16 @@ val flatten_signed : exp -> (exp * int) list option
 (* Left-nested sum of a signed-atom list, as a PP expression (`lfold [] ≡ 𝟎`). *)
 val lfold_exp : (exp * int) list -> exp
 
+(* `ϵ INT` evidence for a τ ι *atom* (a bound slot / free integer var): an
+   injected typing premise.  Set once per emission by [Translate] to this run's
+   ctx-side resolver ([Emit_ctx.atom_int_evidence]); the structural cases of
+   [int_evidence] need no ctx, so it stays out of the public arith signatures. *)
+val atom_int_ev : (exp -> Lp_tree.term) ref
+
+(* `π (e ϵ INT)`: structural for compound terms / literals, else [atom_int_ev].
+   The emitter supplies it to the guarded arithmetic lemmas (add_zero/neg_neg). *)
+val int_evidence : Lp_tree.proj_env -> exp -> Lp_tree.term
+
 (* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
    multiset after additive cancellation (`n + —n = 𝟎`); None if either is
    unsupported or the reduced multisets differ.  Bridges an arithmetic-reorder

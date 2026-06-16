@@ -12,7 +12,7 @@
 // The `Res`, `mk_1`, `res_tm`, `res_eq` primitives themselves live in
 // Quant.lp so that All.lp / Xst.lp can refer to them.
 
-require open pp2lp.B pp2lp.ConjList pp2lp.Quant;
+require open pp2lp.B pp2lp.Int pp2lp.ConjList pp2lp.Quant;
 
 // ============================================================
 // Generic equality combinators

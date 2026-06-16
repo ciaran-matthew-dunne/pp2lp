@@ -208,3 +208,26 @@ and subst_prd env = function
 let prd_of_rhs = function
   | Simple p -> p
   | Fin (p, _, _, _) -> p
+
+(* MSB-first binary digits (leading digit 1) of a positive decimal string.
+   Long division by two, so it handles literals past native int (apero's 2⁶⁴
+   uint64 bounds).  Emitted `from_int` ℤ literals use this binary Stdlib.Pos
+   form — `Zpos (O/I … H)` — never a unary `𝟏`-sum, which would blow up. *)
+let pos_bits (decimal : string) : int list =
+  let halve s =
+    let buf = Buffer.create (String.length s) and rem = ref 0 and seen = ref false in
+    String.iter (fun ch ->
+      let d = !rem * 10 + (Char.code ch - Char.code '0') in
+      let q = d / 2 in
+      if q <> 0 || !seen then begin
+        Buffer.add_char buf (Char.chr (q + Char.code '0')); seen := true
+      end;
+      rem := d mod 2) s;
+    let q = Buffer.contents buf in
+    ((if q = "" then "0" else q), !rem)
+  in
+  let rec go s acc =
+    if s = "0" then acc
+    else let q, b = halve s in go q (b :: acc)
+  in
+  go decimal []

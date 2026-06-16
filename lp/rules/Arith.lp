@@ -1,6 +1,6 @@
 // Arithmetic (§A.14) — shallow encoding
 // Uses ≤ and leq_refl from B.lp.
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
 
 // ---- AR1-3: Reflexivity of ≤ ----
 
@@ -44,10 +44,14 @@ begin
   refine h0
 end;
 
-// Bridge lemma: `𝟏 - (— x)` reduces to `𝟏 + x` after `neg_neg`.
+// Bridge lemma: `𝟏 - (— x) = 𝟏 + x` (Z.—_idem on the projection; unconditional).
 opaque symbol ar3_bridge_neg (x : τ ι) : π (𝟏 - (— x) = 𝟏 + x) ≔
 begin
-  assume x; simplify; rewrite neg_neg x; reflexivity
+  assume x;
+  have e : π (Stdlib.Z.+ (to_int 𝟏) (Stdlib.Z.— (Stdlib.Z.— (to_int x)))
+             = Stdlib.Z.+ (to_int 𝟏) (to_int x))
+    { rewrite Stdlib.Z.—_idem (to_int x); reflexivity };
+  refine feq from_int e
 end;
 
 // ---- AR3_F: PP's forward normalisation `¬(a ≤ 𝟎) ⟿ r ≤ 𝟎` (r = 𝟏−a) ----
@@ -89,7 +93,10 @@ begin assume a b; refine propExt _ _ (sub_leq a b) (leq_of_sub a b) end;
 
 // AR4: F ≤ 0 in H; E + F > 0 (solver-confirmed) → H ⊢ E ≤ 0 ⇒ R
 // If E ≤ 0 and F ≤ 0 then E + F ≤ 0, contradicting E + F > 0.
-opaque symbol AR4 [E : τ ι] [R : Prop] (F : τ ι)
+// E, F implicit: E inferred from the `(E ≤ 𝟎)` goal, F from the `F ≤ 𝟎` premise —
+// both via the Int.lp `to_int`/`isGt` unification rules (a defined `≤` would
+// otherwise hide them behind `to_int (from_int …)`).
+opaque symbol AR4 [E : τ ι] [R : Prop] [F : τ ι]
   : π (F ≤ 𝟎)
   → π ((E + F) > 𝟎)
   → π ((E ≤ 𝟎) ⇒ R) ≔
@@ -104,23 +111,23 @@ end;
 // the antecedents (presumably via classical equivalence inside its
 // solver) before chaining into AR12. We use the commuted form here so
 // the LP rule matches PP's emission shape directly.
-opaque symbol AR5 [a : τ ι] [R : Prop]
+opaque symbol AR5 [a : τ ι] [R : Prop] (hai : π (a ϵ INT))
   : π (a ≪ 𝟎)
   → π ((— a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((— a ≤ 𝟎) ⇒ R) ≔
 begin
-  assume a R ha hR hna;
-  refine hR hna (leq_antisym a 𝟎 ha (neg_leq_zero a hna))
+  assume a R hai ha hR hna;
+  refine hR hna (leq_antisym a 𝟎 hai zero_in_int ha (neg_leq_zero a hna))
 end;
 
 // AR6: —a ≤ 0 in H, a ≤ 0 antecedent ⇒ a = 0 (dual to AR5).
-opaque symbol AR6 [a : τ ι] [R : Prop]
+opaque symbol AR6 [a : τ ι] [R : Prop] (hai : π (a ϵ INT))
   : π ((— a) ≤ 𝟎)
   → π ((a ≤ 𝟎) ⇒ ((a = 𝟎) ⇒ R))
   → π ((a ≤ 𝟎) ⇒ R) ≔
 begin
-  assume a R hna hR ha;
-  refine hR ha (leq_antisym a 𝟎 ha (neg_leq_zero a hna))
+  assume a R hai hna hR ha;
+  refine hR ha (leq_antisym a 𝟎 hai zero_in_int ha (neg_leq_zero a hna))
 end;
 
 // AR7: c+b ≤ 0 in H, a+c = 0, a−b ≤ 0 antecedent ⇒ a = b.
@@ -130,51 +137,47 @@ end;
 // equality bare-variable-first (e.g. `b = -1+a`), and the emitter feeds that
 // child directly into the `hR` slot, so the lemma must match that orientation.
 opaque symbol AR7 [a b : τ ι] (c : τ ι) [R : Prop]
+  (hai : π (a ϵ INT)) (hbi : π (b ϵ INT)) (hci : π (c ϵ INT))
   : π ((c + b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
   → π ((b = a) ⇒ (((a - b) ≤ 𝟎) ⇒ R))
   → π (((a - b) ≤ 𝟎) ⇒ R) ≔
 begin
-  assume a b c R hcb hac hR hab;
+  assume a b c R hai hbi hci hcb hac hR hab;
   have heq_c : π (c = — a) {
-    rewrite left zero_add c;
+    rewrite left (zero_add c hci);
     rewrite left neg_add a;
     rewrite add_assoc (— a) a c;
     rewrite hac;
-    refine add_zero (— a)
+    refine add_zero (— a) (neg_in_int a)
   };
   have ba_leq : π (b - a ≤ 𝟎) {
-    simplify;
-    rewrite left heq_c;
-    rewrite add_comm b c;
-    refine hcb
+    refine leq_subst_l (eq_trans (add_congR b (eq_sym heq_c)) (add_comm b c)) hcb
   };
-  refine hR (eq_sym (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hab
+  refine hR (eq_sym (leq_antisym a b hai hbi (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hab
 end;
 
 // AR8: dual to AR7 — a−b ≤ 0 in H, a+c = 0, c+b ≤ 0 antecedent ⇒ a = b.
 // `b = a` orientation, as for AR7 above.
 opaque symbol AR8 (a : τ ι) [b c : τ ι] [R : Prop]
+  (hai : π (a ϵ INT)) (hbi : π (b ϵ INT)) (hci : π (c ϵ INT))
   : π ((a - b) ≪ 𝟎)
   → π ((a + c) = 𝟎)
   → π ((b = a) ⇒ (((c + b) ≤ 𝟎) ⇒ R))
   → π (((c + b) ≤ 𝟎) ⇒ R) ≔
 begin
-  assume a b c R hab hac hR hcb;
+  assume a b c R hai hbi hci hab hac hR hcb;
   have heq_c : π (c = — a) {
-    rewrite left zero_add c;
+    rewrite left (zero_add c hci);
     rewrite left neg_add a;
     rewrite add_assoc (— a) a c;
     rewrite hac;
-    refine add_zero (— a)
+    refine add_zero (— a) (neg_in_int a)
   };
   have ba_leq : π (b - a ≤ 𝟎) {
-    simplify;
-    rewrite left heq_c;
-    rewrite add_comm b c;
-    refine hcb
+    refine leq_subst_l (eq_trans (add_congR b (eq_sym heq_c)) (add_comm b c)) hcb
   };
-  refine hR (eq_sym (leq_antisym a b (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hcb
+  refine hR (eq_sym (leq_antisym a b hai hbi (leq_of_sub a b hab) (leq_of_sub b a ba_leq))) hcb
 end;
 
 opaque symbol AR9 [E : τ ι] (F : τ ι) [R : Prop]
@@ -208,6 +211,7 @@ end;
 // AR12: H, (a ≤ b) ⊢ P → H ⊢ (a ≪ b) ⇒ P in the B-book; PP never emits ≪
 // on the wire, so we type the antecedent with ≤ directly. (B.lp also aliases
 // ≪ ≔ ≤ for AR5–AR8, AR13 whose signatures still mention ≪.)
+// a, b explicit: a defined `≤` can't infer them from `(a ≤ b)` (emitter supplies).
 opaque symbol AR12 [a b : τ ι] [P : Prop]
   : (π (a ≤ b) → π P)
   → π ((a ≤ b) ⇒ P) ≔
@@ -246,10 +250,10 @@ end;
 
 symbol AR1_1 [E : τ ι] [R : Prop]
   (r : Res R) : Res ((E ≤ E) ⇒ R)
-  ≔ mk_1 (res_tm r) (eq_trans ar1_eq (res_eq r));
+  ≔ mk_1 (res_tm r) (eq_trans (@ar1_eq E R) (res_eq r));
 
 symbol AR2_1 [a b : τ ι] [R : Prop] (h : π (a > b))
-  : Res ((a ≤ b) ⇒ R) ≔ mk_0 (prop_eq_top (AR2 h));
+  : Res ((a ≤ b) ⇒ R) ≔ mk_0 (prop_eq_top (@AR2 a b R h));
 
 symbol AR3_1 (a : τ ι) [R : Prop]
   (r : Res ((𝟏 - a ≤ 𝟎) ⇒ R)) : Res (¬ (a ≤ 𝟎) ⇒ R)
@@ -269,7 +273,7 @@ symbol AR3'_1 (a r : τ ι) [R : Prop]
 // AR4_1: reuse the base rule (F≤𝟎, (E+F)>𝟎 solver facts as evidence).
 symbol AR4_1 [E : τ ι] [R : Prop] (F : τ ι)
   (hf : π (F ≤ 𝟎)) (hef : π ((E + F) > 𝟎)) : Res ((E ≤ 𝟎) ⇒ R)
-  ≔ mk_0 (prop_eq_top (AR4 F hf hef));
+  ≔ mk_0 (prop_eq_top (@AR4 E R F hf hef));
 
 // AR5/AR6: antisymmetry-to-zero — `a = 𝟎` (from the two bounds) lets the inner
 // `(a=𝟎) ⇒` be stripped (imp_known_drop under imp_cong_r).
@@ -310,7 +314,7 @@ symbol AR10_1 [P Q R : Prop]
   ≔ mk_1 (res_tm r) (eq_trans (imp_cong_l heq) (res_eq r));
 
 symbol AR11_1 [E : τ ι] [P : Prop] : Res (¬ (E ≤ E) ⇒ P)
-  ≔ mk_0 (prop_eq_top AR11);  // ¬(E≤E) absurd (leq_refl) ⇒ vacuously ⊤
+  ≔ mk_0 (prop_eq_top (@AR11 E P));  // ¬(E≤E) absurd (leq_refl) ⇒ vacuously ⊤
 
 symbol AR12_1 [a b : τ ι] [P : Prop] (h : π (a ≤ b))
   (r : Res P) : Res ((a ≤ b) ⇒ P)

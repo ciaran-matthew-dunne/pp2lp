@@ -17,18 +17,20 @@ file in the same commit.
 - **Never `git clean` under `lp/bench` or at the repo root.** The bench tree
   holds ~1 GB of gitignored generated artifacts (`.trace`/`.replay`/`.lp`)
   that take hours of PP/REPLAY time to regenerate. For stale-object errors
-  the fix is `find lp -name '*.lpo' -delete` (object caches are cheap).
+  the fix is `pp2lp clean` (drops the project + Stdlib `.lpo`; caches are cheap).
 - **`pp2lp gen` rewrites suites.** `gen <suite>` wipes every benchmark dir
   not in that suite's source of truth (goals.txt / checked-in `.but`s),
   tracked orphans included. Run it only when the task *is* corpus
   generation, never as a debugging reflex.
 - **`tex/` is the LPAR-26 paper, not the tool.** Don't touch it, `notes.md`,
-  `admin/`, `doc/`, or `vendor/` unless explicitly asked.
+  `admin/`, `doc/`, or `vendor/` unless explicitly asked. Submission deadline:
+  **21 June 2026, anywhere on Earth** (extended). Tool track; 8 pp limit
+  excludes references *and* appendices.
 - Stage by explicit path (`git add <paths>`); never `git add -A`/`-u` or
   `commit -a` — the working tree routinely carries the maintainer's
   in-flight edits. Commit messages: plain prose, no Co-Authored-By, no
   Claude/Anthropic attribution. Don't push unless asked.
-- og / prv / claude must be green at every commit (counts under Gates).
+- og / prv / claude must be green at every commit (counts under Checks).
 - Probe files (`*_probe.lp`, `*.probe.lp` outside `lp/bench`) are scratch —
   delete them when done.
 
@@ -45,9 +47,10 @@ pp2lp run og -q                 # summary only (suppress failure windows)
 
 pp2lp gen claude                # (re)gen .but/.trace/.replay via krt (PP/REPLAY)
 pp2lp gen prv --only replays    # one stage only (buts,traces,replays)
-pp2lp gen apero                 # convert+prove the CLEARSY POG corpus (see Suites)
+pp2lp gen apero --only buts      # apero stage 1: pog2but + select (see Suites)
+pp2lp gen apero                 # all apero stages: buts→traces→replays
 
-pp2lp audit                     # static pre-commit gate (see Gates); --full adds suites
+pp2lp clean                     # drop stale .lpo caches (project lp/ + Stdlib)
 ```
 
 `run` auto-builds the engine first (`--no-build` to skip). Suites run in
@@ -64,27 +67,21 @@ taking down the host; the one-off shared-library warm-up compile is exempt
 `pp2lp gen` shells out to the vendored Atelier B tools (`krt`,
 `vendor/atelierb/<plat>/REPLAY.kin`); you never call them directly.
 
-## Gates
+## Checks
 
 The feedback ladder, fastest first — climb only as far as the change demands:
 
-| gate                                   | time    | catches                                  |
+| check                                  | time    | catches                                  |
 |----------------------------------------|---------|------------------------------------------|
 | `cd ocaml && dune build`               | seconds | type/exhaustiveness errors (warn 8 fatal) |
 | `cd ocaml && dune runtest`             | seconds | emitter output drift (golden replay→.lp) |
-| `./pp2lp audit`                        | seconds | invariants below + both test files       |
+| `python3 bench/test_cli.py`            | seconds | the OCaml↔Python error-code contract     |
 | `./pp2lp run og -q`                    | ~3 s    | end-to-end smoke (30 traces)             |
 | `./pp2lp run prv -q && pp2lp run claude -q` | ~5 min | full regression (70 + 1207 traces)  |
-| apero                                  | n/a     | **not a gate** — the open frontier       |
+| apero                                  | n/a     | **not a check** — the unfinished suite       |
 
-`pp2lp audit` checks: no `admit` anywhere in `lp/` (no exceptions); no
-`trust` token in any emitted `lp/bench` `.lp`; no stray probe files; no
-generated parser artifacts in `ocaml/src/`; `bench/test_cli.py` passes
-(includes the axiom-inventory check and the OCaml↔Python contract); `dune
-runtest` passes.
-
-Pre-commit minimum: `./pp2lp audit && ./pp2lp run og -q`. Run prv + claude
-too whenever `ocaml/` or `lp/` (non-bench) changed.
+Pre-commit minimum: `cd ocaml && dune runtest && ./pp2lp run og -q`. Run prv +
+claude too whenever `ocaml/` or `lp/` (non-bench) changed.
 
 Green counts (updated 2026-06-12): **og 30 ✓, prv 70 ✓, claude 1207 ✓**
 (claude checks 1207 of 1284 goals; the rest are gen-time REPLAY drops).
@@ -93,18 +90,18 @@ Green counts (updated 2026-06-12): **og 30 ✓, prv 70 ✓, claude 1207 ✓**
 
 - **Zero admits.** `lp/` contains no `admit` and no postulated oracle. The
   historical `trust` axiom and the 9 unreachable binder-reshape `_1` lemmas
-  that used it were removed 2026-06-12; re-adding `trust` for a frontier
+  that used it were removed 2026-06-12; re-adding `trust` for a one-off
   experiment is one line in `B.lp`, but it must not survive a commit.
-- **The trusted base is exactly the axiom-inventory allowlist** enforced by
-  `bench/test_cli.py`: every bodyless `π`-typed `symbol` in `lp/B.lp` (the
-  B-Book set/arithmetic/BOOL primitives), the eight quantifier bridges in
-  `lp/Quant.lp` (`pi_to_!!`, `!!_to_pi`, `pi_to_??_intro`, `pi_to_??_elim`,
-  and the `♢`/`♡` pairs), and ConjList's `⋀`/`Res` interface. Nothing else.
-  A new bodyless symbol anywhere else fails the audit.
+- **The trusted base is small and principled** (no longer mechanically
+  allowlisted): the bodyless `π`-typed `symbol`s are B.lp's B-Book set/pair/BOOL
+  primitives, `lp/Int.lp`'s `int_mem` membership bridge and `le_def` (the
+  axiomatised `(x ≤ y) = Z.≤ (to_int x) (to_int y)` — see *Arithmetic*), the
+  eight `lp/Quant.lp` quantifier bridges (`pi_to_!!`, `!!_to_pi`, the `??`/`♢`/
+  `♡` pairs), and ConjList's `⋀`/`Res` interface. Don't add postulates casually.
 - **The engine cannot emit `trust`.** `Lp_tree.term` has no such
   constructor; every solver side-condition, BOOL-membership, AXM-evidence,
-  or AR-cancellation that can't be *generated* fails loud with a stable
-  `E_*`-coded message instead.
+  or AR-cancellation that can't be *generated* raises a stable
+  `E_*`-coded error instead.
 - **Emit dispatch is typed and exhaustive.** Rules carry a `Rule_db.emit`
   variant; the match in `rule_emit.ml`/`translate.ml` is exhaustive with
   warning 8 fatal, so adding a rule *forces* a dispatch arm.
@@ -114,26 +111,31 @@ Green counts (updated 2026-06-12): **og 30 ✓, prv 70 ✓, claude 1207 ✓**
 PP is Atelier B's automated first-order prover. A `.but` file (formula +
 flags) becomes a `.trace` (postorder), then REPLAY turns that into a
 `.replay`: sequent proof nodes prefix-style (rule before child subproofs),
-and the result-chain child of a branching quantifier (ALL7/XST8) emitted
-*before* the branch rule. Each line carries the per-rule formula annotation
+and the result-chain child of a result-consuming quantifier (ALL7/XST8)
+emitted *before* the rule itself. Each line carries the per-rule formula annotation
 PP saw.
 
 `pp2lp` parses the replay, rebuilds the tree (`proof_tree.ml`), and emits an
 `opaque symbol` whose body is a tactic script — each PP rule becomes a
 `refine RULE …` against a lemma in `lp/rules/`. Lambdapi type-checks the
-symbol. The generated `.lp` has no comments; the engine instead writes a
-provenance map (lp line → PP rule, replay line, goal) that the CLI joins
-into failure reports.
+symbol. The generated `.lp` has no comments; the engine instead records where each line came from (lp line → PP rule,
+replay line, goal), which the CLI uses to build failure reports.
 
-Three rule shapes, decoded by `Rule_db.strip_suffix` / `is_primed`:
+Three rule shapes:
 
 - **base** — `[AND2]`. Plain LP refine in the main sequent proof.
-- **`_1` primed** — `[AND2_1]`. Inside a Res-typed equality chain preceding
-  a branching quantifier. Chains are emitted as explicit *terms*
+- **`_1` primed** (the suffix axis, decoded by `Rule_db.strip_suffix` /
+  `is_primed`) — `[AND2_1]`. Inside a Res-typed equality chain preceding
+  a result-consuming quantifier. Chains are emitted as explicit *terms*
   (`refine ALL7 (λ v, …) _`), not tactic blocks — see `translate.ml`'s
   header for why.
-- **branching** — ALL7 / XST8: two children, a Res chain plus a
-  continuation under the bound variable.
+- **result-consuming** — ALL7 / XST8: arity `[Res; Seq]`, the only rules that
+  take a *result derivation* (a Res chain) as one child and a sequent
+  continuation (under the bound variable) as the other. (The code calls these
+  "branching" — `Rule_db.is_branching`, the `branching` walker in
+  `translate.ml` — but that name only tests for a `Res` slot, *not* tree
+  branching; the genuinely branching `[Seq; Seq]` splits like OR3 are not in
+  this class. Misnomer, flagged here so it doesn't spread.)
 
 **Binder merging is done at the AST level, not by an LP rule.** PP regroups
 adjacent same-quantifier binders — `∀x·∀y·P ↦ ∀(x,y)·P` (spec §A.7–8,
@@ -146,9 +148,9 @@ at `Translate.tree`). This is **not** a HOAS identity (only ALL6 is) — it is
 a deliberate skip: the compound-tuple-encoded merge lemmas put the predicate
 at a non-pattern position lambdapi cannot invert. **ALL3 is the exception**:
 re-encoded *curried* (`!! w, !! y, P w y` — All.lp) so P is a pattern, and
-`branch_cont` emits `refine ALL3 _` for real when a branch continuation's
+`branch_cont` emits `refine ALL3 _` for real when a continuation's
 nested antecedent escapes flattening. The chain (`_1`) forms of the binder
-merges are unsupported by design and fail loud at emit; the eventual real
+merges are unsupported by design and raise at emit (`E_DISPATCH`); the eventual real
 fix is currying the remaining merge rules and deleting `flatten_binds`
 (blocked on an inductive tuple-append — see git log around 2026-06-11).
 
@@ -161,7 +163,7 @@ lists; its four eliminators are part of the trusted base.
 ## Source layout
 
 ```
-pp2lp                  the single CLI (Python, one file): run, gen, audit.
+pp2lp                  the single CLI (Python, one file): run, gen, clean.
 ocaml/src/             the engine (each core module has a .mli):
   parse_replay.ml        .replay → rule lines
   rule_db.ml             rule metadata + the typed emit-dispatch key
@@ -242,7 +244,7 @@ files when done.**
    `bexpr` (bare) make PP genuinely prove it (this is what fires the
    equality-prover rules). `#` existentials are allowed in goals.
 2. `pp2lp gen claude` — runs PP/REPLAY; goals PP can't prove or REPLAY
-   truncates are dropped loudly.
+   truncates are dropped, with the reason logged.
 3. `pp2lp run claude/name`.
 
 ### Adding / teaching a new PP rule
@@ -253,24 +255,25 @@ files when done.**
    `translate.ml` if the rule shapes the tree).
 3. The LP lemma goes in the matching `lp/rules/*.lp`; spec recap is
    `doc/pp-spec-rules.pdf` (§8 for rule schemas, §A.7–8 for binder rules).
-4. Gate ladder bottom-up; add a golden test if the rule changes emission.
+4. Work up the check ladder; add a golden test if the rule changes emission.
 
-### Apero triage (the open frontier)
+### Apero triage
 
-apero is huge and **not a clean gate** — work it in families, never
+apero is huge and **not a clean check** — work it in families, never
 wholesale:
 
 1. `pp2lp run apero --filter '<family>' --json -q` on a bounded subset;
    never iterate over the full suite in a loop.
 2. Group failures by the error-code histogram, pick one code/family.
-3. Known frontier families are listed under Known broken — check there
+3. The known-broken families are listed below — check there
    before treating a failure as a regression. A regression is a code
    appearing on a benchmark family that previously passed, or any og/prv/
    claude breakage.
-4. `lp/bench/apero/.gen_ledger.json` is the gen pass's content-hash ledger
-   (dedupe + resume); never edit it. The dataset lives at
-   `PP2LP_APERO_POG` (default `vendor/apero/pog`); `PP2LP_APERO_TIMER`
-   (default R45) and `PP2LP_GEN_JOBS` tune the PP pass.
+4. apero has no central ledger: state is per-dir on disk (a stage skips an
+   input whose output is already current). The dataset lives at
+   `PP2LP_APERO_POG` (default `vendor/apero/pog`); `PP2LP_APERO_MAX_PREMISE`
+   (default 50, 0=off) is the selection cap, `PP2LP_APERO_TIMER` (default R45)
+   and `PP2LP_GEN_JOBS` tune the PP pass.
 
 ## Suites
 
@@ -278,25 +281,35 @@ wholesale:
   (no `.but`; traces are the source of truth). Also the golden-test fixtures.
 - **prv** — Atelier B PRV corpus, 70 green. `.but` checked in;
   `.trace`/`.replay` generated.
-- **claude** — the synthetic pipeline-stress suite, generated from
+- **claude** — the synthetic suite, generated from
   `goals.txt` (source of truth; 1284 goals, 1207 checked — the rest are
   gen-time REPLAY drops). Spans every rule family, proof sizes 1→416 replay
-  lines, and probes the failure frontier on purpose; inline notes flag each
+  lines, and deliberately includes cases the tool can't yet handle; inline notes flag each
   known blocker. `.but` checked in (generation output, kept for diffing).
 - **apero** — raw industrial proof obligations from CLEARSY's open POG
-  corpus (Zenodo 10.5281/zenodo.7050797: 5434 `.pog` files, 36 projects).
-  There is no Atelier B path from `.pog` to PP, so `pp2lp gen apero` renders
-  each obligation into PP's own rule-validator input (same `.but` shape as
-  prv) and runs PP, fused and streamed: a benchmark dir materialises only
-  when PP proves the goal; the ledger makes the pass resumable (`--force`
-  resets). The whole suite is gitignored — reproducible from the dataset.
+  corpus (Zenodo 10.5281/zenodo.7050797: 5434 `.pog` files, 681,285 simple
+  goals, 36 anonymised projects). There is no Atelier B path from `.pog` to
+  PP, so apero runs the same five staged steps as the other suites, with the
+  POG corpus + selection cap as its source of truth instead of a goals.txt:
+  **buts** = pog2but + select (`gen_apero_buts`: convert every obligation,
+  drop the unconvertible, apply `PP2LP_APERO_MAX_PREMISE`, dedup, write the
+  selected `.but`s, wipe the rest); **traces** = parallel PP (`gen_apero_traces`)
+  → `.trace`; **replays** = REPLAY → `.replay`. Then `run` emits + checks.
+  Of the 681k goals only ~32% are pog2but-convertible (set-comprehensions
+  block the rest), and ~580 is the median premise count — so the default
+  ≤50-premise selection is ~3,400 unique goals, the band where REPLAY does
+  not truncate. The whole suite is gitignored — reproducible from the
+  dataset + cap.
 
-## Known broken / frontiers
+## Known broken
 
-- **Chain-nested branching** (`XST8_1 expected a result-chain child but
-  stack is empty`) — the largest apero family (~21 of the first 53 complete
-  replays) and the same replay-format class as AR7_1/AR8_1 (result-chain
-  with no STOP_1 seed). Start: `proof_tree.ml` (the Res-mode stack machine).
+- **Missing result-chain child** (`OR3_1`/`XST8_1`/`ALL7_1 expected a
+  result-chain child but stack is empty`) — the largest apero family
+  (436 of 438 E_TREE_BUILD in the 2026-06-15 full run, **`OR3_1` dominating
+  at 403**; `XST8_1` 31, `ALL7_1` 2), the same replay-format class as
+  AR7_1/AR8_1 (result-chain with no STOP_1 seed). Any rule whose chain form
+  expects a Res child hits it, not just XST8. Start: `proof_tree.ml` (the
+  Res-mode stack machine).
 - **AR2 over symbolic bounds** — apero side-conditions `a > b` come from
   interval hypotheses, not positive-literal cancellations, so
   `prove_gt_zero` refuses (~16 replays). Start: the in-scope-bound evidence
@@ -313,13 +326,46 @@ wholesale:
   path is validated against a hand-completed minimal replay.
 - **NRM20/21 pin slot ≥ 3** (and NRM26 drops at slot ≥ 3 that aren't
   last-listed): substitution lemmas cover slots 0/1/2 after tail rotation;
-  later slots fail loudly. Start: `rule_emit.ml` Nrm20/21 dispatch +
+  later slots raise. Start: `rule_emit.ml` Nrm20/21 dispatch +
   `lp/rules/Nrm.lp`.
 - **BOOL11–52 unreachable end-to-end** — under self-proof they collapse to
   one AXM8; under bare kinds PP can't prove `bool()` round-trips at all (a
   PP limitation). Rule firings overall: 105/138 rule_db names fire; still
   unfired: BOOL*, EAXM2/91/92, EQC1/2, EIMP5*, ECTR5/6, EVR11, NRM16–18,
   NRM27/28/30, ALL2, AR6/7/13, VR2, FX2, XST2/61.
+- **E_PARSE on apero set-theory surface** (~106 of 110 in the full run) —
+  relational composition `;` (`(s7;s29)`) and nested-tuple membership
+  `(a,b): s` deep inside big ALL8/ALL7 formulas. Out of the goal/replay
+  grammar by design (see PP limitations: set-theoretic surface), not a lexer
+  bug. The other 4 are the FIN_INS/__INSTANCIATION markers above.
+- **Fresh emitter-bug candidates** (real defects, *not* known limits;
+  surfaced by the 2026-06-15 full run, 298 ✓ / 1300 ✗): `Missing subproofs
+  (0 for 3)` ×17 (a `refine` leaves subgoals open). E_LP_CHECK — emitted then
+  rejected by lambdapi. The `int_of_string` ×89 crash (uint64 bounds
+  overflowing native `int` at the lexer) was a bug, fixed 2026-06-15 via the
+  `BigNat` exp constructor (see LP gotchas).
+- **Unsupported NRM-in-chain now raises at emit, not as an undefined symbol**
+  (2026-06-15). PP emits NRM rules unprimed even inside result chains, so the
+  emitter primes them (`chain_emit_name`: `NRM14` → `NRM14_1`). That append is
+  now guarded by `Rule_db.has_chain_form` — the eight NRM rules with a real `_1`
+  Res lemma (NRM1/3/12/13/14/15/22/23, flagged `~chain_form:true`). Any other
+  NRM reaching a chain (NRM2 ×2, plus NRM5/6/7/8/10/19/… if they show up) raises
+  `E_DISPATCH` at emit instead of emitting a `NRMk_1` that only lambdapi rejects.
+  **To support one: add its `_1` Res lemma to `Nrm.lp`, then flip its
+  `~chain_form` flag** — keep the two in sync.
+- **NRM2 has its evidence-form `_1` + dispatch, but is blocked on chain
+  context.** Built (2026-06-15): `NRM2_1 (hp : π P) (r : Res ((♢v·Q v) ⇒ S)) :
+  Res ((♢v·P⇒Q v) ⇒ S)` via the evidence-conditioned `nrm2_eq` bridge, plus a
+  `translate.ml` chain dispatch (mirroring IMP5_1) that pulls the v-free `P`
+  from the `♢`-body antecedent and recovers it with `leaf_evidence`; `NRM2` is
+  `~chain_form:true`. It type-checks, but the two apero benchmarks still fail
+  at emit (`E_EMIT: no in-scope evidence`): their `P` (e.g. `x34 = s25`) is a *pin
+  on an outer XST8/ALL8 binder*, and result chains are emitted **before** the
+  witness (see Replay format), so the pin isn't in the chain's
+  `ctx.hyps` yet. Greening these needs the witness/outer constraint threaded
+  into the result-chain context — the **missing-result-chain-child problem**, not
+  more lemma work. (The other missing NRM `_1` are heterogeneous — some pure
+  bridges like NRM12–15, some evidence forms — so this stays staged work.)
 
 ## PP limitations (when authoring goals)
 
@@ -342,8 +388,8 @@ wholesale:
  [STOP_NORM] / [NRM] …     phantom
 ```
 
-Main proof is prefix-style; a branching quantifier's result-chain child is
-emitted *before* the branch rule. The first non-phantom line's annotation is
+Main proof is prefix-style; a result-consuming quantifier's result-chain child is
+emitted *before* the rule itself. The first non-phantom line's annotation is
 the overall goal. `Rule_db.is_phantom` filters phantoms; unknown rule names
 raise. PP emits a few `_`-prefixed identifiers (`_eql_set`, `_pj1`, `_pj2`);
 the lexer accepts them and the emitter maps them to LP names.
@@ -353,11 +399,15 @@ the lexer accepts them and the emitter maps them to LP names.
 - A bare numeral ≥ 1 in a rewrite-rule *pattern* is a **wildcard**, not the
   literal — spell slot 1 as `+1 0`.
 - Never force whnf of a big `int_lit` (decimal numerals exist precisely to
-  keep big literals folded).
+  keep big literals folded). A decimal literal too big for OCaml's native
+  `int` (≥ 2⁶³, e.g. apero's 2⁶⁴ uint64 bounds) is carried as
+  `Syntax_pp.BigNat of string` — an opaque atom that renders through the same
+  `int_lit` decimal path; the lexer routes it via `int_of_string_opt`. Never
+  re-add `int_of_string` on a `natural` token (it overflows and crashes).
 - `sequential` rule blocks are order-sensitive (the ⊤-erasure rules in
   ConjList must precede the general cons rule).
-- Stale `.lpo` after a lambdapi upgrade or lp/ edit storm:
-  `find lp -name '*.lpo' -delete`.
+- Stale `.lpo` after a lambdapi upgrade or lp/ edit storm: `pp2lp clean`
+  (clears both the project and the Stdlib lib_root caches).
 
 ## Common errors
 
@@ -367,7 +417,7 @@ the lexer accepts them and the emitter maps them to LP names.
 | `E_ARITY` / `E_DISPATCH`                                | `proof_tree.ml`/`translate.ml` | Review the rule's slot kinds / add the dispatch arm.    |
 | `E_TREE_BUILD` (`unconsumed rule lines`, `expected a child`) | `proof_tree.ml`         | An earlier rule has the wrong arity; `PP2LP_DEBUG_REPLAY=1`. |
 | `E_PARSE`                                               | `parser.mly`/`parse_replay.ml` | Bad replay line; inspect the reported column.           |
-| `File X.lpo is incompatible with current binary`        | lambdapi                     | `find lp -name '*.lpo' -delete`.                          |
+| `File X.lpo is incompatible with current binary`        | lambdapi                     | `pp2lp clean` (project + Stdlib `.lpo`).                  |
 | `package X cannot be mapped under the library root`     | lambdapi                     | Missing `lambdapi.pkg`; `lp/lambdapi.pkg` covers the package. |
 | dune: `file present in source tree` (parser.ml/.conflicts) | menhir promotion          | `rm -f ocaml/src/parser.ml ocaml/src/parser.conflicts`.   |
 

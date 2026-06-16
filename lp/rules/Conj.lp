@@ -4,7 +4,7 @@
 // structurally: init = `⋀ ps`, last = `P`.  Each rule pattern-matches the
 // `∷` directly; Lambdapi infers `ps`/`P` from the goal (via the `⋀`
 // unification rule in ConjList.lp).
-require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 

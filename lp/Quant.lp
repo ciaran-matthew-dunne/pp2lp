@@ -44,12 +44,12 @@ with prj 0       (_ ⨾ $x) ↪ $x;
 constant symbol set_lambda [n] : (Tuple n → Prop) → (Tuple n → τ ι) → τ ι;
 constant symbol sigma [n] : (Tuple n → Prop) → (Tuple n → τ ι) → τ ι;
 
-// Canonical inhabitant of `Tuple n` — every slot filled with `inh`.
+// Canonical inhabitant of `Tuple n` — every slot filled with `el ι`.
 // Used when a rule needs a witness tuple but its predicate is
 // independent of the tuple's contents.
 symbol inh_tuple [n] : Tuple n;
 rule inh_tuple [0] ↪ unit
-with inh_tuple [+1 $n] ↪ inh_tuple [$n] ⨾ inh;
+with inh_tuple [+1 $n] ↪ inh_tuple [$n] ⨾ el ι;
 
 // ---- Tuple split: `++`, take, drop --------------------------------
 // Custom natural-number addition that recurses on the LEFT, unlike

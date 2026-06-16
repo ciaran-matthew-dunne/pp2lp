@@ -1,5 +1,5 @@
 // Implication (§A.3) — shallow encoding
-require open pp2lp.B pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.ConjList pp2lp.Quant pp2lp.rules.Res;
 
 // ---- Base rules ----
 

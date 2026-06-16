@@ -26,6 +26,46 @@ let is_atom_exp = function
    literal stays an opaque atom as before. *)
 let lit_unfold_max = 64
 
+(* The binary `Stdlib.Pos.ℙ` term for a positive decimal literal (`O p = 2p`,
+   `I p = 2p+1`, `H = 1`), folded MSB→LSB onto `H` from [pos_bits]. *)
+let pos_term (decimal : string) : L.term =
+  match Syntax_pp.pos_bits decimal with
+  | [] -> L.Name "Stdlib.Pos.H"
+  | _ :: rest ->
+    List.fold_left (fun p b ->
+      L.App (L.Name (if b = 1 then "Stdlib.Pos.I" else "Stdlib.Pos.O"), [p]))
+      (L.Name "Stdlib.Pos.H") rest
+
+(* The ℤ literal term for a non-negative PP literal (decimal string), in binary
+   `Stdlib.Z` form — `Z0` or `Zpos (binary)`.  Matches the printer's literals. *)
+let z_lit (decimal : string) : L.term =
+  match Syntax_pp.pos_bits decimal with
+  | [] -> L.Name "Stdlib.Z.Z0"
+  | _ -> L.App (L.Name "Stdlib.Z.Zpos", [pos_term decimal])
+
+(* `ϵ INT` evidence for a τ ι *atom* (a bound tuple slot / free integer var):
+   an injected typing premise.  The only ctx-dependent part of [int_evidence],
+   so it is set once per emission by [Translate] (single-threaded) rather than
+   threaded through every arith helper.  ponytail: dynamically-scoped ref over
+   one emission; thread it as a param if emission ever goes concurrent. *)
+let atom_int_ev : (exp -> L.term) ref =
+  ref (fun _ -> failwith "arith_proofs: atom_int_ev unset")
+
+(* `π (e ϵ INT)` for a τ ι expression.  Compound terms are structurally in INT
+   (`—`/`+` land in from_int's range; a literal is from_int of a ℤ), so their
+   side-conditions discharge without a premise; an atom defers to [atom_int_ev].
+   Mirrors the BOOL precedent — morally-true premises, never a postulate. *)
+let int_evidence env e : L.term =
+  let ex t = L.Exp (env, t) in
+  match e with
+  | Nat 0 | Neg (Nat 0) -> L.Name "zero_in_int"
+  | Nat n -> L.App (L.Name "from_int_in_int", [z_lit (string_of_int n)])
+  | BigNat s -> L.App (L.Name "from_int_in_int", [z_lit s])
+  | Neg a -> L.App (L.Name "neg_in_int", [ex a])
+  | AOp (Add, x, y) -> L.App (L.Name "add_in_int", [ex x; ex y])
+  | AOp (Sub, x, y) -> L.App (L.Name "add_in_int", [ex x; ex (Neg y)])
+  | _ -> !atom_int_ev e
+
 (* Flatten a `+`/`−` expression to its ordered signed-atom list, pushing unary
    `—` down to the atoms (— distributes over + and is involutive); None if a
    non-arithmetic node blocks it.  Mirrors [normalize]'s recursion exactly, so
@@ -105,8 +145,12 @@ let prove_eq_lnested env l_orig : L.term =
 let rec concat env la lb : L.term =
   let ex t = L.Exp (env, t) in
   match la, List.rev lb with
-  | _, [] -> L.App (L.Name "add_zero", [ ex (lfold_exp la) ])
-  | [], _ -> L.App (L.Name "zero_add", [ ex (lfold_exp lb) ])
+  | _, [] ->
+    let a = lfold_exp la in
+    L.App (L.Name "add_zero", [ ex a; int_evidence env a ])
+  | [], _ ->
+    let b = lfold_exp lb in
+    L.App (L.Name "zero_add", [ ex b; int_evidence env b ])
   | _, [ _ ] ->
     L.App (L.Name "eq_refl", [ ex (AOp (Add, lfold_exp la, lfold_exp lb)) ])
   | _, last :: front_rev ->
@@ -158,7 +202,8 @@ let rec normalize env e : ((exp * int) list * L.term) option =
   | Neg (AOp (Sub, x, y)) -> normalize env (Neg (AOp (Add, x, Neg y)))
   | Neg (Neg a) ->
     (match normalize env a with
-     | Some (la, pa) -> Some (la, trans (L.App (L.Name "neg_neg", [ ex a ])) pa)
+     | Some (la, pa) ->
+       Some (la, trans (L.App (L.Name "neg_neg", [ ex a; int_evidence env a ])) pa)
      | None -> None)
   | _ -> None
 
@@ -182,7 +227,8 @@ let prove_cancel env l k : L.term =
     (* (lfold pre + —a) + a = lfold pre, then congL the suffix back on. *)
     let pf = lfold_exp pre in
     let core = trans (assoc pf (Neg a) a)
-                 (trans (congR pf neg_add_a) (L.App (L.Name "add_zero", [ ex pf ]))) in
+                 (trans (congR pf neg_add_a)
+                    (L.App (L.Name "add_zero", [ ex pf; int_evidence env pf ]))) in
     fold_congL core suf
   | [] ->
     (match suf with
@@ -190,7 +236,8 @@ let prove_cancel env l k : L.term =
      | s0 :: rest ->
        (* (—a + a) + s0 = s0, then congL the rest. *)
        let s0e = signed_exp s0 in
-       let core = trans (congL s0e neg_add_a) (L.App (L.Name "zero_add", [ ex s0e ])) in
+       let core = trans (congL s0e neg_add_a)
+                    (L.App (L.Name "zero_add", [ ex s0e; int_evidence env s0e ])) in
        fold_congL core rest)
 
 (* Reduce a SORTED signed-atom list by cancelling adjacent `(a,−1),(a,+1)`
@@ -270,13 +317,13 @@ let prove_gt_zero env e : L.term option =
               [ L.Exp (env, Nat 1); L.Exp (env, Nat c); L.Exp (env, Nat 0);
                 one_leq_lit c; L.Name "_hk" ]) ]))
   in
-  let positive_lit c =                            (* π (¬(int_lit c ≤ 𝟎)), c ≥ 1 *)
-    if c <= lit_unfold_max then lit_not_leq_zero c       (* unary, matches the
-       printer's 𝟏-sum rendering of `Nat c` while it unfolds *)
-    else L.App (L.Name "lit_pos", [ L.Name (string_of_int (c - 1)) ])
+  let positive_lit c =                            (* π (¬(from_int c ≤ 𝟎)), c ≥ 1 *)
+    if c <= lit_unfold_max then lit_not_leq_zero c       (* unary chain; the
+       atoms are 𝟏, which the printer still renders 𝟏 *)
+    else L.App (L.Name "lit_pos", [ pos_term (string_of_int c) ])
                                                   (* O(1); past the cap `Nat c`
-       renders as a folded decimal = `int_lit c`, so `lit_pos (c−1)` lines up.
-       The arg is a BARE ℕ literal (numeral text, no int_lit coercion). *)
+       renders as `from_int (Zpos P_c)`, and `lit_pos P_c` refutes it directly
+       (`Zpos p ≐ Z0 ↪ Gt`), no unary blowup. *)
   in
   (* The value [e] cancels to, when it is a positive literal — either k copies
      of the 𝟏-atom or a single folded literal past [lit_unfold_max].  Read off

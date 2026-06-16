@@ -992,15 +992,22 @@ def _strip_flags(content):
 # Point PP2LP_APERO_POG at the extracted `zenodo-dataset-pog-20220905` dir
 # (default: vendor/apero/pog).  There is no Atelier B path from .pog to PP —
 # the modern proof-mechanism drivers all target SMT/TPTP — so we render each
-# obligation (full hypothesis set, as stated) into PP's own rule-validator
-# input, the same .but shape Atelier B writes for the prv corpus.
+# obligation into PP's own rule-validator input, the same .but shape Atelier B
+# writes for the prv corpus.
 #
-# Conversion and the PP run are fused and streamed: a benchmark dir
-# materialises only when PP proves the goal, so disk scales with proofs, not
-# with the ~600k-goal corpus.  A content-hash ledger (.gen_ledger.json)
-# dedupes the very repetitive corpus and makes the pass resumable; --force
-# resets it.  PP timer: PP2LP_APERO_TIMER (default R45, as gen_traces);
-# workers: PP2LP_GEN_JOBS (default half the cores).
+# The pipeline is the same five stages the other suites use, one gen verb each:
+#   buts    pog2but + selection — gen_apero_buts renders every obligation,
+#           applies the premise cap (PP2LP_APERO_MAX_PREMISE), dedups identical
+#           content, and writes one NAME/NAME.but per selected goal (wiping dirs
+#           outside the selection).  No Atelier B; the corpus + cap are this
+#           suite's source of truth, as goals.txt is for the others.
+#   traces  PP — gen_apero_traces proves the .but files in parallel
+#           (PP2LP_GEN_JOBS, timer PP2LP_APERO_TIMER, default R45) → .trace.
+#   replays REPLAY → .replay (shared gen_replays); a .trace with no .replay is a
+#           REPLAY loss, left in place and simply skipped by `run`.
+# Then `run` emits .lp and type-checks (stages 4–5).  State is per-dir on disk
+# (no central ledger): each stage skips inputs whose output is already current.
+# The ~600k-goal corpus is gitignored and reproducible from the dataset + cap.
 
 _APERO_NS = "{https://www.atelierb.eu/Formats/pog}"
 
@@ -1016,6 +1023,15 @@ _APERO_BIN = {"+i": "+", "-i": "-", "*i": "*", "/i": "/", "**i": "**",
               "+f": "+", "-f": "-", "*f": "*", "/f": "/",
               "-s": "-", "*s": "*", "+s": "+"}
 _APERO_UN = {"imax": "max", "imin": "min", "rmax": "max", "rmin": "min"}
+
+# Hypothesis-size selection.  PP proves ~98% of converted obligations regardless
+# of size, but REPLAY truncates and lambdapi times out as the hypothesis context
+# grows: measured replay-completeness is 72% at <=5 premises, 46% at 25-50, 25%
+# at 50-100, and 0% at >=1000 (corpus median is ~580).  Capping the premise
+# count (top-level & conjuncts of the rendered hypothesis) keeps gen's PP/REPLAY
+# time on the tractable band — ~4k corpus-wide at the default — instead of the
+# big-context monsters that always truncate.  0 = no cap (the full corpus).
+_APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "50"))
 
 
 def _apero_src() -> Path:
@@ -1116,10 +1132,19 @@ def _ap_prd(el) -> str:
     raise _AperoUnsupported(f"pred node {t}")
 
 
+def _ap_premises(el) -> int:
+    """Number of top-level conjuncts an element contributes to the hypothesis
+    (Nary '&' flattened recursively) — the count PP/REPLAY actually sees."""
+    if _ap_tag(el) == "Nary_Pred" and el.get("op") == "&":
+        return sum(_ap_premises(c) for c in el)
+    return 1
+
+
 def _apero_goals(pogfile: Path):
-    """Yield (name, but_content_or_None, unsupported_reason) per simple goal,
-    with the obligation's full hypothesis set (Definition refs + Hypothesis +
-    the goal's Ref_Hyp'd Local_Hyps)."""
+    """Yield (name, but_content_or_None, drop_reason) per simple goal, with the
+    obligation's full hypothesis set (Definition refs + Hypothesis + the goal's
+    Ref_Hyp'd Local_Hyps).  drop_reason is an unsupported-node message, or
+    "premises>N" when the premise count exceeds _APERO_MAX_PREMISE."""
     root = ET.parse(pogfile).getroot()
     defs = {d.get("name"): list(d) for d in root.findall(f"{_APERO_NS}Define")}
     proj, stem = pogfile.parent.name, pogfile.stem
@@ -1129,50 +1154,134 @@ def _apero_goals(pogfile: Path):
             hyp_els += defs.get(dref.get("name"), [])
         hyp_els += [h[0] for h in po.findall(f"{_APERO_NS}Hypothesis")]
         loc = {h.get("num"): h for h in po.findall(f"{_APERO_NS}Local_Hyp")}
+        base_prem = sum(_ap_premises(h) for h in hyp_els)
         for j, sg in enumerate(po.findall(f"{_APERO_NS}Simple_Goal")):
             name = f"ap_{proj}_{stem}_po{i}_g{j}"
+            refs = [loc[r.get("num")][0]
+                    for r in sg.findall(f"{_APERO_NS}Ref_Hyp")
+                    if r.get("num") in loc]
             try:
                 hyps = [s for s in (_ap_prd(h) for h in hyp_els) if s]
-                lh = [_ap_prd(loc[r.get("num")][0])
-                      for r in sg.findall(f"{_APERO_NS}Ref_Hyp")
-                      if r.get("num") in loc]
+                lh = [_ap_prd(r) for r in refs]
                 goal = _ap_prd(sg.find(f"{_APERO_NS}Goal")[0])
             except _AperoUnsupported as e:
                 yield name, None, str(e)
                 continue
+            if _APERO_MAX_PREMISE:
+                n_prem = base_prem + sum(_ap_premises(r) for r in refs)
+                if n_prem > _APERO_MAX_PREMISE:
+                    yield name, None, f"premises>{_APERO_MAX_PREMISE}"
+                    continue
             hyp = " & ".join(hyps + [s for s in lh if s]) or "1 = 1"
             yield name, f"Set(Valid.1 | Rule(Implication | {hyp} | ? | ? | {goal} | nn))\n", None
 
 
-def _apero_pp_one(krt, pp_kin, timer, name, content):
-    """Run PP on one converted goal in a scratch dir; return (verdict, trace_bytes)."""
-    with tempfile.TemporaryDirectory(prefix="pp2lp_apero_") as td:
-        goal = Path(td) / "case.goal"
-        goal.write_text(f'Flag(TraceOn("{name}.trace")) & '
-                        f'Flag(FileOn("{name}.res")) & ' + content)
-        okk, _out, reason = run_krt(krt, pp_kin, goal.name, td, timer=timer)
-        trace = Path(td) / f"{name}.trace"
-        if okk and trace.exists():
-            data = trace.read_bytes()
-            if data.strip():
-                return "proved", data
-        if reason.startswith("timer") or reason == "timeout":
-            return "pp-timeout", None
-        if reason.startswith("saturation"):
-            return reason, None
-        return "no-proof", None
-
-
-def gen_apero(krt, force=False):
-    """Fused convert+prove pass over the apero POG corpus.  Returns a stats
-    dict; benchmark dirs (NAME/{NAME.but,NAME.trace}) materialise only for
-    proved goals.  Resumable via the content-hash ledger."""
+def gen_apero_buts(force=False):
+    """Stage 1 — pog2but + selection.  Walk the apero POG corpus, render every
+    obligation with the pog2but converter, apply the premise cap
+    (PP2LP_APERO_MAX_PREMISE), dedup identical content, and materialise one
+    NAME/NAME.but per selected goal — wiping apero dirs outside the current
+    selection (the corpus + cap are this suite's source of truth, as goals.txt
+    is for the others).  No Atelier B; deterministic.  Writes are content-aware,
+    so an unchanged .but keeps its mtime and the trace/replay stages can skip it.
+    Returns a stats dict."""
     src = _apero_src()
     if not src.is_dir():
         sys.exit(f"pp2lp: apero POG dataset not found at {src}\n"
                  "  extract https://doi.org/10.5281/zenodo.7050797 and point "
                  "PP2LP_APERO_POG at the zenodo-dataset-pog-20220905 directory "
                  "(or symlink it to vendor/apero/pog)")
+    here = BENCH / "apero"
+    here.mkdir(parents=True, exist_ok=True)
+    # One-time migration off the legacy fused-pipeline ledger: those dirs predate
+    # the premise cap and the staged layout, so wipe them and rebuild clean.
+    legacy = here / ".gen_ledger.json"
+    if legacy.exists():
+        for d in sorted(p for p in here.iterdir() if p.is_dir()):
+            _rm_benchmark(d)
+        legacy.unlink()
+
+    files = sorted(src.glob("*/*.pog"), key=lambda p: p.stat().st_size)
+    wanted: dict[str, str] = {}        # name -> .but content (deduped by content)
+    seen: set[str] = set()             # content hashes
+    stats = {"goals": 0, "unsupported": 0, "capped": 0, "dups": 0, "selected": 0}
+    unsup_reasons: dict[str, int] = {}
+    t0 = time.time()
+    last_line = last_tty = 0.0
+
+    def progress(i):
+        nonlocal last_line, last_tty
+        now = time.time()
+        line = (f"pog {i}/{len(files)} files · {stats['goals']} goals · "
+                f"{stats['selected']} selected · {stats['dups']} dups · "
+                f"{stats['unsupported']} unsup · {stats['capped']} capped · "
+                f"{(now - t0) / 60:.0f}m")
+        if IS_TTY:
+            if now - last_tty >= 0.2:
+                sys.stdout.write("\r\033[K  " + dim(line)); sys.stdout.flush()
+                last_tty = now
+        elif now - last_line >= 60:
+            print("  " + line, flush=True); last_line = now
+
+    for i, pog in enumerate(files, 1):
+        for name, content, drop in _apero_goals(pog):
+            stats["goals"] += 1
+            if drop is not None:
+                if drop.startswith("premises>"):
+                    stats["capped"] += 1
+                else:
+                    stats["unsupported"] += 1
+                    unsup_reasons[drop] = unsup_reasons.get(drop, 0) + 1
+                continue
+            h = hashlib.sha1(content.encode()).hexdigest()
+            if h in seen:
+                stats["dups"] += 1; continue
+            seen.add(h); wanted[name] = content; stats["selected"] += 1
+        progress(i)
+    if IS_TTY:
+        sys.stdout.write("\r\033[K"); sys.stdout.flush()
+
+    # Wipe dirs outside the selection, then write .but content-aware.
+    for p in here.glob("*/*.but"):
+        if p.stem not in wanted:
+            _rm_benchmark(p.parent)
+    written = 0
+    for name, content in wanted.items():
+        d = here / name; d.mkdir(parents=True, exist_ok=True)
+        bp = d / f"{name}.but"
+        if force or not bp.exists() or bp.read_text() != content:
+            bp.write_text(content); written += 1
+    stats["written"] = written
+    stats["unsup_reasons"] = dict(sorted(unsup_reasons.items(), key=lambda kv: -kv[1]))
+    return stats
+
+
+def _pp_one_but(krt, pp_kin, timer, but):
+    """Prove one selected .but in its own dir; write .trace on success.  Returns
+    (stem, verdict) with verdict in proved / no-proof / pp-timeout / saturation*."""
+    stem, d = but.stem, but.parent
+    content = (f'Flag(TraceOn("{stem}.trace")) & Flag(FileOn("{stem}.res")) & '
+               + _strip_flags(but.read_text()))
+    goal = d / f"{stem}.goal"
+    goal.write_text(content)
+    okk, _o, reason = run_krt(krt, pp_kin, goal.name, str(d), timer=timer)
+    goal.unlink(missing_ok=True)
+    (d / f"{stem}.res").unlink(missing_ok=True)
+    trace = d / f"{stem}.trace"
+    if okk and trace.exists() and trace.read_bytes().strip():
+        return stem, "proved"
+    trace.unlink(missing_ok=True)
+    if reason.startswith("timer") or reason == "timeout":
+        return stem, "pp-timeout"
+    if reason.startswith("saturation"):
+        return stem, reason
+    return stem, "no-proof"
+
+
+def gen_apero_traces(krt, force=False):
+    """Stage 2 — PP.  Prove each selected .but in parallel (PP2LP_GEN_JOBS),
+    writing .trace on success; a .but whose .trace is up to date is skipped.
+    Records a PP-verdict histogram for the funnel.  Returns a stats dict."""
     pp_kin = find_kin(["/opt/atelierb-free-24.04.2/bin/PP.kin",
                        os.path.expanduser("~/atelierb/bin/PP.kin")])
     if not pp_kin:
@@ -1180,41 +1289,18 @@ def gen_apero(krt, force=False):
     timer = os.environ.get("PP2LP_APERO_TIMER", "R45")
     jobs = int(os.environ.get("PP2LP_GEN_JOBS") or max(4, (os.cpu_count() or 8) // 2))
     here = BENCH / "apero"
-    here.mkdir(parents=True, exist_ok=True)
-    ledger_path = here / ".gen_ledger.json"
-    ledger = {}
-    if ledger_path.exists() and not force:
-        ledger = {k: e for k, e in json.loads(ledger_path.read_text()).items()
-                  if e.get("v") != "pending"}   # an interrupted run's claims
-    # Anything on disk the ledger doesn't know is stale (old experiments,
-    # interrupted runs): regenerate from the corpus, not from leftovers.
-    known = {e["n"] for e in ledger.values() if e.get("n")}
-    for d in sorted(p for p in here.iterdir() if p.is_dir()):
-        if d.name not in known:
-            _rm_benchmark(d)
+    buts = sorted(here.glob("*/*.but"))
+    stats = {"proved": 0, "no-proof": 0, "pp-timeout": 0, "saturation": 0, "skip": 0}
+    todo = []
+    for but in buts:
+        trace = but.parent / f"{but.stem}.trace"
+        if not force and trace.exists() and trace.stat().st_mtime >= but.stat().st_mtime:
+            stats["skip"] += 1
+        else:
+            todo.append(but)
 
-    stats = {"goals": 0, "dups": 0, "unsupported": 0, "proved": 0,
-             "no-proof": 0, "pp-timeout": 0, "saturation": 0}
-    unsup_reasons: dict[str, int] = {}
-    flush_every = 200
-
-    def flush():
-        tmp = ledger_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(ledger))
-        tmp.replace(ledger_path)
-
-    def admit(name, content, data):
-        d = here / name
-        d.mkdir(parents=True, exist_ok=True)
-        (d / f"{name}.but").write_text(content)
-        (d / f"{name}.trace").write_bytes(data)
-
-    # Smallest files first: progress is visible immediately and the handful of
-    # 100 MB+ monsters (slow even to XML-parse) come last.
-    files = sorted(src.glob("*/*.pog"), key=lambda p: p.stat().st_size)
     t0 = time.time()
-    pending = decided = files_done = 0
-    last_flush = 0
+    done = 0
     last_line = last_tty = 0.0
     sig_seen = []
 
@@ -1222,108 +1308,47 @@ def gen_apero(krt, force=False):
         sig_seen.append(signum)
         raise KeyboardInterrupt
 
-    def _line():
-        el = (time.time() - t0) / 60
-        return (f"pog {files_done}/{len(files)} files · {stats['goals']} goals · "
-                f"{stats['proved']} proved · {stats['dups']} dups · "
-                f"{stats['unsupported']} unsup · {stats['no-proof']} unproved · "
-                f"{stats['pp-timeout']} t/o · {el:.0f}m")
-
     def progress():
         nonlocal last_line, last_tty
         now = time.time()
+        line = (f"pp {done}/{len(todo)} · {stats['proved']} proved · "
+                f"{stats['no-proof']} unproved · {stats['pp-timeout']} t/o · "
+                f"{stats['saturation']} sat · {stats['skip']} skip · {(now - t0) / 60:.0f}m")
         if IS_TTY:
-            if now - last_tty >= 0.2:              # throttle terminal rewrites
-                sys.stdout.write("\r\033[K  " + dim(_line()))
-                sys.stdout.flush()
+            if now - last_tty >= 0.2:
+                sys.stdout.write("\r\033[K  " + dim(line)); sys.stdout.flush()
                 last_tty = now
-        elif now - last_line >= 60:                # piped/nohup: one line a minute
-            print("  " + _line(), flush=True)
-            last_line = now
-
-    futs: dict = {}
-
-    def record(f):
-        nonlocal pending, decided
-        key, name, content = futs.pop(f)
-        verdict, data = f.result()
-        v = verdict if verdict in stats else "saturation"
-        stats[v] += 1
-        ledger[key] = {"v": verdict, "n": name if verdict == "proved" else None}
-        if verdict == "proved":
-            admit(name, content, data)
-        pending -= 1
-        decided += 1
-
-    def drain(block_at):
-        nonlocal last_flush
-        while pending >= block_at:
-            done, _ = concurrent.futures.wait(
-                list(futs), return_when=concurrent.futures.FIRST_COMPLETED)
-            for f in done:
-                record(f)
-            if decided - last_flush >= flush_every:
-                flush()
-                last_flush = decided
-            progress()
+        elif now - last_line >= 60:
+            print("  " + line, flush=True); last_line = now
 
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=jobs)
     old_int = signal.signal(signal.SIGINT, _on_sig)
     old_term = signal.signal(signal.SIGTERM, _on_sig)
     interrupted = False
     try:
-        for pog in files:
-            for name, content, unsup in _apero_goals(pog):
-                stats["goals"] += 1
-                if unsup is not None:
-                    stats["unsupported"] += 1
-                    unsup_reasons[unsup] = unsup_reasons.get(unsup, 0) + 1
-                    continue
-                key = hashlib.sha1(content.encode()).hexdigest()
-                if key in ledger:
-                    stats["dups"] += 1
-                    progress()                     # tick while skipping through dups
-                    continue
-                ledger[key] = {"v": "pending", "n": None}   # claim before submit
-                futs[ex.submit(_apero_pp_one, krt, pp_kin, timer, name, content)] = \
-                    (key, name, content)
-                pending += 1
-                drain(jobs * 2)
-            files_done += 1
+        futs = {ex.submit(_pp_one_but, krt, pp_kin, timer, b): b for b in todo}
+        for f in concurrent.futures.as_completed(futs):
+            _stem, verdict = f.result()
+            stats[verdict if verdict in stats else "saturation"] += 1
+            done += 1
             progress()
-        drain(1)
     except KeyboardInterrupt:
         interrupted = True
-        for f in list(futs):
-            f.cancel()
-        for p in list(_KRT_LIVE):                  # unblock the worker threads now
+        for p in list(_KRT_LIVE):              # unblock worker threads immediately
             try:
                 p.kill()
             except OSError:
                 pass
-        for f in list(futs):                       # harvest what did finish
-            if f.done() and not f.cancelled():
-                try:
-                    record(f)
-                except Exception:
-                    pass
     finally:
         signal.signal(signal.SIGINT, old_int)
         signal.signal(signal.SIGTERM, old_term)
         ex.shutdown(wait=True, cancel_futures=True)
         if IS_TTY:
-            sys.stdout.write("\r\033[K")
-            sys.stdout.flush()
-    # Drop the pending claims (unfinished submissions) from the ledger.
-    ledger = {k: e for k, e in ledger.items() if e.get("v") != "pending"}
-    flush()
+            sys.stdout.write("\r\033[K"); sys.stdout.flush()
     if interrupted:
-        print(yellow(f"  pog:     interrupted — {decided} goals decided this run, "
-                     f"{stats['proved']} proved; ledger saved — "
-                     f"rerun `pp2lp gen apero` to resume"))
+        print(yellow(f"  pp:      interrupted — {done} proved-or-decided this run; "
+                     f"rerun `pp2lp gen apero --only traces` to resume"))
         sys.exit(128 + (sig_seen[0] if sig_seen else 2))
-    stats["unsup_reasons"] = dict(sorted(unsup_reasons.items(),
-                                         key=lambda kv: -kv[1]))
     return stats
 
 
@@ -1436,31 +1461,6 @@ def gen_replays(suite, krt, force=False):
     return ok, fail, skip, dropped
 
 
-def apero_reconcile_replays():
-    """Post-replay hygiene for the apero suite: a dir whose trace yielded no
-    complete replay (REPLAY truncation/abort) can never verify — remove it and
-    record the loss in the ledger so re-runs neither re-prove nor re-replay it."""
-    here = BENCH / "apero"
-    ledger_path = here / ".gen_ledger.json"
-    if not ledger_path.exists():
-        return 0
-    ledger = json.loads(ledger_path.read_text())
-    by_name = {e.get("n"): k for k, e in ledger.items() if e.get("n")}
-    lost = 0
-    for d in sorted(p for p in here.iterdir() if p.is_dir()):
-        if (d / f"{d.name}.trace").exists() and not (d / f"{d.name}.replay").exists():
-            key = by_name.get(d.name)
-            if key:
-                ledger[key] = {"v": "replay-lost", "n": None}
-            _rm_benchmark(d)
-            lost += 1
-    if lost:
-        tmp = ledger_path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(ledger))
-        tmp.replace(ledger_path)
-    return lost
-
-
 def cmd_gen(args) -> int:
     """The `gen` verb: (re)generate a suite's inputs via krt.  Incremental by
     default — a stage skips items whose output is newer than its input; pass
@@ -1487,25 +1487,29 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
     for st in [s.strip() for s in stages_str.split(",") if s.strip()]:
         if st == "buts":
             if suite == "apero":
-                print(dim("  buts:    apero converts from POG at the traces stage — skipped"))
-                continue
-            r = gen_buts(suite, force=force)
-            print(dim("  buts:    no goals.txt — skipped") if r is None
-                  else dim(f"  buts:    {r[0]} written, {r[1] - r[0]} unchanged"))
-        elif st == "traces":
-            if suite == "apero":
-                s = gen_apero(get_krt(), force=force)
-                print(dim(f"  pog:     {s['goals']} goals → {s['proved']} proved "
-                          f"({s['dups']} dups, {s['unsupported']} unsupported, "
-                          f"{s['no-proof']} unproved, {s['pp-timeout']} timeout, "
-                          f"{s['saturation']} saturated)"))
+                s = gen_apero_buts(force=force)
+                print(dim(f"  buts:    {s['goals']} goals → {s['selected']} selected "
+                          f"({s['written']} written; {s['dups']} dups, "
+                          f"{s['unsupported']} unsupported, "
+                          f"{s['capped']} capped >{_APERO_MAX_PREMISE} prem)"))
                 if s["unsup_reasons"]:
                     top = ", ".join(f"{k} ×{v}"
                                     for k, v in list(s["unsup_reasons"].items())[:6])
                     print(dim(f"           unsupported: {top}"))
                 continue
+            r = gen_buts(suite, force=force)
+            print(dim("  buts:    no goals.txt — skipped") if r is None
+                  else dim(f"  buts:    {r[0]} written, {r[1] - r[0]} unchanged"))
+        elif st == "traces":
             if not list(here.glob("*/*.but")):
-                print(dim("  traces:  no .but files — skipped")); continue
+                hint = "run `gen apero --only buts` first" if suite == "apero" else "skipped"
+                print(dim(f"  traces:  no .but files — {hint}")); continue
+            if suite == "apero":
+                s = gen_apero_traces(get_krt(), force=force)
+                print(dim(f"  traces:  {s['proved']} proved "
+                          f"({s['no-proof']} unproved, {s['pp-timeout']} timeout, "
+                          f"{s['saturation']} saturated, {s['skip']} up-to-date)"))
+                continue
             ok, fail, skip = gen_traces(suite, get_krt(), force=force)
             print(dim(f"  traces:  {ok} ok, {fail} failed, {skip} up-to-date"))
         elif st == "replays":
@@ -1517,80 +1521,40 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             ok, fail, skip, dropped = gen_replays(suite, get_krt(), force=force)
             tail = f", {dropped} dropped (truncated)" if dropped else ""
             print(dim(f"  replays: {ok} ok, {fail} failed, {skip} up-to-date{tail}"))
-            if suite == "apero":
-                lost = apero_reconcile_replays()
-                if lost:
-                    print(dim(f"  apero:   {lost} replay-lost dirs removed "
-                              f"(recorded in the ledger; --force retries them)"))
         else:
             sys.exit(f"pp2lp: unknown --gen stage {st!r} (buts|traces|replays)")
 
 
-# ── audit: the single static pre-commit gate ───────────────────────────────
-def _grep_lp(root: Path, pattern: str) -> list[str]:
-    """`file:line: text` for every line under [root]'s *.lp matching [pattern]
-    (whole-file pre-filter, so non-matching files cost one regex search)."""
-    rx, hits = re.compile(pattern), []
-    for f in sorted(root.rglob("*.lp")):
-        try:
-            text = f.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if not rx.search(text):
-            continue
-        for i, line in enumerate(text.splitlines(), 1):
-            if rx.search(line):
-                hits.append(f"{rel(f)}:{i}: {line.strip()[:78]}")
-    return hits
+# ── clean: drop stale .lpo object caches ────────────────────────────────────
+def _lambdapi_lib_root() -> Path | None:
+    """The lambdapi standard-library root (where the Stdlib `.lpo` cache lives),
+    following lambdapi's own resolution order."""
+    for env in ("LAMBDAPI_LIB_ROOT", "OPAM_SWITCH_PREFIX"):
+        base = os.environ.get(env)
+        if base and (p := Path(base) / "lib" / "lambdapi" / "lib_root").is_dir():
+            return p
+    for p in [Path("/usr/local/lib/lambdapi/lib_root"),
+              *sorted(Path.home().glob(".opam/*/lib/lambdapi/lib_root"))]:
+        if p.is_dir():
+            return p
+    return None
 
 
-def cmd_audit(args) -> int:
-    lp, src, ocaml = ROOT / "lp", ROOT / "ocaml" / "src", ROOT / "ocaml"
-    checks = []   # (label, ok, detail-lines)
-
-    admits = _grep_lp(lp, r"\badmit\b")
-    checks.append(("no `admit` anywhere in lp/ (no exceptions)", not admits, admits))
-
-    trusts = _grep_lp(lp / "bench", r"\btrust\b")
-    checks.append(("no `trust` token in emitted lp/bench *.lp", not trusts, trusts))
-
-    strays = [rel(f) for f in sorted(lp.rglob("*"))
-              if f.is_file() and "bench" not in f.relative_to(lp).parts
-              and f.name.endswith((".probe.lp", "_probe.lp", "_test.lp", "_dbg.lp"))]
-    checks.append(("no stray probe/_test/_dbg files under lp/ (outside bench)",
-                   not strays, strays))
-
-    debris = [rel(p) for p in (src / "parser.ml", src / "parser.conflicts") if p.exists()]
-    checks.append(("no generated parser.ml/.conflicts in ocaml/src", not debris, debris))
-
-    tc = subprocess.run([sys.executable, str(ROOT / "bench" / "test_cli.py")],
-                        capture_output=True, text=True)
-    checks.append(("bench/test_cli.py passes", tc.returncode == 0,
-                   [] if tc.returncode == 0
-                   else (tc.stdout.strip().splitlines() + tc.stderr.strip().splitlines())[-6:]))
-
-    rt = subprocess.run(["dune", "runtest"], cwd=ocaml, capture_output=True, text=True)
-    checks.append(("dune runtest passes (golden emitter tests)", rt.returncode == 0,
-                   [] if rt.returncode == 0 else rt.stderr.strip().splitlines()[-6:]))
-
-    print(bold("pp2lp audit"))
-    failed = sum(not ok for _, ok, _ in checks)
-    for label, ok, detail in checks:
-        print(f"  {green('ok  ') if ok else red('FAIL')}  {label}")
-        for d in detail[:8]:
-            print(dim(f"        {d}"))
-
-    if args.full:
-        print(dim("  ── --full: suites (og/prv/claude) ──"))
-        for suite in ("og", "prv", "claude"):
-            rc = subprocess.run([sys.executable, str(ROOT / "pp2lp"), "run", suite, "-q"]).returncode
-            failed += rc != 0
-            print(f"  {green('ok  ') if rc == 0 else red('FAIL')}  suite {suite}")
-
-    if failed:
-        print(red(f"\naudit: {failed} check(s) FAILED"))
-        return 1
-    print(green("\naudit: all checks passed"))
+def cmd_clean(args) -> int:
+    """Remove stale `.lpo` objects — both the project's (lp/) and the shared
+    Stdlib's, which go incompatible after a lambdapi rebuild ("File X.lpo is
+    incompatible with current binary").  They recompile on the next check."""
+    targets = [(ROOT / "lp", "project")]
+    if (root := _lambdapi_lib_root()) is not None:
+        targets.append((root, "Stdlib"))
+    total = 0
+    for base, label in targets:
+        lpos = list(base.rglob("*.lpo"))
+        for f in lpos:
+            f.unlink()
+        total += len(lpos)
+        print(dim(f"  {label}: {len(lpos)} removed under {base}"))
+    print(green(f"clean: removed {total} stale .lpo file(s)"))
     return 0
 
 
@@ -1634,15 +1598,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="regenerate even when an output is newer than its input")
     g.add_argument("-q", "--quiet", action="store_true", help="suppress per-stage detail")
 
-    a = sub.add_parser("audit", help="static pre-commit gate (admit/trust scans, stray "
-                                     "probes, parser debris, test_cli, runtest)",
-                       description="the single static pre-commit gate: no `admit` in lp/, "
-                                   "no `trust` token in emitted lp/bench, no stray "
-                                   "probe/_test/_dbg files under lp/, no generated "
-                                   "parser.ml/.conflicts in ocaml/src, and bench/test_cli.py "
-                                   "+ dune runtest pass.  --full additionally runs the suites.")
-    a.add_argument("--full", action="store_true",
-                   help="additionally run the og/prv/claude suites")
+    sub.add_parser("clean", help="remove stale .lpo object caches (project lp/ + Stdlib)",
+                   description="delete stale lambdapi `.lpo` objects under lp/ and the "
+                               "Stdlib lib_root; they recompile on the next check.  Use "
+                               "after a lambdapi rebuild reports an incompatible .lpo.")
     return p
 
 
@@ -1653,8 +1612,8 @@ def main(argv=None) -> int:
         return cmd_run(args)
     if args.cmd == "gen":
         return cmd_gen(args)
-    if args.cmd == "audit":
-        return cmd_audit(args)
+    if args.cmd == "clean":
+        return cmd_clean(args)
     parser.print_help(sys.stderr)
     return 2
 

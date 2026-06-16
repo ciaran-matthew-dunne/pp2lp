@@ -5,7 +5,7 @@
 // `♢_eq_!!` / `♡_eq_!!` axioms in Quant.lp; bodies use the dedicated
 // `pi_to_♢` / `♢_to_pi` (and ♡ analogues) bridges.
 
-require open pp2lp.B pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
 
 // ---- NRM1-7: Logical transformations under `♢` ----
 
@@ -582,19 +582,20 @@ end;
 // `⋀ (ps v)` to `⋀ (ps ((init v) ⨾ 𝟎))`, contradicting the premise.  Fully
 // trust-free; untriggered in the corpus (the only NRM2x trace is NRM29).
 opaque symbol NRM27 [n] [ps : Tuple (+1 n) → 𝕃* o]
+  (hint : Π v, π (prj 0 v ϵ INT))
   (hpos : Π v, π (mem (prj 0 v ≤ 𝟎) (ps v)))
   (hneg : Π v, π (mem (— prj 0 v ≤ 𝟎) (ps v)))
   : π (`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎)))
   → π (`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ≔
 begin
-  assume n ps hpos hneg h_prem;
+  assume n ps hint hpos hneg h_prem;
   refine pi_to_♡ (λ v, ¬ ⋀ (ps v)) (λ v hpv, _);
   have hle : π (prj 0 v ≤ 𝟎)
     { refine mem_sound _ (ps v) (hpos v) hpv };
   have hge : π (𝟎 ≤ prj 0 v)
     { refine neg_leq_zero (prj 0 v) (mem_sound _ (ps v) (hneg v) hpv) };
   have hz : π (prj 0 v = 𝟎)
-    { refine leq_antisym (prj 0 v) 𝟎 hle hge };
+    { refine leq_antisym (prj 0 v) 𝟎 (hint v) zero_in_int hle hge };
   have heq : π (((init v) ⨾ 𝟎) = v)
     { rewrite left hz; refine tuple_eta v };
   have hcontra : π (¬ ⋀ (ps ((init v) ⨾ 𝟎)))

@@ -1,10 +1,12 @@
-require open pp2lp.B pp2lp.Rules;
+require open pp2lp.B pp2lp.Int pp2lp.Rules;
 
 opaque symbol {|18|} (p : Prop) :
   π ((`!! a_t : Tuple 1,
+      let a ≔ (prj 0 a_t) in
       (`!! x_t : Tuple 1,
-        ¬ (⋀ (∎ ∷ ⊤ ∷ ((prj 0 x_t) = (prj 0 x_t)))))
-      ⇒ (prj 0 a_t) = (prj 0 a_t) ⇒ p)) ≔
+        let x ≔ (prj 0 x_t) in
+        ¬ (⋀ (∎ ∷ ⊤ ∷ (x = x))))
+      ⇒ a = a ⇒ p)) ≔
 begin
   assume p;
   refine ALL8 _;
