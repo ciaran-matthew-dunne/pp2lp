@@ -1,4 +1,4 @@
-require open pp2lp.B pp2lp.Int pp2lp.Rules;
+require open pp2lp.Prelude;
 
 opaque symbol {|04|} (a c p q : Prop) :
   π (⋀ (∎ ∷ a ∷ p ∷ (p ⇒ q) ∷ c) ⇒ q) ≔

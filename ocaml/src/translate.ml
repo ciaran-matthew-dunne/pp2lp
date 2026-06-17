@@ -49,7 +49,7 @@ let rec chain_looks_up node pred =
    `conj_snoc_last_cong`, `!!_cong` under a binder), terminating in `ar3f_eq`;
    the caller transports the live goal with `=⇒`.  `env` renders binder-bound
    vars as `prj k v` — compound NRM8/9 binders included, via the
-   `prj`-through-`take`/`drop` rules in Quant.lp.  None when the occurrence
+   `prj`-through-`take`/`drop` rules in B.lp.  None when the occurrence
    isn't found on a supported path (caller then falls back to a no-op). *)
 let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
   match prd with
@@ -73,8 +73,12 @@ let rec ar3f_cong ctx env prd a_exp r_exp : L.term option =
   | Bind (_, vars, body) ->
     let v = fresh_x_local ctx in
     let env' = List.mapi (fun k var -> (var, L.Proj (k, v))) vars @ env in
+    (* Register the binder in ctx.xs (not just the render env) so that an
+       integer-typed bound var used arithmetically under here (e.g. a generated
+       neg_neg/add_zero in prove_sum_eq) resolves its `ϵ INT` evidence to the
+       `_it_n_k v` typing premise, instead of failing as an unbound witness. *)
     Option.map (fun c -> L.App (L.Name "!!_cong", [L.Lambda (v, None, c)]))
-      (ar3f_cong ctx env' body a_exp r_exp)
+      (with_x ctx v vars (fun () -> ar3f_cong ctx env' body a_exp r_exp))
   | _ -> None
 
 let rec tree ctx node =

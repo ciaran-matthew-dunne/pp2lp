@@ -493,28 +493,27 @@ let tactic_for_rule ctx rule arg anno children =
          "translate: %s expected a 1-binder `forall2(x)·¬(…) ⇒ Q` annotation"
          rule_name))
   | Rule_db.Ar2 ->
-    (* AR2 leaf: `(a ≤ b) ⇒ R` with `a > b`.  `a > b ≡ ¬(a≤b)`; transport
-       `prove_gt_zero (a−b)` (a−b cancels to a positive literal) back along
-       `sub_leq_eq`.  Fail (never trust) if a−b isn't a positive-literal cancellation. *)
-    let env = proj_env_of_ctx ctx in
-    let gen =
-      match goal_of_anno anno with
-      | Some (Binary (Imp, Leq (a, b), _)) ->
-        Option.map (fun gt ->
-          L.Refine (L.Name rule,
-            [ L.App (L.Name "=\xe2\x87\x92",          (* =⇒ *)
-                [ L.App (L.Name "eq_sym",
-                    [ L.App (L.Name "not_cong",
-                        [ L.App (L.Name "sub_leq_eq",
-                            [exp_term ctx a; exp_term ctx b]) ]) ]);
-                  gt ]) ]))
-          (Arith_proofs.prove_gt_zero env (AOp (Sub, a, b)))
-      | _ -> None
+    (* AR2 leaf: `(leq (from_int a) (from_int b)) ⇒ R`, PP's solver having found
+       a > b for concrete ℤ literals a, b (it comes out of AR3's `1−a`, e.g. 2 ≤ 0).
+       The ℤ-literal `AR2` lemma wants `π (Stdlib.Z.> a b)`; for concrete a > b that
+       computes to `¬¬⊤`, so the proof is just `λ k, k ⊤ᵢ` and a, b are inferred
+       from the goal.  No more `prove_gt_zero`/`sub_leq_eq` transport.  Fail loud
+       (never trust) if the comparison isn't between concrete literals; if a ≤ b
+       (PP mis-emitted) the `λ k, k ⊤ᵢ` simply won't type-check — also loud. *)
+    let z_lit = function
+      | Nat n -> L.Name (string_of_int n)
+      | BigNat s -> L.Name s
+      | _ -> assert false                  (* guarded by the match below *)
     in
-    (match gen with
-     | Some t -> t
-     | None -> failwith "rule_emit: AR2 — a − b is not a positive-literal \
-                         cancellation (prove_gt_zero failed), refusing to emit trust")
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, Leq ((Nat _ | BigNat _ as a), (Nat _ | BigNat _ as b)), _)) ->
+       L.Refine (L.Name rule,
+         [ z_lit a; z_lit b;
+           L.Lambda ("k", None,
+             L.App (L.Name "k", [ L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ])) ])
+     | _ ->
+       failwith "rule_emit: AR2 — expected a concrete ℤ-literal comparison \
+                 `(a ≤ b) ⇒ R` (a, b literals); refusing to emit trust")
   | Rule_db.Ar5_6 ->
     (* AR5 [a R] : π (a ≪ 𝟎) → … → π ((—a ≤ 𝟎) ⇒ R) — the antisymmetry-to-zero:
        given the antecedent `—a ≤ 𝟎`, the missing bound `a ≤ 𝟎` makes a = 𝟎.
@@ -556,7 +555,7 @@ let tactic_for_rule ctx rule arg anno children =
           | Leq (f, Nat 0) ->
             Option.map (fun h_gt ->
               (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
-                 both via the Int.lp `to_int`/`isGt` unification rules. *)
+                 both via the B.lp `to_int`/`isGt` unification rules. *)
               L.Refine (L.Name rule, [L.Name name; h_gt]))
               (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
           | _ -> None) ctx.hyps

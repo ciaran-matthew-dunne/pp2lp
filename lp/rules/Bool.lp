@@ -1,6 +1,30 @@
 // Boolean (§A.15) — shallow encoding
 // BTRUE, BFALSE : τ ι with bool_cases (guarded by ϵ BOOL).
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
+
+// BTRUE ≠ BFALSE: 𝔹's constructor disjointness (Stdlib `true≠false`) transported
+// through the left inverse — proved, not postulated.
+opaque symbol bool_distinct : π (BTRUE ≠ BFALSE) ≔
+begin assume h; refine true≠false (feq to_bool h) end;
+
+
+opaque symbol bool_cases (v : τ ι) :
+  π (v ϵ BOOL) → π (v = BTRUE ∨ v = BFALSE) ≔
+begin
+  assume v hv;
+  refine ∃ₑ (∧ₑ₁ (bool_mem v) hv) (λ b hb, _);
+  rewrite hb;
+  refine ∨ₑ (case_𝔹 b) (λ ht, _) (λ hf, _)
+  { rewrite ht; refine ∨ᵢ₁ (eq_refl BTRUE) }
+  { rewrite hf; refine ∨ᵢ₂ (eq_refl BFALSE) }
+end;
+
+opaque symbol btrue_in_bool : π (BTRUE ϵ BOOL) ≔
+begin refine ∧ₑ₂ (bool_mem BTRUE) (∃ᵢ true (eq_refl BTRUE)) end;
+
+opaque symbol bfalse_in_bool : π (BFALSE ϵ BOOL) ≔
+begin refine ∧ₑ₂ (bool_mem BFALSE) (∃ᵢ false (eq_refl BFALSE)) end;
+
 
 // ---- BOOL11/12: Context extension ----
 

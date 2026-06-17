@@ -109,7 +109,12 @@ let chain_emit_name rule =
    with the small ⋀-list proof-term algebra built on them.  Everything
    returns a structured [Lp_tree.term]; nothing renders to a string. *)
 
-let prj k t = L.App (L.Name "prj", [L.Name (string_of_int k); t])
+(* `prj (to_nat k) t` — the k-th projection.  The index is wrapped in `to_nat`
+   (with `k` a ℤ decimal) because the emitted file is ℤ-global; `to_nat k` reduces
+   to the ℕ index `prj` expects (cf. [Pp_lp.pp_to_nat]). *)
+let prj k t =
+  L.App (L.Name "prj",
+    [ L.App (L.Name "to_nat", [L.Name (string_of_int k)]); t ])
 
 let conj_intro a b = L.App (L.Name "\xe2\x8b\x80_intro", [a; b]) (* ⋀_intro *)
 let conj_nil_prf = L.Name "\xe2\x8b\x80_nil_prf"                 (* ⋀_nil_prf *)
@@ -194,7 +199,7 @@ let bool_typing_term ctx v =
     let name = Printf.sprintf "_bt_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 BOOL)" n k
+        "\xce\xa0 u : Tuple (to_nat %d), \xcf\x80 ((prj (to_nat %d) u) \xcf\xb5 BOOL)" n k
     in
     if not (List.mem_assoc name ctx.bool_typings) then
       ctx.bool_typings <- ctx.bool_typings @ [ (name, ty) ];
@@ -213,7 +218,7 @@ let int_typing_term ctx v : L.term =
     let name = Printf.sprintf "_it_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 INT)" n k
+        "\xce\xa0 u : Tuple (to_nat %d), \xcf\x80 ((prj (to_nat %d) u) \xcf\xb5 INT)" n k
     in
     if not (List.mem_assoc name ctx.int_typings) then
       ctx.int_typings <- ctx.int_typings @ [ (name, ty) ];
@@ -721,7 +726,10 @@ let nrm29_witness_bridge ctx goal : (L.term * L.term) option =
                     L.App (L.Name "leq_zero_of_sum_zero", [ L.Hole; eqzero ]) ]))
              (prove_sum_zero env_c lhs_sub)
          in
-         (match opt_all (List.map eqtrue_of bound_lhss) with
+         (* Register the bridge tuple `vc` in ctx.xs (not just env_c) so a
+            generated `prove_sum_zero` under here can resolve a bound var's
+            `ϵ INT` evidence to its `_it_n_k vc` premise (cf. ar3f_cong). *)
+         (match with_x ctx vc rest (fun () -> opt_all (List.map eqtrue_of bound_lhss)) with
           | None -> None
           | Some [] -> None
           | Some eqtrues ->

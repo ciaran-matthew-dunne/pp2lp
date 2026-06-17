@@ -1,11 +1,10 @@
-% ── encoding.tex · §2 ──────────────────
-\section{Encoding \pp{} in \lp}\label{sec:encoding}
+% ── encoding.tex · §2 Preliminaries + §3 Encoding ──────────────────
+\section{Preliminaries}\label{sec:prelim}
 
 \subsection{The Predicate Prover}\label{sec:pp-syntax}
 
 The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
 given as follows:
-% expressions as predicates
 \begin{align*}
 	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
 	\mid E + F \mid E - F \mid -E                                     \\
@@ -19,6 +18,9 @@ where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
 function application $F(E_1,\ldots,E_k)$ applies an expression $F$ to the arguments $E_1,\ldots,E_k$,
 membership relates a tuple of expressions to an expression.
 %
+An expression may itself stand as an atomic predicate, shown by the leading
+$E$ in the production for $P$.
+%
 A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
 list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
 	\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
@@ -29,15 +31,14 @@ to \pp's normalisation procedure; semantically both are $\forall$ and differ
 only in the role they play during proof search.
 
 Although B is a set-theoretic formalism, \pp{} itself proves formulas of
-first-order logic with linear arithmetic: a pre-processing step reduces
-the set theory of a proof obligation to first-order formulas over
+first-order logic with linear arithmetic: a pre-processing step reduces much
+of the set theory of a proof obligation to first-order formulas over
 membership before \pp{} sees it.
-% set-theory operator table in appendix. what gets reduced.
 %
-The set-theoretic operators that survive this reduction (e.g., intervals,
-relational operators) reach \pp{} as uninterpreted function symbols:
-\pp{} has no set-theory rules, and such terms are only ever
-copied, compared for equality, or instantiated.
+The set-theoretic operators that survive this reduction --- intervals, the
+maplet, and the relational operators of \autoref{app:operators} --- reach
+\pp{} as uninterpreted function symbols: \pp{} has no set-theory rules, and
+such terms are only ever copied, compared for equality, or instantiated.
 
 \pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
 hypothesis predicates and $P$ a goal predicate.
@@ -82,12 +83,12 @@ lists:
     \infer2[\rn{AND4\_1}]{(H \seq P \land Q) \yields R_1 \app R_2}
   \end{prooftree}
 \end{center}
-% rework. ALL7 and XST8 are the only rules that consume a result and return sequent.
-% show XST8.
-Two rules, \rn{ALL7} and \rn{XST8}, instead \emph{consume} a result:
-\rn{ALL7} normalises the body of a universal antecedent pointwise to a
-list $R_1,\ldots,R_n$ and continues a subproof under its conjunction
-beneath the post-normalisation universal $\Dia$ thus:
+\rn{ALL7} and \rn{XST8} are the only rules that \emph{consume} a result,
+each turning a result derivation back into an ordinary sequent subproof.
+%
+\rn{ALL7} normalises the body of a universal antecedent pointwise to a list
+$R_1,\ldots,R_n$ and continues under its conjunction, beneath the
+post-normalisation universal $\Dia$:
 \begin{center}
   \begin{prooftree}
     \hypo{(H \seq P) \yields [R_1,\ldots,R_n]}
@@ -96,9 +97,20 @@ beneath the post-normalisation universal $\Dia$ thus:
   \end{prooftree}
 \end{center}
 %
-We encode the result judgment as a dedicated \lp{} type constructor, and the rules
-that produce and consume it as functions over that type, in \autoref{sec:enc-rules}.
-%GB: a small word on XST8?
+\rn{XST8} is its existential dual: to prove $\exists x \cdot P$ it normalises
+$\lnot P$ to a list $R_1,\ldots,R_n$ and continues from a refutation of the
+universally-closed conjunction.
+\begin{center}
+  \begin{prooftree}
+    \hypo{(H \seq \lnot P) \yields [R_1,\ldots,R_n]}
+    \hypo{H \seq (\forall x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow \bot}
+    \infer2[\rn{XST8}]{H \seq \exists x \cdot P}
+  \end{prooftree}
+\end{center}
+%
+We encode the result judgment as a dedicated \lp{} type constructor, and the
+rules that produce and consume it as functions over that type, in
+\autoref{sec:enc-rules}.
 
 As discussed in \autoref{sec:intro}, \pp{} is instrumented to record a
 \trace{} file of the rules it applied; a companion utility re-runs the
@@ -110,13 +122,16 @@ that follows the name in parentheses.
 %
 An example replay and its proof tree are shown in \autoref{fig:replay}.
 %
-% mention FIN, NRM, and STOP_NORM. do we know their meaning? why do we throw them away?
 The main proof is recorded prefix-style (a rule precedes its
 subproofs), with two irregularities: the result derivation
 feeding a rule with a result premise (i.e., \rn{ALL7}, \rn{XST8}) is
-emitted \emph{before} that rule itself, and normalisation markers
-(\texttt{FIN}, \texttt{STOP\_NORM}, \texttt{NRM}) that carry no proof
-content are interleaved throughout.
+emitted \emph{before} that rule itself, and normalisation markers are
+interleaved throughout.
+%
+The markers \texttt{NRM}, \texttt{FIN}, and \texttt{STOP\_NORM} bracket
+\pp's normalisation passes --- \texttt{FIN} carries the predicate a pass
+produced --- but none corresponds to an inference rule; they carry no proof
+content, so \tool{} filters them out while rebuilding the tree.
 %
 The annotation of the first non-marker line is the overall goal.
 %
@@ -136,14 +151,14 @@ The term syntax is given as follows:
 	t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
 	\mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
 \]
-where $x$ ranges over variables, $c$ ranges over declared constants.
+where $x$ ranges over variables, $c$ ranges over declared constants,
 and terms are identified up to $\alpha$-equivalence.
 %
-% typing rules are applied modulo conversion, where ...
-The conversion relation $\Equiv$ is generated by $\beta$-equivalence
-together with user-declared rewrite rules.
-%GB: $\Equiv$ is not used anywhere for the moment
-% the full definition of the typing relation is given in the appendix...
+Typing is standard for the \lpcmr{} (the full system is in
+\autoref{app:typing}); the rule we rely on throughout applies types up to
+\emph{conversion}: a term of type $A$ also has type $B$ whenever
+$A \Equiv B$, where the conversion relation $\Equiv$ is generated by
+$\beta$-equivalence together with the user-declared rewrite rules.
 %
 A \lp{} development is a sequence of declarations.
 %
@@ -169,9 +184,12 @@ mapping each set code to its type of inhabitants, and a type $\Prop$ of
 propositions with $\Prf : \Prop \to \TYPE$ mapping each proposition
 to its type of proofs.
 %
-% differences between Dedukti and LambdaPi.
-% implicit vars, tactic.
+Unlike \dedukti{} --- a bare type-checker for the same calculus --- \lp{}
+adds implicit arguments $[x:A]$ and an interactive tactic language on top
+of the same kernel; both are elaborated away, so a type-checked \lp{}
+development reduces to a \dedukti{}-checkable proof term.
 
+\section{Encoding \pp{} in \lp}\label{sec:encoding}
 
 \subsection{Encoding \pp's Predicates and Expressions}\label{sec:enc-formulas}
 
@@ -225,22 +243,23 @@ rewrite rules
 $\bwand(∎ ∷ \texttt{\$p}) ↪ \texttt{\$p}$ and
 $\bwand(\texttt{\$ps} ∷ \top) ↪ \bwand{\texttt{\$ps}}$.
 %
-% it is crucial that conjunction is abstract.
-% we can just show the type signature in the AND2 in a mathdisplay
-% alongside the PP version.
-Note that the connection to standard binary conjunction is
-not given by rewrite rules: it is axiomatised separately,
-and used only in the soundness proofs for \pp{}'s inference rules.
+It is crucial that this conjunction stays \emph{abstract}: the connection to
+standard binary conjunction is not given by rewrite rules but axiomatised
+separately, and used only in the soundness proofs for \pp's inference rules.
 %
-For example, \texttt{lp/rules/Conj.lp} defines the $\rn{AND2}$ rule:
-\begin{codeLP}
-opaque symbol AND2 [ps : $\mathbb{L}^{*}$ o] [p : Prop]
-    : π ($\bigwedge$ ps ⇒ ¬ p) → π (¬ $\bigwedge$ (ps ∷ p)) ≔
-begin
-    assume ps p h1 hc;
-    refine h1 ($\bigwedge$_init hc) ($\bigwedge$_last hc)
-end;
-\end{codeLP}
+The list form then surfaces directly in a rule's type.  \pp's \rn{AND2}
+refutes a conjunction $\bwand(ps ∷ p)$ by deriving $\lnot p$ from the
+remaining conjuncts $\bwand ps$; its rule and its encoding
+(\texttt{lp/rules/Conj.lp}) read
+\begin{center}
+  \begin{prooftree}
+    \hypo{H \seq \bwand ps \Rightarrow \lnot p}
+    \infer1[\rn{AND2}]{H \seq \lnot\,\bwand (ps ∷ p)}
+  \end{prooftree}
+  \qquad
+  $\rn{AND2} : \Prf\,(\bwand ps \Rightarrow \lnot p)
+             \to \Prf\,(\lnot\,\bwand (ps ∷ p)).$
+\end{center}
 
 \paragraph{Compound Binders.}
 \pp{} distinguishes the compound binder $\forall (x,y) \cdot P$ from the
@@ -254,7 +273,11 @@ whose introduction and elimination principles are axiomatised bridges to
 the $\Pi$-types of \lp{} (e.g.\
 $(\Pi v{:}\,\Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v, P\,v)$ and its
 converse); $\Dia$ and $\Hrt$ are defined aliases of $\allI$.
-%GB: why bridges and not rewrite rules?
+%
+These bridges are axioms rather than rewrite rules: a rule unfolding $\allI$
+to a nested $\Pi$ would erase the quantifier from goals before any rule lemma
+could match it, and recovering the predicate $P$ at each use would demand the
+higher-order unification \lp{} does not attempt.
 %
 % we probably dont need the following text but its useful to have:
 % -----------------------------------------------------------------
@@ -282,11 +305,8 @@ The encoding of a rule's statement is positional: the conclusion sequent
 $H \seq P$ appears as $\Prf\,P$; a premise that extends the hypotheses,
 $H, P \seq Q$, appears as the function type $\Prf\,P \to \Prf\,Q$; and a
 side-condition ``$P$ occurs in $H$'' becomes an explicit argument of
-type $\Prf\,P$,
-% we do this at translation time. it is not a point for encoding rules.
-which our translation tool supplies by looking the hypothesis up in scope.
+type $\Prf\,P$ (supplied by \tool{} at translation time, \autoref{sec:eval}).
 %
-% show the AND2 rule.
 For example, \rn{IMP4} (``to prove $P \Rightarrow Q$, assume $P$ and
 prove $Q$'') and the discharge rule \rn{AXM1} (``$\lnot P$ occurs in
 $H$, so $P \Rightarrow Q$ holds'') have the following type signatures:
@@ -298,11 +318,12 @@ $H$, so $P \Rightarrow Q$ holds'') have the following type signatures:
 
 
 \paragraph{Result Derivations.}
-% rework prose. conj isn't defined.
-A result derivation (\autoref{sec:pp-syntax}) produces a list of
-predicates; we encode it as the type $\Res\,P$, whose value carries that
-list (a snoc list $\mathbb{L}^{*}$) with a proof that $P$ equals the
-conjunction $\mathsf{conj}$ of the list:
+A result derivation (\autoref{sec:pp-syntax}) produces a list of predicates
+standing for the normal form of a formula.  Write $\mathsf{conj}\,ts$ for the
+conjunction of a snoc list $ts$ --- $\top$ when $ts$ is empty, and the
+$\bwand$ of its elements otherwise.  We encode the derivation as a type
+$\Res\,t$ whose value pairs the list with a proof that $t$ equals that
+conjunction:
 \begin{align*}
   \Res &: \El\,o \to \TYPE \\
   \mathsf{mk\_res}\,[t : \El\,o]\,(ts : \mathbb{L}^{*}\,o) &: \Prf\,(t = \mathsf{conj}\,ts) \to \Res\,t \\
@@ -327,7 +348,6 @@ opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
     : π ((`$\diamondsuit$ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔ ...
 \end{lstlisting}
 \end{codeLPmulti}
-% prose needs work.
 \noindent For example, consider the result derivation below, for the body
 $P_1 \land P_2 \land P_3$ with each conjunct kept at a \rn{STOP\_1} leaf:
 \begin{center}\footnotesize
@@ -349,7 +369,9 @@ their children's lists into the single flat list $[P_3, P_2, P_1]$, which
 \rn{ALL7} conjoins.  Combining the results eagerly with $\land$ would
 instead mirror the proof's nesting as $P_3 \land (P_2 \land P_1)$; the list
 defers and flattens the conjunction.
-%% TODO: something is missing here
+%
+Reconstructed, this derivation and its \rn{ALL7} step become the \lp{} proof
+term
 {\small
 \[
   \rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
@@ -368,22 +390,25 @@ $v$ elided):
 
 
 \paragraph{Arithmetic Side-conditions.}
-% how are we generating the proof terms at translation time.
 Some rules invoke \pp's arithmetic solver or equality prover:
 \rn{AR4} requires $(E+F) > \mathbf{0}$ for terms \pp{} already believes
 positive, and the \rn{ARITH} terminal closes a goal because the
 accumulated $\leq$-hypotheses are contradictory.
 %
-The corresponding lemmas take these facts as explicit $\Prf$-arguments,
-and \tool{} \emph{generates} the witnessing proof at translation time.
-% rework abusing notation.
-For \rn{ARITH} the witness is a nonnegative (Farkas-style~\cite{schrijver1986})
-combination of the $\leq \mathbf{0}$ hypotheses. For example, with
+The corresponding lemmas take these facts as explicit $\Prf$-arguments.
+\tool{} \emph{generates} each such proof at translation time by running a
+small decision procedure over the in-scope hypotheses and assembling the
+result from \texttt{B.lp}'s arithmetic lemmas.
+%
+For \rn{ARITH} that procedure searches for a nonnegative
+(Farkas-style~\cite{schrijver1986}) combination of the $\leq \mathbf{0}$
+hypotheses that adds up to a false literal.  For example, with
 $h_1 : \Prf\,(x \leq \mathbf{0})$ and
-$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ in scope, summing
-$h_2 + h_1 + h_1$ along the generated equality
-$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ refutes
-$\mathbf{1} \leq \mathbf{0}$:
+$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ in scope, the combination
+$h_2 + 2h_1$ gives $\mathbf{1} - (x + x) + x + x \leq \mathbf{0}$; rewriting
+along the generated equality
+$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ yields
+$\mathbf{1} \leq \mathbf{0}$, a contradiction:
 \[
   \mathsf{one\_not\_leq\_zero}\,\bigl(\mathsf{leq\_subst\_l}\ e\
     (\mathsf{add\_leq\_zero}\ \_\ \_\ (\mathsf{add\_leq\_zero}\ \_\ \_\ h_2\ h_1)\ h_1)\bigr)
@@ -394,4 +419,13 @@ Permutation proofs are generated likewise whenever \pp{} records a sum in
 a different association order than a lemma expects.
 
 
-% paragraph about soundness proofs.
+\paragraph{Soundness of the rules.}
+Every rule symbol is \lpmod{opaque} with a proof body, so \lp{} accepts a
+rule only after checking that body against the axiomatic base.  The proofs
+follow the structure of the encoding: propositional and quantifier rules
+discharge to the classical axioms and the quantifier bridges, conjunction
+rules to the $\bwand$ eliminators, equality rules to congruence and
+substitution, and arithmetic rules to the ordered-group theory of
+\texttt{B.lp}.  No rule is postulated as an axiom; the trusted base is
+exactly \texttt{B.lp}'s primitives, the quantifier bridges, and the
+$\bwand$/$\Res$ interface.

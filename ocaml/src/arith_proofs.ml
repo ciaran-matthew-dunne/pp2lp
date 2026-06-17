@@ -16,32 +16,33 @@ let is_atom_exp = function
   | RanRestrict _ | BoolOf _ | Compr _ -> true
   | AOp _ | Neg _ -> false
 
-(* Numeric literals 2 ≤ k ≤ [lit_unfold_max] flatten to k copies of the
-   `𝟏`-atom, so PP's solver-side literal folding (`1 + 9 → 10` in AR3's
-   `𝟏 − a` sub-premise) is invisible to the multiset comparison and the
-   generated proofs: `int_lit k ≡ 𝟏 + int_lit (k−1)` definitionally, so the
-   recursive [normalize] proof is checked by conversion.  Bounded: a big
-   literal must never be unfolded (decimal numerals exist precisely to keep
-   them folded — whnf of a big `int_lit` blows up), beyond the cap the
-   literal stays an opaque atom as before. *)
-let lit_unfold_max = 64
+(* A literal is a single folded atom — never unfolded to a `𝟏`-sum (that legacy
+   apparatus existed only because the pre-Z encoding couldn't compute; now
+   `Stdlib.Z` reduces ground arithmetic).  PP's solver-side folding (`2 + 3 → 5`)
+   is matched by [fold_lit_run], which combines a contiguous run of literal atoms
+   into one `from_int` via `lit_add`/`lit_neg`, letting ℤ compute the sum.
 
-(* The binary `Stdlib.Pos.ℙ` term for a positive decimal literal (`O p = 2p`,
-   `I p = 2p+1`, `H = 1`), folded MSB→LSB onto `H` from [pos_bits]. *)
-let pos_term (decimal : string) : L.term =
-  match Syntax_pp.pos_bits decimal with
-  | [] -> L.Name "Stdlib.Pos.H"
-  | _ :: rest ->
-    List.fold_left (fun p b ->
-      L.App (L.Name (if b = 1 then "Stdlib.Pos.I" else "Stdlib.Pos.O"), [p]))
-      (L.Name "Stdlib.Pos.H") rest
+   Only `Nat` literals fold: they fit OCaml's native `int` by construction, so
+   the net value needs no bignum.  A `BigNat` (apero's 2⁶⁴ bounds) is left as an
+   opaque atom — compared structurally, never summed — so [is_foldable_lit] is
+   false for it and [atom_compare] keeps it among the symbolic atoms. *)
+let is_foldable_lit = function Nat _ -> true | _ -> false
 
-(* The ℤ literal term for a non-negative PP literal (decimal string), in binary
-   `Stdlib.Z` form — `Z0` or `Zpos (binary)`.  Matches the printer's literals. *)
-let z_lit (decimal : string) : L.term =
-  match Syntax_pp.pos_bits decimal with
-  | [] -> L.Name "Stdlib.Z.Z0"
-  | _ -> L.App (L.Name "Stdlib.Z.Zpos", [pos_term decimal])
+(* Sort order for signed atoms: foldable `Nat` literals LAST (so a sum's literal
+   part is a contiguous trailing suffix that [fold_lit_run] can collapse), every
+   other atom first in structural order.  Sign is the final key component so a
+   cancelling pair `(a,−1),(a,+1)` stays adjacent in that order — [prove_cancel]
+   relies on the `—a` before `a` orientation (`neg_add`). *)
+let atom_compare (a1, s1) (a2, s2) =
+  compare ((if is_foldable_lit a1 then 1 else 0), a1, s1)
+          ((if is_foldable_lit a2 then 1 else 0), a2, s2)
+
+(* A non-negative PP literal as a bare `Stdlib.Z.ℤ` decimal term.  The emitted
+   file is ℤ-global (`Int` opens `Stdlib.Z`), so the decimal parses as a ℤ and
+   `Stdlib.Z` computes ground arithmetic on it — replacing the old binary
+   `Stdlib.Pos`/`Stdlib.Z.Zpos` construction.  Matches the printer's literals
+   (`Pp_lp.pp_from_int`). *)
+let z_dec (decimal : string) : L.term = L.Name decimal
 
 (* `ϵ INT` evidence for a τ ι *atom* (a bound tuple slot / free integer var):
    an injected typing premise.  The only ctx-dependent part of [int_evidence],
@@ -59,11 +60,15 @@ let int_evidence env e : L.term =
   let ex t = L.Exp (env, t) in
   match e with
   | Nat 0 | Neg (Nat 0) -> L.Name "zero_in_int"
-  | Nat n -> L.App (L.Name "from_int_in_int", [z_lit (string_of_int n)])
-  | BigNat s -> L.App (L.Name "from_int_in_int", [z_lit s])
+  | Nat n -> L.App (L.Name "from_int_in_int", [z_dec (string_of_int n)])
+  | BigNat s -> L.App (L.Name "from_int_in_int", [z_dec s])
   | Neg a -> L.App (L.Name "neg_in_int", [ex a])
   | AOp (Add, x, y) -> L.App (L.Name "add_in_int", [ex x; ex y])
   | AOp (Sub, x, y) -> L.App (L.Name "add_in_int", [ex x; ex (Neg y)])
+  (* `card(s)` is integer-valued (B typing); discharge via the card_in_int
+     postulate rather than searching for an (impossible) typing premise.
+     `card(s)` parses as the generic application `App ("card", …)`. *)
+  | App ("card", [ s ]) | SetOp ("card", [ s ]) -> L.App (L.Name "card_in_int", [ex s])
   | _ -> !atom_int_ev e
 
 (* Flatten a `+`/`−` expression to its ordered signed-atom list, pushing unary
@@ -75,10 +80,6 @@ let rec flatten_signed e : (exp * int) list option =
   let app o p = match o, p with Some a, Some b -> Some (a @ b) | _ -> None in
   match e with
   | Nat 0 | Neg (Nat 0) -> Some []
-  | Nat k when k >= 2 && k <= lit_unfold_max ->
-    Some (List.init k (fun _ -> (Nat 1, 1)))
-  | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
-    Some (List.init k (fun _ -> (Nat 1, -1)))
   | _ when is_atom_exp e -> Some [ (e, 1) ]
   | Neg a when is_atom_exp a -> Some [ (a, -1) ]
   | AOp (Add, a, b) -> app (flatten_signed a) (flatten_signed b)
@@ -127,7 +128,7 @@ let prove_eq_lnested env l_orig : L.term =
   in
   let first_inversion l =
     let rec go i = function
-      | x :: (y :: _ as tl) -> if compare x y > 0 then Some i else go (i + 1) tl
+      | x :: (y :: _ as tl) -> if atom_compare x y > 0 then Some i else go (i + 1) tl
       | _ -> None
     in go 0 l
   in
@@ -173,19 +174,12 @@ let rec normalize env e : ((exp * int) list * L.term) option =
     (lx @ ly, trans (cong px py) (concat env lx ly))
   in
   match e with
-  (* Literal unfold (see [lit_unfold_max]): the printer renders `Nat k` as the
-     left-nested 𝟏-sum `(𝟏 + 𝟏 + … + 𝟏)` — exactly `lfold` of k 𝟏-atoms — so
-     the decomposition is `eq_refl` (the two renderings parse to the same
-     term).  `— k` goes through the `Neg (Add …)` case (opp_add to the
-     leaves), stated at the explicit sum, which parses identically.  `𝟎`
-     contributes NO atom (`lfold [] ≡ 𝟎`, refl; `— 𝟎` via neg_zero) — as an
-     opaque atom it would block cancellation (`1 − 0` vs `1`). *)
+  (* A literal is a single atom (`Nat`/`BigNat`).  `𝟎` contributes NO atom
+     (`lfold [] ≡ 𝟎`, refl; `— 𝟎` via neg_zero) — as an opaque atom it would
+     block cancellation (`1 − 0` vs `1`).  Folding of literal *runs* (`𝟐 + 𝟑`)
+     happens later, in [fold_lit_run], where ℤ computes the sum. *)
   | Nat 0 -> Some ([], refl e)
   | Neg (Nat 0) -> Some ([], L.App (L.Name "neg_zero", []))
-  | Nat k when k >= 2 && k <= lit_unfold_max ->
-    Some (List.init k (fun _ -> (Nat 1, 1)), refl e)
-  | Neg (Nat k) when k >= 2 && k <= lit_unfold_max ->
-    normalize env (Neg (lfold_exp (List.init k (fun _ -> (Nat 1, 1)))))
   | _ when is_atom_exp e -> Some ([ (e, 1) ], refl e)
   | Neg a when is_atom_exp a -> Some ([ (a, -1) ], refl (Neg a))
   | AOp (Add, x, y) ->
@@ -257,113 +251,171 @@ let rec reduce_cancel env l : (exp * int) list * L.term =
     let r, p_rest = reduce_cancel env l' in
     (r, L.App (L.Name "eq_trans", [ p_step; p_rest ]))
 
-(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
-   multiset *after additive cancellation* (`n + —n = 𝟎`); None if either is
-   unsupported or the reduced multisets differ.  Each side goes [normalize] (—
-   to leaves) → sort (a permutation) → [reduce_cancel] (drop ± pairs); the two
-   reduced+sorted lists are identical iff equal as multisets. *)
+(* ---- Literal-run folding (Stdlib.Z computes the sum) ---- *)
+
+(* A signed foldable literal `(Nat v, s)` rewritten to `from_int <z>` form: the
+   ℤ term <z> and a proof `signed_exp (Nat v, s) = from_int z`.  Positive:
+   `signed = Nat v` already renders `from_int v`, so `eq_refl`.  Negative:
+   `signed = — from_int v`, turned into `from_int (Z.— v)` by `lit_neg`. *)
+let signed_to_zform env (v : int) (s : int) : L.term * L.term =
+  if s >= 0 then
+    (z_dec (string_of_int v),
+     L.App (L.Name "eq_refl", [ L.Exp (env, Nat v) ]))
+  else
+    (L.App (L.Name "Stdlib.Z.\xe2\x80\x94", [ z_dec (string_of_int v) ]),  (* Z.— v *)
+     L.App (L.Name "lit_neg", [ z_dec (string_of_int v) ]))
+
+(* Combine two foldable literal atoms into one of value `signed(x)+signed(y)`,
+   with a proof `signed x + signed y = signed z`.  Both operands go to `from_int`
+   form (`signed_to_zform`), then `lit_add` folds them with `Stdlib.Z` computing
+   `Z.+`; a net-negative result needs a closing `lit_neg` to land on the
+   `— from_int` rendering of the combined atom. *)
+let combine_lit env (xa, xs) (ya, ys) : (exp * int) * L.term =
+  let xv = match xa with Nat n -> n | _ -> assert false in
+  let yv = match ya with Nat n -> n | _ -> assert false in
+  let v = xs * xv + ys * yv in
+  let (zx, px) = signed_to_zform env xv xs in
+  let (zy, py) = signed_to_zform env yv ys in
+  let base =
+    L.App (L.Name "eq_trans",
+      [ L.App (L.Name "add_cong", [ px; py ]);
+        L.App (L.Name "lit_add", [ zx; zy ]) ])
+  in
+  (* base : signed x + signed y = from_int (Z.+ zx zy), with Z.+ zx zy ≡ <v as ℤ>. *)
+  if v >= 0 then ((Nat v, 1), base)              (* from_int (Z.+ …) ≡ from_int v *)
+  else
+    ((Nat (-v), -1),
+     L.App (L.Name "eq_trans",
+       [ base;
+         L.App (L.Name "eq_sym",
+           [ L.App (L.Name "lit_neg", [ z_dec (string_of_int (-v)) ]) ]) ]))
+     (* from_int (Z.+ …) ≡ from_int (Z.— (-v)), then lit_neg back to — from_int (-v) *)
+
+(* Fold the trailing run of foldable `Nat` literals of a SORTED atom list into a
+   single literal (dropped if it nets to 𝟎), with a proof `lfold l = lfold
+   folded`.  Sorted ⟹ the literals are a contiguous suffix; combine them two at a
+   time from the right — each step an `add_assoc` to expose the rightmost pair and
+   `add_congR`/[combine_lit] to fold it (`lit_add`, `Stdlib.Z` computing the sum). *)
+let fold_lits env l : (exp * int) list * L.term =
+  let is_lit (a, _) = is_foldable_lit a in
+  let refl ll = L.App (L.Name "eq_refl", [ L.Exp (env, lfold_exp ll) ]) in
+  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+  (* combine the last two atoms of `front @ [x; y]` (both literals) into `z`,
+     with a proof `lfold (front @ [x;y]) = lfold (front @ [z])`. *)
+  let combine_step front x y =
+    let (z, clit) = combine_lit env x y in
+    match front with
+    | [] -> (z, clit)
+    | _ ->
+      let lf = lfold_exp front in
+      let assoc =
+        L.App (L.Name "add_assoc",
+          [ L.Exp (env, lf); L.Exp (env, signed_exp x); L.Exp (env, signed_exp y) ]) in
+      let congr = L.App (L.Name "add_congR", [ L.Exp (env, lf); clit ]) in
+      (z, trans assoc congr)
+  in
+  if List.length (List.filter is_lit l) <= 1 then (l, refl l)
+  else
+    let rec go l =
+      match List.rev l with
+      | y :: x :: front_rev ->
+        let front = List.rev front_rev in
+        let (z, step) = combine_step front x y in
+        let l' = front @ [ z ] in
+        if List.length (List.filter is_lit l') <= 1 then (l', step)
+        else let (l'', rest) = go l' in (l'', trans step rest)
+      | _ -> (l, refl l)
+    in
+    let (folded, pf) = go l in
+    (* drop a net-𝟎 trailing literal: `lfold (syms @ [𝟎]) = lfold syms`. *)
+    match List.rev folded with
+    | (Nat 0, _) :: rest_rev ->
+      let syms = List.rev rest_rev in
+      let drop =
+        match syms with
+        | [] -> refl []                          (* lfold [𝟎] ≡ 𝟎 ≡ lfold [] *)
+        | _ ->
+          let lf = lfold_exp syms in
+          L.App (L.Name "add_zero", [ L.Exp (env, lf); int_evidence env lf ])
+      in
+      (syms, trans pf drop)
+    | _ -> (folded, pf)
+
+(* Normalise [e] to its canonical signed-atom list — symbolic atoms sorted, the
+   literal part cancelled (`n + —n`) then folded to one (or no) `from_int` — with
+   a proof `e = lfold canon`.  Two `+`/`−` expressions are equal iff their
+   canonical lists are; the literal fold matches PP's solver-side constant
+   folding.  Each side: [normalize] (— to leaves) → sort by [atom_compare] (a
+   permutation, [prove_eq_lnested]) → [reduce_cancel] → [fold_lits]. *)
+let canonicalize env e : ((exp * int) list * L.term) option =
+  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
+  match normalize env e with
+  | None -> None
+  | Some (l, p0) ->                                (* p0 : e = lfold l *)
+    let sorted = List.sort atom_compare l in
+    let p1 = prove_eq_lnested env l in             (* lfold l = lfold sorted *)
+    let (rc, p2) = reduce_cancel env sorted in      (* lfold sorted = lfold rc *)
+    let (fl, p3) = fold_lits env rc in              (* lfold rc = lfold fl *)
+    Some (fl, trans p0 (trans p1 (trans p2 p3)))
+
+(* `π (e1 = e2)` for two `+`/`−` expressions with the same canonical form — same
+   symbolic atoms after cancellation and the same folded literal constant; None
+   if either is unsupported or the canonical lists differ.  Bridges an
+   arithmetic-reorder / normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
 let prove_sum_eq env e1 e2 : L.term option =
-  match normalize env e1, normalize env e2 with
-  | Some (l1, p1), Some (l2, p2) ->
-    let r1, c1 = reduce_cancel env (List.sort compare l1) in
-    let r2, c2 = reduce_cancel env (List.sort compare l2) in
-    if r1 = r2 then
-      let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-      let sym p = L.App (L.Name "eq_sym", [ p ]) in
-      (* e1 = lfold l1 = lfold(sort l1) = lfold r1 = lfold r2
-            = lfold(sort l2) = lfold l2 = e2 *)
-      Some (trans p1 (trans (prove_eq_lnested env l1) (trans c1
-              (trans (sym c2)
-                (trans (sym (prove_eq_lnested env l2)) (sym p2))))))
-    else None
+  match canonicalize env e1, canonicalize env e2 with
+  | Some (f1, p1), Some (f2, p2) when f1 = f2 ->
+    (* e1 = lfold f1 = lfold f2 = e2 *)
+    Some (L.App (L.Name "eq_trans", [ p1; L.App (L.Name "eq_sym", [ p2 ]) ]))
   | _ -> None
 
-(* `π (e = 𝟎)` when [e]'s signed atoms cancel to the empty multiset (e.g.
-   `—a + a`, `—(—a) − a`).  [prove_sum_eq … (Nat 0)] can't prove this — `𝟎`
-   normalises to the *atom* `0`, not the empty list, so the multisets differ —
-   so chain the normalise / sort / cancel proofs directly: the cancelled list
-   folds to `lfold [] ≡ 𝟎`. *)
+(* `π (e = 𝟎)` when [e]'s signed atoms cancel/fold to nothing (e.g. `—a + a`,
+   `3 − 2 − 1`).  [prove_sum_eq … (Nat 0)] can't — `𝟎` normalises to the *atom*
+   `0`, not the empty list — so read the canonical form directly: empty ⟹ the
+   proof `e = lfold [] ≡ 𝟎`. *)
 let prove_sum_zero env e : L.term option =
-  match normalize env e with
-  | Some (l, p) ->
-    let r, c = reduce_cancel env (List.sort compare l) in
-    if r = [] then
-      let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-      Some (trans p (trans (prove_eq_lnested env l) c))
-    else None
-  | None -> None
+  match canonicalize env e with
+  | Some ([], p) -> Some p
+  | _ -> None
 
-(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] cancels to a positive literal c.
-   Witness for `¬(c ≤ 𝟎)`: while the literal unfolds (c ≤ [lit_unfold_max]) the
-   unary `one_not_leq_zero`/`leq_plus_one` chain (`𝟏 ≤ c ≤ 𝟎` absurd); past the
-   cap — apero's interval/NAT bounds reach MAXINT (2³¹) — B.lp's folded
-   `lit_pos` gives an O(1) proof with no `int_lit` whnf.  Transported along the
-   generated `e = c`.  Used by AR2 (`a − b`) and AR4 (`E + F`). *)
+(* `π (¬(from_int c ≤ 𝟎))` for a concrete positive literal c.  `from_int c ≤ 𝟎`
+   reduces (le_elim, then the `to_int ∘ from_int` retract) to `Z.≤ c 0`, which
+   `Stdlib.Z` decides `false` by head match on `Zpos … / Z0` for any magnitude —
+   so `(…) ⊤ᵢ : ⊥`, O(1) (mirrors `one_not_leq_zero`, reused for c = 1). *)
+let positive_lit env c : L.term =
+  if c = 1 then L.Name "one_not_leq_zero"
+  else
+    L.Lambda ("_h", None,
+      L.App (L.Name "le_elim",
+        [ L.Exp (env, Nat c); L.Exp (env, Nat 0); L.Name "_h";
+          L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ]))
+
+(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] canonicalises to a positive literal c
+   (so symbolic cancellation like `x + 3 − x` still lands on 3, and a literal run
+   folds via [fold_lits]).  Transport `¬(c ≤ 𝟎)` along the generated `e = c`.
+   Used by AR2 (`a − b`) and AR4 (`E + F`); MAXINT-scale literals stay folded. *)
 let prove_gt_zero env e : L.term option =
-  let rec one_leq_lit c =                         (* π (𝟏 ≤ c·𝟏), c ≥ 1 *)
-    if c <= 1 then L.App (L.Name "leq_refl", [ L.Exp (env, Nat 1) ])
-    else
-      L.App (L.Name "leq_trans",
-        [ L.Exp (env, Nat 1); L.Exp (env, Nat (c - 1)); L.Exp (env, Nat c);
-          one_leq_lit (c - 1);
-          L.App (L.Name "leq_plus_one", [ L.Exp (env, Nat (c - 1)) ]) ])
-  in
-  let lit_not_leq_zero c =                         (* π (¬(c·𝟏 ≤ 𝟎)) *)
-    if c = 1 then L.Name "one_not_leq_zero"
-    else
-      L.Lambda ("_hk", None,
-        L.App (L.Name "one_not_leq_zero",
-          [ L.App (L.Name "leq_trans",
-              [ L.Exp (env, Nat 1); L.Exp (env, Nat c); L.Exp (env, Nat 0);
-                one_leq_lit c; L.Name "_hk" ]) ]))
-  in
-  let positive_lit c =                            (* π (¬(from_int c ≤ 𝟎)), c ≥ 1 *)
-    if c <= lit_unfold_max then lit_not_leq_zero c       (* unary chain; the
-       atoms are 𝟏, which the printer still renders 𝟏 *)
-    else L.App (L.Name "lit_pos", [ pos_term (string_of_int c) ])
-                                                  (* O(1); past the cap `Nat c`
-       renders as `from_int (Zpos P_c)`, and `lit_pos P_c` refutes it directly
-       (`Zpos p ≐ Z0 ↪ Gt`), no unary blowup. *)
-  in
-  (* The value [e] cancels to, when it is a positive literal — either k copies
-     of the 𝟏-atom or a single folded literal past [lit_unfold_max].  Read off
-     the reduced multiset (so symbolic cancellation like `x + 3 − x` still
-     lands on 3), then transport the matching positivity proof back along the
-     generated `e = c`.  No cap: handles MAXINT-scale literals. *)
-  let pos_lit_value l =
-    if l <> [] && List.for_all (fun (a, s) -> a = Nat 1 && s = 1) l
-    then Some (List.length l)
-    else match l with [ (Nat m, 1) ] when m > 1 -> Some m | _ -> None
-  in
-  match normalize env e with
-  | Some (atoms, _) ->
-    let reduced, _ = reduce_cancel env (List.sort compare atoms) in
-    (match pos_lit_value reduced with
-     | Some c ->
-       (match prove_sum_eq env e (Nat c) with
-        | Some eqpf ->
-          Some (L.App (L.Name "=\xe2\x87\x92",        (* =⇒ : π (A = B) → π A → π B *)
-            [ L.App (L.Name "eq_sym",
-                [ L.App (L.Name "not_cong",
-                    [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
-              positive_lit c ]))
-        | None -> None)
-     | None -> None)
-  | None -> None
+  match canonicalize env e with
+  | Some ([ (Nat c, 1) ], eqpf) when c >= 1 ->     (* eqpf : e = lfold [Nat c] ≡ Nat c *)
+    Some (L.App (L.Name "=\xe2\x87\x92",            (* =⇒ : π (A = B) → π A → π B *)
+      [ L.App (L.Name "eq_sym",
+          [ L.App (L.Name "not_cong",
+              [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
+        positive_lit env c ]))
+  | _ -> None
 
 (* ---- ARITH: Farkas-style linear-combination contradiction ----
 
    PP's linear solver closes ⊥ from the `eᵢ ≤ 𝟎` hypotheses in scope without
    recording a certificate.  Reconstruct one: search small nonnegative
-   multipliers λᵢ with Σ λᵢ·eᵢ = 𝟏 — every non-constant atom cancels and the
-   constant lands on exactly one 𝟏 ([flatten_signed] unfolds literals to
-   𝟏-atoms, so "the constant" is the net 𝟏-count) — then emit
+   multipliers λᵢ so that Σ λᵢ·eᵢ has every symbolic atom cancel and its literal
+   part fold to a positive constant c — then emit
 
-     one_not_leq_zero (leq_subst_l (𝟏 = Σ…) (add_leq_zero … hᵢ …))
+     positive_lit c (leq_subst_l (c = Σ…) (add_leq_zero … hᵢ …))
 
-   with the Σ-equality generated by [prove_sum_eq] (no `trust`).  Combinations
-   summing to a constant ≥ 2 exist in principle (no λ with target 𝟏 then);
-   they are out of scope until a trace needs one. *)
+   i.e. `Σ ≤ 𝟎` substituted to `c ≤ 𝟎`, refuted by `c > 𝟎`.  The Σ-equality is
+   generated by [prove_sum_eq] (which folds the literals via `Stdlib.Z`); no
+   `trust`. *)
 let arith_max_lambda = 8
 
 let find_arith_contradiction env hyps =
@@ -375,8 +427,9 @@ let find_arith_contradiction env hyps =
   let vecs = Array.of_list (List.map (fun (_, _, ats) -> vec ats) hyps) in
   let names = Array.of_list (List.map (fun (n, e, _) -> (n, e)) hyps) in
   let n_h = Array.length vecs in
-  (* the combination's net vector must be a single positive constant
-     (every non-𝟏 atom cancels); returns that constant *)
+  (* the combination's net vector must reduce to a positive constant: every
+     non-literal atom cancels, and the constant is the signed sum of the
+     foldable `Nat` literals' values (weighted by their net coefficients) *)
   let pos_const lambdas =
     let total = Hashtbl.create 8 in
     Array.iteri (fun j v ->
@@ -384,9 +437,10 @@ let find_arith_contradiction env hyps =
         List.iter (fun (a, c) ->
           let cur = try Hashtbl.find total a with Not_found -> 0 in
           Hashtbl.replace total a (cur + lambdas.(j) * c)) v) vecs;
-    let ok = Hashtbl.fold (fun a c ok -> ok && (c = 0 || a = Nat 1))
+    let ok = Hashtbl.fold (fun a c ok -> ok && (c = 0 || is_foldable_lit a))
                total true in
-    let const = try Hashtbl.find total (Nat 1) with Not_found -> 0 in
+    let const = Hashtbl.fold (fun a c acc ->
+                  match a with Nat v -> acc + c * v | _ -> acc) total 0 in
     if ok && const >= 1 then Some const else None
   in
   let lambdas = Array.make n_h 0 in
@@ -408,16 +462,6 @@ let find_arith_contradiction env hyps =
       let r = try_l 0 in
       lambdas.(i) <- 0;
       r
-  in
-  (* π (𝟏 ≤ c·𝟏) for the literal c ≥ 1: chain leq_plus_one up the (left-
-     nested, definitionally `lit (k−1) + 𝟏`) literal renders. *)
-  let rec one_leq_lit c =
-    if c <= 1 then L.App (L.Name "leq_refl", [ L.Exp (env, Nat 1) ])
-    else
-      L.App (L.Name "leq_trans",
-        [ L.Exp (env, Nat 1); L.Exp (env, Nat (c - 1)); L.Exp (env, Nat c);
-          one_leq_lit (c - 1);
-          L.App (L.Name "leq_plus_one", [ L.Exp (env, Nat (c - 1)) ]) ])
   in
   if n_h = 0 then None
   else
@@ -441,15 +485,8 @@ let find_arith_contradiction env hyps =
          in
          Option.map
            (fun eqpf ->
-              let lit_leq_zero =
-                L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) in
-              let one_leq_zero =
-                if c = 1 then lit_leq_zero
-                else
-                  L.App (L.Name "leq_trans",
-                    [ L.Exp (env, Nat 1); L.Exp (env, Nat c);
-                      L.Exp (env, Nat 0);
-                      one_leq_lit c; lit_leq_zero ])
-              in
-              L.Refine (L.Name "one_not_leq_zero", [ one_leq_zero ]))
+              (* eqpf : Nat c = combined ; hsum : combined ≤ 𝟎.  leq_subst_l
+                 substitutes to `c ≤ 𝟎`, refuted by positive_lit c. *)
+              L.Refine (positive_lit env c,
+                [ L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) ]))
            (prove_sum_eq env (Nat c) combined))

@@ -2,14 +2,13 @@
 % Table + prose read numbers from results-data.tex — never hard-code a
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
-% .but files not explained.
 % --- pipeline figure ------------------------------------------------
 \begin{boxfigure}{fig:pipeline}{%
-		The \tool{} pipeline. \pp, instrumented, emits a \trace{} of the
-		rules it applied; the \textsc{replay} utility expands this into a
-		\replay{} annotating each step with its intermediate goal; \tool{}
-		rebuilds the proof tree and emits an \lpf{} tactic script, which
-		\lp{} checks against the soundness-proved rule library.}
+		The \tool{} pipeline. A goal in \butf{} format is given to \pp{},
+		which emits a \trace{} of the rules it applied.
+	    The \textsc{replay} utility annotates each step with its intermediate
+		goal, and \tool{} rebuilds the proof tree and emits an \lpf{} tactic
+	    script, which \lp{} checks.}
 	\centering
 	\alttext{Pipeline diagram with two dashed groups. Left, Atelier B: a
 		formula file (.but) maps via PP to a .trace, then via REPLAY to a
@@ -113,35 +112,24 @@ end;
 
 \subsection{Benchmarks}\label{sec:bench}
 
-{\large WARNING TO COAUTHORS. DO NOT REVIEW ANYTHING BELOW.}
-
 We exercise \tool{} on three suites (\autoref{tab:results}).
 %
-\texttt{og} is a fixed set of \ogReplayed{} replays that served as the
+\texttt{og} is a fixed set of \ogReplayed{} replays that served as an
 initial development corpus.
 %
-\texttt{prv} is \ab's rule-validation corpus: each goal is an added
-proof rule submitted to \pp{} for validation, the prover's primary
-industrial role (\autoref{sec:intro}).
+\texttt{prv} are goals that validate custom proof-rules from real
+\ab{} developments.
 %
-\texttt{claude} is a synthetic stress and coverage suite of
-\claudeGoals{} goals, authored by an LLM-based coding agent
-(Claude Opus 4.8): it spans every rule family, proof sizes from one to
-over 400 replay lines, and deliberately probes shapes that previous
-versions of the pipeline mishandled.
-
+\texttt{claude} is a synthetic suite of \claudeGoals{} goals, authored by
+an LLM-based coding agent (Claude Opus 4.8).
+%
 \begin{table}[t]
   \centering
-  \caption{Results per suite. \emph{Goals} are inputs to the upstream
-    \pp/\textsc{replay} toolchain (\texttt{og} has no goal files: its
-    replays are checked in); \emph{Replays} are the complete replays
-    that toolchain produces (\autoref{sec:conclusion} accounts for the
-    losses); \emph{Verified} are replays \tool{} translates and \lp{}
-    type-checks.}
+  \caption{Results for the \texttt{og}, \texttt{prv}, and \texttt{claude} suites}
   \label{tab:results}
   \begin{tabular}{l r r r}
     \toprule
-    Suite           & Goals        & Replays         & Verified \\
+    Suite           & Goals        & Replays         & Checked \\
     \midrule
     \texttt{og}     & ---          & \ogReplayed     & \ogPass \\
     \texttt{prv}    & \prvGoals    & \prvReplayed    & \prvPass \\
@@ -254,6 +242,5 @@ checked \ab{} proofs to set-theory-based assistants such as TLA$^+$'s
 TLAPS, Isabelle/ZF, and Megalodon.
 
 \subsubsection*{Acknowledgements.}
-This work is supported by the ANR project ICSPA
-(ANR-21-CE25-0015) in collaboration with CLEARSY.
-% TODO: confirm grant number and any additional acknowledgements.
+We thank David D\'eharbe for helpful discussions, and the Deducteam team for
+their work on \lp{} and \dedukti.

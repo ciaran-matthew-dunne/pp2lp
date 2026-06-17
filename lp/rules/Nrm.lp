@@ -2,10 +2,10 @@
 //
 // Spec uses `♢` (= goal-side n-ary universal) and `♡` (= hypothesis-
 // side n-ary universal). Both reduce propositionally to `!!` via the
-// `♢_eq_!!` / `♡_eq_!!` axioms in Quant.lp; bodies use the dedicated
+// `♢_eq_!!` / `♡_eq_!!` lemmas in lemmas/Tuple.lp; bodies use the dedicated
 // `pi_to_♢` / `♢_to_pi` (and ♡ analogues) bridges.
 
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
 // ---- NRM1-7: Logical transformations under `♢` ----
 
@@ -102,7 +102,7 @@ end;
 // ---- NRM8-9: compound↔mixed binders (split with `take`/`drop`) ----
 //
 // NRM8: spec is `(♢(x,y) · Q) ⇒ S` ← `(♢x · ∀y · Q) ⇒ S`.
-// Encoded with the n,m-indexed split helpers from Quant.lp:
+// Encoded with the n,m-indexed split helpers from B.lp:
 //   the conclusion's `Q x y` (clean HO pattern) gets unified back
 //   from the premise's `Q (take v) (drop v)` after Lambdapi infers Q.
 opaque symbol NRM8 [n m] [Q : Tuple n → Tuple m → Prop] [S : Prop]
@@ -472,7 +472,7 @@ begin
 end;
 
 // NRM26: y not free in P; H ⊢ ♡(x,...) · P → H ⊢ ♡(x,y,...) · P
-// (`tuple_prepend` and the rest of the slot surgery live in Quant.lp.)
+// (`tuple_prepend` and the rest of the slot surgery live in B.lp.)
 opaque symbol NRM26 [n] [P : Tuple (+1 n) → Prop] [Q : Prop]
   : π ((`♡ v' : Tuple n, P (tuple_prepend 𝟎 v')) ⇒ Q)
   → π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔
@@ -549,7 +549,7 @@ end;
 
 // A sum that arithmetic-normalises to 𝟎 is ≤ 𝟎.  The emitter builds the
 // `E = 𝟎` proof with `prove_sum_eq` (add_comm/assoc/opp cancellation).
-opaque symbol leq_zero_of_sum_zero (E : τ ι) : π (E = 𝟎) → π (E ≤ 𝟎) ≔
+opaque symbol leq_zero_of_sum_zero (E : τ ι) : π (E = 𝟎) → π (leq E 𝟎) ≔
 begin
   assume E h;
   rewrite h;
@@ -578,21 +578,21 @@ end;
 
 // NRM27: bare goal (no `⇒R`), the `xᵢ = 𝟎` case.  The bounds `prj 0 v ≤ 𝟎`
 // and `— prj 0 v ≤ 𝟎` (members of the conjunction) pin `prj 0 v = 𝟎` by
-// antisymmetry; tuple-η (`(init v) ⨾ 𝟎 = v`, via Quant.lp) then transports
+// antisymmetry; tuple-η (`(init v) ⨾ 𝟎 = v`, via lemmas/Tuple.lp) then transports
 // `⋀ (ps v)` to `⋀ (ps ((init v) ⨾ 𝟎))`, contradicting the premise.  Fully
 // trust-free; untriggered in the corpus (the only NRM2x trace is NRM29).
 opaque symbol NRM27 [n] [ps : Tuple (+1 n) → 𝕃* o]
   (hint : Π v, π (prj 0 v ϵ INT))
-  (hpos : Π v, π (mem (prj 0 v ≤ 𝟎) (ps v)))
-  (hneg : Π v, π (mem (— prj 0 v ≤ 𝟎) (ps v)))
+  (hpos : Π v, π (mem (leq (prj 0 v) 𝟎) (ps v)))
+  (hneg : Π v, π (mem (leq (neg (prj 0 v)) 𝟎) (ps v)))
   : π (`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎)))
   → π (`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ≔
 begin
   assume n ps hint hpos hneg h_prem;
   refine pi_to_♡ (λ v, ¬ ⋀ (ps v)) (λ v hpv, _);
-  have hle : π (prj 0 v ≤ 𝟎)
+  have hle : π (leq (prj 0 v) 𝟎)
     { refine mem_sound _ (ps v) (hpos v) hpv };
-  have hge : π (𝟎 ≤ prj 0 v)
+  have hge : π (leq 𝟎 (prj 0 v))
     { refine neg_leq_zero (prj 0 v) (mem_sound _ (ps v) (hneg v) hpv) };
   have hz : π (prj 0 v = 𝟎)
     { refine leq_antisym (prj 0 v) 𝟎 (hint v) zero_in_int hle hge };

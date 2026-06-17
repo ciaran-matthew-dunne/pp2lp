@@ -9,7 +9,9 @@
 \input{macros.tex}      % notation + system names (\pp, \lp, \tool, \rn, …)
 \input{results-data.tex}% ALL benchmark numbers live here — edit only this
 
-\title{Independently Checking Atelier~B's\\ Predicate Prover in LambdaPi}
+\title{Independently Checking Atelier~B's\\ Predicate Prover in LambdaPi%
+  \thanks{This work is supported by the ANR project ICSPA
+    (ANR-21-CE25-0015), in collaboration with CLEARSY.}}
 \titlerunning{Independently Checking Atelier B's Predicate Prover}
 
 % TODO(authors): confirm affiliations/emails before submission.
@@ -58,15 +60,13 @@
 
 % pages 1-2: abstract, intro, related work.
 \input{intro.tex}
-% pages 3-5: abstract syntax for PP & LP. encoding PP in LP.
-% split into two sections: preliminaries
-%
+% pages 3-5: preliminaries (PP & LP); then encoding PP in LP.
 \input{encoding.tex}
 % pages 6-8: pipeline, benchmark eval, discussion, conclusion
 \input{eval.tex}
 
-% ANR acknowledgement on first page footnote.
-% acknowledgement to david and deducteam in acknowledgtements
+% appendices (excluded from the page limit)
+\input{appendix.tex}
 
 \printbibliography
 

@@ -3,7 +3,7 @@
 contract check that the engine emits a *clean* .lp (no comments) and a
 parseable provenance map.
 
-Run from the repo root:  python3 bench/test_cli.py
+Run from the repo root:  python3 lp/bench/test_cli.py
 Exit status is non-zero if any check fails.
 """
 import importlib.machinery
@@ -13,7 +13,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]   # lp/bench/test_cli.py → repo root
 pp = importlib.machinery.SourceFileLoader("pp2lp_cli", str(ROOT / "pp2lp")).load_module()
 pp.COLOR = False                          # deterministic output, no ANSI
 
@@ -48,32 +48,18 @@ check("join between rules → preceding", pp.join_prov(3, sm)["rule"] == "AND1")
 check("join above the first → None", pp.join_prov(1, sm) is None)
 check("join past the last → last", pp.join_prov(999, sm)["rule"] == "AXM4")
 
-# ── _distill: keep [tag] lines, drop the solve{} dump and crashes ───────────
-TRACE = ["debug +u", "[unif] solve {recompute=false;", "       metas={?1:...}",
-         "[unif] solve A ≡ B", "[unif] failed", "Start checking foo.lp"]
-d = pp._distill(TRACE)
-check("distill keeps the constraint", "[unif] solve A ≡ B" in d)
-check("distill keeps 'failed'", "[unif] failed" in d)
-check("distill drops the solve{} dump", not any("metas" in l or "recompute" in l for l in d))
-check("distill drops non-tag noise", not any("Start checking" in l for l in d))
-crash = pp._distill(["[infr] Uncaught [...Assertion failed]."])
-check("distill surfaces a lambdapi crash", any("internal error" in l for l in crash))
-
-# ── _parse_goal_state: split a probe run into hyps + goal ────────────────────
-PROBE_OUT = ['Start checking "x.probe.lp"', "debug +u", "x: P", "hyp: Q",
-             "-" * 78, "0. ?4: Q", "[unif] solve P ≡ Q", "[unif] Unsolvable",
-             "[/tmp/x.probe.lp:7:0] ", "P", "is not unifiable with", "Q."]
-gs = pp._parse_goal_state(PROBE_OUT)
-check("goal_state pulls the hypotheses", gs["hyps"] == ["x: P", "hyp: Q"])
-check("goal_state strips the N. ?meta: goal prefix", gs["goals"] == ["Q"])
-check("goal_state skips the debug echo line", "debug +u" not in gs["hyps"])
-check("goal_state stops at the [tag]/[file] lines",
-      not any("unif" in h or "unifiable" in h for h in gs["hyps"] + gs["goals"]))
-# debug trace still distils from the same output
-check("distill coexists with the goal block",
-      pp._distill(PROBE_OUT) == ["[unif] solve P ≡ Q", "[unif] Unsolvable"])
-empty = pp._parse_goal_state(["nothing here", "no banner"])
-check("goal_state empty when no proof banner", empty == {"hyps": [], "goals": []})
+# ── _goal_state_for: adapt lambdapi's structured goals to {hyps, goals} ──────
+# goals_after (subproof mismatch) wins over goals_before; each goal carries hyps.
+DIAG = {"goals_before": [{"hyps": [{"name": "x", "type": "P"}], "concl": "Q"}],
+        "goals_after": [{"hyps": [{"name": "h", "type": "A"}], "concl": "B"},
+                        {"hyps": [], "constr": "C ≡ D"}]}
+gsf = pp._goal_state_for(DIAG)
+check("goal_state_for prefers goals_after", gsf["goals"] == ["B", "C ≡ D"])
+check("goal_state_for takes the focused goal's hyps", gsf["hyps"] == ["h : A"])
+check("goal_state_for falls back to goals_before",
+      pp._goal_state_for({"goals_before": DIAG["goals_before"]})["goals"] == ["Q"])
+check("goal_state_for empty when the diagnostic carries no goals",
+      pp._goal_state_for({}) == {"hyps": [], "goals": []})
 
 # ── _error_headline: drop the re-dumped goal state, flow the rest ────────────
 SUBPROOFS = "Missing subproofs (0 subproofs for 3 subgoals):\nx: τ ι\n" + "-" * 78 + "\n0. ?39: τ ι"
@@ -107,6 +93,15 @@ _goals = [{"status": "ok"},
 _hist = pp._failure_histogram(_goals)
 check("histogram counts per code", _hist == {"E_DISPATCH": 2, "E_LP_CHECK": 1})
 check("histogram ignores ok/warn goals", sum(_hist.values()) == 3)
+
+# ── _Stream._matches: the --code failure-window filter ──────────────────────
+_s_ins = pp._Stream("apero", 3, code_rx=re.compile("E_INS", re.I))
+check("code filter keeps the matching code",
+      _s_ins._matches({"status": "emit_fail", "error": {"code": "E_INS"}}))
+check("code filter drops a non-matching code",
+      not _s_ins._matches({"status": "emit_fail", "error": {"code": "E_TREE_BUILD"}}))
+check("no code filter keeps every failure",
+      pp._Stream("apero", 1)._matches({"status": "emit_fail", "error": {"code": "E_X"}}))
 
 # ── _rule_signature: pull a rule's type from lp/rules/ ─────────────────────
 # _rule_signature returns (path, start_line, end_line) into lp/rules/*.lp.

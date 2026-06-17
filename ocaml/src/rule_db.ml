@@ -38,8 +38,8 @@ type emit =
   | Nrm2730        (* NRM27-30: trust-free solver dispatch — peel the pinned
                       binder at the witness `b`, ⊤-normalise the substituted
                       conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
-  | Ar2            (* AR2: leaf `(a≤b) ⇒ R`, a > b — generate `¬(a≤b)` from a
-                      positive-literal `a−b` (prove_gt_zero, via sub_leq_eq) *)
+  | Ar2            (* AR2: leaf `(leq a b) ⇒ R` with a > b concrete ℤ literals —
+                      the ℤ-literal `AR2` lemma, closed by `λ k, k ⊤ᵢ` *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
   | Bool_split     (* BOOL31/32/41/42: discharge the `V ϵ BOOL` side-condition
                       from an injected typing hypothesis (Emit_ctx.bool_split_var) *)

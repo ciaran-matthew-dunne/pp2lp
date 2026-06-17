@@ -1,6 +1,6 @@
 // Equality rules (§A.13) — shallow encoding
 // Exp ≃ Exp becomes Leibniz equality (polymorphic)
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
 // ---- EVR (equality reflexivity) ----
 

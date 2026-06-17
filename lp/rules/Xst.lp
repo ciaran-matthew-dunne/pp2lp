@@ -10,7 +10,7 @@
 // nested forms are *definitionally equal* — XST1–4 are identity in
 // HOAS.
 
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
 // Helper: compound → nested for `??`. Defined by rewrite rule on
 // the tuple constructor; pattern-match exposes (w ⨾ a) shape.

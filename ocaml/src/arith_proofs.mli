@@ -5,9 +5,10 @@
 
 open Syntax_pp
 
-(* Flatten a `+`/`−` expression to its ordered signed-atom list (— pushed to
-   the atoms; literals 2..64 unfolded to 𝟏-atoms); None if a non-arithmetic
-   node blocks it.  Mirrors the internal [normalize]'s recursion. *)
+(* Flatten a `+`/`−` expression to its ordered signed-atom list (— pushed to the
+   atoms; each literal a single atom — no 𝟏-unfold, the internal fold combines
+   literal runs via `Stdlib.Z`); None if a non-arithmetic node blocks it.
+   Mirrors the internal [normalize]'s recursion. *)
 val flatten_signed : exp -> (exp * int) list option
 
 (* Left-nested sum of a signed-atom list, as a PP expression (`lfold [] ≡ 𝟎`). *)

@@ -16,7 +16,7 @@
 // direction (nested → compound) is provable by a rewrite rule that
 // pattern-matches on the constructor.
 
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
 // Helper: nested → compound. Defined by rewrite rule on the
 // tuple constructor `($w ⨾ $a)`. Used by ALL2 (ALL3 is now curried, below).

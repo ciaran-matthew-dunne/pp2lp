@@ -12,7 +12,7 @@
 // The `Res`, `mk_1`, `res_tm`, `res_eq` primitives themselves live in
 // Quant.lp so that All.lp / Xst.lp can refer to them.
 
-require open pp2lp.B pp2lp.Int pp2lp.ConjList pp2lp.Quant;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.ConjList pp2lp.lemmas.Tuple;
 
 // ============================================================
 // Generic equality combinators
@@ -176,9 +176,9 @@ begin
   { assume hq hp2; refine hq }
 end;
 
-// LHS-of-≤-zero congruence (for AR9_1).
+// LHS-of-leq-zero congruence (for AR9_1).
 opaque symbol leq_zero_eq [E F : τ ι]
-  : π (E = F) → π ((E ≤ 𝟎) = (F ≤ 𝟎)) ≔
+  : π (E = F) → π ((leq E 𝟎) = (leq F 𝟎)) ≔
 begin assume E F h; rewrite h; reflexivity end;
 
 // ============================================================

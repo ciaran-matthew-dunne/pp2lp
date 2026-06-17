@@ -1,5 +1,5 @@
 // Disjunction (§A.2) — shallow encoding
-require open pp2lp.B pp2lp.Int pp2lp.Quant pp2lp.rules.Res;
+require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
 // ---- Base rules ----
 

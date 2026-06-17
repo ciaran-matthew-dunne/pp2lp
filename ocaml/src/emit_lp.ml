@@ -1,6 +1,9 @@
 open Syntax_pp
 
-let lp_header = "require open pp2lp.B pp2lp.Int pp2lp.Rules;\n"
+(* ℤ-global: B opens Stdlib.Z, so bare decimals are ℤ (literals → from_int,
+   Tuple/prj indices → to_nat).  pp2lp.Prelude re-exports B + lemmas/* + rules/*,
+   so opening it alone brings every symbol the emitted proofs cite. *)
+let lp_header = "require open pp2lp.Prelude;\n"
 
 let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
     : string * (int * Lp_tree.prov) list =

@@ -1,10 +1,10 @@
-require open pp2lp.B pp2lp.Int pp2lp.Rules;
+require open pp2lp.Prelude;
 
 opaque symbol {|18|} (p : Prop) :
-  π ((`!! a_t : Tuple 1,
-      let a ≔ (prj 0 a_t) in
-      (`!! x_t : Tuple 1,
-        let x ≔ (prj 0 x_t) in
+  π ((`!! a_t : Tuple (to_nat 1),
+      let a ≔ (prj (to_nat 0) a_t) in
+      (`!! x_t : Tuple (to_nat 1),
+        let x ≔ (prj (to_nat 0) x_t) in
         ¬ (⋀ (∎ ∷ ⊤ ∷ (x = x))))
       ⇒ a = a ⇒ p)) ≔
 begin

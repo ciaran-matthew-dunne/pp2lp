@@ -27,24 +27,20 @@ let pp_ident buf s =
     Buffer.add_string buf "|}"
   end
 
-(* Write `(from_int (Stdlib.Z.Zpos P))` for a positive decimal literal, P the
-   binary Stdlib.Pos built MSB→LSB from [pos_bits].  ℤ literals are written
-   explicitly because bench bare numerals are ℕ (Tuple arities); the binary
-   form keeps apero's 2³¹/2⁶⁴ literals compact (no unary 𝟏-sum blowup). *)
-let pp_from_int_pos buf decimal =
-  Buffer.add_string buf "(from_int (Stdlib.Z.Zpos ";
-  (match Syntax_pp.pos_bits decimal with
-   | [] -> Buffer.add_string buf "Stdlib.Pos.H"   (* unreachable: decimal ≥ 2 *)
-   | _ :: rest ->
-     (* `O p = 2p`, `I p = 2p+1` ⇒ outermost constructor is the LSB, so wrap
-        from the least-significant `rest` bit (last) outward to H (the MSB). *)
-     let lsb_first = List.rev rest in
-     List.iter (fun b ->
-       Buffer.add_string buf
-         (if b = 1 then "(Stdlib.Pos.I " else "(Stdlib.Pos.O ")) lsb_first;
-     Buffer.add_string buf "Stdlib.Pos.H";
-     List.iter (fun _ -> Buffer.add_char buf ')') lsb_first);
-  Buffer.add_string buf "))"
+(* Non-negative integer literal as `(from_int <decimal>)`: the file is ℤ-global,
+   so the decimal is a `Stdlib.Z.ℤ` and Stdlib.Z computes on it, keeping big apero
+   literals (2³¹/2⁶⁴) a single decimal.  Nat 0/1 keep the `𝟎`/`𝟏` abbreviations. *)
+let pp_from_int buf decimal =
+  Buffer.add_string buf "(from_int ";
+  Buffer.add_string buf decimal;
+  Buffer.add_char buf ')'
+
+(* Tuple arity / prj index: ℕ-valued, but the file is ℤ-global, so write
+   `(to_nat <decimal>)` — `to_nat` computes it back to the ℕ literal (see B.lp). *)
+let pp_to_nat buf k =
+  Buffer.add_string buf "(to_nat ";
+  Buffer.add_string buf (string_of_int k);
+  Buffer.add_char buf ')'
 
 (* ---- Precedence-aware pretty-printing ----
 
@@ -151,7 +147,7 @@ let pp_lets buf ~sep v_name lets =
     Buffer.add_string buf "let ";
     pp_ident buf name;
     Buffer.add_string buf " \xe2\x89\x94 (prj "; (* ≔ (prj *)
-    Buffer.add_string buf (string_of_int k);
+    pp_to_nat buf k;
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf ") in";
@@ -169,12 +165,15 @@ let pp_lets buf ~sep v_name lets =
    vars render as `prj k v`.  Inner binders shadow outer bindings. *)
 
 let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
+  (* B-integer operators print as self-parenthesising prefix applications, so
+     min_bp is no longer threaded here; kept for the API. *)
+  let _ = min_bp in
   match e with
   | Var s when List.mem_assoc s env ->
     (match List.assoc s env with
      | Proj (k, v) ->
        Buffer.add_string buf "(prj ";
-       Buffer.add_string buf (string_of_int k);
+       pp_to_nat buf k;
        Buffer.add_char buf ' ';
        pp_ident buf v;
        Buffer.add_char buf ')'
@@ -182,10 +181,10 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
   | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
   | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
   | Var s -> pp_ident buf s
-  | BigNat s -> pp_from_int_pos buf s
+  | BigNat s -> pp_from_int buf s                    (* apero 2⁶⁴ bound, ℤ decimal *)
   | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 ≔ from_int 0 *)
   | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 ≔ from_int 1 *)
-  | Nat n -> pp_from_int_pos buf (string_of_int n)   (* n ≥ 2 → from_int binary ℤ *)
+  | Nat n -> pp_from_int buf (string_of_int n)       (* n ≥ 2 → from_int <decimal> *)
   | App (f, args) ->
     (* PP writes some primitives `_`-prefixed; map to the B.lp names (mirrors
        the `_eql_set` → `eql_set` case). *)
@@ -208,20 +207,21 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
     Buffer.add_char buf ' ';
     pp_exp_args ~env buf args;
     Buffer.add_char buf ')'
+  (* B-integer operators are the prefix symbols `plus`/`minus`/`neg` (B.lp), not
+     infix (that would clash with Stdlib.Z's `+`/`-`/`—`), so emit plain
+     self-parenthesising applications; operands print at `bp_max`. *)
   | AOp (Add, e1, e2) ->
-    wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 ~env buf e1;
-      Buffer.add_string buf " + ";
-      pp_exp ~min_bp:7 ~env buf e2)
+    Buffer.add_string buf "(plus ";
+    pp_exp ~env buf e1; Buffer.add_char buf ' '; pp_exp ~env buf e2;
+    Buffer.add_char buf ')'
   | AOp (Sub, e1, e2) ->
-    wrap buf (6 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 ~env buf e1;
-      Buffer.add_string buf " - ";
-      pp_exp ~min_bp:7 ~env buf e2)
+    Buffer.add_string buf "(minus ";
+    pp_exp ~env buf e1; Buffer.add_char buf ' '; pp_exp ~env buf e2;
+    Buffer.add_char buf ')'
   | Neg e1 ->
-    wrap buf (7 < min_bp) (fun () ->
-      Buffer.add_string buf "\xe2\x80\x94 "; (* — *)
-      pp_exp ~min_bp:8 ~env buf e1)
+    Buffer.add_string buf "(neg ";
+    pp_exp ~env buf e1;
+    Buffer.add_char buf ')'
   (* Set-theoretic operators are higher-order symbols (e.g. inter :
      τι→τι→τι), applied DIRECTLY — `eapp` is only for B-function (set-of-pairs)
      application (the App/EApp cases above). *)
@@ -268,7 +268,7 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
       Buffer.add_string buf "(\xce\xbb "; (* λ *)
       pp_ident buf v_name;
       Buffer.add_string buf " : Tuple ";
-      Buffer.add_string buf (string_of_int n);
+      pp_to_nat buf n;
       Buffer.add_string buf ", ";
       tail ();
       Buffer.add_char buf ')'
@@ -365,11 +365,10 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
       pp_exp ~min_bp:11 ~env buf e1;
       Buffer.add_string buf " = ";
       pp_exp ~min_bp:11 ~env buf e2)
-  | Leq (e1, e2) ->
-    wrap buf (5 < min_bp) (fun () ->
-      pp_exp ~min_bp:6 ~env buf e1;
-      Buffer.add_string buf " \xe2\x89\xa4 "; (* ≤ *)
-      pp_exp ~min_bp:6 ~env buf e2)
+  | Leq (e1, e2) ->                       (* `leq` is the prefix B-integer ≤ (B.lp) *)
+    Buffer.add_string buf "(leq ";
+    pp_exp ~env buf e1; Buffer.add_char buf ' '; pp_exp ~env buf e2;
+    Buffer.add_char buf ')'
   | Mem (es, e) ->
     wrap buf (5 < min_bp) (fun () ->
       pp_exp_args ~env buf es;
@@ -384,7 +383,7 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
-    Buffer.add_string buf (string_of_int n);
+    pp_to_nat buf n;
     Buffer.add_string buf ", ";
     pp_lets buf ~sep:(fun () -> Buffer.add_char buf ' ') v_name lets;
     pp_prd ~env:env' buf body;
@@ -449,7 +448,7 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
-    Buffer.add_string buf (string_of_int n);
+    pp_to_nat buf n;
     Buffer.add_char buf ',';
     Buffer.add_char buf '\n';
     let inner_pad = String.make (ind + 2) ' ' in
