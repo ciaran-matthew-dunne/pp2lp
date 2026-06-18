@@ -1,1 +1,1 @@
-Flag(FileOn("xst_eq.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = a)) & _delta_e(a) | ? | ? | #x.(x = a) | nn))
+Flag(FileOn("xst_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x = a) | nn))

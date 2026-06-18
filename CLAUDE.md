@@ -42,6 +42,9 @@ pp2lp gen prv --only replays    # one stage (buts,traces,replays)
 pp2lp gen apero --only buts     # apero stage 1: pog2but + select (see Apero)
 
 pp2lp clean                     # drop stale .lpo caches (project lp/ + Stdlib)
+
+pp2lp test                      # type-check the rule-base unit tests (lp/tests/)
+pp2lp test --filter Nrm         # one test module; -q for summary only
 ```
 
 `run` auto-builds the engine (`--no-build` to skip), runs suites in parallel
@@ -58,13 +61,15 @@ own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real failure.
 | `cd ocaml && dune build`                      | seconds | type/exhaustiveness errors (warn 8 fatal) |
 | `cd ocaml && dune runtest`                    | seconds | emitter output drift (replay→.lp)  |
 | `python3 lp/bench/test_cli.py`                | seconds | the OCaml↔Python error-code contract      |
+| `./pp2lp test`                                | <1 s    | rule signatures drifting from their spec  |
 | `./pp2lp run og -q`                           | ~3 s    | end-to-end smoke (30 traces)              |
 | `./pp2lp run prv -q && ./pp2lp run claude -q` | ~5 min  | full regression                           |
 
 Pre-commit minimum: `cd ocaml && dune runtest && ./pp2lp run og -q`. Add prv +
 claude when `ocaml/` or non-bench `lp/` changed. Rough baseline: og 30, prv ~70,
-claude ~1160 of 1284 (rest are gen-time REPLAY drops); the live numbers are in
-`lp/bench/results/`.
+claude ~1020 of 1129 (every goal is a genuine theorem PP proves bare — see the
+goals.txt header; the ~110 ✗ are the emit/translate frontier those real proofs
+exercise: FIN_INS, INS search, Farkas/AR). Live numbers are in `lp/bench/results/`.
 
 ## Source layout
 
@@ -89,6 +94,7 @@ lp/
                          ♢/♡ bridges), ConjList (⋀ surgery, conj_concat_eq)
   Prelude.lp             re-exports B + lemmas/* + rules/* — the emitter's sole import
   rules/*.lp             per-section rule lemmas (All, Arith, Axm, Bool, …)
+  tests/*.lp             rule-base unit tests (one file per rules/ module; `pp2lp test`)
   bench/<suite>/<name>/  per-benchmark inputs/artifacts (see Suites)
   bench/test_cli.py      CLI self-tests + repo contract checks
   bench/results/         per-run JSON (gitignored)

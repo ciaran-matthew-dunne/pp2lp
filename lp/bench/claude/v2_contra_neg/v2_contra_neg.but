@@ -1,1 +1,1 @@
-Flag(FileOn("v2_contra_neg.res")) & Set(Valid.1 | Rule(Implication | ((a => not(a)) => not(a)) & _delta_p(a) | ? | ? | (a => not(a)) => not(a) | nn))
+Flag(FileOn("v2_contra_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => not(a)) => not(a) | nn))

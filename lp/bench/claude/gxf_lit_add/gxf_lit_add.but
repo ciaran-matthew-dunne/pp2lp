@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lit_add.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 2 + 3 = 5 | nn))

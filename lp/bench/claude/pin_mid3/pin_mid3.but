@@ -1,1 +1,1 @@
-Flag(FileOn("pin_mid3.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.#z.(y = x)) | ? | ? | #x.#y.#z.(y = x) | nn))
+Flag(FileOn("pin_mid3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.#z.(y = x) | nn))

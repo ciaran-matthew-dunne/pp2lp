@@ -1,1 +1,1 @@
-Flag(FileOn("a2_lt_irrefl.res")) & Set(Valid.1 | Rule(Implication | (not(x < x)) & _delta_e(x) | ? | ? | not(x < x) | nn))
+Flag(FileOn("a2_lt_irrefl.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(x < x) | nn))

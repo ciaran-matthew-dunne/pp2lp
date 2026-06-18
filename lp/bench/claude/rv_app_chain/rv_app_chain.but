@@ -1,1 +1,1 @@
-Flag(FileOn("rv_app_chain.res")) & Set(Valid.1 | Rule(Implication | (w = f(x) & f(x) = z => w = z) & _delta_e(w) & _delta_e(f) & _delta_e(x) & _delta_e(z) | ? | ? | w = f(x) & f(x) = z => w = z | nn))
+Flag(FileOn("rv_app_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | w = f(x) & f(x) = z => w = z | nn))

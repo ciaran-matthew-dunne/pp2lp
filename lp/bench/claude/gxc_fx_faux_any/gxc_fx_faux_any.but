@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_fx_faux_any.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | FAUX => p | nn))

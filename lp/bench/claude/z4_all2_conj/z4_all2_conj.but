@@ -1,1 +1,1 @@
-Flag(FileOn("z4_all2_conj.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) & _delta_e(a) & _delta_e(t) | ? | ? | !x.(x: s) & a: t => a: t | nn))
+Flag(FileOn("z4_all2_conj.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s) & a: t => a: t | nn))

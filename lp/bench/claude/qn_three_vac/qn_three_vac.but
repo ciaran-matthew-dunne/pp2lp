@@ -1,1 +1,1 @@
-Flag(FileOn("qn_three_vac.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.(a: s) => a: s) & _delta_e(a) & _delta_e(s) | ? | ? | !x.!y.!z.(a: s) => a: s | nn))
+Flag(FileOn("qn_three_vac.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.!z.(a: s) => a: s | nn))

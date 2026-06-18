@@ -1,1 +1,1 @@
-Flag(FileOn("qn_xst_or_split.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s or x: t) => #x.(x: s) or #x.(x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s or x: t) => #x.(x: s) or #x.(x: t) | nn))
+Flag(FileOn("qn_xst_or_split.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x: s or x: t) => #x.(x: s) or #x.(x: t) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("xw_eq_neq_pair.res")) & Set(Valid.1 | Rule(Implication | (not(a = b) => #x.#y.(not(x = y))) & _delta_e(a) & _delta_e(b) | ? | ? | not(a = b) => #x.#y.(not(x = y)) | nn))
+Flag(FileOn("xw_eq_neq_pair.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a = b) => #x.#y.(not(x = y)) | nn))

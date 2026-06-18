@@ -1,1 +1,1 @@
-Flag(FileOn("u2_or_cases_all.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a or x: b) & !x.(x: a => x: c) & !x.(x: b => x: c) => !x.(x: s => x: c)) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | !x.(x: s => x: a or x: b) & !x.(x: a => x: c) & !x.(x: b => x: c) => !x.(x: s => x: c) | nn))
+Flag(FileOn("u2_or_cases_all.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: a or x: b) & !x.(x: a => x: c) & !x.(x: b => x: c) => !x.(x: s => x: c) | nn))

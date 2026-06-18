@@ -1,1 +1,1 @@
-Flag(FileOn("qn_or_xst_join.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s) or #x.(x: t) => #x.(x: s or x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s) or #x.(x: t) => #x.(x: s or x: t) | nn))
+Flag(FileOn("qn_or_xst_join.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x: s) or #x.(x: t) => #x.(x: s or x: t) | nn))

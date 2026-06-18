@@ -1,1 +1,1 @@
-Flag(FileOn("xw_two_same.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.#y.(x: s & y: s)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.#y.(x: s & y: s) | nn))
+Flag(FileOn("xw_two_same.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.#y.(x: s & y: s) | nn))

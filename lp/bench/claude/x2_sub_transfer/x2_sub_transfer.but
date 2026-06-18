@@ -1,1 +1,1 @@
-Flag(FileOn("x2_sub_transfer.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s) & s <: t => #x.(x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.(x: s) & s <: t => #x.(x: t) | nn))
+Flag(FileOn("x2_sub_transfer.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x: s) & s <: t => #x.(x: t) | nn))

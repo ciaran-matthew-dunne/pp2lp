@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nall_h3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(!x.(x: s)) => p or not(p) | nn))

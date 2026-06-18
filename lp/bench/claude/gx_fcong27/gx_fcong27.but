@@ -1,0 +1,1 @@
+Flag(FileOn("gx_fcong27.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(x))))))))))))))))))))))))))) = h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(k(h(g(f(y))))))))))))))))))))))))))) | nn))

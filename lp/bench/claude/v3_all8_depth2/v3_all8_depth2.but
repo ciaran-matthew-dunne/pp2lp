@@ -1,1 +1,1 @@
-Flag(FileOn("v3_all8_depth2.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => !y.(y: t => x, y: r)) & a: s & b: t => a, b: r) & _delta_e(s) & _delta_e(t) & _delta_e(r) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => !y.(y: t => x, y: r)) & a: s & b: t => a, b: r | nn))
+Flag(FileOn("v3_all8_depth2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => !y.(y: t => x, y: r)) & a: s & b: t => a, b: r | nn))

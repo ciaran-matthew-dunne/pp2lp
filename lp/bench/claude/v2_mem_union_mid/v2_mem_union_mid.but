@@ -1,1 +1,1 @@
-Flag(FileOn("v2_mem_union_mid.res")) & Set(Valid.1 | Rule(Implication | (x: t => x: s \/ t \/ u) & _delta_e(x) & _delta_e(t) & _delta_e(s) & _delta_e(u) | ? | ? | x: t => x: s \/ t \/ u | nn))
+Flag(FileOn("v2_mem_union_mid.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: t => x: s \/ t \/ u | nn))

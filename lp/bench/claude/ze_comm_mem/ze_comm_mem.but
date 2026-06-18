@@ -1,1 +1,1 @@
-Flag(FileOn("ze_comm_mem.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) & _delta_e(s) | ? | ? | y = x & y: s => x: s | nn))
+Flag(FileOn("ze_comm_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y = x & y: s => x: s | nn))

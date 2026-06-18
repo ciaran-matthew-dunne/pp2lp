@@ -1,0 +1,1 @@
+Flag(FileOn("gxq_absorb2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s /\ (s \/ t) = s | nn))

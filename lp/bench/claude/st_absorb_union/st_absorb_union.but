@@ -1,1 +1,1 @@
-Flag(FileOn("st_absorb_union.res")) & Set(Valid.1 | Rule(Implication | (s \/ (s /\ t) <: s) & _delta_e(s) & _delta_e(t) | ? | ? | s \/ (s /\ t) <: s | nn))
+Flag(FileOn("st_absorb_union.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s \/ (s /\ t) <: s | nn))

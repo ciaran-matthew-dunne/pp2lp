@@ -1,1 +1,1 @@
-Flag(FileOn("ag_lit_both.res")) & Set(Valid.1 | Rule(Implication | (2 <= x & x <= 2 => x = 2) & _delta_e(x) | ? | ? | 2 <= x & x <= 2 => x = 2 | nn))
+Flag(FileOn("ag_lit_both.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 2 <= x & x <= 2 => x = 2 | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxh_bool_t1.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = TRUE => not(x = FALSE) | nn))

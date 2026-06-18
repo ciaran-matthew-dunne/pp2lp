@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_max_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s: FIN1(t) & x: s => x <= max(s) | nn))

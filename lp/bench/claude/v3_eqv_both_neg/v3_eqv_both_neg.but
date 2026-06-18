@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eqv_both_neg.res")) & Set(Valid.1 | Rule(Implication | ((not(a) <=> not(b)) => (a <=> b)) & _delta_p(a) & _delta_p(b) | ? | ? | (not(a) <=> not(b)) => (a <=> b) | nn))
+Flag(FileOn("v3_eqv_both_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(a) <=> not(b)) => (a <=> b) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("zb_mem_round.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(s) & _delta_e(btrue) | ? | ? | bool(x: s) = btrue => x: s | nn))

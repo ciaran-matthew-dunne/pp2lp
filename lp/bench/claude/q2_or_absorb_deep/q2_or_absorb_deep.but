@@ -1,1 +1,1 @@
-Flag(FileOn("q2_or_absorb_deep.res")) & Set(Valid.1 | Rule(Implication | (a or (a & b & c) => a) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a or (a & b & c) => a | nn))
+Flag(FileOn("q2_or_absorb_deep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a or (a & b & c) => a | nn))

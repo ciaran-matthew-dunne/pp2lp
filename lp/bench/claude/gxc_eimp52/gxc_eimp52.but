@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_eimp52.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | b = a => (a = b => (p or not(p))) | nn))

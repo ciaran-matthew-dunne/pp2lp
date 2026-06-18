@@ -1,1 +1,0 @@
-Flag(FileOn("xw_card_wit.res")) & Set(Valid.1 | Rule(Implication | (card(s) = n => #x.(card(s) = x)) & _delta_e(s) & _delta_e(n) | ? | ? | card(s) = n => #x.(card(s) = x) | nn))

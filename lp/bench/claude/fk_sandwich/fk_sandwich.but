@@ -1,1 +1,1 @@
-Flag(FileOn("fk_sandwich.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x <= y & y <= x & x <= 0 => y <= 0)) | ? | ? | !x.!y.(x <= y & y <= x & x <= 0 => y <= 0) | nn))
+Flag(FileOn("fk_sandwich.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x <= y & y <= x & x <= 0 => y <= 0) | nn))

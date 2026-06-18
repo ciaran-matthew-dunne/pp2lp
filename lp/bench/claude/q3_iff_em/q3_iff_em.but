@@ -1,1 +1,1 @@
-Flag(FileOn("q3_iff_em.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) or (a <=> not(b))) & _delta_p(a) & _delta_p(b) | ? | ? | (a <=> b) or (a <=> not(b)) | nn))
+Flag(FileOn("q3_iff_em.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a <=> b) or (a <=> not(b)) | nn))

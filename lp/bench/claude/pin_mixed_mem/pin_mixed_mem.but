@@ -1,1 +1,1 @@
-Flag(FileOn("pin_mixed_mem.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.#y.(x: s & y = x)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.#y.(x: s & y = x) | nn))
+Flag(FileOn("pin_mixed_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.#y.(x: s & y = x) | nn))

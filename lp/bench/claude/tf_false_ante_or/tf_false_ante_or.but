@@ -1,1 +1,1 @@
-Flag(FileOn("tf_false_ante_or.res")) & Set(Valid.1 | Rule(Implication | ((p & not(p)) or q => q) & _delta_p(p) & _delta_p(q) | ? | ? | (p & not(p)) or q => q | nn))
+Flag(FileOn("tf_false_ante_or.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (p & not(p)) or q => q | nn))

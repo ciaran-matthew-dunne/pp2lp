@@ -1,1 +1,1 @@
-Flag(FileOn("sc_quant_or_fix.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s or x: t) & not(b: s) => b: t) & _delta_e(s) & _delta_e(t) & _delta_e(b) | ? | ? | !x.(x: s or x: t) & not(b: s) => b: t | nn))
+Flag(FileOn("sc_quant_or_fix.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s or x: t) & not(b: s) => b: t | nn))

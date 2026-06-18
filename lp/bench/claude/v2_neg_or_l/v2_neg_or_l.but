@@ -1,1 +1,1 @@
-Flag(FileOn("v2_neg_or_l.res")) & Set(Valid.1 | Rule(Implication | (not(a) & (a or b) => b) & _delta_p(a) & _delta_p(b) | ? | ? | not(a) & (a or b) => b | nn))
+Flag(FileOn("v2_neg_or_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a) & (a or b) => b | nn))

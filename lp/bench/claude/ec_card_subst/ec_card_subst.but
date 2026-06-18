@@ -1,1 +1,1 @@
-Flag(FileOn("ec_card_subst.res")) & Set(Valid.1 | Rule(Implication | (card(s) = n & n = m => card(s) = m) & _delta_e(s) & _delta_e(n) & _delta_e(m) | ? | ? | card(s) = n & n = m => card(s) = m | nn))
+Flag(FileOn("ec_card_subst.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | card(s) = n & n = m => card(s) = m | nn))

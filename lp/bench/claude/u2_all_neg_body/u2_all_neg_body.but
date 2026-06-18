@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_neg_body.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => not(x: t)) & a: s & a: t => bfalse) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(x: s => not(x: t)) & a: s & a: t => bfalse | nn))
+Flag(FileOn("u2_all_neg_body.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => not(x: t)) & a: s & a: t => bfalse | nn))

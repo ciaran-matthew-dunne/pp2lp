@@ -1,1 +1,1 @@
-Flag(FileOn("qn_neg_xst_all.res")) & Set(Valid.1 | Rule(Implication | (not(#x.(x: s)) => !x.(not(x: s))) & _delta_e(s) | ? | ? | not(#x.(x: s)) => !x.(not(x: s)) | nn))
+Flag(FileOn("qn_neg_xst_all.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(#x.(x: s)) => !x.(not(x: s)) | nn))

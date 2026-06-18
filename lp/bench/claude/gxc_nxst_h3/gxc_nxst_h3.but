@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nxst_h3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(#x.#y.(p(x,y))) => (a = a) | nn))

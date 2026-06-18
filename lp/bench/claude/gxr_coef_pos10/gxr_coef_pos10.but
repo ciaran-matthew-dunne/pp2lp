@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_coef_pos10.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= x => 0 <= 10 * x | nn))

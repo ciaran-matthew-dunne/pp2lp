@@ -1,1 +1,1 @@
-Flag(FileOn("v3_neg_xst_inst.res")) & Set(Valid.1 | Rule(Implication | (not(#x.(x: s & x: t)) & a: s => not(a: t)) & _delta_e(s) & _delta_e(t) & _delta_e(a) | ? | ? | not(#x.(x: s & x: t)) & a: s => not(a: t) | nn))
+Flag(FileOn("v3_neg_xst_inst.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(#x.(x: s & x: t)) & a: s => not(a: t) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lit_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 5 <= 12 | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxq_ran_union.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ran(r \/ s) = ran(r) \/ ran(s) | nn))

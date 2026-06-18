@@ -1,1 +1,1 @@
-Flag(FileOn("ag_coeff_back.res")) & Set(Valid.1 | Rule(Implication | (x + x <= y => 2*x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x + x <= y => 2*x <= y | nn))
+Flag(FileOn("ag_coeff_back.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + x <= y => 2*x <= y | nn))

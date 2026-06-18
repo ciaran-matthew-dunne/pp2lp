@@ -1,1 +1,1 @@
-Flag(FileOn("ec_app_subst_lhs.res")) & Set(Valid.1 | Rule(Implication | (x = y & f(y) = z => f(x) = z) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(z) | ? | ? | x = y & f(y) = z => f(x) = z | nn))
+Flag(FileOn("ec_app_subst_lhs.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & f(y) = z => f(x) = z | nn))

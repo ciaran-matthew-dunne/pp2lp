@@ -1,1 +1,1 @@
-Flag(FileOn("v2_lit_ladder2.res")) & Set(Valid.1 | Rule(Implication | (x <= 2 => x <= 4) & _delta_e(x) | ? | ? | x <= 2 => x <= 4 | nn))
+Flag(FileOn("v2_lit_ladder2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 2 => x <= 4 | nn))

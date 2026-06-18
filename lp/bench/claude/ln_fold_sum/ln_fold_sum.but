@@ -1,1 +1,1 @@
-Flag(FileOn("ln_fold_sum.res")) & Set(Valid.1 | Rule(Implication | (x <= 30 & y <= 34 => x + y <= 64) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 30 & y <= 34 => x + y <= 64 | nn))
+Flag(FileOn("ln_fold_sum.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 30 & y <= 34 => x + y <= 64 | nn))

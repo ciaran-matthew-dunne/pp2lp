@@ -1,1 +1,1 @@
-Flag(FileOn("v3_ins_pair.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: s => y: t => x, y: r) & a: s & b: t & not(a, b: r) => bfalse) & _delta_e(s) & _delta_e(t) & _delta_e(r) & _delta_e(a) & _delta_e(b) & _delta_e(bfalse) | ? | ? | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t & not(a, b: r) => bfalse | nn))
+Flag(FileOn("v3_ins_pair.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t & not(a, b: r) => bfalse | nn))

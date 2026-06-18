@@ -1,1 +1,1 @@
-Flag(FileOn("v3_demorgan_back.res")) & Set(Valid.1 | Rule(Implication | ((a => b) => not(a & not(b))) & _delta_p(a) & _delta_p(b) | ? | ? | (a => b) => not(a & not(b)) | nn))
+Flag(FileOn("v3_demorgan_back.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) => not(a & not(b)) | nn))

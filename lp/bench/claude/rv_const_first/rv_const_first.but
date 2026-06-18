@@ -1,1 +1,1 @@
-Flag(FileOn("rv_const_first.res")) & Set(Valid.1 | Rule(Implication | (5 = x => x = 5) & _delta_e(x) | ? | ? | 5 = x => x = 5 | nn))
+Flag(FileOn("rv_const_first.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 5 = x => x = 5 | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("q2_case_split.res")) & Set(Valid.1 | Rule(Implication | ((a => b) & (not(a) => b) => b) & _delta_p(a) & _delta_p(b) | ? | ? | (a => b) & (not(a) => b) => b | nn))
+Flag(FileOn("q2_case_split.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) & (not(a) => b) => b | nn))

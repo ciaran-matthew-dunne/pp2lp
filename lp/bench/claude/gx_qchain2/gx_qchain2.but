@@ -1,0 +1,1 @@
+Flag(FileOn("gx_qchain2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s1 => x: s2) & a: s1 => a: s2 | nn))

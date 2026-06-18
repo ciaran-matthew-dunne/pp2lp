@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_evr2_exfalso.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | FAUX => not(x = x) | nn))

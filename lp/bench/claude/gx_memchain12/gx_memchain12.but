@@ -1,0 +1,1 @@
+Flag(FileOn("gx_memchain12.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s1 & s1 <: s2 & s2 <: s3 & s3 <: s4 & s4 <: s5 & s5 <: s6 & s6 <: s7 & s7 <: s8 & s8 <: s9 & s9 <: s10 & s10 <: s11 & s11 <: s12 => x: s12 | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("za_plus_mono.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) | ? | ? | x <= y => x + 1 <= y + 1 | nn))
+Flag(FileOn("za_plus_mono.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y => x + 1 <= y + 1 | nn))

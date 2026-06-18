@@ -1,0 +1,1 @@
+Flag(FileOn("gx_fcong3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => h(g(f(x))) = h(g(f(y))) | nn))

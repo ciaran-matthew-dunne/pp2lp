@@ -1,1 +1,1 @@
-Flag(FileOn("q2_contrapos_rev.res")) & Set(Valid.1 | Rule(Implication | ((not(b) => not(a)) => (a => b)) & _delta_p(b) & _delta_p(a) | ? | ? | (not(b) => not(a)) => (a => b) | nn))
+Flag(FileOn("q2_contrapos_rev.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(b) => not(a)) => (a => b) | nn))

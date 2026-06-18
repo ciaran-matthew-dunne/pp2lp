@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_ectr1.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | b: s & not(a: s) => (a = b => bfalse) | nn))

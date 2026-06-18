@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_ectr6.res")) & Set(Valid.1 | Rule(Implication | (x = y & not(x: s) & y: s => bfalse) & _delta_e(x) & _delta_e(y) & _delta_e(s) & _delta_e(bfalse) | ? | ? | x = y & not(x: s) & y: s => bfalse | nn))
+Flag(FileOn("eqx_ectr6.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & not(x: s) & y: s => bfalse | nn))

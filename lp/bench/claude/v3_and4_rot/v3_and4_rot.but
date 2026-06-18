@@ -1,1 +1,1 @@
-Flag(FileOn("v3_and4_rot.res")) & Set(Valid.1 | Rule(Implication | (a & b & c & d => b & c & d & a) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | a & b & c & d => b & c & d & a | nn))
+Flag(FileOn("v3_and4_rot.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a & b & c & d => b & c & d & a | nn))

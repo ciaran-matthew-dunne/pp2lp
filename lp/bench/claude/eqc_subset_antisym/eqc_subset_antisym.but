@@ -1,1 +1,1 @@
-Flag(FileOn("eqc_subset_antisym.res")) & Set(Valid.1 | Rule(Implication | (s <: t & t <: s => s = t) & _delta_e(s) & _delta_e(t) | ? | ? | s <: t & t <: s => s = t | nn))
+Flag(FileOn("eqc_subset_antisym.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: t & t <: s => s = t | nn))

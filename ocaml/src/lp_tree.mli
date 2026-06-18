@@ -28,6 +28,9 @@ type term =
   | Expl of term                      (* @t — pass implicit arguments explicitly *)
   | Lambda of string * binder_ty option * term
   | Eq of term * term                 (* LP-level equality a = b *)
+  | Infix of string * term * term     (* infix application `(a op b)` — for a
+                                         notation-infix symbol that must print
+                                         infix (e.g. `+` inside a rewrite pattern) *)
   | Pred of proj_env * Syntax_pp.prd  (* a PP predicate, LP-encoded at print time *)
   | Exp of proj_env * Syntax_pp.exp   (* a PP expression, LP-encoded at print time *)
 
@@ -37,14 +40,30 @@ type prov = { rule : string; replay_line : int; goal : string }
 
 type tactic =
   | Refine of term * term list        (* refine head args — head is [Name]/[Expl] *)
-  | Rewrite of { try_ : bool; rtl : bool; name : string }
+  | Rewrite of { try_ : bool; repeat_ : bool; rtl : bool; pat : term option; name : string }
+    (* [pat] is an SSReflect target `.[<pat>]`; [repeat_] prefixes `repeat`. *)
+  | Simplify                          (* the `simplify` tactic *)
+  | Reflexivity                       (* the `reflexivity` tactic *)
 
-type t =
+(* A `have NAME : TYPE { PROOF }` binding emitted before [hv_cont].  Each
+   [(v, arity)] in [hv_binder] adds a `Π v : Tuple arity,` prefix (so an
+   arith-equality lemma over the enclosing tuple binders can be applied — `NAME
+   v…` — inside an under-binder term); an empty list gives a plain `π <hv_ty>`. *)
+type have = {
+  hv_name : string;
+  hv_binder : (string * int) list;
+  hv_ty : term;
+  hv_proof : t;
+  hv_cont : t;
+}
+
+and t =
   | Step of tactic
   | Then of tactic * t
   | Assume of string * t
   | Assume_then of tactic * string * t
   | Branches of tactic * t * t
+  | Have of have
   | Commented of prov * t
 
 (* Render [t] into [buf].  [pad] indents every line; [lead_pad] overrides

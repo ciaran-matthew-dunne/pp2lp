@@ -1,1 +1,1 @@
-Flag(FileOn("qn_swap_const.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(y: s & a: t) => !y.!x.(y: s & a: t)) & _delta_e(s) & _delta_e(a) & _delta_e(t) | ? | ? | !x.!y.(y: s & a: t) => !y.!x.(y: s & a: t) | nn))
+Flag(FileOn("qn_swap_const.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(y: s & a: t) => !y.!x.(y: s & a: t) | nn))

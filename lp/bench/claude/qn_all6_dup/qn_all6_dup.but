@@ -1,1 +1,1 @@
-Flag(FileOn("qn_all6_dup.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: s) => !z.(z: s)) & _delta_e(s) | ? | ? | !x.!y.(x: s) => !z.(z: s) | nn))
+Flag(FileOn("qn_all6_dup.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x: s) => !z.(z: s) | nn))

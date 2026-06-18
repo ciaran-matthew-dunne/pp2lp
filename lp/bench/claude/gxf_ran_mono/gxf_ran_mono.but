@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_ran_mono.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | r <: s => ran(r) <: ran(s) | nn))

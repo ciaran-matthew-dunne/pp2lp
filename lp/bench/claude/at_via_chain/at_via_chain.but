@@ -1,1 +1,1 @@
-Flag(FileOn("at_via_chain.res")) & Set(Valid.1 | Rule(Implication | (x <= y & y <= 0 => x + x <= 0) & _delta_e(x) & _delta_e(y) | ? | ? | x <= y & y <= 0 => x + x <= 0 | nn))
+Flag(FileOn("at_via_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y & y <= 0 => x + x <= 0 | nn))

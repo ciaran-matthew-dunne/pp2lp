@@ -1,1 +1,0 @@
-Flag(FileOn("nrm_arith_succ.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= a => x <= a => x: s)) & _delta_e(a) & _delta_e(s) | ? | ? | !x.(x <= a => x <= a => x: s) | nn))

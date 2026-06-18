@@ -1,1 +1,1 @@
-Flag(FileOn("sc_b5_swap_outer.res")) & Set(Valid.1 | Rule(Implication | (!v.!w.!x.!y.!z.(v: a => z: e) => !z.!v.(v: a => z: e)) & _delta_e(a) & _delta_e(e) | ? | ? | !v.!w.!x.!y.!z.(v: a => z: e) => !z.!v.(v: a => z: e) | nn))
+Flag(FileOn("sc_b5_swap_outer.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !v.!w.!x.!y.!z.(v: a => z: e) => !z.!v.(v: a => z: e) | nn))

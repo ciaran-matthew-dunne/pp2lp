@@ -1,1 +1,1 @@
-Flag(FileOn("q2_demorgan4.res")) & Set(Valid.1 | Rule(Implication | (not(a or b or c or d) => not(a) & not(b) & not(c) & not(d)) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | not(a or b or c or d) => not(a) & not(b) & not(c) & not(d) | nn))
+Flag(FileOn("q2_demorgan4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a or b or c or d) => not(a) & not(b) & not(c) & not(d) | nn))

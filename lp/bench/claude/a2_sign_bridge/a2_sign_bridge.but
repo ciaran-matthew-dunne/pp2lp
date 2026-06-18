@@ -1,1 +1,1 @@
-Flag(FileOn("a2_sign_bridge.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & 0 <= y => x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 0 & 0 <= y => x <= y | nn))
+Flag(FileOn("a2_sign_bridge.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 0 & 0 <= y => x <= y | nn))

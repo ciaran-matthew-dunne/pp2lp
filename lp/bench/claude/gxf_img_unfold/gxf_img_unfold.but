@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_img_unfold.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | b: r[s] => #x.(x: s & (x, b): r) | nn))

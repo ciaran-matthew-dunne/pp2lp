@@ -1,1 +1,1 @@
-Flag(FileOn("zq_vac.res")) & Set(Valid.1 | Rule(Implication | _delta_e(a) & _delta_e(s) | ? | ? | !x.(a: s) => a: s | nn))
+Flag(FileOn("zq_vac.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(a: s) => a: s | nn))

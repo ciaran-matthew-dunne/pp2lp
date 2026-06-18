@@ -1,1 +1,1 @@
-Flag(FileOn("v3_fn_nested_mix.res")) & Set(Valid.1 | Rule(Implication | (f(g(a)) = b & g(a) = c => f(c) = b) & _delta_e(f) & _delta_e(g) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | f(g(a)) = b & g(a) = c => f(c) = b | nn))
+Flag(FileOn("v3_fn_nested_mix.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(g(a)) = b & g(a) = c => f(c) = b | nn))

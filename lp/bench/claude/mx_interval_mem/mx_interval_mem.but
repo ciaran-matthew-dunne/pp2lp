@@ -1,1 +1,1 @@
-Flag(FileOn("mx_interval_mem.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => 1 <= x & x <= 9) & a: s => 1 <= a) & _delta_e(s) & _delta_e(a) | ? | ? | !x.(x: s => 1 <= x & x <= 9) & a: s => 1 <= a | nn))
+Flag(FileOn("mx_interval_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => 1 <= x & x <= 9) & a: s => 1 <= a | nn))

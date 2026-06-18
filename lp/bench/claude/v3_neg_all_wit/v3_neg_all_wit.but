@@ -1,1 +1,1 @@
-Flag(FileOn("v3_neg_all_wit.res")) & Set(Valid.1 | Rule(Implication | (not(!x.(x: s)) & (not(#x.(not(x: s))) => bfalse) => not(!x.(x: s))) & _delta_e(s) & _delta_e(bfalse) | ? | ? | not(!x.(x: s)) & (not(#x.(not(x: s))) => bfalse) => not(!x.(x: s)) | nn))
+Flag(FileOn("v3_neg_all_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(!x.(x: s)) & (not(#x.(not(x: s))) => bfalse) => not(!x.(x: s)) | nn))

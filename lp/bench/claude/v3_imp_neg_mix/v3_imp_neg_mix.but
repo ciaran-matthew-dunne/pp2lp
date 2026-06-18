@@ -1,1 +1,1 @@
-Flag(FileOn("v3_imp_neg_mix.res")) & Set(Valid.1 | Rule(Implication | ((not(a) => b) & not(b) => a) & _delta_p(a) & _delta_p(b) | ? | ? | (not(a) => b) & not(b) => a | nn))
+Flag(FileOn("v3_imp_neg_mix.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(a) => b) & not(b) => a | nn))

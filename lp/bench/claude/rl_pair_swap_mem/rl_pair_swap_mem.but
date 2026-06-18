@@ -1,1 +1,1 @@
-Flag(FileOn("rl_pair_swap_mem.res")) & Set(Valid.1 | Rule(Implication | (x, y: r & y, x: r => y, x: r) & _delta_e(x) & _delta_e(y) & _delta_e(r) | ? | ? | x, y: r & y, x: r => y, x: r | nn))
+Flag(FileOn("rl_pair_swap_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x, y: r & y, x: r => y, x: r | nn))

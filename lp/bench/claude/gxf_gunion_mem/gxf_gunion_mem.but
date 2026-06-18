@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_gunion_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s: S & x: s => x: union(S) | nn))

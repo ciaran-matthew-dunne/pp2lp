@@ -1,1 +1,1 @@
-Flag(FileOn("a2_neg_cancel_l.res")) & Set(Valid.1 | Rule(Implication | ((-x) + x = 0) & _delta_e(x) | ? | ? | (-x) + x = 0 | nn))
+Flag(FileOn("a2_neg_cancel_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (-x) + x = 0 | nn))

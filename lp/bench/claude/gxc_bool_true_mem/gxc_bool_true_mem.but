@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_bool_true_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | TRUE: BOOL | nn))

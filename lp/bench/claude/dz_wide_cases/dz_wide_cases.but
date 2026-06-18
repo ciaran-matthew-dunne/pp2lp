@@ -1,1 +1,1 @@
-Flag(FileOn("dz_wide_cases.res")) & Set(Valid.1 | Rule(Implication | ((a or b or c or d) & (a => z) & (b => z) & (c => z) & (d => z) => z) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(z) | ? | ? | (a or b or c or d) & (a => z) & (b => z) & (c => z) & (d => z) => z | nn))
+Flag(FileOn("dz_wide_cases.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a or b or c or d) & (a => z) & (b => z) & (c => z) & (d => z) => z | nn))

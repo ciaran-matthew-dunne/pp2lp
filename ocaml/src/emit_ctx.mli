@@ -11,10 +11,19 @@ open Syntax_pp
    `_hN` to the predicate it was introduced with (structural-equality hyp
    lookup); [xs] maps each `_xN` to the PP-side binder vars it stands for
    (witness substitution). *)
+(* A generated arith-equality lemma awaiting emission as a `have`; see [ctx]. *)
+type pending_have = {
+  ph_name : string;
+  ph_binder : (string * int) list;
+  ph_ty : Lp_tree.term;
+  ph_proof : Lp_tree.t;
+}
+
 type ctx = {
   mutable n : int;
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
+  mutable pending_haves : pending_have list;
   mutable bool_typings : (string * string) list;
   mutable int_typings : (string * string) list;
   int_free_vars : Free_vars.SS.t;
@@ -120,6 +129,27 @@ val proj_env_of_ctx : ctx -> Lp_tree.proj_env
 (* The sum-equality / sum-zero / positivity provers moved to [Arith_proofs]
    (they are ctx-free).  [find_arith_contradiction] below stays as a thin ctx
    wrapper over the Farkas search there. *)
+
+(* `arith_eq_have ctx env ~binders e1 e2` — a proof term of `e1 = e2`.  When the
+   negation/associativity/literal-fold recipe closes it (the commutation-free
+   case), registers a Π-quantified [toint_eq]-based `have` (over the term-internal
+   [binders] the equality sits under) and returns its name applied to them;
+   otherwise returns the explicit reorder term.  [None] if neither route applies. *)
+val arith_eq_have :
+  ctx -> Lp_tree.proj_env -> binders:(string * int) list -> exp -> exp ->
+  Lp_tree.term option
+
+(* Wrap [cont] in the arith-equality `have`s registered for the current node
+   (first-registered outermost) and clear them.  Called per node by [Translate]. *)
+val flush_haves : ctx -> Lp_tree.t -> Lp_tree.t
+
+(* `π (e > 𝟎)` (AR4's `(E+F) > 𝟎`) via the cancel recipe — a generated `have`
+   transporting `positive_lit c` along `e = from_int c` (pattern-free bubble-sort +
+   cancellation), Π-quantified over the term-internal [binders].  [None] when e
+   doesn't cancel to a positive literal by the recipe (caller falls back / fails
+   loud, never trust). *)
+val prove_gt_zero_t :
+  ctx -> Lp_tree.proj_env -> binders:(string * int) list -> exp -> Lp_tree.term option
 
 (* Proof of a single `≤ 𝟎` (or ⊤) leaf from the in-scope hyps: a direct
    match (up to alpha / binder-kind) or, failing that, an arithmetic-reorder

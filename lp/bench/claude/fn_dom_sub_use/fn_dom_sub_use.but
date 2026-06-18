@@ -1,1 +1,1 @@
-Flag(FileOn("fn_dom_sub_use.res")) & Set(Valid.1 | Rule(Implication | (dom(f) <: s & a: dom(f) => a: s) & _delta_e(f) & _delta_e(s) & _delta_e(a) | ? | ? | dom(f) <: s & a: dom(f) => a: s | nn))
+Flag(FileOn("fn_dom_sub_use.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | dom(f) <: s & a: dom(f) => a: s | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v3_pair_in_two.res")) & Set(Valid.1 | Rule(Implication | (x, y: r /\ q => x, y: r) & _delta_e(x) & _delta_e(y) & _delta_e(r) & _delta_e(q) | ? | ? | x, y: r /\ q => x, y: r | nn))
+Flag(FileOn("v3_pair_in_two.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x, y: r /\ q => x, y: r | nn))

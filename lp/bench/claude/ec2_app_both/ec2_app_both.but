@@ -1,1 +1,1 @@
-Flag(FileOn("ec2_app_both.res")) & Set(Valid.1 | Rule(Implication | (x = y & f(x) = g(y) & f(x) = w => g(y) = w) & _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(g) & _delta_e(w) | ? | ? | x = y & f(x) = g(y) & f(x) = w => g(y) = w | nn))
+Flag(FileOn("ec2_app_both.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & f(x) = g(y) & f(x) = w => g(y) = w | nn))

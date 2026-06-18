@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_inter_idem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s /\ s = s | nn))

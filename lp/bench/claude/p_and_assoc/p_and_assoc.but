@@ -1,1 +1,1 @@
-Flag(FileOn("p_and_assoc.res")) & Set(Valid.1 | Rule(Implication | ((a & b) & c <=> a & (b & c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a & b) & c <=> a & (b & c) | nn))
+Flag(FileOn("p_and_assoc.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ((a & b) & c) <=> (a & (b & c)) | nn))

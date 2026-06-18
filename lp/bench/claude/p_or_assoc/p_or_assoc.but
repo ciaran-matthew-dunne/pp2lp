@@ -1,1 +1,1 @@
-Flag(FileOn("p_or_assoc.res")) & Set(Valid.1 | Rule(Implication | ((a or b) or c <=> a or (b or c)) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a or b) or c <=> a or (b or c) | nn))
+Flag(FileOn("p_or_assoc.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a or b) or c <=> a or (b or c) | nn))

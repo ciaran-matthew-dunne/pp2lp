@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_tfun_comp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f: s --> t & g: t --> u & a: s => g(f(a)): u | nn))

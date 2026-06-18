@@ -1,1 +1,1 @@
-Flag(FileOn("tf_double_taut.res")) & Set(Valid.1 | Rule(Implication | ((p => p) & (q => q) or r) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (p => p) & (q => q) or r | nn))
+Flag(FileOn("tf_double_taut.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (p => p) & (q => q) or r | nn))

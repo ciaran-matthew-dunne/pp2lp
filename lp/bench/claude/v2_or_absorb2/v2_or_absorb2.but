@@ -1,1 +1,1 @@
-Flag(FileOn("v2_or_absorb2.res")) & Set(Valid.1 | Rule(Implication | ((a or b) & a <=> a) & _delta_p(a) & _delta_p(b) | ? | ? | (a or b) & a <=> a | nn))
+Flag(FileOn("v2_or_absorb2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ((a or b) & a) <=> a | nn))

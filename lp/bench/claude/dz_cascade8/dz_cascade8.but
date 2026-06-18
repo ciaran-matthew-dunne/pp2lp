@@ -1,1 +1,0 @@
-Flag(FileOn("dz_cascade8.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: c1 => x: c2 => x: c3 => x: c4 => x: c5 => x: c6 => x: c7 => x: c8)) & _delta_e(c1) & _delta_e(c2) & _delta_e(c3) & _delta_e(c4) & _delta_e(c5) & _delta_e(c6) & _delta_e(c7) & _delta_e(c8) | ? | ? | !x.(x: c1 => x: c2 => x: c3 => x: c4 => x: c5 => x: c6 => x: c7 => x: c8) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v2_leq_plus_r.res")) & Set(Valid.1 | Rule(Implication | (x <= y => x + z <= y + z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= y => x + z <= y + z | nn))
+Flag(FileOn("v2_leq_plus_r.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y => x + z <= y + z | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("p_imp_self.res")) & Set(Valid.1 | Rule(Implication | (a => a) & _delta_p(a) | ? | ? | a => a | nn))
+Flag(FileOn("p_imp_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a => a | nn))

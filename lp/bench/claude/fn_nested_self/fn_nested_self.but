@@ -1,1 +1,1 @@
-Flag(FileOn("fn_nested_self.res")) & Set(Valid.1 | Rule(Implication | (g(f(x)) = g(f(x))) & _delta_e(g) & _delta_e(f) & _delta_e(x) | ? | ? | g(f(x)) = g(f(x)) | nn))
+Flag(FileOn("fn_nested_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | g(f(x)) = g(f(x)) | nn))

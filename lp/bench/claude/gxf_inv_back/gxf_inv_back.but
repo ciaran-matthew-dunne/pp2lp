@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_inv_back.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (b, a): r~ => (a, b): r | nn))

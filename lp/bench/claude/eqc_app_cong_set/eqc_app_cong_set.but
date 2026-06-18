@@ -1,1 +1,1 @@
-Flag(FileOn("eqc_app_cong_set.res")) & Set(Valid.1 | Rule(Implication | (s = t => f(s) = f(t)) & _delta_e(s) & _delta_e(t) & _delta_e(f) | ? | ? | s = t => f(s) = f(t) | nn))
+Flag(FileOn("eqc_app_cong_set.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s = t => f(s) = f(t) | nn))

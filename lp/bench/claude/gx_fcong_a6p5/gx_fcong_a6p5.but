@@ -1,0 +1,1 @@
+Flag(FileOn("gx_fcong_a6p5.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => f(z1, z2, z3, z4, x, z6) = f(z1, z2, z3, z4, y, z6) | nn))

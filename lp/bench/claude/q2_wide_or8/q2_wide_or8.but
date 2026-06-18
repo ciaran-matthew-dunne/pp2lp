@@ -1,1 +1,1 @@
-Flag(FileOn("q2_wide_or8.res")) & Set(Valid.1 | Rule(Implication | (a => a or b or c or d or e or g or h or i) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) & _delta_p(g) & _delta_p(h) & _delta_p(i) | ? | ? | a => a or b or c or d or e or g or h or i | nn))
+Flag(FileOn("q2_wide_or8.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a => a or b or c or d or e or g or h or i | nn))

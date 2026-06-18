@@ -1,1 +1,1 @@
-Flag(FileOn("q2_imp_refl_deep.res")) & Set(Valid.1 | Rule(Implication | (((a => a) => b) => b) & _delta_p(a) & _delta_p(b) | ? | ? | ((a => a) => b) => b | nn))
+Flag(FileOn("q2_imp_refl_deep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ((a => a) => b) => b | nn))

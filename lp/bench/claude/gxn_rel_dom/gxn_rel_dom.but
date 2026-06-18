@@ -1,0 +1,1 @@
+Flag(FileOn("gxn_rel_dom.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | r: s <-> t & (a, b): r => a: s | nn))

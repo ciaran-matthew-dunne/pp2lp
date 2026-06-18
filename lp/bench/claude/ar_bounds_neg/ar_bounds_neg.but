@@ -1,1 +1,1 @@
-Flag(FileOn("ar_bounds_neg.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & y <= 0 => x + y <= 0) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 0 & y <= 0 => x + y <= 0 | nn))
+Flag(FileOn("ar_bounds_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 0 & y <= 0 => x + y <= 0 | nn))

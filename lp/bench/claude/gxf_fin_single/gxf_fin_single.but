@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_fin_single.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s => {x}: FIN(s) | nn))

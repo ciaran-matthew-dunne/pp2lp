@@ -1,0 +1,1 @@
+Flag(FileOn("gxp_pair_swap.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): s * t => (b, a): t * s | nn))

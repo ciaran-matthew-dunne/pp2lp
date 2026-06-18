@@ -1,1 +1,1 @@
-Flag(FileOn("v3_lit_neg_chain.res")) & Set(Valid.1 | Rule(Implication | (x <= -2 => x <= -1) & _delta_e(x) | ? | ? | x <= -2 => x <= -1 | nn))
+Flag(FileOn("v3_lit_neg_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= -2 => x <= -1 | nn))

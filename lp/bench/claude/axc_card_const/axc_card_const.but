@@ -1,1 +1,0 @@
-Flag(FileOn("axc_card_const.res")) & Set(Valid.1 | Rule(Implication | (card(s) = n & !x.(x: t => card(s) = n)) & _delta_e(s) & _delta_e(n) & _delta_e(t) | ? | ? | card(s) = n & !x.(x: t => card(s) = n) | nn))

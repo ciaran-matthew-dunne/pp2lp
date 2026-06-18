@@ -1,1 +1,1 @@
-Flag(FileOn("st_card_self.res")) & Set(Valid.1 | Rule(Implication | (card(s) = card(s)) & _delta_e(s) | ? | ? | card(s) = card(s) | nn))
+Flag(FileOn("st_card_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | card(s) = card(s) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("st_pair_sub.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: s => {a, b} <: s) & _delta_e(a) & _delta_e(s) & _delta_e(b) | ? | ? | a: s & b: s => {a, b} <: s | nn))
+Flag(FileOn("st_pair_sub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & b: s => {a, b} <: s | nn))

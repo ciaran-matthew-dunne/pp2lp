@@ -1,1 +1,1 @@
-Flag(FileOn("v3_opr_both_sides.res")) & Set(Valid.1 | Rule(Implication | (x = a & y = b & x <= y => a <= b) & _delta_e(x) & _delta_e(a) & _delta_e(y) & _delta_e(b) | ? | ? | x = a & y = b & x <= y => a <= b | nn))
+Flag(FileOn("v3_opr_both_sides.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = a & y = b & x <= y => a <= b | nn))

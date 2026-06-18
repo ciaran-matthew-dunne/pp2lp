@@ -1,1 +1,1 @@
-Flag(FileOn("mx_neg_mem_arith.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 0 => not(x: s)) & a: s => not(a <= 0)) & _delta_e(s) & _delta_e(a) | ? | ? | !x.(x <= 0 => not(x: s)) & a: s => not(a <= 0) | nn))
+Flag(FileOn("mx_neg_mem_arith.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x <= 0 => not(x: s)) & a: s => not(a <= 0) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("ag_coeff_eq.res")) & Set(Valid.1 | Rule(Implication | (2*x = y => x + x = y) & _delta_e(x) & _delta_e(y) | ? | ? | 2*x = y => x + x = y | nn))
+Flag(FileOn("ag_coeff_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 2*x = y => x + x = y | nn))

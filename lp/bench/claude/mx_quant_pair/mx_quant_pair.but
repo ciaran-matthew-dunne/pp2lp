@@ -1,1 +1,1 @@
-Flag(FileOn("mx_quant_pair.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x, f(x): r) & a: s => a, f(a): r) & _delta_e(s) & _delta_e(f) & _delta_e(r) & _delta_e(a) | ? | ? | !x.(x: s => x, f(x): r) & a: s => a, f(a): r | nn))
+Flag(FileOn("mx_quant_pair.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x, f(x): r) & a: s => a, f(a): r | nn))

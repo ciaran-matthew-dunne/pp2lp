@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_ectr_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(x) = y & not(y = f(x)) => bfalse | nn))

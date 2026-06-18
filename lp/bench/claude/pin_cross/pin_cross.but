@@ -1,1 +1,1 @@
-Flag(FileOn("pin_cross.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.#y.(x = y & y = a)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.#y.(x = y & y = a) | nn))
+Flag(FileOn("pin_cross.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.#y.(x = y & y = a) | nn))

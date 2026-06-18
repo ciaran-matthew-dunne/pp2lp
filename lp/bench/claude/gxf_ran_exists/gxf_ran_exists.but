@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_ran_exists.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | b: ran(r) => #x.((x, b): r) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v3_ins_eq_univ.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x = c) & a: s & not(a = c) => bfalse) & _delta_e(s) & _delta_e(c) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(x: s => x = c) & a: s & not(a = c) => bfalse | nn))
+Flag(FileOn("v3_ins_eq_univ.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x = c) & a: s & not(a = c) => bfalse | nn))

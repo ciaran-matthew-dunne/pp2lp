@@ -1,0 +1,1 @@
+Flag(FileOn("gx_meetmem3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s1 & x: s2 & x: s3 => x: s1 /\ s2 /\ s3 | nn))

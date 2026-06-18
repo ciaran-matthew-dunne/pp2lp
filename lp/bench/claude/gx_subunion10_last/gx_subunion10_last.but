@@ -1,0 +1,1 @@
+Flag(FileOn("gx_subunion10_last.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s10 <: s1 \/ s2 \/ s3 \/ s4 \/ s5 \/ s6 \/ s7 \/ s8 \/ s9 \/ s10 | nn))

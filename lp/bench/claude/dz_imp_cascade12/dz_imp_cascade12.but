@@ -1,1 +1,0 @@
-Flag(FileOn("dz_imp_cascade12.res")) & Set(Valid.1 | Rule(Implication | (a => b => c => d => e => g => h => i => j => k => l => m) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) & _delta_p(g) & _delta_p(h) & _delta_p(i) & _delta_p(j) & _delta_p(k) & _delta_p(l) & _delta_p(m) | ? | ? | a => b => c => d => e => g => h => i => j => k => l => m | nn))

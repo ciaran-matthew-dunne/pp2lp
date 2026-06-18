@@ -1,1 +1,1 @@
-Flag(FileOn("xw_wit_const.res")) & Set(Valid.1 | Rule(Implication | (0 <= 1 => #x.#y.(x <= y)) | ? | ? | 0 <= 1 => #x.#y.(x <= y) | nn))
+Flag(FileOn("xw_wit_const.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= 1 => #x.#y.(x <= y) | nn))

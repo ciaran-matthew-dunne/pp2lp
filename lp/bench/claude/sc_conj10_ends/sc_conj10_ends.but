@@ -1,1 +1,1 @@
-Flag(FileOn("sc_conj10_ends.res")) & Set(Valid.1 | Rule(Implication | (a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9 & a10 => a1 & a10) & _delta_p(a1) & _delta_p(a2) & _delta_p(a3) & _delta_p(a4) & _delta_p(a5) & _delta_p(a6) & _delta_p(a7) & _delta_p(a8) & _delta_p(a9) & _delta_p(a10) | ? | ? | a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9 & a10 => a1 & a10 | nn))
+Flag(FileOn("sc_conj10_ends.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9 & a10 => a1 & a10 | nn))

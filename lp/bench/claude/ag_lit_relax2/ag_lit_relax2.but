@@ -1,1 +1,1 @@
-Flag(FileOn("ag_lit_relax2.res")) & Set(Valid.1 | Rule(Implication | (x <= -3 => x <= 2) & _delta_e(x) | ? | ? | x <= -3 => x <= 2 | nn))
+Flag(FileOn("ag_lit_relax2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= -3 => x <= 2 | nn))

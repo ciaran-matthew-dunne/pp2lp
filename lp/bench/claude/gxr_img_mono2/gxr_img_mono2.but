@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_img_mono2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: t & t <: u => r[s] <: r[u] | nn))

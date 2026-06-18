@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_comm_use.res")) & Set(Valid.1 | Rule(Implication | (y = x => x = y) & _delta_e(y) & _delta_e(x) | ? | ? | y = x => x = y | nn))
+Flag(FileOn("eqx_comm_use.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y = x => x = y | nn))

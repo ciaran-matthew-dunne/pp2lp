@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eq_by_squeeze.res")) & Set(Valid.1 | Rule(Implication | (x <= y & y <= z & z <= x => y = z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= y & y <= z & z <= x => y = z | nn))
+Flag(FileOn("v3_eq_by_squeeze.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y & y <= z & z <= x => y = z | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("q2_or_as_imp.res")) & Set(Valid.1 | Rule(Implication | ((not(a) or b) <=> (a => b)) & _delta_p(a) & _delta_p(b) | ? | ? | (not(a) or b) <=> (a => b) | nn))
+Flag(FileOn("q2_or_as_imp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(a) or b) <=> (a => b) | nn))

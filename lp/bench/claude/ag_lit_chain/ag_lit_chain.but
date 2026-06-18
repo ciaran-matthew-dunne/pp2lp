@@ -1,1 +1,1 @@
-Flag(FileOn("ag_lit_chain.res")) & Set(Valid.1 | Rule(Implication | (x <= 1 & 1 <= y & y <= 2 & 2 <= z => x <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= 1 & 1 <= y & y <= 2 & 2 <= z => x <= z | nn))
+Flag(FileOn("ag_lit_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 1 & 1 <= y & y <= 2 & 2 <= z => x <= z | nn))

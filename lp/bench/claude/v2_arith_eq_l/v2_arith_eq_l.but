@@ -1,1 +1,1 @@
-Flag(FileOn("v2_arith_eq_l.res")) & Set(Valid.1 | Rule(Implication | (x = y + 1 => y <= x) & _delta_e(x) & _delta_e(y) | ? | ? | x = y + 1 => y <= x | nn))
+Flag(FileOn("v2_arith_eq_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y + 1 => y <= x | nn))

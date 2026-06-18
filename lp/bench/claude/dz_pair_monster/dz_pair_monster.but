@@ -1,1 +1,1 @@
-Flag(FileOn("dz_pair_monster.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x,y: r => y,x: r) & !x.!y.(x,y: r & y,x: r => x: s) & a,b: r => a: s) & _delta_e(r) & _delta_e(s) & _delta_e(a) & _delta_e(b) | ? | ? | !x.!y.(x,y: r => y,x: r) & !x.!y.(x,y: r & y,x: r => x: s) & a,b: r => a: s | nn))
+Flag(FileOn("dz_pair_monster.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x,y: r => y,x: r) & !x.!y.(x,y: r & y,x: r => x: s) & a,b: r => a: s | nn))

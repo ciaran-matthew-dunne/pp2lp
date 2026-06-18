@@ -1,1 +1,1 @@
-Flag(FileOn("pin_two_pins.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.#y.(x = a & y = a)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.#y.(x = a & y = a) | nn))
+Flag(FileOn("pin_two_pins.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.#y.(x = a & y = a) | nn))

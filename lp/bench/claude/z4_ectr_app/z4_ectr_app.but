@@ -1,1 +1,1 @@
-Flag(FileOn("z4_ectr_app.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(f) & _delta_e(s) & _delta_e(bfalse) | ? | ? | x = y & f(x): s & not(f(y): s) => bfalse | nn))
+Flag(FileOn("z4_ectr_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & f(x): s & not(f(y): s) => bfalse | nn))

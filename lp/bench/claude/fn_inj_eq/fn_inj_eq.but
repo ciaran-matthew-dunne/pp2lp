@@ -1,1 +1,1 @@
-Flag(FileOn("fn_inj_eq.res")) & Set(Valid.1 | Rule(Implication | (f: s >-> t & a: s & b: s & f(a) = f(b) => a = b) & _delta_e(f) & _delta_e(s) & _delta_e(t) & _delta_e(a) & _delta_e(b) | ? | ? | f: s >-> t & a: s & b: s & f(a) = f(b) => a = b | nn))
+Flag(FileOn("fn_inj_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f: s >-> t & a: s & b: s & f(a) = f(b) => a = b | nn))

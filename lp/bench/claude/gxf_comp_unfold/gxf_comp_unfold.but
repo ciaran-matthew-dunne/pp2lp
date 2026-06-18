@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_comp_unfold.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, c): (r ; s) => #x.((a, x): r & (x, c): s) | nn))

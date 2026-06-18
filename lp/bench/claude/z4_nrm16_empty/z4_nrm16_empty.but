@@ -1,1 +1,1 @@
-Flag(FileOn("z4_nrm16_empty.res")) & Set(Valid.1 | Rule(Implication | 1 = 1 | ? | ? | not(#x.(not(x = x))) | nn))
+Flag(FileOn("z4_nrm16_empty.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(#x.(not(x = x))) | nn))

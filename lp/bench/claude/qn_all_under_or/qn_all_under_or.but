@@ -1,1 +1,1 @@
-Flag(FileOn("qn_all_under_or.res")) & Set(Valid.1 | Rule(Implication | (a: s or !x.(x: t) => !x.(a: s or x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s or !x.(x: t) => !x.(a: s or x: t) | nn))
+Flag(FileOn("qn_all_under_or.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s or !x.(x: t) => !x.(a: s or x: t) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_pair_proj.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x,y: r => x: s & y: t) => !x.!y.(x,y: r => y: t)) & _delta_e(r) & _delta_e(s) & _delta_e(t) | ? | ? | !x.!y.(x,y: r => x: s & y: t) => !x.!y.(x,y: r => y: t) | nn))
+Flag(FileOn("u2_all_pair_proj.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x,y: r => x: s & y: t) => !x.!y.(x,y: r => y: t) | nn))

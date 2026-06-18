@@ -1,1 +1,1 @@
-Flag(FileOn("v3_b_axiom.res")) & Set(Valid.1 | Rule(Implication | ((b => c) => (a => b) => (a => c)) & _delta_p(b) & _delta_p(c) & _delta_p(a) | ? | ? | (b => c) => (a => b) => (a => c) | nn))
+Flag(FileOn("v3_b_axiom.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (b => c) => ((a => b) => (a => c)) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_eq_commute_h.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | b = a & a: s => b: s | nn))

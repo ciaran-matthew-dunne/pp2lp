@@ -1,0 +1,1 @@
+Flag(FileOn("gxn_fun_app2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f: s --> t & g: t --> u & a: s => g(f(a)): u | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("pin_rev_dep.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(a = x & x = y)) & _delta_e(a) | ? | ? | #x.#y.(a = x & x = y) | nn))
+Flag(FileOn("pin_rev_dep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.(a = x & x = y) | nn))

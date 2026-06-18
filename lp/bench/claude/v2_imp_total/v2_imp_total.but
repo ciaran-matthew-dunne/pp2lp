@@ -1,1 +1,1 @@
-Flag(FileOn("v2_imp_total.res")) & Set(Valid.1 | Rule(Implication | ((a => b) or (b => a)) & _delta_p(a) & _delta_p(b) | ? | ? | (a => b) or (b => a) | nn))
+Flag(FileOn("v2_imp_total.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) or (b => a) | nn))

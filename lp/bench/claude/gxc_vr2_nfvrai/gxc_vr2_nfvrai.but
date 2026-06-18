@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_vr2_nfvrai.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | FAUX => not(VRAI) | nn))

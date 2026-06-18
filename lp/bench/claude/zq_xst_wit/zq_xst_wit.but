@@ -1,1 +1,1 @@
-Flag(FileOn("zq_xst_wit.res")) & Set(Valid.1 | Rule(Implication | _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.(x: s) | nn))
+Flag(FileOn("zq_xst_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.(x: s) | nn))

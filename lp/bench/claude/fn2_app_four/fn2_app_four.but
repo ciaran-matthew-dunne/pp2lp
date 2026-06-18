@@ -1,1 +1,1 @@
-Flag(FileOn("fn2_app_four.res")) & Set(Valid.1 | Rule(Implication | (f(a) = b & f(c) = d & a: dom(f) & c: dom(f) => f(a) = b & f(c) = d) & _delta_e(f) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) | ? | ? | f(a) = b & f(c) = d & a: dom(f) & c: dom(f) => f(a) = b & f(c) = d | nn))
+Flag(FileOn("fn2_app_four.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(a) = b & f(c) = d & a: dom(f) & c: dom(f) => f(a) = b & f(c) = d | nn))

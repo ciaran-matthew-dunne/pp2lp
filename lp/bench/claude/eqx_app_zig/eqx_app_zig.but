@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_app_zig.res")) & Set(Valid.1 | Rule(Implication | (f(a) = w & f(b) = w & f(b) = v => f(a) = v) & _delta_e(f) & _delta_e(a) & _delta_e(w) & _delta_e(b) & _delta_e(v) | ? | ? | f(a) = w & f(b) = w & f(b) = v => f(a) = v | nn))
+Flag(FileOn("eqx_app_zig.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(a) = w & f(b) = w & f(b) = v => f(a) = v | nn))

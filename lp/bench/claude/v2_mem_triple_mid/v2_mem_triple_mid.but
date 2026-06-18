@@ -1,1 +1,1 @@
-Flag(FileOn("v2_mem_triple_mid.res")) & Set(Valid.1 | Rule(Implication | (x: {a, b, c} & not(x = a) & not(x = c) => x = b) & _delta_e(x) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | x: {a, b, c} & not(x = a) & not(x = c) => x = b | nn))
+Flag(FileOn("v2_mem_triple_mid.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: {a, b, c} & not(x = a) & not(x = c) => x = b | nn))

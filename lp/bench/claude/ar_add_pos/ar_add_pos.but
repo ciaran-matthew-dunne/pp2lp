@@ -1,1 +1,1 @@
-Flag(FileOn("ar_add_pos.res")) & Set(Valid.1 | Rule(Implication | (0 <= y => x <= x + y) & _delta_e(y) & _delta_e(x) | ? | ? | 0 <= y => x <= x + y | nn))
+Flag(FileOn("ar_add_pos.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= y => x <= x + y | nn))

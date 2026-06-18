@@ -1,1 +1,1 @@
-Flag(FileOn("ec_subst_mem2.res")) & Set(Valid.1 | Rule(Implication | (x = y & y = z & x: s => z: s) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(s) | ? | ? | x = y & y = z & x: s => z: s | nn))
+Flag(FileOn("ec_subst_mem2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & y = z & x: s => z: s | nn))

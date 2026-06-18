@@ -1,1 +1,1 @@
-Flag(FileOn("v3_ins_two_step.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & !x.(x: t => x: u) & a: s & not(a: u) => bfalse) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & not(a: u) => bfalse | nn))
+Flag(FileOn("v3_ins_two_step.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & not(a: u) => bfalse | nn))

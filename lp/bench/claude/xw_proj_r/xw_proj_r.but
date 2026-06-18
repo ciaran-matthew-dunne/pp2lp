@@ -1,1 +1,1 @@
-Flag(FileOn("xw_proj_r.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x: s & y: t) => #y.(y: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.#y.(x: s & y: t) => #y.(y: t) | nn))
+Flag(FileOn("xw_proj_r.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.(x: s & y: t) => #y.(y: t) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("narf_opp_pair.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x + y <= 0 & 0 <= y => x <= 1)) | ? | ? | !x.!y.(x + y <= 0 & 0 <= y => x <= 1) | nn))
+Flag(FileOn("narf_opp_pair.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x + y <= 0 & 0 <= y => x <= 1) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("zp_contrapos.res")) & Set(Valid.1 | Rule(Implication | _delta_p(a) & _delta_p(b) | ? | ? | (a => b) => (not(b) => not(a)) | nn))
+Flag(FileOn("zp_contrapos.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) => (not(b) => not(a)) | nn))

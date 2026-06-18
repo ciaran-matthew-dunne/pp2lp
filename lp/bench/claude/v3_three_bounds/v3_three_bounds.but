@@ -1,1 +1,1 @@
-Flag(FileOn("v3_three_bounds.res")) & Set(Valid.1 | Rule(Implication | (x <= 3 & y <= 2 & z <= 1 => x + y + z <= 6) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= 3 & y <= 2 & z <= 1 => x + y + z <= 6 | nn))
+Flag(FileOn("v3_three_bounds.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 3 & y <= 2 & z <= 1 => x + y + z <= 6 | nn))

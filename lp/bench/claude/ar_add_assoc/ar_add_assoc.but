@@ -1,1 +1,1 @@
-Flag(FileOn("ar_add_assoc.res")) & Set(Valid.1 | Rule(Implication | ((x + y) + z = x + (y + z)) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | (x + y) + z = x + (y + z) | nn))
+Flag(FileOn("ar_add_assoc.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (x + y) + z = x + (y + z) | nn))

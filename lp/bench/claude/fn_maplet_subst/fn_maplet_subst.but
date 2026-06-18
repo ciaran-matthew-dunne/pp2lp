@@ -1,1 +1,1 @@
-Flag(FileOn("fn_maplet_subst.res")) & Set(Valid.1 | Rule(Implication | (a,b: f & a = c => c,b: f) & _delta_e(a) & _delta_e(b) & _delta_e(f) & _delta_e(c) | ? | ? | a,b: f & a = c => c,b: f | nn))
+Flag(FileOn("fn_maplet_subst.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a,b: f & a = c => c,b: f | nn))

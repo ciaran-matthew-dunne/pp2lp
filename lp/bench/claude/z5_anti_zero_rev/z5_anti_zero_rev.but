@@ -1,1 +1,1 @@
-Flag(FileOn("z5_anti_zero_rev.res")) & Set(Valid.1 | Rule(Implication | (!x.(0 <= x => x <= 0 => 0 = x)) | ? | ? | !x.(0 <= x => x <= 0 => 0 = x) | nn))
+Flag(FileOn("z5_anti_zero_rev.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.((0 <= x => (x <= 0 => 0 = x))) | nn))

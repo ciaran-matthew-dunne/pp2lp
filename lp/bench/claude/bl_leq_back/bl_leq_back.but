@@ -1,1 +1,0 @@
-Flag(FileOn("bl_leq_back.res")) & Set(Valid.1 | Rule(Implication | (bool(x <= y) = btrue => x <= y) & _delta_e(x) & _delta_e(y) & _delta_e(btrue) | ? | ? | bool(x <= y) = btrue => x <= y | nn))

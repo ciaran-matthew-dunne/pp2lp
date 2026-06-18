@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_refl_and_mem.res")) & Set(Valid.1 | Rule(Implication | (a: s => x = x & a: s) & _delta_e(a) & _delta_e(s) & _delta_e(x) | ? | ? | a: s => x = x & a: s | nn))
+Flag(FileOn("eqx_refl_and_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => x = x & a: s | nn))

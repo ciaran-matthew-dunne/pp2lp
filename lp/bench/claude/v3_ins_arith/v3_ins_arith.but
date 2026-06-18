@@ -1,1 +1,1 @@
-Flag(FileOn("v3_ins_arith.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x <= 0) & a: s & not(a <= 0) => bfalse) & _delta_e(s) & _delta_e(a) & _delta_e(bfalse) | ? | ? | !x.(x: s => x <= 0) & a: s & not(a <= 0) => bfalse | nn))
+Flag(FileOn("v3_ins_arith.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x <= 0) & a: s & not(a <= 0) => bfalse | nn))

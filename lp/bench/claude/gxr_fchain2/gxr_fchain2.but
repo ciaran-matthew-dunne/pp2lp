@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_fchain2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f1: s0 --> s1 & f2: s1 --> s2 & a: s0 => f2(f1(a)): s2 | nn))

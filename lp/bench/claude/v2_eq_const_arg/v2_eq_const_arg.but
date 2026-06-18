@@ -1,1 +1,1 @@
-Flag(FileOn("v2_eq_const_arg.res")) & Set(Valid.1 | Rule(Implication | (x = y => g(x, c) = g(y, c)) & _delta_e(x) & _delta_e(y) & _delta_e(g) & _delta_e(c) | ? | ? | x = y => g(x, c) = g(y, c) | nn))
+Flag(FileOn("v2_eq_const_arg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => g(x, c) = g(y, c) | nn))

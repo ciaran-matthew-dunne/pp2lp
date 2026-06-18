@@ -1,0 +1,1 @@
+Flag(FileOn("gxe_card_h.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | n = card(s) & n = m => m = card(s) | nn))

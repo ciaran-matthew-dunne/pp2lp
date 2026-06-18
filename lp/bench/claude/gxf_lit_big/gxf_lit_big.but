@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lit_big.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 1000 + 2000 = 3000 | nn))

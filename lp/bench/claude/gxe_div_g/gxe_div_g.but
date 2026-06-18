@@ -1,0 +1,1 @@
+Flag(FileOn("gxe_div_g.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 < y => x / y <= x / y | nn))

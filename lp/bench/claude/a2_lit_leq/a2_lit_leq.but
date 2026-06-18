@@ -1,1 +1,1 @@
-Flag(FileOn("a2_lit_leq.res")) & Set(Valid.1 | Rule(Implication | (1 <= 1 + 1) | ? | ? | 1 <= 1 + 1 | nn))
+Flag(FileOn("a2_lit_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 1 <= 1 + 1 | nn))

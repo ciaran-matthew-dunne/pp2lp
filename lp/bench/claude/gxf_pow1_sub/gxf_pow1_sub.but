@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_pow1_sub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s: POW1(t) => s <: t | nn))

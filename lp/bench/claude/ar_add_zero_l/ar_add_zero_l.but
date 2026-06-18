@@ -1,1 +1,1 @@
-Flag(FileOn("ar_add_zero_l.res")) & Set(Valid.1 | Rule(Implication | (0 + x = x) & _delta_e(x) | ? | ? | 0 + x = x | nn))
+Flag(FileOn("ar_add_zero_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 + x = x | nn))

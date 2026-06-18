@@ -1,1 +1,1 @@
-Flag(FileOn("v3_opr_leq.res")) & Set(Valid.1 | Rule(Implication | (x = a & x <= y => a <= y) & _delta_e(x) & _delta_e(a) & _delta_e(y) | ? | ? | x = a & x <= y => a <= y | nn))
+Flag(FileOn("v3_opr_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = a & x <= y => a <= y | nn))

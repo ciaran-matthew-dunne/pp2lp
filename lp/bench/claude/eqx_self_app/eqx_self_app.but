@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_self_app.res")) & Set(Valid.1 | Rule(Implication | (f(x) = x => f(f(x)) = x) & _delta_e(f) & _delta_e(x) | ? | ? | f(x) = x => f(f(x)) = x | nn))
+Flag(FileOn("eqx_self_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(x) = x => f(f(x)) = x | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("qn_xst3_project.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.#z.(x: s & y: t & z: u) => #y.(y: t)) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | #x.#y.#z.(x: s & y: t & z: u) => #y.(y: t) | nn))
+Flag(FileOn("qn_xst3_project.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.#z.(x: s & y: t & z: u) => #y.(y: t) | nn))

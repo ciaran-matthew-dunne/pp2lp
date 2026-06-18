@@ -1,1 +1,1 @@
-Flag(FileOn("v3_leq_zero_chain.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & y <= x & z <= y => z <= 0) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x <= 0 & y <= x & z <= y => z <= 0 | nn))
+Flag(FileOn("v3_leq_zero_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 0 & y <= x & z <= y => z <= 0 | nn))

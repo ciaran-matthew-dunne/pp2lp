@@ -1,0 +1,1 @@
+Flag(FileOn("gx_glb4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | u <: s1 & u <: s2 & u <: s3 & u <: s4 => u <: s1 /\ s2 /\ s3 /\ s4 | nn))

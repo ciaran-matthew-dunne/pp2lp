@@ -1,0 +1,1 @@
+Flag(FileOn("gxh_alt2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(!y.(y = y)) | nn))

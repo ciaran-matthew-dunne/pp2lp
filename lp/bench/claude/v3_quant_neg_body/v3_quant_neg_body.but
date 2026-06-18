@@ -1,1 +1,1 @@
-Flag(FileOn("v3_quant_neg_body.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => not(x: t)) & a: t => not(a: s)) & _delta_e(s) & _delta_e(t) & _delta_e(a) | ? | ? | !x.(x: s => not(x: t)) & a: t => not(a: s) | nn))
+Flag(FileOn("v3_quant_neg_body.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => not(x: t)) & a: t => not(a: s) | nn))

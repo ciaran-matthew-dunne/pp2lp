@@ -1,0 +1,1 @@
+Flag(FileOn("gx_fcong_a2p2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => f(z1, x) = f(z1, y) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("a3_zero_middle.res")) & Set(Valid.1 | Rule(Implication | (x <= 0 & 0 <= z => x - 1 <= z) & _delta_e(x) & _delta_e(z) | ? | ? | x <= 0 & 0 <= z => x - 1 <= z | nn))
+Flag(FileOn("a3_zero_middle.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 0 & 0 <= z => x - 1 <= z | nn))

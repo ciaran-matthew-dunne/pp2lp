@@ -1,1 +1,1 @@
-Flag(FileOn("z4_ar7_swap.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) | ? | ? | y <= x & x <= y => x = y | nn))
+Flag(FileOn("z4_ar7_swap.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y <= x & x <= y => x = y | nn))

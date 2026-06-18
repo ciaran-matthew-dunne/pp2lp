@@ -1,1 +1,1 @@
-Flag(FileOn("gemini_comp_domain.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => f(x): t) & !y.(y: t => g(y): u) => !x.(x: s => g(f(x)): u)) & _delta_e(s) & _delta_e(f) & _delta_e(t) & _delta_e(g) & _delta_e(u) | ? | ? | !x.(x: s => f(x): t) & !y.(y: t => g(y): u) => !x.(x: s => g(f(x)): u) | nn))
+Flag(FileOn("gemini_comp_domain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => f(x): t) & !y.(y: t => g(y): u) => !x.(x: s => g(f(x)): u) | nn))

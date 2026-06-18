@@ -1,1 +1,0 @@
-Flag(FileOn("axc_arith_const.res")) & Set(Valid.1 | Rule(Implication | (0 <= y & !x.(x <= 0 => 0 <= y)) & _delta_e(y) | ? | ? | 0 <= y & !x.(x <= 0 => 0 <= y) | nn))

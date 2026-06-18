@@ -1,0 +1,1 @@
+Flag(FileOn("gxq_inv_ran.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ran(r~) = dom(r) | nn))

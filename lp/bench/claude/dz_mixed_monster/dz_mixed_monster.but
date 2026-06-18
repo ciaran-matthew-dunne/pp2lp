@@ -1,1 +1,1 @@
-Flag(FileOn("dz_mixed_monster.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & !x.(x: t => x: u) & a: s & b: s & #y.(y: u) => a: u & b: u & #y.(y: u)) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & b: s & #y.(y: u) => a: u & b: u & #y.(y: u) | nn))
+Flag(FileOn("dz_mixed_monster.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) & a: s & b: s & #y.(y: u) => a: u & b: u & #y.(y: u) | nn))

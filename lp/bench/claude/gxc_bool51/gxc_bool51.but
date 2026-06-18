@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_bool51.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | TRUE = FALSE => p | nn))

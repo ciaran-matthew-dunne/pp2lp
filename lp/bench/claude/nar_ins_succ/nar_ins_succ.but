@@ -1,1 +1,1 @@
-Flag(FileOn("nar_ins_succ.res")) & Set(Valid.1 | Rule(Implication | (!x.(not(x + 1 <= x))) | ? | ? | !x.(not(x + 1 <= x)) | nn))
+Flag(FileOn("nar_ins_succ.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(not(x + 1 <= x)) | nn))

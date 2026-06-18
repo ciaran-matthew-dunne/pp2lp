@@ -1,1 +1,1 @@
-Flag(FileOn("mx_fn_chain_leq.res")) & Set(Valid.1 | Rule(Implication | (f(a) <= g(b) & g(b) <= h(c) => f(a) <= h(c)) & _delta_e(f) & _delta_e(a) & _delta_e(g) & _delta_e(b) & _delta_e(h) & _delta_e(c) | ? | ? | f(a) <= g(b) & g(b) <= h(c) => f(a) <= h(c) | nn))
+Flag(FileOn("mx_fn_chain_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(a) <= g(b) & g(b) <= h(c) => f(a) <= h(c) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_eq_rev_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(x) = y => y = f(x) | nn))

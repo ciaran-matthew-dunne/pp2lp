@@ -1,1 +1,1 @@
-Flag(FileOn("u3_neg_inst.res")) & Set(Valid.1 | Rule(Implication | (!x.(not(x: s) or x: t) & a: s => a: t) & _delta_e(s) & _delta_e(t) & _delta_e(a) | ? | ? | !x.(not(x: s) or x: t) & a: s => a: t | nn))
+Flag(FileOn("u3_neg_inst.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(not(x: s) or x: t) & a: s => a: t | nn))

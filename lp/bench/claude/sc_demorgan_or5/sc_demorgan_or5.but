@@ -1,1 +1,1 @@
-Flag(FileOn("sc_demorgan_or5.res")) & Set(Valid.1 | Rule(Implication | (not(a1 or a2 or a3 or a4 or a5) <=> not(a1) & not(a2) & not(a3) & not(a4) & not(a5)) & _delta_p(a1) & _delta_p(a2) & _delta_p(a3) & _delta_p(a4) & _delta_p(a5) | ? | ? | not(a1 or a2 or a3 or a4 or a5) <=> not(a1) & not(a2) & not(a3) & not(a4) & not(a5) | nn))
+Flag(FileOn("sc_demorgan_or5.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not ((((a1 or a2) or a3) or a4) or a5)) <=> (((((not a1) & (not a2)) & (not a3)) & (not a4)) & (not a5)) | nn))

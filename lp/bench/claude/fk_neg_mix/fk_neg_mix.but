@@ -1,1 +1,1 @@
-Flag(FileOn("fk_neg_mix.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(0 <= x & y + x <= 0 => y <= 0)) | ? | ? | !x.!y.(0 <= x & y + x <= 0 => y <= 0) | nn))
+Flag(FileOn("fk_neg_mix.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(0 <= x & y + x <= 0 => y <= 0) | nn))

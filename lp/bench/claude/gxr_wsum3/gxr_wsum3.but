@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_wsum3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= x1 & 0 <= x2 & 0 <= x3 => 0 <= 1 * x1 + 2 * x2 + 3 * x3 | nn))

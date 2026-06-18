@@ -1,1 +1,1 @@
-Flag(FileOn("v3_succ_collapse.res")) & Set(Valid.1 | Rule(Implication | (x + 1 <= y & y <= x + 1 => y = x + 1) & _delta_e(x) & _delta_e(y) | ? | ? | x + 1 <= y & y <= x + 1 => y = x + 1 | nn))
+Flag(FileOn("v3_succ_collapse.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + 1 <= y & y <= x + 1 => y = x + 1 | nn))

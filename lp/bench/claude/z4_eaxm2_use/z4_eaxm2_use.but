@@ -1,1 +1,1 @@
-Flag(FileOn("z4_eaxm2_use.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) & _delta_e(a) & _delta_e(s) | ? | ? | y = x & (not(x = y) or a: s) => a: s | nn))
+Flag(FileOn("z4_eaxm2_use.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y = x & (not(x = y) or a: s) => a: s | nn))

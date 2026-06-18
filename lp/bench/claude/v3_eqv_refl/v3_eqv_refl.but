@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eqv_refl.res")) & Set(Valid.1 | Rule(Implication | (a <=> a) & _delta_p(a) | ? | ? | a <=> a | nn))
+Flag(FileOn("v3_eqv_refl.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a <=> a | nn))

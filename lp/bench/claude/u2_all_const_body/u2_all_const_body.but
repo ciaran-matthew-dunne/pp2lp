@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_const_body.res")) & Set(Valid.1 | Rule(Implication | (p => !x.!y.(x: s => p)) & _delta_e(p) & _delta_e(s) | ? | ? | p => !x.!y.(x: s => p) | nn))
+Flag(FileOn("u2_all_const_body.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p => !x.!y.(x: s => p) | nn))

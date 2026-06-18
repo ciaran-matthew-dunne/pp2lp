@@ -1,1 +1,1 @@
-Flag(FileOn("at_with_const.res")) & Set(Valid.1 | Rule(Implication | (x + 1 <= 0 => x + x + 1 <= 0) & _delta_e(x) | ? | ? | x + 1 <= 0 => x + x + 1 <= 0 | nn))
+Flag(FileOn("at_with_const.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + 1 <= 0 => x + x + 1 <= 0 | nn))

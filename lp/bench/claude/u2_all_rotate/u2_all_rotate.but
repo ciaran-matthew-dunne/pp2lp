@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_rotate.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.(x: a => y: b => z: c) => !y.!z.!x.(x: a => y: b => z: c)) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | !x.!y.!z.(x: a => y: b => z: c) => !y.!z.!x.(x: a => y: b => z: c) | nn))
+Flag(FileOn("u2_all_rotate.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.!z.(x: a => y: b => z: c) => !y.!z.!x.(x: a => y: b => z: c) | nn))

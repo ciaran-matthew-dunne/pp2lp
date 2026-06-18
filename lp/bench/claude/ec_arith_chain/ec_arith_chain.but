@@ -1,1 +1,1 @@
-Flag(FileOn("ec_arith_chain.res")) & Set(Valid.1 | Rule(Implication | (x + 1 = y & y = z => x + 1 = z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x + 1 = y & y = z => x + 1 = z | nn))
+Flag(FileOn("ec_arith_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + 1 = y & y = z => x + 1 = z | nn))

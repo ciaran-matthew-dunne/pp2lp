@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_pow_empty.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | {} : POW(s) | nn))

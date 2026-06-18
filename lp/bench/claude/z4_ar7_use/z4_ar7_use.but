@@ -1,1 +1,1 @@
-Flag(FileOn("z4_ar7_use.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) & _delta_e(s) | ? | ? | y <= x & x <= y & x: s => y: s | nn))
+Flag(FileOn("z4_ar7_use.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y <= x & x <= y & x: s => y: s | nn))

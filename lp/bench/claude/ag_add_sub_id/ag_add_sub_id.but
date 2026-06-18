@@ -1,1 +1,1 @@
-Flag(FileOn("ag_add_sub_id.res")) & Set(Valid.1 | Rule(Implication | (x + y - y = x) & _delta_e(x) & _delta_e(y) | ? | ? | x + y - y = x | nn))
+Flag(FileOn("ag_add_sub_id.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + y - y = x | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eq_fn_sets.res")) & Set(Valid.1 | Rule(Implication | (s = t & f(a): s & f(b): t => f(a): t & f(b): s) & _delta_e(s) & _delta_e(t) & _delta_e(f) & _delta_e(a) & _delta_e(b) | ? | ? | s = t & f(a): s & f(b): t => f(a): t & f(b): s | nn))
+Flag(FileOn("v3_eq_fn_sets.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s = t & f(a): s & f(b): t => f(a): t & f(b): s | nn))

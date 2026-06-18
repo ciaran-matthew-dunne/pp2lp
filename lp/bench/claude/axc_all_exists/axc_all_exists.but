@@ -1,1 +1,0 @@
-Flag(FileOn("axc_all_exists.res")) & Set(Valid.1 | Rule(Implication | (p & !x.(x: s => #y.(y: s & p))) & _delta_e(p) & _delta_e(s) | ? | ? | p & !x.(x: s => #y.(y: s & p)) | nn))

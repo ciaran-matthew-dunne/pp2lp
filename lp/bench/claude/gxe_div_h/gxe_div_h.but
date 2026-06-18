@@ -1,0 +1,1 @@
+Flag(FileOn("gxe_div_h.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | z = x / y & z = w => w = x / y | nn))

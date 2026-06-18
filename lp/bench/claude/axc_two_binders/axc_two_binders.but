@@ -1,1 +1,0 @@
-Flag(FileOn("axc_two_binders.res")) & Set(Valid.1 | Rule(Implication | (p & !x.!y.(x: s & y: t => p)) & _delta_e(p) & _delta_e(s) & _delta_e(t) | ? | ? | p & !x.!y.(x: s & y: t => p) | nn))

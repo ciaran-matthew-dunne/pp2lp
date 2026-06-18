@@ -1,1 +1,1 @@
-Flag(FileOn("z4_eimp52.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) & _delta_e(a) & _delta_e(s) | ? | ? | y = x & a: s => (x = y => a: s) | nn))
+Flag(FileOn("z4_eimp52.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y = x & a: s => (x = y => a: s) | nn))

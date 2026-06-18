@@ -1,0 +1,1 @@
+Flag(FileOn("gxq_union_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s \/ s = s | nn))

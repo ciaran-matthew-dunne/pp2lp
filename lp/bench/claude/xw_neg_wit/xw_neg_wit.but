@@ -1,1 +1,1 @@
-Flag(FileOn("xw_neg_wit.res")) & Set(Valid.1 | Rule(Implication | (not(a: s) => #x.(not(x: s))) & _delta_e(a) & _delta_e(s) | ? | ? | not(a: s) => #x.(not(x: s)) | nn))
+Flag(FileOn("xw_neg_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a: s) => #x.(not(x: s)) | nn))

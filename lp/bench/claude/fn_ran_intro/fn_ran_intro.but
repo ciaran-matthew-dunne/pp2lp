@@ -1,1 +1,1 @@
-Flag(FileOn("fn_ran_intro.res")) & Set(Valid.1 | Rule(Implication | (a,b: f => b: ran(f)) & _delta_e(a) & _delta_e(b) & _delta_e(f) | ? | ? | a,b: f => b: ran(f) | nn))
+Flag(FileOn("fn_ran_intro.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a,b: f => b: ran(f) | nn))

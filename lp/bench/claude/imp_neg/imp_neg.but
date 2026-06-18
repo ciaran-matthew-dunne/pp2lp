@@ -1,1 +1,1 @@
-Flag(FileOn("imp_neg.res")) & Set(Valid.1 | Rule(Implication | (not(a => b) => a & not(b)) & _delta_p(a) & _delta_p(b) | ? | ? | not(a => b) => a & not(b) | nn))
+Flag(FileOn("imp_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a => b) => a & not(b) | nn))

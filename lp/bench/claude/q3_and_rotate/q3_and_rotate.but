@@ -1,1 +1,1 @@
-Flag(FileOn("q3_and_rotate.res")) & Set(Valid.1 | Rule(Implication | (a & b & c => c & a & b) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | a & b & c => c & a & b | nn))
+Flag(FileOn("q3_and_rotate.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a & b & c => c & a & b | nn))

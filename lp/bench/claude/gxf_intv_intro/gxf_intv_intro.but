@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_intv_intro.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | c <= a & a <= d => a: c .. d | nn))

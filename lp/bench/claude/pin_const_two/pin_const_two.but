@@ -1,1 +1,0 @@
-Flag(FileOn("pin_const_two.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x = 1 & y = 2)) | ? | ? | #x.#y.(x = 1 & y = 2) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("z4_eqc_deep.res")) & Set(Valid.1 | Rule(Implication | _delta_e(y) & _delta_e(x) & _delta_e(a) & _delta_e(s) | ? | ? | (y = x or a: s) & not(a: s) => x = y | nn))
+Flag(FileOn("z4_eqc_deep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (y = x or a: s) & not(a: s) => x = y | nn))

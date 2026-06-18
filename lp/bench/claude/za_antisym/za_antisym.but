@@ -1,1 +1,1 @@
-Flag(FileOn("za_antisym.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) | ? | ? | x <= y & y <= x => x = y | nn))
+Flag(FileOn("za_antisym.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y & y <= x => x = y | nn))

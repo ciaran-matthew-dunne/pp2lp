@@ -1,0 +1,1 @@
+Flag(FileOn("gxq_dom_union.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | dom(r \/ s) = dom(r) \/ dom(s) | nn))

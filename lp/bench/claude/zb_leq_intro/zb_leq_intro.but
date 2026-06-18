@@ -1,1 +1,0 @@
-Flag(FileOn("zb_leq_intro.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(btrue) | ? | ? | x <= y => bool(x <= y) = btrue | nn))

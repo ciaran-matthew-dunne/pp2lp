@@ -1,1 +1,1 @@
-Flag(FileOn("ag_neg_distrib2.res")) & Set(Valid.1 | Rule(Implication | (-(x - y) <= z => y - x <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | -(x - y) <= z => y - x <= z | nn))
+Flag(FileOn("ag_neg_distrib2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | -(x - y) <= z => y - x <= z | nn))

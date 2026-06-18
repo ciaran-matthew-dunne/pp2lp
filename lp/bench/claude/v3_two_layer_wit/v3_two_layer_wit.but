@@ -1,1 +1,1 @@
-Flag(FileOn("v3_two_layer_wit.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: t => #x.(x: s & #y.(y: t & x: s))) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) | ? | ? | a: s & b: t => #x.(x: s & #y.(y: t & x: s)) | nn))
+Flag(FileOn("v3_two_layer_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & b: t => #x.(x: s & #y.(y: t & x: s)) | nn))

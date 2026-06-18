@@ -1,1 +1,1 @@
-Flag(FileOn("nrm8_nested_univ.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: s => y: t => x: s)) & _delta_e(s) & _delta_e(t) | ? | ? | !x.!y.(x: s => y: t => x: s) | nn))
+Flag(FileOn("nrm8_nested_univ.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(!y.((x: s => (y: t => x: s)))) | nn))

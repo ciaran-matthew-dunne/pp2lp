@@ -54,6 +54,7 @@ inductive Tuple : ℕ → TYPE ≔
   | ⨾ [n] : Tuple n → τ ι → Tuple (+1 n);
 notation ⨾ infix left 5;
 
+
 // k-th projection; prj 0 is the rightmost (most recently appended) element.
 symbol prj [n] (k : ℕ) (_ : Tuple n) : τ ι;
 rule prj (+1 $n) ($t ⨾ _) ↪ prj $n $t
@@ -250,14 +251,11 @@ constant symbol func : τ ι → τ ι → τ ι → τ ι;  // _func(…)  func
 // ======================================================================
 // from_int : ℤ → τ ι injects ℤ; to_int is its left inverse, INT its range.
 // plus/neg/leq (with 𝟎/𝟏, minus, gt) are abstract — rigid under conversion —
-// and bridged to ℤ by the def-axioms add_def/neg_def/le_def. The group laws are
+// and bridged to ℤ by the def-axioms plus_def/neg_def/le_def. The group laws are
 // proved from these in lemmas/Int.lp.
-type nat;
 symbol NAT : τ ι;
 
-symbol from_int : ℤ → τ ι;
-// injective is a unification hint (to_int left-inverts from_int): lambdapi can
-// solve `to_int ?x ≡ to_int t` ⟹ `?x ≔ t`. No provable axiom, so no soundness cost.
+injective symbol from_int : ℤ → τ ι;
 injective symbol to_int : τ ι → τ int;
 rule to_int (from_int $z) ↪ $z;
 
@@ -269,21 +267,30 @@ symbol 𝟏 ≔ from_int 1;
 
 // plus/neg kept abstract (like leq): rigid under conversion, so they never unfold
 // into the from_int/to_int embedding and unification on a rule conclusion recovers
-// their operands. add_def/neg_def give their meaning propositionally (not a
-// reduction, so no provable axiom). injective recovers operands for an implicit
-// `plus ?E ?F` against a concrete goal (AR4 etc.).
+// their operands. plus_def/neg_def give their meaning propositionally. injective
+// recovers operands for an implicit `plus ?E ?F` against a concrete goal (AR4 etc.).
 injective symbol plus : τ ι → τ ι → τ ι;
-symbol add_def (x y : τ ι) : π (plus x y = from_int (to_int x + to_int y));
+symbol plus_def (x y : τ ι) : π (plus x y = from_int (to_int x + to_int y));
 
 injective symbol neg : τ ι → τ ι; // unary minus
 symbol neg_def (x : τ ι) : π (neg x = from_int (— (to_int x)));
+
+// `to_int` projects plus/neg onto Stdlib.Z by REDUCTION — the to_int-image of
+// plus_def/neg_def composed with the retract (`to_int (from_int z) ↪ z`), so a
+// conservative orientation of those axioms (sound by to_int's injectivity). This
+// makes ground arithmetic *compute* (`to_int (plus (from_int 2) (from_int 3)) ↪
+// 2 + 3 ↪ 5`) and lets the emitter prove arithmetic reorderings on ℤ. `plus`/`neg`
+// stay rigid (no rule fires on a bare `plus x y`), so unification still recovers
+// operands.
+rule to_int (plus $x $y) ↪ to_int $x + to_int $y
+with to_int (neg $x)     ↪ — (to_int $x);
 
 symbol minus (x y : τ ι) ≔ plus x (neg y);
 
 // Decimal literals: a numeral parses as ℤ and coerces into τ ι via from_int, so
 // the emitter can write bare numerals where a τ ι is expected.
 coerce_rule coerce ℤ (τ ι) $z ↪ from_int $z;
-
+coerce_rule coerce (τ ι) ℤ $z ↪ to_int $z;
 // leq abstract for the same reason: reducing through Z's ≤ would lose the operands
 // (fatal for reflexive `leq E E`, where to_int ?E ≐ to_int ?E erases ?E). le_def is
 // its meaning; le_intro/le_elim (lemmas/Int.lp) bridge to Stdlib.Z.≤.
@@ -311,6 +318,7 @@ rule to_nat Z0 ↪ _0
 with to_nat (Zpos $p) ↪ val $p;
 
 coerce_rule coerce ℤ ℕ $z ↪ to_nat $z;
+
 
 
 // ======================================================================

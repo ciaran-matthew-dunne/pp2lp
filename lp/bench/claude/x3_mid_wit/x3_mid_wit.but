@@ -1,1 +1,1 @@
-Flag(FileOn("x3_mid_wit.res")) & Set(Valid.1 | Rule(Implication | (a: s & f(a) = c => #x.#y.(x: s & f(x) = y & y = c)) & _delta_e(a) & _delta_e(s) & _delta_e(f) & _delta_e(c) | ? | ? | a: s & f(a) = c => #x.#y.(x: s & f(x) = y & y = c) | nn))
+Flag(FileOn("x3_mid_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & f(a) = c => #x.#y.(x: s & f(x) = y & y = c) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("bl_arith_false.res")) & Set(Valid.1 | Rule(Implication | (bool(x <= y) = bfalse => not(x <= y)) & _delta_e(x) & _delta_e(y) & _delta_e(bfalse) | ? | ? | bool(x <= y) = bfalse => not(x <= y) | nn))

@@ -20,9 +20,9 @@ begin assume x y h; refine =⇒ (eq_sym (le_def x y)) h end;
 opaque symbol le_elim (x y : τ ι) : π (leq x y) → π (to_int x ≤ to_int y) ≔
 begin assume x y h; refine =⇒ (le_def x y) h end;
 
-// to_int distributes over plus/neg (from add_def/neg_def + the retract).
+// to_int distributes over plus/neg (from plus_def/neg_def + the retract).
 opaque symbol to_int_add (x y : τ ι) : π (to_int (plus x y) = to_int x + to_int y) ≔
-begin assume x y; rewrite (add_def x y); reflexivity end;
+begin assume x y; rewrite (plus_def x y); reflexivity end;
 opaque symbol to_int_neg (x : τ ι) : π (to_int (neg x) = — (to_int x)) ≔
 begin assume x; rewrite (neg_def x); reflexivity end;
 // minus = plus x (neg y); unfold directly (simplify would also unfold Z's ≤).
@@ -30,33 +30,24 @@ opaque symbol sub_def (x y : τ ι) : π (minus x y = plus x (neg y)) ≔ begin 
 opaque symbol to_int_sub (x y : τ ι) : π (to_int (minus x y) = to_int x + (— (to_int y))) ≔
 begin assume x y; rewrite (sub_def x y); rewrite (to_int_add x (neg y)); rewrite (to_int_neg y); reflexivity end;
 
-// Fold two ℤ literals into one (Z computes the sum); lit_neg first flips a negated
-// literal. Lets the emitter collapse a run of literal atoms (𝟐 + 𝟑 ↦ 𝟓).
-opaque symbol lit_add (a b : ℤ) : π (plus (from_int a) (from_int b) = from_int (a + b)) ≔
-begin assume a b; rewrite (add_def (from_int a) (from_int b)); reflexivity end;
-opaque symbol lit_neg (z : ℤ) : π (neg (from_int z) = from_int (— z)) ≔
-begin assume z; rewrite (neg_def (from_int z)); reflexivity end;
-
 // neg/plus land in from_int's range, so their `ϵ INT` discharges with no premise.
 opaque symbol neg_in_int (a : τ ι) : π (neg a ϵ INT) ≔
 begin assume a; rewrite (neg_def a); refine from_int_in_int (— (to_int a)) end;
 opaque symbol add_in_int (a b : τ ι) : π (plus a b ϵ INT) ≔
-begin assume a b; rewrite (add_def a b); refine from_int_in_int (to_int a + to_int b) end;
+begin assume a b; rewrite (plus_def a b); refine from_int_in_int (to_int a + to_int b) end;
+
+// Reflect a τ ι equality onto ℤ: with both sides in INT, `to_int x = to_int y` lifts
+// to `x = y` (int_retract on both sides + feq).  The emitter discharges its generated
+// arithmetic equalities through this — `simplify` then computes `to_int` through
+// plus/neg/minus/literals, leaving a pure-ℤ goal that Stdlib.Z reductions + a small
+// reorder rewrite chain close.  Replaces the inlined int_retract/feq/eq_sym scaffolding.
+opaque symbol toint_eq (x y : τ ι) (hx : π (x ϵ INT)) (hy : π (y ϵ INT))
+  : π (to_int x = to_int y) → π (x = y) ≔
+begin assume x y hx hy h;
+  rewrite (int_retract x hx); rewrite (int_retract y hy); refine feq from_int h end;
 
 // ---- Z-level helpers (pure ℤ; the τ ι laws refine these) ----
 // Kept on ℤ so rewrite matches the + subterms directly.
-
-opaque symbol Z_add_leq_l (a b c : ℤ) : π (a ≤ b) → π ((c + a) ≤ (c + b)) ≔
-begin
-  assume a b c h; rewrite +_com c a; rewrite +_com c b;
-  refine ≤_compat_add a b c h
-end;
-
-opaque symbol Z_leq_succ (a : ℤ) : π (a ≤ (a + 1)) ≔
-begin
-  assume a; have h01 : π (0 ≤ 1) { assume k; refine k };
-  rewrite +_com a 1; refine ≤_compat_add 0 1 a h01
-end;
 
 opaque symbol Z_sub_add (a b : ℤ) : π ((a + (— b)) + b = a) ≔
 begin
@@ -75,6 +66,35 @@ begin assume a b h; rewrite left (Z_sub_add a b); refine ≤_compat_add (a + (�
 
 opaque symbol Z_neg_leq (a : ℤ) : π ((— a) ≤ 0) → π (0 ≤ a) ≔
 begin assume a h; rewrite left (Z_neg_add a); refine ≤_compat_add (— a) 0 a h end;
+
+// ℤ-level congruences for the emitter's to_int-transport arithmetic proofs:
+// the reorder/cancel happens on `to_int e` (Stdlib.Z), so the congruences are
+// on ℤ's `+`/`—` rather than the τ ι `plus`/`neg`.
+opaque symbol Z_congL (b : ℤ) [a a' : ℤ] : π (a = a') → π (a + b = a' + b) ≔
+begin assume b a a' h; rewrite h; reflexivity end;
+opaque symbol Z_congR (a : ℤ) [b b' : ℤ] : π (b = b') → π (a + b = a + b') ≔
+begin assume a b b' h; rewrite h; reflexivity end;
+opaque symbol Z_cong [a a' b b' : ℤ] : π (a = a') → π (b = b') → π (a + b = a' + b') ≔
+begin assume a a' b b' ha hb; rewrite ha; rewrite hb; reflexivity end;
+opaque symbol Z_neg_cong [a a' : ℤ] : π (a = a') → π (— a = — a') ≔
+begin assume a a' h; rewrite h; reflexivity end;
+
+// Single-inverse-pair cancellations on a ℤ `to_int`-image, used by the emitter's
+// cancel recipe.  Each is applied with NO arguments — `rewrite <lemma>` infers the
+// atoms from the goal — so it works on the corpus's `prj k _x` atoms (rendering
+// them into an SSReflect `.[…]` target instead crashes lambdapi's matcher, and a
+// bare-numeral literal there would be read as a wildcard).  Names: n=`—x`, x=`x`,
+// l=a literal, a=an arbitrary prefix; the recipe picks one by the pair's position
+// in the left-nested sum (Z_neg_add/-_same for the front pair, Z_sub_add/Z_add_sub
+// for the end pair, Zc_nlx/Zc_xln for a pair split by one literal).
+opaque symbol Z_add_sub (a x : ℤ) : π ((a + x) + — x = a) ≔   // companion to Z_sub_add
+begin assume a x; rewrite +_assoc; rewrite -_same; reflexivity end;
+opaque symbol Zc_nlx (x l : ℤ) : π ((— x + l) + x = l) ≔
+begin assume x l; rewrite +_assoc; rewrite .[l + x] +_com; rewrite left +_assoc;
+  rewrite Z_neg_add; reflexivity end;
+opaque symbol Zc_xln (x l : ℤ) : π ((x + l) + — x = l) ≔
+begin assume x l; rewrite +_assoc; rewrite .[l + — x] +_com; rewrite left +_assoc;
+  rewrite -_same; reflexivity end;
 
 // ---- Laws — discretely ordered abelian group on τ ι ----
 
@@ -98,32 +118,20 @@ begin
 end;
 
 opaque symbol add_comm (x y : τ ι) : π (plus x y = plus y x) ≔
-begin assume x y; rewrite (add_def x y); rewrite (add_def y x); refine feq from_int (+_com (to_int x) (to_int y)) end;
+begin assume x y; rewrite (plus_def x y); rewrite (plus_def y x); refine feq from_int (+_com (to_int x) (to_int y)) end;
 
 opaque symbol add_assoc (x y z : τ ι) : π (plus (plus x y) z = plus x (plus y z)) ≔
 begin assume x y z;
-  rewrite (add_def (plus x y) z); rewrite (add_def x (plus y z));
+  rewrite (plus_def (plus x y) z); rewrite (plus_def x (plus y z));
   rewrite (to_int_add x y); rewrite (to_int_add y z);
   refine feq from_int (+_assoc (to_int x) (to_int y) (to_int z)) end;
 
 // Right identity only on INT (recovers x); emitter supplies `ϵ INT`.
 opaque symbol add_zero (x : τ ι) (hx : π (x ϵ INT)) : π (plus x 𝟎 = x) ≔
-begin assume x hx; rewrite (add_def x 𝟎); symmetry; refine int_retract x hx end;
-
-opaque symbol add_neg (x : τ ι) : π (plus x (neg x) = 𝟎) ≔
-begin assume x; rewrite (add_def x (neg x)); rewrite (to_int_neg x); refine feq from_int (-_same (to_int x)) end;
-
-// Translation invariance.
-opaque symbol add_leq_l (x y z : τ ι) : π (leq x y) → π (leq (plus z x) (plus z y)) ≔
-begin assume x y z h; refine le_intro (plus z x) (plus z y) _;
-  rewrite (to_int_add z x); rewrite (to_int_add z y);
-  refine Z_add_leq_l (to_int x) (to_int y) (to_int z) (le_elim x y h) end;
+begin assume x hx; rewrite (plus_def x 𝟎); symmetry; refine int_retract x hx end;
 
 opaque symbol one_not_leq_zero : π (¬ (leq 𝟏 𝟎)) ≔
 begin assume h; refine (le_elim 𝟏 𝟎 h) ⊤ᵢ end;
-
-opaque symbol zero_leq_one : π (leq 𝟎 𝟏) ≔
-begin refine le_intro 𝟎 𝟏 _; assume h; refine h end;
 
 // Discreteness: nothing strictly between 𝟎 and 𝟏 (compare H p is never Gt).
 opaque symbol one_le_pos (p : ℙ) : π ((Zpos H) ≤ (Zpos p)) ≔
@@ -149,37 +157,19 @@ begin assume x h;
 // ---- Derived lemmas (congruences + variants of the axioms) ----
 // Used by the emitter's generated equality proofs (arithmetic-reorder bridges).
 
-opaque symbol add_congL (b : τ ι) [a a' : τ ι] :
-  π (a = a') → π (plus a b = plus a' b) ≔
-begin assume b a a' h; rewrite h; reflexivity end;
-
 opaque symbol add_congR (a : τ ι) [b b' : τ ι] :
   π (b = b') → π (plus a b = plus a b') ≔
 begin assume a b b' h; rewrite h; reflexivity end;
-
-opaque symbol add_cong [a a' b b' : τ ι] :
-  π (a = a') → π (b = b') → π (plus a b = plus a' b') ≔
-begin assume a a' b b' ha hb; rewrite ha; rewrite hb; reflexivity end;
 
 opaque symbol leq_subst_l [a b : τ ι] :
   π (a = b) → π (leq b 𝟎) → π (leq a 𝟎) ≔
 begin assume a b h hb; rewrite h; refine hb end;
 
 opaque symbol zero_add (x : τ ι) (hx : π (x ϵ INT)) : π (plus 𝟎 x = x) ≔
-begin assume x hx; rewrite (add_def 𝟎 x); symmetry; refine int_retract x hx end;
+begin assume x hx; rewrite (plus_def 𝟎 x); symmetry; refine int_retract x hx end;
 
 opaque symbol neg_add (x : τ ι) : π (plus (neg x) x = 𝟎) ≔
-begin assume x; rewrite (add_def (neg x) x); rewrite (to_int_neg x); refine feq from_int (Z_neg_add (to_int x)) end;
-
-opaque symbol add_leq_r (x y z : τ ι) :
-  π (leq x y) → π (leq (plus x z) (plus y z)) ≔
-begin assume x y z h; refine le_intro (plus x z) (plus y z) _;
-  rewrite (to_int_add x z); rewrite (to_int_add y z);
-  refine ≤_compat_add (to_int x) (to_int y) (to_int z) (le_elim x y h) end;
-
-// x ≤ x + 𝟏 — the ARITH closer chains this to refute a positive-literal sum.
-opaque symbol leq_plus_one (x : τ ι) : π (leq x (plus x 𝟏)) ≔
-begin assume x; refine le_intro x (plus x 𝟏) _; rewrite (to_int_add x 𝟏); refine Z_leq_succ (to_int x) end;
+begin assume x; rewrite (plus_def (neg x) x); rewrite (to_int_neg x); refine feq from_int (Z_neg_add (to_int x)) end;
 
 // Sum of two non-positives is non-positive.
 opaque symbol add_leq_zero (x y : τ ι) :
@@ -190,21 +180,6 @@ begin
   refine ≤_trans (to_int x + to_int y) (to_int y) 0 _ (le_elim y 𝟎 hy);
   refine ≤_compat_add (to_int x) 0 (to_int y) (le_elim x 𝟎 hx)
 end;
-
-// 𝟏 + (≥𝟎) > 𝟎 — O(1) positivity for the AR2/AR4 closer (no unary blowup).
-opaque symbol pos_add (x : τ ι) : π (leq 𝟎 x) → π (¬ (leq (plus 𝟏 x) 𝟎)) ≔
-begin
-  assume x h hk;
-  have h1 : π (1 ≤ (1 + to_int x))
-    { rewrite +_com 1 (to_int x); refine ≤_compat_add 0 (to_int x) 1 (le_elim 𝟎 x h) };
-  have hk2 : π ((to_int 𝟏 + to_int x) ≤ 0)
-    { rewrite left (to_int_add 𝟏 x); refine le_elim (plus 𝟏 x) 𝟎 hk };
-  refine (≤_trans 1 (to_int 𝟏 + to_int x) 0 h1 hk2) ⊤ᵢ
-end;
-
-// from_int (Zpos p) > 𝟎 for any magnitude p (Zpos p ≐ Z0 ↪ Gt by head match).
-opaque symbol lit_pos (p : ℙ) : π (¬ (leq (from_int (Zpos p)) 𝟎)) ≔
-begin assume p h; refine (le_elim (from_int (Zpos p)) 𝟎 h) ⊤ᵢ end;
 
 // leq x y ↔ leq (minus x y) 𝟎. Used by AR3, AR5–AR8, AR13.
 opaque symbol sub_leq (x y : τ ι) : π (leq x y) → π (leq (minus x y) 𝟎) ≔
@@ -220,18 +195,3 @@ opaque symbol neg_leq_zero (a : τ ι) : π (leq (neg a) 𝟎) → π (leq 𝟎 
 begin assume a h; refine le_intro 𝟎 a (Z_neg_leq (to_int a) _);
   rewrite left (to_int_neg a); refine le_elim (neg a) 𝟎 h end;
 
-// ---- Algebraic identities ----
-
-opaque symbol neg_zero : π (neg 𝟎 = 𝟎) ≔
-begin rewrite (neg_def 𝟎); reflexivity end;
-
-// Involutive (recovers x, so guarded by `ϵ INT`).
-opaque symbol neg_neg (x : τ ι) (hx : π (x ϵ INT)) : π (neg (neg x) = x) ≔
-begin assume x hx; rewrite (neg_def (neg x)); rewrite (to_int_neg x);
-  rewrite (—_idem (to_int x)); symmetry; refine int_retract x hx end;
-
-// neg distributes over plus.
-opaque symbol opp_add (x y : τ ι) : π (neg (plus x y) = plus (neg x) (neg y)) ≔
-begin assume x y; rewrite (neg_def (plus x y)); rewrite (add_def (neg x) (neg y));
-  rewrite (to_int_add x y); rewrite (to_int_neg x); rewrite (to_int_neg y);
-  refine feq from_int (distr_—_+ (to_int x) (to_int y)) end;

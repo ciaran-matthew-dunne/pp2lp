@@ -1,1 +1,1 @@
-Flag(FileOn("dz_eqv_ladder.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) & (e <=> g) => (a <=> g)) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) & _delta_p(g) | ? | ? | (a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) & (e <=> g) => (a <=> g) | nn))
+Flag(FileOn("dz_eqv_ladder.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a <=> b) & (b <=> c) & (c <=> d) & (d <=> e) & (e <=> g) => (a <=> g) | nn))

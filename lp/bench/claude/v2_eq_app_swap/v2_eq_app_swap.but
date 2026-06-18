@@ -1,1 +1,1 @@
-Flag(FileOn("v2_eq_app_swap.res")) & Set(Valid.1 | Rule(Implication | (g(x, y) = c & x = y => g(y, x) = c) & _delta_e(g) & _delta_e(x) & _delta_e(y) & _delta_e(c) | ? | ? | g(x, y) = c & x = y => g(y, x) = c | nn))
+Flag(FileOn("v2_eq_app_swap.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | g(x, y) = c & x = y => g(y, x) = c | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("fn_app_two_eq.res")) & Set(Valid.1 | Rule(Implication | (a: dom(f) & b: dom(f) & f(a) = c & f(b) = c => f(a) = f(b)) & _delta_e(a) & _delta_e(f) & _delta_e(b) & _delta_e(c) | ? | ? | a: dom(f) & b: dom(f) & f(a) = c & f(b) = c => f(a) = f(b) | nn))
+Flag(FileOn("fn_app_two_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: dom(f) & b: dom(f) & f(a) = c & f(b) = c => f(a) = f(b) | nn))

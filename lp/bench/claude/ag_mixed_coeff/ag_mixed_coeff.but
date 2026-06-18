@@ -1,1 +1,1 @@
-Flag(FileOn("ag_mixed_coeff.res")) & Set(Valid.1 | Rule(Implication | (2*x + 3*y <= z => y + x + y + x + y <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | 2*x + 3*y <= z => y + x + y + x + y <= z | nn))
+Flag(FileOn("ag_mixed_coeff.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 2*x + 3*y <= z => y + x + y + x + y <= z | nn))

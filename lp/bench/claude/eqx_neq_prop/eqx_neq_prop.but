@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_neq_prop.res")) & Set(Valid.1 | Rule(Implication | (not(x = y) & y = z => not(x = z)) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | not(x = y) & y = z => not(x = z) | nn))
+Flag(FileOn("eqx_neq_prop.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(x = y) & y = z => not(x = z) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_vr3_passthru.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | VRAI => (p or not(p)) | nn))

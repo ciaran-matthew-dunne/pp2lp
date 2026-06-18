@@ -1,1 +1,1 @@
-Flag(FileOn("fk_neg_loose.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= -1 => x + x <= 0)) | ? | ? | !x.(x <= -1 => x + x <= 0) | nn))
+Flag(FileOn("fk_neg_loose.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x <= -1 => x + x <= 0) | nn))

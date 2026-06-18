@@ -1,1 +1,1 @@
-Flag(FileOn("za_lit_zero.res")) & Set(Valid.1 | Rule(Implication | 1 = 1 | ? | ? | 0 <= 0 | nn))
+Flag(FileOn("za_lit_zero.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= 0 | nn))

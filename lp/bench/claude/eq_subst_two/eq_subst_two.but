@@ -1,1 +1,1 @@
-Flag(FileOn("eq_subst_two.res")) & Set(Valid.1 | Rule(Implication | (x = y & z = w & x: s & z: t => y: s & w: t) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) & _delta_e(s) & _delta_e(t) | ? | ? | x = y & z = w & x: s & z: t => y: s & w: t | nn))
+Flag(FileOn("eq_subst_two.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y & z = w & x: s & z: t => y: s & w: t | nn))

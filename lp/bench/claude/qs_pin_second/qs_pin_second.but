@@ -1,1 +1,1 @@
-Flag(FileOn("qs_pin_second.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(y <= 0 & 0 <= y & x: s) => #x.(x: s)) & _delta_e(s) | ? | ? | #x.#y.(y <= 0 & 0 <= y & x: s) => #x.(x: s) | nn))
+Flag(FileOn("qs_pin_second.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.(y <= 0 & 0 <= y & x: s) => #x.(x: s) | nn))

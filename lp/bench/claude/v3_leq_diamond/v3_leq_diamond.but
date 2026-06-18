@@ -1,1 +1,1 @@
-Flag(FileOn("v3_leq_diamond.res")) & Set(Valid.1 | Rule(Implication | (x <= y & x <= z & y <= w & z <= w => x <= w) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | x <= y & x <= z & y <= w & z <= w => x <= w | nn))
+Flag(FileOn("v3_leq_diamond.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y & x <= z & y <= w & z <= w => x <= w | nn))

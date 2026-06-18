@@ -1,0 +1,1 @@
+Flag(FileOn("gxp_rel_typ_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | r <: s * t & (a, b): r => a: s | nn))

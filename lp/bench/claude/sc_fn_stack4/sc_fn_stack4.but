@@ -1,1 +1,1 @@
-Flag(FileOn("sc_fn_stack4.res")) & Set(Valid.1 | Rule(Implication | (f(g(h(k(x)))) = y & y = z => f(g(h(k(x)))) = z) & _delta_e(f) & _delta_e(g) & _delta_e(h) & _delta_e(k) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | f(g(h(k(x)))) = y & y = z => f(g(h(k(x)))) = z | nn))
+Flag(FileOn("sc_fn_stack4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(g(h(k(x)))) = y & y = z => f(g(h(k(x)))) = z | nn))

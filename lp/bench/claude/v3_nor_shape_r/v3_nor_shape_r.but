@@ -1,1 +1,1 @@
-Flag(FileOn("v3_nor_shape_r.res")) & Set(Valid.1 | Rule(Implication | (not(a or b) => not(b)) & _delta_p(a) & _delta_p(b) | ? | ? | not(a or b) => not(b) | nn))
+Flag(FileOn("v3_nor_shape_r.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a or b) => not(b) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_dom_mono.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | r <: s => dom(r) <: dom(s) | nn))

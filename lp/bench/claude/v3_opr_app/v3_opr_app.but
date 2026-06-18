@@ -1,1 +1,1 @@
-Flag(FileOn("v3_opr_app.res")) & Set(Valid.1 | Rule(Implication | (x = f(a) & x: s => f(a): s) & _delta_e(x) & _delta_e(f) & _delta_e(a) & _delta_e(s) | ? | ? | x = f(a) & x: s => f(a): s | nn))
+Flag(FileOn("v3_opr_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = f(a) & x: s => f(a): s | nn))

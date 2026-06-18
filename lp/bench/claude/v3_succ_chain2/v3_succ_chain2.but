@@ -1,1 +1,1 @@
-Flag(FileOn("v3_succ_chain2.res")) & Set(Valid.1 | Rule(Implication | (x + 1 <= y & y + 1 <= z => x + 2 <= z) & _delta_e(x) & _delta_e(y) & _delta_e(z) | ? | ? | x + 1 <= y & y + 1 <= z => x + 2 <= z | nn))
+Flag(FileOn("v3_succ_chain2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + 1 <= y & y + 1 <= z => x + 2 <= z | nn))

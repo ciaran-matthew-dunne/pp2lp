@@ -1,1 +1,1 @@
-Flag(FileOn("v3_fn_two_args_eq.res")) & Set(Valid.1 | Rule(Implication | (g(a, b) = c & a = x & b = y => g(x, y) = c) & _delta_e(g) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(x) & _delta_e(y) | ? | ? | g(a, b) = c & a = x & b = y => g(x, y) = c | nn))
+Flag(FileOn("v3_fn_two_args_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | g(a, b) = c & a = x & b = y => g(x, y) = c | nn))

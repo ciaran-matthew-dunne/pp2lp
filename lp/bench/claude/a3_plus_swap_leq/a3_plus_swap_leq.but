@@ -1,1 +1,1 @@
-Flag(FileOn("a3_plus_swap_leq.res")) & Set(Valid.1 | Rule(Implication | (x + y + z <= w => z + y + x <= w) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | x + y + z <= w => z + y + x <= w | nn))
+Flag(FileOn("a3_plus_swap_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + y + z <= w => z + y + x <= w | nn))

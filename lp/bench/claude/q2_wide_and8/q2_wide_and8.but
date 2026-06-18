@@ -1,1 +1,1 @@
-Flag(FileOn("q2_wide_and8.res")) & Set(Valid.1 | Rule(Implication | (a & b & c & d & e & g & h & i => e) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) & _delta_p(g) & _delta_p(h) & _delta_p(i) | ? | ? | a & b & c & d & e & g & h & i => e | nn))
+Flag(FileOn("q2_wide_and8.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a & b & c & d & e & g & h & i => e | nn))

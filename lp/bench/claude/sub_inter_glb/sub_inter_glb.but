@@ -1,1 +1,1 @@
-Flag(FileOn("sub_inter_glb.res")) & Set(Valid.1 | Rule(Implication | (u <: s & u <: t => u <: s /\ t) & _delta_e(u) & _delta_e(s) & _delta_e(t) | ? | ? | u <: s & u <: t => u <: s /\ t | nn))
+Flag(FileOn("sub_inter_glb.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | u <: s & u <: t => u <: s /\ t | nn))

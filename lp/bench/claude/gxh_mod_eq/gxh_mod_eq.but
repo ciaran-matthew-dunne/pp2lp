@@ -1,0 +1,1 @@
+Flag(FileOn("gxh_mod_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | z = x mod y => z = x mod y | nn))

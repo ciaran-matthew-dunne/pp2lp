@@ -1,1 +1,0 @@
-Flag(FileOn("zb_chain.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) & _delta_e(btrue) & _delta_e(z) | ? | ? | bool(x = y) = btrue & bool(y = z) = btrue => x = z | nn))

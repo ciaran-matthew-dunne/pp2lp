@@ -1,1 +1,1 @@
-Flag(FileOn("at_double_pos.res")) & Set(Valid.1 | Rule(Implication | (0 <= x => 0 <= x + x) & _delta_e(x) | ? | ? | 0 <= x => 0 <= x + x | nn))
+Flag(FileOn("at_double_pos.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= x => 0 <= x + x | nn))

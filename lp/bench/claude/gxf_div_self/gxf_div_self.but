@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_div_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 < x => x / x = 1 | nn))

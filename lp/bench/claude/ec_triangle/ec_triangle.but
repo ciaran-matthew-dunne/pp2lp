@@ -1,1 +1,1 @@
-Flag(FileOn("ec_triangle.res")) & Set(Valid.1 | Rule(Implication | (a = b & b = c => a = c & c = a & b = a) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | a = b & b = c => a = c & c = a & b = a | nn))
+Flag(FileOn("ec_triangle.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a = b & b = c => a = c & c = a & b = a | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v3_pin_wit_leq.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = a & x <= y) => a <= y) & _delta_e(a) & _delta_e(y) | ? | ? | #x.(x = a & x <= y) => a <= y | nn))
+Flag(FileOn("v3_pin_wit_leq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x = a & x <= y) => a <= y | nn))

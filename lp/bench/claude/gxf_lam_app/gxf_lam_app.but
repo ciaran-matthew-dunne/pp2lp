@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lam_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s => (%y.(y: s | y))(x) = x | nn))

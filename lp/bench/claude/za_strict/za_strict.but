@@ -1,1 +1,1 @@
-Flag(FileOn("za_strict.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) & _delta_e(y) | ? | ? | x < y => x <= y | nn))
+Flag(FileOn("za_strict.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x < y => x <= y | nn))

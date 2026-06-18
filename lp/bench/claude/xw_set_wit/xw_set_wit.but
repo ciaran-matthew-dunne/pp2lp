@@ -1,1 +1,1 @@
-Flag(FileOn("xw_set_wit.res")) & Set(Valid.1 | Rule(Implication | (a: s /\ t => #x.(x: s & x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s /\ t => #x.(x: s & x: t) | nn))
+Flag(FileOn("xw_set_wit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s /\ t => #x.(x: s & x: t) | nn))

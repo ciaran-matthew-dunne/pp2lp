@@ -1,1 +1,1 @@
-Flag(FileOn("st_pair_cases.res")) & Set(Valid.1 | Rule(Implication | (x: {a, b} => x = a or x = b) & _delta_e(x) & _delta_e(a) & _delta_e(b) | ? | ? | x: {a, b} => x = a or x = b | nn))
+Flag(FileOn("st_pair_cases.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: {a, b} => x = a or x = b | nn))

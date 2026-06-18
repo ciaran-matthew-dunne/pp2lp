@@ -16,16 +16,13 @@ let is_atom_exp = function
   | RanRestrict _ | BoolOf _ | Compr _ -> true
   | AOp _ | Neg _ -> false
 
-(* A literal is a single folded atom — never unfolded to a `𝟏`-sum (that legacy
-   apparatus existed only because the pre-Z encoding couldn't compute; now
-   `Stdlib.Z` reduces ground arithmetic).  PP's solver-side folding (`2 + 3 → 5`)
-   is matched by [fold_lit_run], which combines a contiguous run of literal atoms
-   into one `from_int` via `lit_add`/`lit_neg`, letting ℤ compute the sum.
-
-   Only `Nat` literals fold: they fit OCaml's native `int` by construction, so
-   the net value needs no bignum.  A `BigNat` (apero's 2⁶⁴ bounds) is left as an
-   opaque atom — compared structurally, never summed — so [is_foldable_lit] is
-   false for it and [atom_compare] keeps it among the symbolic atoms. *)
+(* Whether a literal atom folds into a constant run.  Only `Nat` literals do:
+   they fit OCaml's native `int`, so [prove_fold_lits] sums a contiguous run into
+   one decimal that `Stdlib.Z` then *computes* — no `lit_add` apparatus, that
+   legacy machinery existed only because the pre-Z encoding couldn't compute.  A
+   `BigNat` (apero's 2⁶⁴ bounds) is left an opaque atom — compared structurally,
+   never summed — so it is false here and [atom_compare] keeps it among the
+   symbolic atoms. *)
 let is_foldable_lit = function Nat _ -> true | _ -> false
 
 (* Sort order for signed atoms: foldable `Nat` literals LAST (so a sum's literal
@@ -97,146 +94,182 @@ let lfold_exp = function
   | s0 :: rest ->
     List.fold_left (fun acc s -> AOp (Add, acc, signed_exp s)) (signed_exp s0) rest
 
-(* π (lfold l = lfold (sorted l)): bubble-sort the signed-atom list, each
-   adjacent swap an `add_comm`/`add_assoc` step lifted to its depth. *)
-let prove_eq_lnested env l_orig : L.term =
-  let ex e = L.Exp (env, e) in
-  let refl e = L.App (L.Name "eq_refl", [ ex e ]) in
-  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-  let sym p = L.App (L.Name "eq_sym", [ p ]) in
-  let comm a b = L.App (L.Name "add_comm", [ ex a; ex b ]) in
-  let assoc a b c = L.App (L.Name "add_assoc", [ ex a; ex b; ex c ]) in
-  let congL b p = L.App (L.Name "add_congL", [ ex b; p ]) in   (* fix right operand *)
-  let congR a p = L.App (L.Name "add_congR", [ ex a; p ]) in   (* fix left operand *)
-  let prove_swap l k =
-    let nth i = List.nth l i in
-    let pre = List.filteri (fun i _ -> i < k) l in
-    let suf = List.filteri (fun i _ -> i > k + 1) l in
-    let a = signed_exp (nth k) and b = signed_exp (nth (k + 1)) in
-    let core =
-      match pre with
-      | [] -> comm a b                                  (* a + b = b + a *)
-      | _ ->
-        let p = lfold_exp pre in                        (* (p+a)+b = (p+b)+a *)
-        trans (assoc p a b) (trans (congR p (comm a b)) (sym (assoc p b a)))
-    in
-    List.fold_left (fun acc s -> congL (signed_exp s) acc) core suf
-  in
-  let swap_list l k =
-    List.mapi (fun i x -> if i = k then List.nth l (k + 1)
-                          else if i = k + 1 then List.nth l k else x) l
-  in
-  let first_inversion l =
-    let rec go i = function
-      | x :: (y :: _ as tl) -> if atom_compare x y > 0 then Some i else go (i + 1) tl
-      | _ -> None
-    in go 0 l
-  in
-  let rec go l =
-    match first_inversion l with
-    | None -> refl (lfold_exp l)
-    | Some k -> trans (prove_swap l k) (go (swap_list l k))
-  in
-  go l_orig
+(* ====================================================================
+   to_int-transport: prove an arithmetic equality by reflecting it onto
+   `to_int e` (Stdlib.Z), where the literal arithmetic *computes* and the
+   `0 + z` / `z + 0` identities are reductions.  Only reorder-swaps and
+   cancellations cost a lemma; constant folding is `Stdlib.Z` reducing a
+   ground sum, so the old `lit_add` / signed-literal apparatus is gone.
+   ==================================================================== *)
 
-(* π (lfold la + lfold lb = lfold (la @ lb)): peel lb's tail, reassociating
-   each element onto la with add_assoc (left-fold structure).  An empty side
-   is NOT the identity syntactically (`lfold [] ≡ 𝟎`), so those cases close
-   with add_zero/zero_add — reachable since literal `𝟎` flattens to no atom. *)
-let rec concat env la lb : L.term =
-  let ex t = L.Exp (env, t) in
+(* ---- Z (Stdlib.Z) term builders.  The emitted file is ℤ-global, so bare
+   `+` / `—` / decimals are `Stdlib.Z`'s; a τ ι atom reflects via `to_int`. *)
+let z_neg (t : L.term) : L.term = L.App (L.Name "\xe2\x80\x94", [ t ])     (* — t *)
+let z_add (a : L.term) (b : L.term) : L.term = L.Infix ("+", a, b)
+let z_toint env (a : exp) : L.term = L.App (L.Name "to_int", [ L.Exp (env, a) ])
+
+(* Eq combinators that elide reflexive steps.  An already-canonical sub-sum
+   yields `eq_refl`, so a near-sorted expression's swap/cancel/fold chain
+   collapses instead of nesting trivial `eq_trans (eq_refl …) …` — the common
+   case (PP usually records arithmetic already normalised) becomes one step. *)
+let refl t = L.App (L.Name "eq_refl", [ t ])
+let as_refl = function L.App (L.Name "eq_refl", [ a ]) -> Some a | _ -> None
+let trans p q =
+  match as_refl p, as_refl q with Some _, _ -> q | _, Some _ -> p
+  | _ -> L.App (L.Name "eq_trans", [ p; q ])
+let sym p = match as_refl p with Some _ -> p | None -> L.App (L.Name "eq_sym", [ p ])
+
+(* ℤ congruences, likewise refl-eliding (a reflexive operand recovers the fixed
+   term from its `eq_refl`, collapsing the congruence to a reflexivity). *)
+let z_congL b p = match as_refl p with
+  | Some a -> refl (z_add a b) | None -> L.App (L.Name "Z_congL", [ b; p ])
+let z_congR a p = match as_refl p with
+  | Some b -> refl (z_add a b) | None -> L.App (L.Name "Z_congR", [ a; p ])
+let z_neg_cong p = match as_refl p with
+  | Some a -> refl (z_neg a) | None -> L.App (L.Name "Z_neg_cong", [ p ])
+let z_cong px py = match as_refl px, as_refl py with
+  | Some a, Some b -> refl (z_add a b)
+  | Some a, None -> z_congR a py
+  | None, Some b -> z_congL b px
+  | None, None -> L.App (L.Name "Z_cong", [ px; py ])
+
+(* A signed atom as a ℤ term.  A foldable `Nat` literal is its bare decimal
+   (`to_int (from_int n)` reduces to it), so a run of them folds by computation;
+   any other atom is `to_int a`.  A negative sign wraps in `—`. *)
+let zatom_base env (a : exp) : L.term =
+  match a with Nat n -> z_dec (string_of_int n) | _ -> z_toint env a
+let zatom env (a, s) : L.term =
+  let b = zatom_base env a in if s >= 0 then b else z_neg b
+
+(* Left-nested ℤ sum of a signed-atom list; `[]` is `0` (Stdlib.Z's identity). *)
+let zfold env (l : (exp * int) list) : L.term =
+  match l with
+  | [] -> z_dec "0"
+  | s0 :: rest -> List.fold_left (fun acc s -> z_add acc (zatom env s)) (zatom env s0) rest
+
+(* π (zfold la + zfold lb = zfold (la @ lb)): peel lb's tail, reassociating each
+   element onto la (`+_assoc`).  An empty side is the identity *by reduction*
+   (`0 + z ↪ z`, `z + 0 ↪ z`), so those close with `eq_refl`. *)
+let rec z_concat env la lb : L.term =
   match la, List.rev lb with
-  | _, [] ->
-    let a = lfold_exp la in
-    L.App (L.Name "add_zero", [ ex a; int_evidence env a ])
-  | [], _ ->
-    let b = lfold_exp lb in
-    L.App (L.Name "zero_add", [ ex b; int_evidence env b ])
-  | _, [ _ ] ->
-    L.App (L.Name "eq_refl", [ ex (AOp (Add, lfold_exp la, lfold_exp lb)) ])
+  | _, [] -> refl (zfold env la)
+  | [], _ -> refl (zfold env lb)
+  | _, [ _ ] -> refl (z_add (zfold env la) (zfold env lb))
   | _, last :: front_rev ->
     let front = List.rev front_rev in
-    L.App (L.Name "eq_trans",
-      [ L.App (L.Name "eq_sym",
-          [ L.App (L.Name "add_assoc",
-              [ ex (lfold_exp la); ex (lfold_exp front); ex (signed_exp last) ]) ]);
-        L.App (L.Name "add_congL", [ ex (signed_exp last); concat env la front ]) ])
+    trans (sym (L.App (L.Name "+_assoc",
+                  [ zfold env la; zfold env front; zatom env last ])))
+          (z_congL (zatom env last) (z_concat env la front))
 
-(* Normalise [e] to the left-nested sum of its signed atoms, returning the
-   atom list and a proof `e = lfold atoms`.  Pushes `—` to the leaves with
-   `opp_add`/`neg_neg`; `add_cong`/`concat` reassemble the recursive proofs. *)
-let rec normalize env e : ((exp * int) list * L.term) option =
-  let ex t = L.Exp (env, t) in
-  let refl t = L.App (L.Name "eq_refl", [ ex t ]) in
-  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-  let cong px py = L.App (L.Name "add_cong", [ px; py ]) in
-  let combine lx px ly py =
-    (lx @ ly, trans (cong px py) (concat env lx ly))
-  in
+(* π (— zatom s = zatom (negate s)): `— —` collapses by `—_idem` (a negative
+   atom), else reflexive (negating a positive atom just adds the `—`). *)
+let z_neg_atom env (a, s) : L.term =
+  let b = zatom_base env a in
+  if s >= 0 then refl (z_neg b)
+  else L.App (L.Name "\xe2\x80\x94_idem", [ b ])    (* — — b = b *)
+
+(* π (— zfold l = zfold (negate l)): distribute `—` over the left-nested sum
+   (`distr_—_+`), recursing into the prefix. *)
+let rec z_neg_distr env l : L.term =
+  match l with
+  | [] -> refl (z_dec "0")                          (* — 0 ≡ 0 *)
+  | [ s ] -> z_neg_atom env s
+  | _ ->
+    let n = List.length l in
+    let last = List.nth l (n - 1) in
+    let front = List.filteri (fun i _ -> i < n - 1) l in
+    trans (L.App (L.Name "distr_\xe2\x80\x94_+", [ zfold env front; zatom env last ]))
+          (z_cong (z_neg_distr env front) (z_neg_atom env last))
+
+(* Given `pa : to_int e = zfold la`, build `(negate la, to_int (neg e) = zfold
+   (negate la))`.  `to_int (neg e) ↪ — to_int e` (B.lp rule) places the `—`, so
+   rewrite under it with `pa` (`Z_neg_cong`) then distribute (`z_neg_distr`).
+   Handles `Neg` of any sub-expression. *)
+let neg_push env (la, pa) : (exp * int) list * L.term =
+  let lneg = List.map (fun (a, s) -> (a, -s)) la in
+  let p = trans (z_neg_cong pa) (z_neg_distr env la) in
+  (lneg, p)
+
+(* Reflect [e] onto its flattened ℤ signed-atom list with a proof
+   `to_int e = zfold atoms`.  `to_int` pushes through `plus`/`neg` by REDUCTION
+   (the B.lp rules; `minus` desugars), so the proof carries no push step — just
+   the `Z_cong` / `z_concat` reassembly — mirroring the data-only [flatten_signed]. *)
+let rec toint_flat env e : ((exp * int) list * L.term) option =
   match e with
-  (* A literal is a single atom (`Nat`/`BigNat`).  `𝟎` contributes NO atom
-     (`lfold [] ≡ 𝟎`, refl; `— 𝟎` via neg_zero) — as an opaque atom it would
-     block cancellation (`1 − 0` vs `1`).  Folding of literal *runs* (`𝟐 + 𝟑`)
-     happens later, in [fold_lit_run], where ℤ computes the sum. *)
-  | Nat 0 -> Some ([], refl e)
-  | Neg (Nat 0) -> Some ([], L.App (L.Name "neg_zero", []))
-  | _ when is_atom_exp e -> Some ([ (e, 1) ], refl e)
-  | Neg a when is_atom_exp a -> Some ([ (a, -1) ], refl (Neg a))
-  | AOp (Add, x, y) ->
-    (match normalize env x, normalize env y with
-     | Some (lx, px), Some (ly, py) -> Some (combine lx px ly py)
-     | _ -> None)
-  | AOp (Sub, x, y) -> normalize env (AOp (Add, x, Neg y))
-  | Neg (AOp (Add, x, y)) ->
-    (match normalize env (Neg x), normalize env (Neg y) with
-     | Some (lx, px), Some (ly, py) ->
-       let l, p = combine lx px ly py in
-       Some (l, trans (L.App (L.Name "opp_add", [ ex x; ex y ])) p)
-     | _ -> None)
-  | Neg (AOp (Sub, x, y)) -> normalize env (Neg (AOp (Add, x, Neg y)))
-  | Neg (Neg a) ->
-    (match normalize env a with
-     | Some (la, pa) ->
-       Some (la, trans (L.App (L.Name "neg_neg", [ ex a; int_evidence env a ])) pa)
+  | Nat 0 -> Some ([], refl (z_dec "0"))            (* to_int 𝟎 ≡ 0 = zfold [] *)
+  | _ when is_atom_exp e -> Some ([ (e, 1) ], refl (zatom env (e, 1)))
+  | Neg a ->
+    (match toint_flat env a with
+     | Some (la, pa) -> Some (neg_push env (la, pa))
      | None -> None)
+  | AOp (Add, x, y) -> combine_add env x y
+  | AOp (Sub, x, y) -> toint_flat env (AOp (Add, x, Neg y))
+  | _ -> None
+and combine_add env x y : ((exp * int) list * L.term) option =
+  match toint_flat env x, toint_flat env y with
+  | Some (lx, px), Some (ly, py) ->
+    (* to_int (plus x y) ↪ to_int x + to_int y  (B.lp rule)
+                         = zfold lx + zfold ly  [Z_cong]
+                         = zfold (lx @ ly)       [z_concat] *)
+    let p = trans (z_cong px py) (z_concat env lx ly) in
+    Some (lx @ ly, p)
   | _ -> None
 
-(* π (lfold l = lfold l') where l' is the SORTED list l with the adjacent
-   canceling pair at (k, k+1) — `(a,−1)` then `(a,+1)` — removed.  Cancels
-   `—a + a = 𝟎` (`neg_add`) in place, reassociating around the surrounding
-   `pre`/`suf`; mirrors [prove_eq_lnested]'s congL-the-suffix structure. *)
+(* π (zfold l = zfold l') where l' swaps the adjacent atoms at (k, k+1): a single
+   `+_com` (the pair is the whole sum) or `assoc · congR comm · assoc⁻¹` under the
+   left-nested prefix, then `Z_congL` back over the suffix. *)
+let prove_swap env l k : L.term =
+  let nth i = List.nth l i in
+  let pre = List.filteri (fun i _ -> i < k) l in
+  let suf = List.filteri (fun i _ -> i > k + 1) l in
+  let a = zatom env (nth k) and b = zatom env (nth (k + 1)) in
+  let core =
+    match pre with
+    | [] -> L.App (L.Name "+_com", [ a; b ])
+    | _ ->
+      let p = zfold env pre in
+      trans (L.App (L.Name "+_assoc", [ p; a; b ]))
+        (trans (z_congR p (L.App (L.Name "+_com", [ a; b ])))
+           (sym (L.App (L.Name "+_assoc", [ p; b; a ]))))
+  in
+  List.fold_left (fun acc s -> z_congL (zatom env s) acc) core suf
+
+let swap_list l k =
+  List.mapi (fun i x -> if i = k then List.nth l (k + 1)
+                        else if i = k + 1 then List.nth l k else x) l
+
+let first_inversion l =
+  let rec go i = function
+    | x :: (y :: _ as tl) -> if atom_compare x y > 0 then Some i else go (i + 1) tl
+    | _ -> None
+  in go 0 l
+
+(* π (zfold l = zfold (sort l)): bubble-sort, each adjacent inversion a swap. *)
+let rec prove_sort env l : L.term =
+  match first_inversion l with
+  | None -> refl (zfold env l)
+  | Some k -> trans (prove_swap env l k) (prove_sort env (swap_list l k))
+
+(* π (zfold l = zfold l') cancelling the adjacent pair `(a,−1),(a,+1)` at (k,k+1).
+   With a prefix it is `simpl_inv_right` (`(p + —a) + a = p`); with none, the pair
+   is `Z_neg_add` and the trailing `0 +` collapses by reduction. *)
 let prove_cancel env l k : L.term =
-  let ex e = L.Exp (env, e) in
-  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-  let congL b p = L.App (L.Name "add_congL", [ ex b; p ]) in
-  let congR a p = L.App (L.Name "add_congR", [ ex a; p ]) in
-  let assoc a b c = L.App (L.Name "add_assoc", [ ex a; ex b; ex c ]) in
   let a = fst (List.nth l k) in
   let pre = List.filteri (fun i _ -> i < k) l in
   let suf = List.filteri (fun i _ -> i > k + 1) l in
-  let neg_add_a = L.App (L.Name "neg_add", [ ex a ]) in          (* —a + a = 𝟎 *)
-  let fold_congL = List.fold_left (fun acc s -> congL (signed_exp s) acc) in
+  let neg_a_a = L.App (L.Name "Z_neg_add", [ zatom_base env a ]) in   (* — a + a = 0 *)
+  let fold_congL =
+    List.fold_left (fun acc s -> z_congL (zatom env s) acc) in
   match pre with
   | _ :: _ ->
-    (* (lfold pre + —a) + a = lfold pre, then congL the suffix back on. *)
-    let pf = lfold_exp pre in
-    let core = trans (assoc pf (Neg a) a)
-                 (trans (congR pf neg_add_a)
-                    (L.App (L.Name "add_zero", [ ex pf; int_evidence env pf ]))) in
+    let core = L.App (L.Name "simpl_inv_right", [ zfold env pre; zatom_base env a ]) in
     fold_congL core suf
   | [] ->
     (match suf with
-     | [] -> neg_add_a                                            (* —a + a = 𝟎 = lfold [] *)
+     | [] -> neg_a_a
      | s0 :: rest ->
-       (* (—a + a) + s0 = s0, then congL the rest. *)
-       let s0e = signed_exp s0 in
-       let core = trans (congL s0e neg_add_a)
-                    (L.App (L.Name "zero_add", [ ex s0e; int_evidence env s0e ])) in
-       fold_congL core rest)
+       fold_congL (z_congL (zatom env s0) neg_a_a) rest)
 
-(* Reduce a SORTED signed-atom list by cancelling adjacent `(a,−1),(a,+1)`
-   pairs (same-atom occurrences are contiguous once sorted, signs −1 before
-   +1), returning the reduced list and a proof `lfold l = lfold reduced`. *)
 let rec reduce_cancel env l : (exp * int) list * L.term =
   let rec find i = function
     | (x, sx) :: ((y, sy) :: _ as tl) ->
@@ -244,139 +277,132 @@ let rec reduce_cancel env l : (exp * int) list * L.term =
     | _ -> None
   in
   match find 0 l with
-  | None -> (l, L.App (L.Name "eq_refl", [ L.Exp (env, lfold_exp l) ]))
+  | None -> (l, refl (zfold env l))
   | Some k ->
     let l' = List.filteri (fun i _ -> i <> k && i <> k + 1) l in
     let p_step = prove_cancel env l k in
     let r, p_rest = reduce_cancel env l' in
-    (r, L.App (L.Name "eq_trans", [ p_step; p_rest ]))
+    (r, trans p_step p_rest)
 
-(* ---- Literal-run folding (Stdlib.Z computes the sum) ---- *)
-
-(* A signed foldable literal `(Nat v, s)` rewritten to `from_int <z>` form: the
-   ℤ term <z> and a proof `signed_exp (Nat v, s) = from_int z`.  Positive:
-   `signed = Nat v` already renders `from_int v`, so `eq_refl`.  Negative:
-   `signed = — from_int v`, turned into `from_int (Z.— v)` by `lit_neg`. *)
-let signed_to_zform env (v : int) (s : int) : L.term * L.term =
-  if s >= 0 then
-    (z_dec (string_of_int v),
-     L.App (L.Name "eq_refl", [ L.Exp (env, Nat v) ]))
-  else
-    (L.App (L.Name "Stdlib.Z.\xe2\x80\x94", [ z_dec (string_of_int v) ]),  (* Z.— v *)
-     L.App (L.Name "lit_neg", [ z_dec (string_of_int v) ]))
-
-(* Combine two foldable literal atoms into one of value `signed(x)+signed(y)`,
-   with a proof `signed x + signed y = signed z`.  Both operands go to `from_int`
-   form (`signed_to_zform`), then `lit_add` folds them with `Stdlib.Z` computing
-   `Z.+`; a net-negative result needs a closing `lit_neg` to land on the
-   `— from_int` rendering of the combined atom. *)
-let combine_lit env (xa, xs) (ya, ys) : (exp * int) * L.term =
-  let xv = match xa with Nat n -> n | _ -> assert false in
-  let yv = match ya with Nat n -> n | _ -> assert false in
-  let v = xs * xv + ys * yv in
-  let (zx, px) = signed_to_zform env xv xs in
-  let (zy, py) = signed_to_zform env yv ys in
-  let base =
-    L.App (L.Name "eq_trans",
-      [ L.App (L.Name "add_cong", [ px; py ]);
-        L.App (L.Name "lit_add", [ zx; zy ]) ])
-  in
-  (* base : signed x + signed y = from_int (Z.+ zx zy), with Z.+ zx zy ≡ <v as ℤ>. *)
-  if v >= 0 then ((Nat v, 1), base)              (* from_int (Z.+ …) ≡ from_int v *)
-  else
-    ((Nat (-v), -1),
-     L.App (L.Name "eq_trans",
-       [ base;
-         L.App (L.Name "eq_sym",
-           [ L.App (L.Name "lit_neg", [ z_dec (string_of_int (-v)) ]) ]) ]))
-     (* from_int (Z.+ …) ≡ from_int (Z.— (-v)), then lit_neg back to — from_int (-v) *)
-
-(* Fold the trailing run of foldable `Nat` literals of a SORTED atom list into a
-   single literal (dropped if it nets to 𝟎), with a proof `lfold l = lfold
-   folded`.  Sorted ⟹ the literals are a contiguous suffix; combine them two at a
-   time from the right — each step an `add_assoc` to expose the rightmost pair and
-   `add_congR`/[combine_lit] to fold it (`lit_add`, `Stdlib.Z` computing the sum). *)
-let fold_lits env l : (exp * int) list * L.term =
+(* Fold the trailing run of foldable `Nat` literals into one (or none) — sorted ⟹
+   they are a contiguous suffix.  `Stdlib.Z` *computes* each combined sum, so the
+   step is `+_assoc` to expose the rightmost pair then `eq_refl` (no `lit_add`);
+   a net-zero trailing literal drops by the `z + 0` reduction. *)
+let prove_fold_lits env l : (exp * int) list * L.term =
   let is_lit (a, _) = is_foldable_lit a in
-  let refl ll = L.App (L.Name "eq_refl", [ L.Exp (env, lfold_exp ll) ]) in
-  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-  (* combine the last two atoms of `front @ [x; y]` (both literals) into `z`,
-     with a proof `lfold (front @ [x;y]) = lfold (front @ [z])`. *)
-  let combine_step front x y =
-    let (z, clit) = combine_lit env x y in
-    match front with
-    | [] -> (z, clit)
-    | _ ->
-      let lf = lfold_exp front in
-      let assoc =
-        L.App (L.Name "add_assoc",
-          [ L.Exp (env, lf); L.Exp (env, signed_exp x); L.Exp (env, signed_exp y) ]) in
-      let congr = L.App (L.Name "add_congR", [ L.Exp (env, lf); clit ]) in
-      (z, trans assoc congr)
-  in
-  if List.length (List.filter is_lit l) <= 1 then (l, refl l)
+  if List.length (List.filter is_lit l) <= 1 then (l, refl (zfold env l))
   else
+    let combine_step front x y =
+      let uv, su = (match x with (Nat u, s) -> (u, s) | _ -> assert false) in
+      let vv, sv = (match y with (Nat v, s) -> (v, s) | _ -> assert false) in
+      let w = (su * uv) + (sv * vv) in
+      let z = if w >= 0 then (Nat w, 1) else (Nat (-w), -1) in
+      let step =
+        match front with
+        | [] -> refl (zatom env z)              (* zatom x + zatom y ≡ zatom z *)
+        | _ ->
+          let lf = zfold env front in
+          trans (L.App (L.Name "+_assoc", [ lf; zatom env x; zatom env y ]))
+                (z_congR lf (refl (zatom env z)))
+      in (z, step)
+    in
     let rec go l =
       match List.rev l with
-      | y :: x :: front_rev ->
+      | y :: x :: front_rev when is_lit x && is_lit y ->
         let front = List.rev front_rev in
-        let (z, step) = combine_step front x y in
+        let z, step = combine_step front x y in
         let l' = front @ [ z ] in
         if List.length (List.filter is_lit l') <= 1 then (l', step)
-        else let (l'', rest) = go l' in (l'', trans step rest)
-      | _ -> (l, refl l)
+        else let l'', rest = go l' in (l'', trans step rest)
+      | _ -> (l, refl (zfold env l))
     in
-    let (folded, pf) = go l in
-    (* drop a net-𝟎 trailing literal: `lfold (syms @ [𝟎]) = lfold syms`. *)
+    let folded, pf = go l in
     match List.rev folded with
-    | (Nat 0, _) :: rest_rev ->
-      let syms = List.rev rest_rev in
-      let drop =
-        match syms with
-        | [] -> refl []                          (* lfold [𝟎] ≡ 𝟎 ≡ lfold [] *)
-        | _ ->
-          let lf = lfold_exp syms in
-          L.App (L.Name "add_zero", [ L.Exp (env, lf); int_evidence env lf ])
-      in
-      (syms, trans pf drop)
+    | (Nat 0, _) :: rest_rev -> (List.rev rest_rev, pf)   (* zfold (syms@[𝟎]) ≡ zfold syms *)
     | _ -> (folded, pf)
 
-(* Normalise [e] to its canonical signed-atom list — symbolic atoms sorted, the
-   literal part cancelled (`n + —n`) then folded to one (or no) `from_int` — with
-   a proof `e = lfold canon`.  Two `+`/`−` expressions are equal iff their
-   canonical lists are; the literal fold matches PP's solver-side constant
-   folding.  Each side: [normalize] (— to leaves) → sort by [atom_compare] (a
-   permutation, [prove_eq_lnested]) → [reduce_cancel] → [fold_lits]. *)
+(* Reflect [e] onto its canonical signed-atom list with a proof
+   `to_int e = zfold canon`: flatten ([toint_flat]) → sort → cancel → fold the
+   literal run.  Two expressions are equal iff their canon lists match; the
+   constant fold is `Stdlib.Z` computing, matching PP's solver-side folding. *)
 let canonicalize env e : ((exp * int) list * L.term) option =
-  let trans p q = L.App (L.Name "eq_trans", [ p; q ]) in
-  match normalize env e with
+  match toint_flat env e with
   | None -> None
-  | Some (l, p0) ->                                (* p0 : e = lfold l *)
+  | Some (l, p0) ->                                 (* p0 : to_int e = zfold l *)
     let sorted = List.sort atom_compare l in
-    let p1 = prove_eq_lnested env l in             (* lfold l = lfold sorted *)
-    let (rc, p2) = reduce_cancel env sorted in      (* lfold sorted = lfold rc *)
-    let (fl, p3) = fold_lits env rc in              (* lfold rc = lfold fl *)
+    let p1 = prove_sort env l in                    (* zfold l = zfold sorted *)
+    let rc, p2 = reduce_cancel env sorted in        (* zfold sorted = zfold rc *)
+    let fl, p3 = prove_fold_lits env rc in          (* zfold rc = zfold fl *)
     Some (fl, trans p0 (trans p1 (trans p2 p3)))
 
-(* `π (e1 = e2)` for two `+`/`−` expressions with the same canonical form — same
-   symbolic atoms after cancellation and the same folded literal constant; None
-   if either is unsupported or the canonical lists differ.  Bridges an
-   arithmetic-reorder / normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
-let prove_sum_eq env e1 e2 : L.term option =
-  match canonicalize env e1, canonicalize env e2 with
-  | Some (f1, p1), Some (f2, p2) when f1 = f2 ->
-    (* e1 = lfold f1 = lfold f2 = e2 *)
-    Some (L.App (L.Name "eq_trans", [ p1; L.App (L.Name "eq_sym", [ p2 ]) ]))
-  | _ -> None
+(* ====================================================================
+   Cancel recipe: the *tactic* form of the to_int-transport, for closing
+   `to_int e = c` where [e]'s atoms cancel/fold to the single literal c.
+   Where [canonicalize] builds a congruence *term*, this emits the same
+   bubble-sort + cancellation as *pattern-free* `rewrite`s on the post-`simplify`
+   goal: `simplify` computes `to_int`, the negation/associativity prefix left-nests
+   it, then each sort swap is `rewrite +_com` (the innermost, leftmost pair) or
+   `rewrite Z_swap2` (the outermost pair), and the single inverse pair cancels with
+   `rewrite Z_neg_add`; reflexivity computes the trailing literal run to c.
 
-(* `π (e = 𝟎)` when [e]'s signed atoms cancel/fold to nothing (e.g. `—a + a`,
-   `3 − 2 − 1`).  [prove_sum_eq … (Nat 0)] can't — `𝟎` normalises to the *atom*
-   `0`, not the empty list — so read the canonical form directly: empty ⟹ the
-   proof `e = lfold [] ≡ 𝟎`. *)
-let prove_sum_zero env e : L.term option =
-  match canonicalize env e with
-  | Some ([], p) -> Some p
-  | _ -> None
+   Pattern-free on purpose: a `rewrite .[<rendered subterm>]` would have to predict
+   `simplify`'s exact output, and a non-matching SSReflect pattern crashes the
+   lambdapi matcher.  The cost is reach: only swaps at the first (k=0) or last
+   (k=len−2) position are realisable without a target, and a single symbolic inverse
+   pair keeps the no-target cancel unambiguous — so this handles the dominant AR4 /
+   sum-zero shapes (one inverse pair + a literal, ≤3 atoms) and *bails to the
+   explicit term* ([None]) otherwise.  No correctness risk: a bail keeps the proven
+   congruence term. *)
+let cancel_recipe _env e : (L.t * int) option =
+  let rw ?(rep = false) ?(rtl = false) name =
+    L.Rewrite { try_ = false; repeat_ = rep; rtl; pat = None; name } in
+  let is_lit (a, _) = is_foldable_lit a in
+  match flatten_signed e with
+  | None -> None
+  | Some l ->
+    let lits = List.filter is_lit l and syms = List.filter (fun a -> not (is_lit a)) l in
+    let c = List.fold_left
+        (fun acc (a, s) -> match a with Nat n -> acc + (s * n) | _ -> acc) 0 lits in
+    (* Pick the no-argument cancel lemma for this shape — `rewrite <lemma>` infers
+       the atoms from the goal, so it works on `prj k _x` atoms (rendering them into
+       a target crashes the lambdapi matcher).  Reach: one inverse pair plus at most
+       one literal (≤3 atoms, the AR3-followup shapes that dominate AR4); the pair's
+       position in the left-nested sum (front / end / split-by-the-literal) and the
+       sign of its first-listed atom select the lemma.  Anything else → [None] (the
+       caller keeps the proven congruence term).  [Some None] = no symbolic pair, so
+       the literal run just computes under `reflexivity`. *)
+    let step_name : string option option =
+      let first_sym_neg = match syms with (_, s) :: _ -> s < 0 | [] -> false in
+      let litpos =                                   (* index of the lone literal, if any *)
+        let rec go i = function
+          | a :: tl -> if is_lit a then Some i else go (i + 1) tl
+          | [] -> None
+        in go 0 l in
+      match syms with
+      | [] when lits <> [] -> Some None
+      | [ (x1, s1); (x2, s2) ] when x1 = x2 && s1 + s2 = 0 && List.length lits <= 1 ->
+        (match litpos with
+         | None | Some 2 ->                           (* pair at the front: `(±x + ∓x) + …` *)
+           Some (Some (if first_sym_neg then "Z_neg_add" else "-_same"))
+         | Some 0 ->                                  (* pair at the end: `(l + ±x) + ∓x` *)
+           Some (Some (if first_sym_neg then "Z_sub_add" else "Z_add_sub"))
+         | Some 1 ->                                  (* pair split by the literal: `(±x + l) + ∓x` *)
+           Some (Some (if first_sym_neg then "Zc_nlx" else "Zc_xln"))
+         | _ -> None)
+      | _ -> None
+    in
+    (match step_name with
+     | None -> None
+     | Some step ->
+       let prefix =
+         [ L.Simplify; rw ~rep:true "distr_\xe2\x80\x94_+";
+           rw ~rep:true "\xe2\x80\x94_idem"; rw ~rep:true ~rtl:true "+_assoc" ] in
+       let cancel = match step with None -> [] | Some nm -> [ rw nm ] in
+       let rec seq = function
+         | [] -> L.Step L.Reflexivity
+         | [ t ] -> L.Step t
+         | t :: r -> L.Then (t, seq r) in
+       Some (seq (prefix @ cancel @ [ L.Reflexivity ]), c))
 
 (* `π (¬(from_int c ≤ 𝟎))` for a concrete positive literal c.  `from_int c ≤ 𝟎`
    reduces (le_elim, then the `to_int ∘ from_int` retract) to `Z.≤ c 0`, which
@@ -390,17 +416,48 @@ let positive_lit env c : L.term =
         [ L.Exp (env, Nat c); L.Exp (env, Nat 0); L.Name "_h";
           L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ]))
 
-(* `π (e > 𝟎)` (= `π (¬(e ≤ 𝟎))`) when [e] canonicalises to a positive literal c
-   (so symbolic cancellation like `x + 3 − x` still lands on 3, and a literal run
-   folds via [fold_lits]).  Transport `¬(c ≤ 𝟎)` along the generated `e = c`.
-   Used by AR2 (`a − b`) and AR4 (`E + F`); MAXINT-scale literals stay folded. *)
+(* Bridge a τ ι equality from its reflected ℤ proof: `e = from_int (to_int e)`
+   (`int_retract`) then `feq from_int` of `zpf : to_int e = …`. *)
+let from_toint env e zpf : L.term =
+  trans (L.App (L.Name "int_retract", [ L.Exp (env, e); int_evidence env e ]))
+        (L.App (L.Name "feq", [ L.Name "from_int"; zpf ]))
+
+(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
+   multiset after cancellation; None if either is unsupported or the canon lists
+   differ.  `to_int e1 = zfold = to_int e2`, lifted to τ ι by the [toint_eq]
+   reflection lemma (one node — no inlined int_retract/feq/eq_sym scaffolding).
+   Common no-reorder case (e.g. AR3's `𝟏−a = 𝟏−a`): the sides are already
+   identical, so the proof is `eq_refl` — no canonicalisation or `to_int` bridge.
+   (The commutation-free majority is emitted as a `simplify`-based recipe `have`
+   upstream by [Emit_ctx.arith_eq_have]; this term path is the reorder/cancel
+   remainder where atoms genuinely permute.) *)
+let prove_sum_eq env e1 e2 : L.term option =
+  if e1 = e2 then Some (refl (L.Exp (env, e1)))
+  else
+    match canonicalize env e1, canonicalize env e2 with
+    | Some (f1, p1), Some (f2, p2) when f1 = f2 ->
+      let zeq = trans p1 (sym p2) in                (* to_int e1 = to_int e2 *)
+      Some (L.App (L.Name "toint_eq",
+              [ L.Exp (env, e1); L.Exp (env, e2);
+                int_evidence env e1; int_evidence env e2; zeq ]))
+    | _ -> None
+
+(* `π (e = 𝟎)` when [e]'s atoms cancel to the empty multiset: `to_int e = 0`,
+   lifted by `from_int` (`from_int 0 ≡ 𝟎`). *)
+let prove_sum_zero env e : L.term option =
+  match canonicalize env e with
+  | Some ([], p) -> Some (from_toint env e p)
+  | _ -> None
+
+(* `π (e > 𝟎)` when [e] cancels/folds to a positive literal c: transport
+   `¬(from_int c ≤ 𝟎)` (`positive_lit`) along the generated `e = from_int c`. *)
 let prove_gt_zero env e : L.term option =
   match canonicalize env e with
-  | Some ([ (Nat c, 1) ], eqpf) when c >= 1 ->     (* eqpf : e = lfold [Nat c] ≡ Nat c *)
+  | Some ([ (Nat c, 1) ], p) when c >= 1 ->         (* p : to_int e = c *)
+    let e_eq_c = from_toint env e p in              (* e = from_int c *)
     Some (L.App (L.Name "=\xe2\x87\x92",            (* =⇒ : π (A = B) → π A → π B *)
-      [ L.App (L.Name "eq_sym",
-          [ L.App (L.Name "not_cong",
-              [ L.App (L.Name "leq_zero_eq", [ eqpf ]) ]) ]);
+      [ sym (L.App (L.Name "not_cong",
+              [ L.App (L.Name "leq_zero_eq", [ e_eq_c ]) ]));
         positive_lit env c ]))
   | _ -> None
 

@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_ginter_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s: S & x: inter(S) => x: s | nn))

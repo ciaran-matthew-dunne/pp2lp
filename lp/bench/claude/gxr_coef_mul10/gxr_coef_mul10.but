@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_coef_mul10.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y => 10 * x <= 10 * y | nn))

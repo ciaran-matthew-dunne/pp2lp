@@ -1,1 +1,1 @@
-Flag(FileOn("qn_deep_vac.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => !y.!z.(x: s))) & _delta_e(s) | ? | ? | !x.(x: s => !y.!z.(x: s)) | nn))
+Flag(FileOn("qn_deep_vac.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => !y.!z.(x: s)) | nn))

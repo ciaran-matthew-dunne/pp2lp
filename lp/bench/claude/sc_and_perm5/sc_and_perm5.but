@@ -1,1 +1,1 @@
-Flag(FileOn("sc_and_perm5.res")) & Set(Valid.1 | Rule(Implication | (a & b & c & d & e => e & c & a & d & b) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) | ? | ? | a & b & c & d & e => e & c & a & d & b | nn))
+Flag(FileOn("sc_and_perm5.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a & b & c & d & e => e & c & a & d & b | nn))

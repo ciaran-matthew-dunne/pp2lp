@@ -1,1 +1,1 @@
-Flag(FileOn("v3_or_to_imp2.res")) & Set(Valid.1 | Rule(Implication | (a or b => (not(b) => a)) & _delta_p(a) & _delta_p(b) | ? | ? | a or b => (not(b) => a) | nn))
+Flag(FileOn("v3_or_to_imp2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a or b => (not(b) => a) | nn))

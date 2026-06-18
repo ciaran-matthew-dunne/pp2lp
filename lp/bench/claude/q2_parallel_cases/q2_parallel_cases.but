@@ -1,1 +1,1 @@
-Flag(FileOn("q2_parallel_cases.res")) & Set(Valid.1 | Rule(Implication | ((a => b) & (c => d) & (a or c) => b or d) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | (a => b) & (c => d) & (a or c) => b or d | nn))
+Flag(FileOn("q2_parallel_cases.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) & (c => d) & (a or c) => b or d | nn))

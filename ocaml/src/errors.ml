@@ -14,3 +14,8 @@
      E_INS           the INS universal-instantiation contradiction search failed
      E_EMIT          any other emit-side failure (the CLI default) *)
 let fail code fmt = Printf.ksprintf (fun s -> failwith (code ^ ": " ^ s)) fmt
+
+(* A non-fatal emit-side warning.  Prints `WARNING: <message>` to stderr; the
+   engine continues (exit 0) and the CLI's emit step scrapes these lines and
+   surfaces them as the trace's warnings (see pp2lp `emit`). *)
+let warn fmt = Printf.ksprintf (fun s -> Printf.eprintf "WARNING: %s\n%!" s) fmt

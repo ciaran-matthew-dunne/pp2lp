@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_inv_comp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): r & (b, c): s => (c, a): (r ; s)~ | nn))

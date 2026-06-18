@@ -1,1 +1,1 @@
-Flag(FileOn("zp_iff_refl.res")) & Set(Valid.1 | Rule(Implication | _delta_p(a) | ? | ? | a <=> a | nn))
+Flag(FileOn("zp_iff_refl.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a <=> a | nn))

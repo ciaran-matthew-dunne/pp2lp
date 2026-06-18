@@ -1,1 +1,1 @@
-Flag(FileOn("v3_imp5_shape.res")) & Set(Valid.1 | Rule(Implication | (a: s & (a: s => b: t) & (b: t => c: u) => c: u) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) & _delta_e(c) & _delta_e(u) | ? | ? | a: s & (a: s => b: t) & (b: t => c: u) => c: u | nn))
+Flag(FileOn("v3_imp5_shape.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & (a: s => b: t) & (b: t => c: u) => c: u | nn))

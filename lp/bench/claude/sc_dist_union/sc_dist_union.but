@@ -1,1 +1,1 @@
-Flag(FileOn("sc_dist_union.res")) & Set(Valid.1 | Rule(Implication | (x: (s /\ t1) \/ (s /\ t2) => x: s /\ (t1 \/ t2)) & _delta_e(x) & _delta_e(s) & _delta_e(t1) & _delta_e(t2) | ? | ? | x: (s /\ t1) \/ (s /\ t2) => x: s /\ (t1 \/ t2) | nn))
+Flag(FileOn("sc_dist_union.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: (s /\ t1) \/ (s /\ t2) => x: s /\ (t1 \/ t2) | nn))

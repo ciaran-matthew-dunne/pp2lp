@@ -1,1 +1,1 @@
-Flag(FileOn("qn_xst_ante_or.res")) & Set(Valid.1 | Rule(Implication | ((#x.(x: s) or a: t) & not(#x.(x: s)) => a: t) & _delta_e(s) & _delta_e(a) & _delta_e(t) | ? | ? | (#x.(x: s) or a: t) & not(#x.(x: s)) => a: t | nn))
+Flag(FileOn("qn_xst_ante_or.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (#x.(x: s) or a: t) & not(#x.(x: s)) => a: t | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("all_cascade.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: a => x: b => x: c)) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | !x.(x: a => x: b => x: c) | nn))

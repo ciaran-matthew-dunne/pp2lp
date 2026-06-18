@@ -1,0 +1,1 @@
+Flag(FileOn("gx_resol3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a1 or a2 or a3) & not(a1) & not(a2) => a3 | nn))

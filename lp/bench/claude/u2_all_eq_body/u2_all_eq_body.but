@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_eq_body.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x = a) & b: s => b = a) & _delta_e(s) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => x = a) & b: s => b = a | nn))
+Flag(FileOn("u2_all_eq_body.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x = a) & b: s => b = a | nn))

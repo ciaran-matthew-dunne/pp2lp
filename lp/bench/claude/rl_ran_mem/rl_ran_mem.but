@@ -1,1 +1,1 @@
-Flag(FileOn("rl_ran_mem.res")) & Set(Valid.1 | Rule(Implication | (y: ran(f) & ran(f) <: t => y: t) & _delta_e(y) & _delta_e(f) & _delta_e(t) | ? | ? | y: ran(f) & ran(f) <: t => y: t | nn))
+Flag(FileOn("rl_ran_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y: ran(f) & ran(f) <: t => y: t | nn))

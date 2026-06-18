@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eqv_true_unit.res")) & Set(Valid.1 | Rule(Implication | (a => (a <=> (a or a))) & _delta_p(a) | ? | ? | a => (a <=> (a or a)) | nn))
+Flag(FileOn("v3_eqv_true_unit.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a => (a <=> (a or a)) | nn))

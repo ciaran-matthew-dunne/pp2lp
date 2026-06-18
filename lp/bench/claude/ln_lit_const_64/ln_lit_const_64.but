@@ -1,1 +1,1 @@
-Flag(FileOn("ln_lit_const_64.res")) & Set(Valid.1 | Rule(Implication | (60 <= 64) | ? | ? | 60 <= 64 | nn))
+Flag(FileOn("ln_lit_const_64.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 60 <= 64 | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("sc_all4_const.res")) & Set(Valid.1 | Rule(Implication | (!w.!x.!y.!z.(a: s) => a: s) & _delta_e(a) & _delta_e(s) | ? | ? | !w.!x.!y.!z.(a: s) => a: s | nn))
+Flag(FileOn("sc_all4_const.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !w.!x.!y.!z.(a: s) => a: s | nn))

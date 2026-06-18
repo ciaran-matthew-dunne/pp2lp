@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_mul_one_r.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x * 1 = x | nn))

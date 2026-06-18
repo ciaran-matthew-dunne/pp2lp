@@ -1,1 +1,1 @@
-Flag(FileOn("zp_neg_eqv.res")) & Set(Valid.1 | Rule(Implication | _delta_p(a) | ? | ? | not(a <=> not(a)) | nn))
+Flag(FileOn("zp_neg_eqv.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a <=> not(a)) | nn))

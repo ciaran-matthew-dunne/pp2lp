@@ -1,1 +1,0 @@
-Flag(FileOn("all_pair_binder.res")) & Set(Valid.1 | Rule(Implication | (!(x, y).(x: s & y: t => x, y: r)) & _delta_e(s) & _delta_e(t) & _delta_e(r) | ? | ? | !(x, y).(x: s & y: t => x, y: r) | nn))

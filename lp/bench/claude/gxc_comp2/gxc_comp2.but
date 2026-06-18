@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_comp2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (x0, x1): r1 & (x1, x2): r2 => (x0, x2): (r1 ; r2) | nn))

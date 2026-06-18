@@ -1,1 +1,1 @@
-Flag(FileOn("dz_sub_chain8.res")) & Set(Valid.1 | Rule(Implication | (m1 <: m2 & m2 <: m3 & m3 <: m4 & m4 <: m5 & m5 <: m6 & m6 <: m7 & m7 <: m8 => m1 <: m8) & _delta_e(m1) & _delta_e(m2) & _delta_e(m3) & _delta_e(m4) & _delta_e(m5) & _delta_e(m6) & _delta_e(m7) & _delta_e(m8) | ? | ? | m1 <: m2 & m2 <: m3 & m3 <: m4 & m4 <: m5 & m5 <: m6 & m6 <: m7 & m7 <: m8 => m1 <: m8 | nn))
+Flag(FileOn("dz_sub_chain8.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | m1 <: m2 & m2 <: m3 & m3 <: m4 & m4 <: m5 & m5 <: m6 & m6 <: m7 & m7 <: m8 => m1 <: m8 | nn))

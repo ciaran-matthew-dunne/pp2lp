@@ -4,3 +4,9 @@
    The code set is fixed: E_UNKNOWN_RULE, E_ARITY, E_DISPATCH, E_TREE_BUILD,
    E_PARSE, E_INS, E_EMIT. *)
 val fail : string -> ('a, unit, string, 'b) format4 -> 'a
+
+(* [warn fmt …] prints `WARNING: <message>` to stderr (engine continues, exit 0).
+   The CLI's emit step scrapes `WARNING: ` lines and surfaces them as the trace's
+   warnings — for emit-side conditions worth flagging but not failing on (e.g. an
+   AR10 no-op whose solver result diverges from the goal antecedent). *)
+val warn : ('a, unit, string, unit) format4 -> 'a

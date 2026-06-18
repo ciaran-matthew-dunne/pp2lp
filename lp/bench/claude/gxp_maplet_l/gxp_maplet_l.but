@@ -1,0 +1,1 @@
+Flag(FileOn("gxp_maplet_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a |-> b): s * t => a: s | nn))

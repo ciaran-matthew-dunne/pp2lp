@@ -1,1 +1,1 @@
-Flag(FileOn("xw_triple_chain.res")) & Set(Valid.1 | Rule(Implication | (a: s & f(a): t & g(f(a)): u => #x.(x: s & f(x): t & g(f(x)): u)) & _delta_e(a) & _delta_e(s) & _delta_e(f) & _delta_e(t) & _delta_e(g) & _delta_e(u) | ? | ? | a: s & f(a): t & g(f(a)): u => #x.(x: s & f(x): t & g(f(x)): u) | nn))
+Flag(FileOn("xw_triple_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & f(a): t & g(f(a)): u => #x.(x: s & f(x): t & g(f(x)): u) | nn))

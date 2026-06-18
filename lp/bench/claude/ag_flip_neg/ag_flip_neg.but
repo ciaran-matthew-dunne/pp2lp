@@ -1,1 +1,1 @@
-Flag(FileOn("ag_flip_neg.res")) & Set(Valid.1 | Rule(Implication | (y < x => not(x <= y)) & _delta_e(y) & _delta_e(x) | ? | ? | y < x => not(x <= y) | nn))
+Flag(FileOn("ag_flip_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | y < x => not(x <= y) | nn))

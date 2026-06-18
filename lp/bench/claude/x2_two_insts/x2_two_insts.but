@@ -1,1 +1,1 @@
-Flag(FileOn("x2_two_insts.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => #y.(x,y: r)) & a: s & b: s => #y.(a,y: r) & #y.(b,y: r)) & _delta_e(s) & _delta_e(r) & _delta_e(a) & _delta_e(b) | ? | ? | !x.(x: s => #y.(x,y: r)) & a: s & b: s => #y.(a,y: r) & #y.(b,y: r) | nn))
+Flag(FileOn("x2_two_insts.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => #y.(x,y: r)) & a: s & b: s => #y.(a,y: r) & #y.(b,y: r) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("za_relax.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) | ? | ? | x <= -1 => x <= 0 | nn))
+Flag(FileOn("za_relax.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= -1 => x <= 0 | nn))

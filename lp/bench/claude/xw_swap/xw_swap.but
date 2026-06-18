@@ -1,1 +1,1 @@
-Flag(FileOn("xw_swap.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x: s & y: t) => #y.#x.(x: s & y: t)) & _delta_e(s) & _delta_e(t) | ? | ? | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t) | nn))
+Flag(FileOn("xw_swap.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.#y.(x: s & y: t) => #y.#x.(x: s & y: t) | nn))

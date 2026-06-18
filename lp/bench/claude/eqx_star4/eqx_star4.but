@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_star4.res")) & Set(Valid.1 | Rule(Implication | (x1 = c & x2 = c & x3 = c & x4 = c => x1 = x4) & _delta_e(x1) & _delta_e(c) & _delta_e(x2) & _delta_e(x3) & _delta_e(x4) | ? | ? | x1 = c & x2 = c & x3 = c & x4 = c => x1 = x4 | nn))
+Flag(FileOn("eqx_star4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x1 = c & x2 = c & x3 = c & x4 = c => x1 = x4 | nn))

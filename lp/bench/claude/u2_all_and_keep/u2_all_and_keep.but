@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_and_keep.res")) & Set(Valid.1 | Rule(Implication | (p & !x.(x: s => x: t) => !x.(x: s => x: t) & p) & _delta_e(p) & _delta_e(s) & _delta_e(t) | ? | ? | p & !x.(x: s => x: t) => !x.(x: s => x: t) & p | nn))
+Flag(FileOn("u2_all_and_keep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p & !x.(x: s => x: t) => !x.(x: s => x: t) & p | nn))

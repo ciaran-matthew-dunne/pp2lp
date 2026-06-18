@@ -1,1 +1,1 @@
-Flag(FileOn("st_distrib_mem.res")) & Set(Valid.1 | Rule(Implication | (x: s /\ (t \/ u) => x: (s /\ t) \/ (s /\ u)) & _delta_e(x) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | x: s /\ (t \/ u) => x: (s /\ t) \/ (s /\ u) | nn))
+Flag(FileOn("st_distrib_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s /\ (t \/ u) => x: (s /\ t) \/ (s /\ u) | nn))

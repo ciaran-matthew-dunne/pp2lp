@@ -1,1 +1,1 @@
-Flag(FileOn("v2_imp_chain_skip.res")) & Set(Valid.1 | Rule(Implication | ((a => b) & (b => c) & (c => d) & a => c) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | (a => b) & (b => c) & (c => d) & a => c | nn))
+Flag(FileOn("v2_imp_chain_skip.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => b) & (b => c) & (c => d) & a => c | nn))

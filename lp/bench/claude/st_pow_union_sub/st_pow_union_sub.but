@@ -1,1 +1,1 @@
-Flag(FileOn("st_pow_union_sub.res")) & Set(Valid.1 | Rule(Implication | (POW(s) <: POW(s \/ t)) & _delta_e(s) & _delta_e(t) | ? | ? | POW(s) <: POW(s \/ t) | nn))
+Flag(FileOn("st_pow_union_sub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | POW(s) <: POW(s \/ t) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_eq_or_neq.res")) & Set(Valid.1 | Rule(Implication | (x = y or not(x = y)) & _delta_e(x) & _delta_e(y) | ? | ? | x = y or not(x = y) | nn))
+Flag(FileOn("eqx_eq_or_neq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y or not(x = y) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("p_atom.res")) & Set(Valid.1 | Rule(Implication | (a) & _delta_p(a) | ? | ? | a | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("bl_neq_consts_rev.res")) & Set(Valid.1 | Rule(Implication | (not(bfalse = btrue)) & _delta_e(bfalse) & _delta_e(btrue) | ? | ? | not(bfalse = btrue) | nn))

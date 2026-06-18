@@ -1,1 +1,1 @@
-Flag(FileOn("fk_shifted.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 1 => x + x <= 2)) | ? | ? | !x.(x <= 1 => x + x <= 2) | nn))
+Flag(FileOn("fk_shifted.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x <= 1 => x + x <= 2) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_max_single.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | max({x}) = x | nn))

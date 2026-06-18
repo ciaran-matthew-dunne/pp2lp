@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nall_self2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(!x.!y.(not(x = x))) | nn))

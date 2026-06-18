@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_mem_disagree.res")) & Set(Valid.1 | Rule(Implication | (x: s & not(y: s) => not(x = y)) & _delta_e(x) & _delta_e(s) & _delta_e(y) | ? | ? | x: s & not(y: s) => not(x = y) | nn))
+Flag(FileOn("eqx_mem_disagree.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s & not(y: s) => not(x = y) | nn))

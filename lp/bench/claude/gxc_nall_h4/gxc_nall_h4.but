@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nall_h4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(!x.!y.(x: s)) => (a = a) | nn))

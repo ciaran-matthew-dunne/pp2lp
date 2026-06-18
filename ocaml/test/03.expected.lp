@@ -7,7 +7,6 @@ begin
   refine AND3 _;
   refine IMP4 _;
   assume _h1;
-  refine @AR10 _ (q) _ (eq_refl (q)) _;
   refine IMP4 _;
   assume _h2;
   refine AND4 _ _

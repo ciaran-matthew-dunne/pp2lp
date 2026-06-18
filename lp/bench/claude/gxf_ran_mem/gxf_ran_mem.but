@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_ran_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): r => b: ran(r) | nn))

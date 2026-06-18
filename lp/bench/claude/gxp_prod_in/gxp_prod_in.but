@@ -1,0 +1,1 @@
+Flag(FileOn("gxp_prod_in.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & b: t => (a, b): s * t | nn))

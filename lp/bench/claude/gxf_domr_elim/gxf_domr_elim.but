@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_domr_elim.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): (s <| r) => a: s | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gx_cases8.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a1 => c) & (a2 => c) & (a3 => c) & (a4 => c) & (a5 => c) & (a6 => c) & (a7 => c) & (a8 => c) => ((a1 or a2 or a3 or a4 or a5 or a6 or a7 or a8) => c) | nn))

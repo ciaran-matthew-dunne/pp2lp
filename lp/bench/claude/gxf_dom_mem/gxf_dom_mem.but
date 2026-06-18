@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_dom_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): r => a: dom(r) | nn))

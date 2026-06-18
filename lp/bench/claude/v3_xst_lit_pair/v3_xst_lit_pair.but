@@ -1,1 +1,0 @@
-Flag(FileOn("v3_xst_lit_pair.res")) & Set(Valid.1 | Rule(Implication | (#x.#y.(x <= y)) | ? | ? | #x.#y.(x <= y) | nn))

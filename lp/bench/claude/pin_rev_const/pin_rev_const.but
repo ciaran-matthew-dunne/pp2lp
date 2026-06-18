@@ -1,1 +1,0 @@
-Flag(FileOn("pin_rev_const.res")) & Set(Valid.1 | Rule(Implication | (#x.(5 = x)) | ? | ? | #x.(5 = x) | nn))

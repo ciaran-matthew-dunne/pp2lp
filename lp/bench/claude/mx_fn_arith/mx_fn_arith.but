@@ -1,1 +1,1 @@
-Flag(FileOn("mx_fn_arith.res")) & Set(Valid.1 | Rule(Implication | (f(a) = x & x <= 3 => f(a) <= 3) & _delta_e(f) & _delta_e(a) & _delta_e(x) | ? | ? | f(a) = x & x <= 3 => f(a) <= 3 | nn))
+Flag(FileOn("mx_fn_arith.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f(a) = x & x <= 3 => f(a) <= 3 | nn))

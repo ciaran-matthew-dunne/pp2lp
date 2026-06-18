@@ -1,1 +1,1 @@
-Flag(FileOn("ln_cap_wide.res")) & Set(Valid.1 | Rule(Implication | (x <= 60 => x <= 70) & _delta_e(x) | ? | ? | x <= 60 => x <= 70 | nn))
+Flag(FileOn("ln_cap_wide.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 60 => x <= 70 | nn))

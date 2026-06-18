@@ -13,54 +13,38 @@ end;
 
 // AR2: `(leq a b) ⇒ R` with `a > b`.  PP only emits this leaf with a, b
 // concrete ℤ literals (it comes out of AR3's `1−a` normalisation, e.g. `2 ≤ 0`),
-// so we take them at the ℤ level: `Stdlib.Z.> a b` *computes* (`¬¬⊤` when a > b),
-// and `le_elim` bridges the τ ι antecedent `leq (from_int a) (from_int b)` down to
-// `Stdlib.Z.≤ a b` to feed the refutation.  The emitter passes `λ k, k ⊤ᵢ`.
-// a, b are EXPLICIT: `from_int` is not injective, so the implicit form leaves
-// `from_int ?a ≡ from_int 1` unsolved.  The emitter knows the literals and passes
-// them, so unification of the conclusion is immediate and `Stdlib.Z.> a b` reduces.
-opaque symbol AR2 (a b : Stdlib.Z.ℤ) [R : Prop]
-  : π (Stdlib.Z.> a b)
+// so `a > b` *computes* (`¬¬⊤` when a > b), and `le_elim` bridges the τ ι
+// antecedent `leq (from_int a) (from_int b)` down to `a ≤ b` to feed the refutation.
+// a, b, R are IMPLICIT: `from_int` is injective, so unifying the goal's
+// `from_int a` / `from_int b` against the literal goal solves a, b; the emitter
+// then passes only `λ k, k ⊤ᵢ` and `a > b` reduces on the solved literals.
+opaque symbol AR2 [a b : ℤ] [R : Prop]
+  : π (a > b)
   → π ((leq (from_int a) (from_int b)) ⇒ R) ≔
 begin
   assume a b R hgt h;
   refine ⊥ₑ (hgt (le_elim (from_int a) (from_int b) h))
 end;
 
-opaque symbol AR3 (a : τ ι) [R : Prop]
-  : π ((leq (minus 𝟏 a) 𝟎) ⇒ R)
-  → π (¬ (leq a 𝟎) ⇒ R) ≔
-begin
-  assume a R h hna;
-  refine h (sub_leq 𝟏 a (discrete a hna))
-end;
+compute (λ x, 1 - (1 - x));
 
-// AR3' — bridged variant for the case where PP's solver normalises the
-// AR3 sub-premise `leq (minus 𝟏 a) 𝟎` to `leq r 𝟎` for some r ≠ (minus 𝟏 a). The
-// emitter passes (a, r, eq) where eq : (minus 𝟏 a) = r, and the inner proof
-// works directly with (leq r 𝟎) ⇒ R.
-opaque symbol AR3' (a r : τ ι) [R : Prop]
+// AR3: PP's discreteness step — from `¬(a ≤ 𝟎)` derive `𝟏 ≤ a`, i.e. `𝟏 − a ≤ 𝟎`
+// (ℤ is discrete: nothing strictly between 𝟎 and 𝟏).  PP's solver records that
+// sub-premise in its own normalised order `r` (the `a | r` pipe), so the
+// continuation is typed at `leq r 𝟎`; the emitter passes (a, r) and a generated
+// `𝟏 − a = r` proof (no trust — `eq_refl`-cheap when r = 𝟏 − a).  Discreteness:
+// `discrete` gives `𝟏 ≤ a`, `sub_leq` turns it into `𝟏 − a ≤ 𝟎`, transported to
+// `leq r 𝟎` along `eq`.  (Subsumes the old plain/bridged split: the no-reorder
+// case is just r = 𝟏 − a, eq = eq_refl.)
+opaque symbol AR3 (a r : τ ι) [R : Prop]
   : π (minus 𝟏 a = r)
   → π ((leq r 𝟎) ⇒ R)
   → π (¬ (leq a 𝟎) ⇒ R) ≔
 begin
-  assume a r R eq h;
-  refine AR3 a _;
-  assume h0;
+  assume a r R eq h hna;
   refine h _;
   rewrite left eq;
-  refine h0
-end;
-
-// Bridge lemma: `minus 𝟏 (neg x) = plus 𝟏 x` (Z.—_idem on the projection;
-// unconditional).  With plus/neg abstract, bridge both sides into from_int form
-// (sub_def/add_def/to_int_neg) before the Z.—_idem cancellation.
-opaque symbol ar3_bridge_neg (x : τ ι) : π (minus 𝟏 (neg x) = plus 𝟏 x) ≔
-begin
-  assume x;
-  rewrite (sub_def 𝟏 (neg x)); rewrite (add_def 𝟏 (neg (neg x))); rewrite (add_def 𝟏 x);
-  rewrite (to_int_neg (neg x)); rewrite (to_int_neg x);
-  rewrite (Stdlib.Z.—_idem (to_int x)); reflexivity
+  refine sub_leq 𝟏 a (discrete a hna)
 end;
 
 // ---- AR3_F: PP's forward normalisation `¬(leq a 𝟎) ⟿ leq r 𝟎` (r = minus 𝟏 a) ----
@@ -87,10 +71,6 @@ begin
   { assume hna; refine sub_leq 𝟏 a (discrete a hna) }
   { assume hsub; refine not_leq_of_sub1 a hsub }
 end;
-
-// (leq a b) = (leq (minus a b) 𝟎), as a propositional equality bridge.
-opaque symbol sub_leq_eq (a b : τ ι) : π (leq a b = (leq (minus a b) 𝟎)) ≔
-begin assume a b; refine propExt _ _ (sub_leq a b) (leq_of_sub a b) end;
 
 // AR3_F is *not* a single symbol: PP's forward normalisation rewrites a
 // `¬(leq a 𝟎)` occurrence in place, at an arbitrary binder-nested position.
@@ -138,11 +118,7 @@ begin
 end;
 
 // AR7: leq (plus c b) 𝟎 in H, plus a c = 𝟎, leq (minus a b) 𝟎 antecedent ⇒ a = b.
-// From plus a c = 𝟎: c = neg a. So leq (plus c b) 𝟎 becomes neg a + b = b−a ≤ 0, i.e. b ≤ a.
-// Combined with minus a b ≤ 𝟎 (i.e. a ≤ b), antisymmetry gives a = b.
-// hR's equality is stated `b = a` (not `a = b`): PP records the antisymmetry
-// equality bare-variable-first (e.g. `b = -1+a`), and the emitter feeds that
-// child directly into the `hR` slot, so the lemma must match that orientation.
+// TODO. unsupported?
 opaque symbol AR7 [a b : τ ι] (c : τ ι) [R : Prop]
   (hai : π (a ϵ INT)) (hbi : π (b ϵ INT)) (hci : π (c ϵ INT))
   : π ((plus c b) ≪ 𝟎)
@@ -165,7 +141,7 @@ begin
 end;
 
 // AR8: dual to AR7 — minus a b ≤ 𝟎 in H, plus a c = 𝟎, leq (plus c b) 𝟎 antecedent ⇒ a = b.
-// `b = a` orientation, as for AR7 above.
+// TODO. unsupported?
 opaque symbol AR8 (a : τ ι) [b c : τ ι] [R : Prop]
   (hai : π (a ϵ INT)) (hbi : π (b ϵ INT)) (hci : π (c ϵ INT))
   : π ((minus a b) ≪ 𝟎)
@@ -262,16 +238,10 @@ symbol AR1_1 [E : τ ι] [R : Prop]
 // AR2 is a leaf-only rule (no Res-chain variant): PP emits it on concrete ℤ
 // literals, closed by the base `AR2` above.
 
-symbol AR3_1 (a : τ ι) [R : Prop]
-  (r : Res ((leq (minus 𝟏 a) 𝟎) ⇒ R)) : Res (¬ (leq a 𝟎) ⇒ R)
-  ≔ mk_1 (res_tm r)
-       (eq_trans (imp_cong_l (ar3f_eq a (minus 𝟏 a) (eq_refl (minus 𝟏 a)))) (res_eq r));
-
-// AR3'_1: bridged Res-chain AR3, for when PP's solver records the sub-premise
-// `minus 𝟏 a` in a different (neg-normalised) term order `r`.  Both steps are now
-// real: `¬(leq a 𝟎) = (leq r 𝟎)` is `ar3f_eq a r eq` and `eq : minus 𝟏 a = r` is
-// the emitter-supplied equality (cf. AR3_1, the special case r = minus 𝟏 a).
-symbol AR3'_1 (a r : τ ι) [R : Prop]
+// AR3_1: the Res-chain form of AR3 — same `ar3f_eq` bridge (`¬(leq a 𝟎) = leq r 𝟎`)
+// lifted onto a result chain.  `eq : minus 𝟏 a = r` is the emitter-supplied
+// equality (eq_refl when PP recorded no reorder, r = minus 𝟏 a).
+symbol AR3_1 (a r : τ ι) [R : Prop]
   (eq : π (minus 𝟏 a = r))
   (cont : Res ((leq r 𝟎) ⇒ R)) : Res (¬ (leq a 𝟎) ⇒ R)
   ≔ mk_1 (res_tm cont)

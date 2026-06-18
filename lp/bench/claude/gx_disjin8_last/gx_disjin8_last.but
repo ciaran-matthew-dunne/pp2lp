@@ -1,0 +1,1 @@
+Flag(FileOn("gx_disjin8_last.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a8 => (a1 or a2 or a3 or a4 or a5 or a6 or a7 or a8) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all5_wide.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.!z.!v.!w.(x: a & y: b & z: c & v: d & w: e => x: a & w: e)) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(d) & _delta_e(e) | ? | ? | !x.!y.!z.!v.!w.(x: a & y: b & z: c & v: d & w: e => x: a & w: e) | nn))
+Flag(FileOn("u2_all5_wide.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.!z.!v.!w.(x: a & y: b & z: c & v: d & w: e => x: a & w: e) | nn))

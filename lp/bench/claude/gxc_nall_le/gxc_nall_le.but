@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nall_le.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(!x.(x <= x => not(x <= x))) | nn))

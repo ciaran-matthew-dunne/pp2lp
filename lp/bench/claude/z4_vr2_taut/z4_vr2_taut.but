@@ -1,1 +1,1 @@
-Flag(FileOn("z4_vr2_taut.res")) & Set(Valid.1 | Rule(Implication | _delta_e(x) | ? | ? | not(not(x = x)) | nn))
+Flag(FileOn("z4_vr2_taut.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(not(x = x)) | nn))

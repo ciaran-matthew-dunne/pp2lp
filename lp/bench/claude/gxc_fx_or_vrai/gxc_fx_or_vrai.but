@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_fx_or_vrai.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p or VRAI | nn))

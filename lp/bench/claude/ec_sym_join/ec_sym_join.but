@@ -1,1 +1,1 @@
-Flag(FileOn("ec_sym_join.res")) & Set(Valid.1 | Rule(Implication | (a = b & c = b => a = c) & _delta_e(a) & _delta_e(b) & _delta_e(c) | ? | ? | a = b & c = b => a = c | nn))
+Flag(FileOn("ec_sym_join.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a = b & c = b => a = c | nn))

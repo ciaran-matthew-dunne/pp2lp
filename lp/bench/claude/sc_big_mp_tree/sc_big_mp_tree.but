@@ -1,1 +1,1 @@
-Flag(FileOn("sc_big_mp_tree.res")) & Set(Valid.1 | Rule(Implication | ((a & b => c) & (c & d => e) & a & b & d => e) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) & _delta_p(e) | ? | ? | (a & b => c) & (c & d => e) & a & b & d => e | nn))
+Flag(FileOn("sc_big_mp_tree.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a & b => c) & (c & d => e) & a & b & d => e | nn))

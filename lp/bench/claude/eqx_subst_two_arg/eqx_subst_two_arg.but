@@ -1,1 +1,1 @@
-Flag(FileOn("eqx_subst_two_arg.res")) & Set(Valid.1 | Rule(Implication | (x = y => g(f(x), f(y)) = g(f(y), f(x))) & _delta_e(x) & _delta_e(y) & _delta_e(g) & _delta_e(f) | ? | ? | x = y => g(f(x), f(y)) = g(f(y), f(x)) | nn))
+Flag(FileOn("eqx_subst_two_arg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x = y => g(f(x), f(y)) = g(f(y), f(x)) | nn))

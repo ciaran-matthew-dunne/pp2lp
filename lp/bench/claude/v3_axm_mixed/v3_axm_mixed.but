@@ -1,1 +1,1 @@
-Flag(FileOn("v3_axm_mixed.res")) & Set(Valid.1 | Rule(Implication | (a: s & not(b: t) & c = d => not(b: t) & c = d) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) & _delta_e(c) & _delta_e(d) | ? | ? | a: s & not(b: t) & c = d => not(b: t) & c = d | nn))
+Flag(FileOn("v3_axm_mixed.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & not(b: t) & c = d => not(b: t) & c = d | nn))

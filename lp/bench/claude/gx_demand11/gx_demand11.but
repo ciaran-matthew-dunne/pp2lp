@@ -1,0 +1,1 @@
+Flag(FileOn("gx_demand11.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(a1 & a2 & a3 & a4 & a5 & a6 & a7 & a8 & a9 & a10 & a11)) <=> (not(a1) or not(a2) or not(a3) or not(a4) or not(a5) or not(a6) or not(a7) or not(a8) or not(a9) or not(a10) or not(a11)) | nn))

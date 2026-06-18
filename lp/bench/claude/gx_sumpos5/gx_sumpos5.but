@@ -1,0 +1,1 @@
+Flag(FileOn("gx_sumpos5.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= x1 & 0 <= x2 & 0 <= x3 & 0 <= x4 & 0 <= x5 => 0 <= x1 + x2 + x3 + x4 + x5 | nn))

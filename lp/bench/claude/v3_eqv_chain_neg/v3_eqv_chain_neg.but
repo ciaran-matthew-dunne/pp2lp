@@ -1,1 +1,1 @@
-Flag(FileOn("v3_eqv_chain_neg.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) & (b <=> c) => (not(a) <=> not(c))) & _delta_p(a) & _delta_p(b) & _delta_p(c) | ? | ? | (a <=> b) & (b <=> c) => (not(a) <=> not(c)) | nn))
+Flag(FileOn("v3_eqv_chain_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a <=> b) & (b <=> c) => (not(a) <=> not(c)) | nn))

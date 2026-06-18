@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_img_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & (a, b): r => b: r[s] | nn))

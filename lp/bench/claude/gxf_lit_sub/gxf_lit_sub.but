@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lit_sub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 100 - 1 = 99 | nn))

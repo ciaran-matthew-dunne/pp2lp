@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_ar_eq_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x = x) | nn))

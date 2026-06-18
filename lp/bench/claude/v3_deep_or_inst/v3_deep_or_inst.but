@@ -1,1 +1,1 @@
-Flag(FileOn("v3_deep_or_inst.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t or x: u) & a: s & not(a: u) => a: t) & _delta_e(s) & _delta_e(t) & _delta_e(u) & _delta_e(a) | ? | ? | !x.(x: s => x: t or x: u) & a: s & not(a: u) => a: t | nn))
+Flag(FileOn("v3_deep_or_inst.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: t or x: u) & a: s & not(a: u) => a: t | nn))

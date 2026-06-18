@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_rchain3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (x0, x1): r1 & (x1, x2): r2 & (x2, x3): r3 => (x0, x3): ((r1 ; r2) ; r3) | nn))

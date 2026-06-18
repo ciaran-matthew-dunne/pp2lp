@@ -1,1 +1,1 @@
-Flag(FileOn("p_dneg_intro.res")) & Set(Valid.1 | Rule(Implication | (a => not(not(a))) & _delta_p(a) | ? | ? | a => not(not(a)) | nn))
+Flag(FileOn("p_dneg_intro.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a => not(not(a)) | nn))

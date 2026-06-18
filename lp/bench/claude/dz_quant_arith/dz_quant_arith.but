@@ -1,1 +1,1 @@
-Flag(FileOn("dz_quant_arith.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => 0 <= x) & !x.(x: s => x <= 9) & a: s => 0 <= a & a <= 9) & _delta_e(s) & _delta_e(a) | ? | ? | !x.(x: s => 0 <= x) & !x.(x: s => x <= 9) & a: s => 0 <= a & a <= 9 | nn))
+Flag(FileOn("dz_quant_arith.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => 0 <= x) & !x.(x: s => x <= 9) & a: s => 0 <= a & a <= 9 | nn))

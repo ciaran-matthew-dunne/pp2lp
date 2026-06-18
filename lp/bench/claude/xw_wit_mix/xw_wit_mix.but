@@ -1,1 +1,1 @@
-Flag(FileOn("xw_wit_mix.res")) & Set(Valid.1 | Rule(Implication | (a: s & f(a) = b => #x.(x: s & f(x) = b)) & _delta_e(a) & _delta_e(s) & _delta_e(f) & _delta_e(b) | ? | ? | a: s & f(a) = b => #x.(x: s & f(x) = b) | nn))
+Flag(FileOn("xw_wit_mix.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & f(a) = b => #x.(x: s & f(x) = b) | nn))

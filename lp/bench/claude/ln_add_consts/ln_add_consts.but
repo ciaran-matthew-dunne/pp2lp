@@ -1,1 +1,1 @@
-Flag(FileOn("ln_add_consts.res")) & Set(Valid.1 | Rule(Implication | (x <= 7 + 8 => x <= 15) & _delta_e(x) | ? | ? | x <= 7 + 8 => x <= 15 | nn))
+Flag(FileOn("ln_add_consts.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 7 + 8 => x <= 15 | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("q2_neg3.res")) & Set(Valid.1 | Rule(Implication | (not(not(not(a))) => not(a)) & _delta_p(a) | ? | ? | not(not(not(a))) => not(a) | nn))
+Flag(FileOn("q2_neg3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(not(not(a))) => not(a) | nn))

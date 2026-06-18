@@ -1,1 +1,1 @@
-Flag(FileOn("xw_or_wit_r.res")) & Set(Valid.1 | Rule(Implication | (a: t => #x.(x: s or x: t)) & _delta_e(a) & _delta_e(t) & _delta_e(s) | ? | ? | a: t => #x.(x: s or x: t) | nn))
+Flag(FileOn("xw_or_wit_r.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: t => #x.(x: s or x: t) | nn))

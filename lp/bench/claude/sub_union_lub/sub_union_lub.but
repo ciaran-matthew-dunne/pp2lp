@@ -1,1 +1,1 @@
-Flag(FileOn("sub_union_lub.res")) & Set(Valid.1 | Rule(Implication | (s <: u & t <: u => s \/ t <: u) & _delta_e(s) & _delta_e(u) & _delta_e(t) | ? | ? | s <: u & t <: u => s \/ t <: u | nn))
+Flag(FileOn("sub_union_lub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: u & t <: u => s \/ t <: u | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("fk_const_big.res")) & Set(Valid.1 | Rule(Implication | (!x.(x <= 5 => x + x <= 12)) | ? | ? | !x.(x <= 5 => x + x <= 12) | nn))
+Flag(FileOn("fk_const_big.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x <= 5 => x + x <= 12) | nn))

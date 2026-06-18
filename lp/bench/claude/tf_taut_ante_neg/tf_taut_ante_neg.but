@@ -1,1 +1,1 @@
-Flag(FileOn("tf_taut_ante_neg.res")) & Set(Valid.1 | Rule(Implication | ((not(p or not(p)) => q) & r => r) & _delta_p(p) & _delta_p(q) & _delta_p(r) | ? | ? | (not(p or not(p)) => q) & r => r | nn))
+Flag(FileOn("tf_taut_ante_neg.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (not(p or not(p)) => q) & r => r | nn))

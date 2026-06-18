@@ -1,1 +1,1 @@
-Flag(FileOn("q2_peirce.res")) & Set(Valid.1 | Rule(Implication | (((a => b) => a) => a) & _delta_p(a) & _delta_p(b) | ? | ? | ((a => b) => a) => a | nn))
+Flag(FileOn("q2_peirce.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | ((a => b) => a) => a | nn))

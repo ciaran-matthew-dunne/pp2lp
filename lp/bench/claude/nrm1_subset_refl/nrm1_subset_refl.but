@@ -1,1 +1,1 @@
-Flag(FileOn("nrm1_subset_refl.res")) & Set(Valid.1 | Rule(Implication | (s <: s) & _delta_e(s) | ? | ? | s <: s | nn))
+Flag(FileOn("nrm1_subset_refl.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: s | nn))

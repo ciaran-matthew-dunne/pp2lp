@@ -1,1 +1,1 @@
-Flag(FileOn("mx_all_pairs.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x: s => y: t => x, y: r) & a: s & b: t => a, b: r) & _delta_e(s) & _delta_e(t) & _delta_e(r) & _delta_e(a) & _delta_e(b) | ? | ? | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t => a, b: r | nn))
+Flag(FileOn("mx_all_pairs.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x: s => y: t => x, y: r) & a: s & b: t => a, b: r | nn))

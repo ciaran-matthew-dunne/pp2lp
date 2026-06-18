@@ -1,1 +1,1 @@
-Flag(FileOn("eqv_to_imp.res")) & Set(Valid.1 | Rule(Implication | ((a <=> b) => (a => b) & (b => a)) & _delta_p(a) & _delta_p(b) | ? | ? | (a <=> b) => (a => b) & (b => a) | nn))
+Flag(FileOn("eqv_to_imp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a <=> b) => (a => b) & (b => a) | nn))

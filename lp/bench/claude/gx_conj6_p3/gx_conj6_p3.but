@@ -1,0 +1,1 @@
+Flag(FileOn("gx_conj6_p3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a1 & a2 & a3 & a4 & a5 & a6 => a3 | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("ln_fold_sum80.res")) & Set(Valid.1 | Rule(Implication | (x <= 40 & y <= 40 => x + y <= 80) & _delta_e(x) & _delta_e(y) | ? | ? | x <= 40 & y <= 40 => x + y <= 80 | nn))
+Flag(FileOn("ln_fold_sum80.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 40 & y <= 40 => x + y <= 80 | nn))

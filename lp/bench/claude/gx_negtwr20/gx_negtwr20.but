@@ -1,0 +1,1 @@
+Flag(FileOn("gx_negtwr20.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(not(a)))))))))))))))))))) => a | nn))

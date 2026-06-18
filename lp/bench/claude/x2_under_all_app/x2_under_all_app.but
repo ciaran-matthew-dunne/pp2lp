@@ -1,1 +1,1 @@
-Flag(FileOn("x2_under_all_app.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => f(x) = g(x)) => !x.(x: s => #y.(f(x) = y & g(x) = y))) & _delta_e(s) & _delta_e(f) & _delta_e(g) | ? | ? | !x.(x: s => f(x) = g(x)) => !x.(x: s => #y.(f(x) = y & g(x) = y)) | nn))
+Flag(FileOn("x2_under_all_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => f(x) = g(x)) => !x.(x: s => #y.(f(x) = y & g(x) = y)) | nn))

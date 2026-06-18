@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nrm_vac_all.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(a = a) | nn))

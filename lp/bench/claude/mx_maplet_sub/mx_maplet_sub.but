@@ -1,1 +1,1 @@
-Flag(FileOn("mx_maplet_sub.res")) & Set(Valid.1 | Rule(Implication | (x, y: r & r <: q => x, y: q) & _delta_e(x) & _delta_e(y) & _delta_e(r) & _delta_e(q) | ? | ? | x, y: r & r <: q => x, y: q | nn))
+Flag(FileOn("mx_maplet_sub.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x, y: r & r <: q => x, y: q | nn))

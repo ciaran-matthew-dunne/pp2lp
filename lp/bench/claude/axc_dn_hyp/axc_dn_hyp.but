@@ -1,1 +1,0 @@
-Flag(FileOn("axc_dn_hyp.res")) & Set(Valid.1 | Rule(Implication | (not(not(p)) & !x.(x: s => p)) & _delta_e(p) & _delta_e(s) | ? | ? | not(not(p)) & !x.(x: s => p) | nn))

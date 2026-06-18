@@ -1,1 +1,1 @@
-Flag(FileOn("v2_subset_inter.res")) & Set(Valid.1 | Rule(Implication | (s <: t & x: s /\ u => x: t) & _delta_e(s) & _delta_e(t) & _delta_e(x) & _delta_e(u) | ? | ? | s <: t & x: s /\ u => x: t | nn))
+Flag(FileOn("v2_subset_inter.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: t & x: s /\ u => x: t | nn))

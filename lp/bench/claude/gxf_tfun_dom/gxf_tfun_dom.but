@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_tfun_dom.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f: s --> t => dom(f) = s | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_coef_mul5.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y => 5 * x <= 5 * y | nn))

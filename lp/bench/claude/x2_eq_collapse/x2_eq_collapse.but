@@ -1,1 +1,1 @@
-Flag(FileOn("x2_eq_collapse.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = a & x: s) => a: s) & _delta_e(a) & _delta_e(s) | ? | ? | #x.(x = a & x: s) => a: s | nn))
+Flag(FileOn("x2_eq_collapse.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x = a & x: s) => a: s | nn))

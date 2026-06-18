@@ -1,1 +1,1 @@
-Flag(FileOn("st_pair_mem_l.res")) & Set(Valid.1 | Rule(Implication | (a: {a, b}) & _delta_e(a) & _delta_e(b) | ? | ? | a: {a, b} | nn))
+Flag(FileOn("st_pair_mem_l.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: {a, b} | nn))

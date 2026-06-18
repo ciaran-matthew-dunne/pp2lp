@@ -1,1 +1,0 @@
-Flag(FileOn("big_two_univ.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: a & x: b & x: c) & !y.(y: u => y: p & y: q & y: r)) & _delta_e(s) & _delta_e(a) & _delta_e(b) & _delta_e(c) & _delta_e(u) & _delta_e(p) & _delta_e(q) & _delta_e(r) | ? | ? | !x.(x: s => x: a & x: b & x: c) & !y.(y: u => y: p & y: q & y: r) | nn))

@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_lit_mul.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 7 * 6 = 42 | nn))

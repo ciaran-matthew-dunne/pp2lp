@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_coef_mul8.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= y => 8 * x <= 8 * y | nn))

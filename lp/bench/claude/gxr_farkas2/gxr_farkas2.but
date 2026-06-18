@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_farkas2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + y <= 0 & 0 <= x & 0 <= y => x = 0 | nn))

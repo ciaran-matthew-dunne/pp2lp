@@ -1,1 +1,1 @@
-Flag(FileOn("zq_swap2.res")) & Set(Valid.1 | Rule(Implication | _delta_e(s) & _delta_e(t) | ? | ? | !x.!y.(x: s => y: t => x: s) | nn))
+Flag(FileOn("zq_swap2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(!y.((x: s => (y: t => x: s)))) | nn))

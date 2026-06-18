@@ -1,1 +1,1 @@
-Flag(FileOn("pin_chain_dep.res")) & Set(Valid.1 | Rule(Implication | (a: s => #x.#y.(x = a & y = x)) & _delta_e(a) & _delta_e(s) | ? | ? | a: s => #x.#y.(x = a & y = x) | nn))
+Flag(FileOn("pin_chain_dep.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s => #x.#y.(x = a & y = x) | nn))

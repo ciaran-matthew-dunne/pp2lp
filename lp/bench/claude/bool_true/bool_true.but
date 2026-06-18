@@ -1,1 +1,0 @@
-Flag(FileOn("bool_true.res")) & Set(Valid.1 | Rule(Implication | (x = TRUE) & _delta_e(x) | ? | ? | x = TRUE | nn))

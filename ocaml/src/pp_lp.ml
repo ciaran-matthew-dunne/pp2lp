@@ -35,12 +35,11 @@ let pp_from_int buf decimal =
   Buffer.add_string buf decimal;
   Buffer.add_char buf ')'
 
-(* Tuple arity / prj index: ℕ-valued, but the file is ℤ-global, so write
-   `(to_nat <decimal>)` — `to_nat` computes it back to the ℕ literal (see B.lp). *)
-let pp_to_nat buf k =
-  Buffer.add_string buf "(to_nat ";
-  Buffer.add_string buf (string_of_int k);
-  Buffer.add_char buf ')'
+(* Tuple arity / prj index: ℕ-valued.  The file is ℤ-global, so emit the bare
+   decimal — the `coerce ℤ ℕ ↪ to_nat` rule (B.lp) inserts the conversion to the
+   ℕ index `prj`/`Tuple` expect, so no explicit `to_nat` wrapper is needed. *)
+let pp_idx buf k =
+  Buffer.add_string buf (string_of_int k)
 
 (* ---- Precedence-aware pretty-printing ----
 
@@ -147,7 +146,7 @@ let pp_lets buf ~sep v_name lets =
     Buffer.add_string buf "let ";
     pp_ident buf name;
     Buffer.add_string buf " \xe2\x89\x94 (prj "; (* ≔ (prj *)
-    pp_to_nat buf k;
+    pp_idx buf k;
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf ") in";
@@ -173,7 +172,7 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
     (match List.assoc s env with
      | Proj (k, v) ->
        Buffer.add_string buf "(prj ";
-       pp_to_nat buf k;
+       pp_idx buf k;
        Buffer.add_char buf ' ';
        pp_ident buf v;
        Buffer.add_char buf ')'
@@ -268,7 +267,7 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
       Buffer.add_string buf "(\xce\xbb "; (* λ *)
       pp_ident buf v_name;
       Buffer.add_string buf " : Tuple ";
-      pp_to_nat buf n;
+      pp_idx buf n;
       Buffer.add_string buf ", ";
       tail ();
       Buffer.add_char buf ')'
@@ -383,7 +382,7 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
-    pp_to_nat buf n;
+    pp_idx buf n;
     Buffer.add_string buf ", ";
     pp_lets buf ~sep:(fun () -> Buffer.add_char buf ' ') v_name lets;
     pp_prd ~env:env' buf body;
@@ -448,7 +447,7 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
     Buffer.add_char buf ' ';
     pp_ident buf v_name;
     Buffer.add_string buf " : Tuple ";
-    pp_to_nat buf n;
+    pp_idx buf n;
     Buffer.add_char buf ',';
     Buffer.add_char buf '\n';
     let inner_pad = String.make (ind + 2) ' ' in

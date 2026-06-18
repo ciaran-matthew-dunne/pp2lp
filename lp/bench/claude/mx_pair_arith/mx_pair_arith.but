@@ -1,1 +1,1 @@
-Flag(FileOn("mx_pair_arith.res")) & Set(Valid.1 | Rule(Implication | (x, y: r & x <= 0 & 0 <= x => x = 0) & _delta_e(x) & _delta_e(y) & _delta_e(r) | ? | ? | x, y: r & x <= 0 & 0 <= x => x = 0 | nn))
+Flag(FileOn("mx_pair_arith.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x, y: r & x <= 0 & 0 <= x => x = 0 | nn))

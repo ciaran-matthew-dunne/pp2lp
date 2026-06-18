@@ -1,1 +1,1 @@
-Flag(FileOn("eqc_union_cong.res")) & Set(Valid.1 | Rule(Implication | (s = t => s \/ u = t \/ u) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | s = t => s \/ u = t \/ u | nn))
+Flag(FileOn("eqc_union_cong.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s = t => s \/ u = t \/ u | nn))

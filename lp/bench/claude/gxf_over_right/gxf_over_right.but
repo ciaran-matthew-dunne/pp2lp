@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_over_right.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, b): s => (a, b): (r <+ s) | nn))

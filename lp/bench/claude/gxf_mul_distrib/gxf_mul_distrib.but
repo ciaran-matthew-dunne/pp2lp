@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_mul_distrib.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x * (y + z) = x * y + x * z | nn))

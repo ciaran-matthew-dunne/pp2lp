@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_nrm_const_imp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p => !x.(p) | nn))

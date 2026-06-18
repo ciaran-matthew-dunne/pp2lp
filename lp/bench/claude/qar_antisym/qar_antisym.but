@@ -1,1 +1,1 @@
-Flag(FileOn("qar_antisym.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x <= y => y <= x => x = y)) | ? | ? | !x.!y.(x <= y => y <= x => x = y) | nn))
+Flag(FileOn("qar_antisym.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(!y.((x <= y => (y <= x => x = y)))) | nn))

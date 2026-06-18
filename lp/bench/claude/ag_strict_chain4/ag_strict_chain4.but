@@ -1,1 +1,1 @@
-Flag(FileOn("ag_strict_chain4.res")) & Set(Valid.1 | Rule(Implication | (x < y & y < z & z < w => x < w) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | x < y & y < z & z < w => x < w | nn))
+Flag(FileOn("ag_strict_chain4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x < y & y < z & z < w => x < w | nn))

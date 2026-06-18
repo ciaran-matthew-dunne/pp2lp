@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_mul_mono.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 0 <= z & x <= y => x * z <= y * z | nn))

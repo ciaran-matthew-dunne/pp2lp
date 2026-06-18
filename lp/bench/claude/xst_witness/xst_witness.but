@@ -1,1 +1,1 @@
-Flag(FileOn("xst_witness.res")) & Set(Valid.1 | Rule(Implication | (a: s & a: t => #x.(x: s & x: t)) & _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s & a: t => #x.(x: s & x: t) | nn))
+Flag(FileOn("xst_witness.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & a: t => #x.(x: s & x: t) | nn))

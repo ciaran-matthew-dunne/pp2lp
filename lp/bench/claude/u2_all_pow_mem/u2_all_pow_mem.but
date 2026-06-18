@@ -1,1 +1,1 @@
-Flag(FileOn("u2_all_pow_mem.res")) & Set(Valid.1 | Rule(Implication | (s <: t => !x.(x: POW(s) => x: POW(t))) & _delta_e(s) & _delta_e(t) | ? | ? | s <: t => !x.(x: POW(s) => x: POW(t)) | nn))
+Flag(FileOn("u2_all_pow_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s <: t => !x.(x: POW(s) => x: POW(t)) | nn))

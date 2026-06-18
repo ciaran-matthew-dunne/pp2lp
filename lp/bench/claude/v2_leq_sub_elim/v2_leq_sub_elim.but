@@ -1,1 +1,1 @@
-Flag(FileOn("v2_leq_sub_elim.res")) & Set(Valid.1 | Rule(Implication | (x - y <= 0 => x <= y) & _delta_e(x) & _delta_e(y) | ? | ? | x - y <= 0 => x <= y | nn))
+Flag(FileOn("v2_leq_sub_elim.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x - y <= 0 => x <= y | nn))

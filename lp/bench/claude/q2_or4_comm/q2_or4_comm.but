@@ -1,1 +1,1 @@
-Flag(FileOn("q2_or4_comm.res")) & Set(Valid.1 | Rule(Implication | (a or b or c or d => d or c or b or a) & _delta_p(a) & _delta_p(b) & _delta_p(c) & _delta_p(d) | ? | ? | a or b or c or d => d or c or b or a | nn))
+Flag(FileOn("q2_or4_comm.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a or b or c or d => d or c or b or a | nn))

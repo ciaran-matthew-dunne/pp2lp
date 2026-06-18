@@ -1,1 +1,1 @@
-Flag(FileOn("u2_rel_chain.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x,y: r => x,y: q) & !x.!y.(x,y: q => x,y: w) => !x.!y.(x,y: r => x,y: w)) & _delta_e(r) & _delta_e(q) & _delta_e(w) | ? | ? | !x.!y.(x,y: r => x,y: q) & !x.!y.(x,y: q => x,y: w) => !x.!y.(x,y: r => x,y: w) | nn))
+Flag(FileOn("u2_rel_chain.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.!y.(x,y: r => x,y: q) & !x.!y.(x,y: q => x,y: w) => !x.!y.(x,y: r => x,y: w) | nn))

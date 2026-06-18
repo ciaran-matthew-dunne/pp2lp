@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_mul_two.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | 2 * x = x + x | nn))

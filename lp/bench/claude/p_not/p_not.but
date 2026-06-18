@@ -1,1 +1,0 @@
-Flag(FileOn("p_not.res")) & Set(Valid.1 | Rule(Implication | (not(a)) & _delta_p(a) | ? | ? | not(a) | nn))

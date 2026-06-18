@@ -26,18 +26,32 @@ open Arith_proofs
    binder's vars at the point we entered it). Witness-search rules (AXM9,
    NRM19) substitute those names into the rule's expected hypothesis
    pattern and look it up in `hyps`. *)
+(* A generated arith-equality lemma awaiting emission as a `have` before the
+   current proof-tree node's tactic.  [ph_binder] Π-quantifies the term-internal
+   binders the equality sits under (so its name applies inside an under-binder
+   term); [ph_ty] is the `e1 = e2` proposition; [ph_proof] is the tactic recipe. *)
+type pending_have = {
+  ph_name : string;
+  ph_binder : (string * int) list;
+  ph_ty : L.term;
+  ph_proof : L.t;
+}
+
 type ctx = {
   mutable n : int;
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
+  (* Arith-equality `have`s registered while building the current node's tactic,
+     flushed (innermost-node-first) right before that tactic by [Translate.tree]. *)
+  mutable pending_haves : pending_have list;
   (* Boolean-typing premises accumulated during emission: (name, type), one
      per (arity, slot) a BOOL31/32/41/42 split needs.  [Emit_lp] adds them to
      the symbol header. *)
   mutable bool_typings : (string * string) list;
-  (* Integer-typing premises, same idea: a guarded arithmetic lemma (add_zero /
-     neg_neg / leq_antisym / AR5–8) needs `<atom> ϵ INT` evidence the goal
-     extraction dropped.  Per-(arity,slot) for a bound tuple slot, per-name for
-     a free var; [Emit_lp] adds them to the header. *)
+  (* Integer-typing premises, same idea: a guarded arithmetic lemma (int_retract
+     in the to_int-transport / leq_antisym / AR5–8) needs `<atom> ϵ INT` evidence
+     the goal extraction dropped.  Per-(arity,slot) for a bound tuple slot,
+     per-name for a free var; [Emit_lp] adds them to the header. *)
   mutable int_typings : (string * string) list;
   (* The goal's free τ ι variables (the emitted symbol's `(x : τ ι)` params).
      Only these can carry an injected `π (x ϵ INT)` premise; a witness / locally
@@ -46,7 +60,8 @@ type ctx = {
 }
 
 let create_ctx ?(int_free_vars = Free_vars.SS.empty) () =
-  { n = 0; hyps = []; xs = []; bool_typings = []; int_typings = []; int_free_vars }
+  { n = 0; hyps = []; xs = []; pending_haves = [];
+    bool_typings = []; int_typings = []; int_free_vars }
 
 let fresh_h ctx pred =
   ctx.n <- ctx.n + 1;
@@ -109,12 +124,11 @@ let chain_emit_name rule =
    with the small ⋀-list proof-term algebra built on them.  Everything
    returns a structured [Lp_tree.term]; nothing renders to a string. *)
 
-(* `prj (to_nat k) t` — the k-th projection.  The index is wrapped in `to_nat`
-   (with `k` a ℤ decimal) because the emitted file is ℤ-global; `to_nat k` reduces
-   to the ℕ index `prj` expects (cf. [Pp_lp.pp_to_nat]). *)
+(* `prj k t` — the k-th projection.  The index is a bare ℤ decimal (the emitted
+   file is ℤ-global); the `coerce ℤ ℕ ↪ to_nat` rule (B.lp) converts it to the ℕ
+   index `prj` expects, so no explicit `to_nat` wrapper is needed (cf. [Pp_lp.pp_idx]). *)
 let prj k t =
-  L.App (L.Name "prj",
-    [ L.App (L.Name "to_nat", [L.Name (string_of_int k)]); t ])
+  L.App (L.Name "prj", [ L.Name (string_of_int k); t ])
 
 let conj_intro a b = L.App (L.Name "\xe2\x8b\x80_intro", [a; b]) (* ⋀_intro *)
 let conj_nil_prf = L.Name "\xe2\x8b\x80_nil_prf"                 (* ⋀_nil_prf *)
@@ -199,7 +213,7 @@ let bool_typing_term ctx v =
     let name = Printf.sprintf "_bt_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple (to_nat %d), \xcf\x80 ((prj (to_nat %d) u) \xcf\xb5 BOOL)" n k
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 BOOL)" n k
     in
     if not (List.mem_assoc name ctx.bool_typings) then
       ctx.bool_typings <- ctx.bool_typings @ [ (name, ty) ];
@@ -218,7 +232,7 @@ let int_typing_term ctx v : L.term =
     let name = Printf.sprintf "_it_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple (to_nat %d), \xcf\x80 ((prj (to_nat %d) u) \xcf\xb5 INT)" n k
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 INT)" n k
     in
     if not (List.mem_assoc name ctx.int_typings) then
       ctx.int_typings <- ctx.int_typings @ [ (name, ty) ];
@@ -658,15 +672,140 @@ let collect_conj_leaves = Pp_lp.conj_leaves
    order: the universal reads `x - g ≤ 𝟎`, the in-scope hyp reads
    `(—g) + x ≤ 𝟎`.  Same value, but `find_hyp_by_equiv` is structural and
    misses it.  Rather than `trust` the conjunct, we build a real proof that
-   the two sides are equal (a permutation of one signed sum) from `add_comm`
-   / `add_assoc` (and `opp_add`/`neg_neg` to push `—` to the leaves), and
-   transport the hypothesis along it with `leq_subst_l`. *)
+   the two sides are equal (a permutation of one signed sum) by reflecting onto
+   `to_int` (Stdlib.Z), where the reorder is `+_com`/`+_assoc` and `—` distributes,
+   and transport the hypothesis along it with `leq_subst_l`. *)
 
 (* The projection env (witness tuple-var → `prj k x`) the printer needs, built
    from the in-scope binders; mirrors [Rule_emit.pp_env_of]. *)
 let proj_env_of_ctx ctx : L.proj_env =
   List.concat_map (fun (x_name, pp_vars) ->
     List.mapi (fun i v -> (v, L.Proj (i, x_name))) pp_vars) ctx.xs
+
+(* ---- Arith-equality `have`s: the [toint_eq] + recipe path ----
+
+   The generated arithmetic equalities (AR3's `𝟏 − a = r`, AR3_F's congruence
+   leaf) reflect onto ℤ through the proved [toint_eq] lemma, after which `simplify`
+   computes `to_int` away and a short fixed rewrite recipe closes the residual
+   ℤ goal.  Emitted as a `have` (so tactics can run) and Π-quantified over the
+   term-internal binders the equality sits under, so the same lemma applies inside
+   an `!!_cong (λ v, …)` term as `NAME v`.  This replaces the verbose inlined
+   `eq_trans`/`Z_cong`/`int_retract` congruence terms for the commutation-free
+   (negation/associativity/literal-fold) cases that dominate the corpus. *)
+
+(* Flush the arith-equality `have`s registered while building the current node's
+   tactic as nested [L.Have] wrappers around [cont] (first-registered outermost,
+   each in scope for the rest).  Called per node by [Translate.tree]. *)
+let flush_haves ctx (cont : L.t) : L.t =
+  let hs = List.rev ctx.pending_haves in
+  ctx.pending_haves <- [];
+  List.fold_right
+    (fun ph acc ->
+       L.Have { L.hv_name = ph.ph_name; hv_binder = ph.ph_binder;
+                hv_ty = ph.ph_ty; hv_proof = ph.ph_proof; hv_cont = acc })
+    hs cont
+
+(* Whether the recipe alone (no atom commutation) closes `e1 = e2`: both flatten
+   to the same non-literal atom sequence with equal literal totals, and in each
+   the literals form a contiguous prefix — so `repeat rewrite left +_assoc` brings
+   them adjacent for Stdlib.Z to fold.  When false, the explicit reorder term is
+   kept (the few genuine-permutation sites). *)
+let recipe_closes e1 e2 =
+  let is_lit (a, _) = is_foldable_lit a in
+  let lit_sum = List.fold_left
+    (fun acc (a, s) -> match a with Nat n -> acc + (s * n) | _ -> acc) 0 in
+  let non_lits = List.filter (fun a -> not (is_lit a)) in
+  let lits_prefix l =
+    let rec go = function
+      | a :: tl when is_lit a -> go tl
+      | rest -> List.for_all (fun a -> not (is_lit a)) rest
+    in go l in
+  match flatten_signed e1, flatten_signed e2 with
+  | Some l1, Some l2 ->
+    lits_prefix l1 && lits_prefix l2
+    && non_lits l1 = non_lits l2 && lit_sum l1 = lit_sum l2
+  | _ -> false
+
+(* The fixed recipe closing a recipe-closable `to_int e1 = to_int e2` after
+   [toint_eq]: compute `to_int` through plus/neg/literals (simplify), push `—`
+   inward, drop double negation, fully left-associate, then `reflexivity` (the
+   ground literal run computes in Stdlib.Z). *)
+let recipe_steps : L.t =
+  let rw ?(repeat_ = false) ?(rtl = false) name =
+    L.Rewrite { try_ = false; repeat_; rtl; pat = None; name } in
+  L.Then (L.Simplify,
+  L.Then (rw ~repeat_:true "distr_\xe2\x80\x94_+",        (* distr_—_+ *)
+  L.Then (rw ~repeat_:true "\xe2\x80\x94_idem",           (* —_idem *)
+  L.Then (rw ~repeat_:true ~rtl:true "+_assoc",
+  L.Step L.Reflexivity))))
+
+(* Register (or, by structural dedup, reuse) a `have NAME : [Π binders,] π <ty>
+   { <proof> }` and return `NAME` applied to the binder vars.  Dedup collapses
+   identical lemmas registered for the same node.  [binders] Π-quantify the
+   term-internal binders the lemma sits under (the binders must be in [ctx.xs] so
+   the proof's `ϵ INT` evidence resolves to `_it`). *)
+let register_have ctx ~binders ~ty ~proof : L.term =
+  let same ph = ph.ph_binder = binders && ph.ph_ty = ty && ph.ph_proof = proof in
+  let name =
+    match List.find_opt same ctx.pending_haves with
+    | Some ph -> ph.ph_name
+    | None ->
+      ctx.n <- ctx.n + 1;
+      let nm = Printf.sprintf "_lem%d" ctx.n in
+      ctx.pending_haves <-
+        { ph_name = nm; ph_binder = binders; ph_ty = ty; ph_proof = proof }
+        :: ctx.pending_haves;
+      nm
+  in
+  match List.map (fun (v, _) -> L.Name v) binders with
+  | [] -> L.Name name
+  | args -> L.App (L.Name name, args)
+
+(* A `refine toint_eq _ _ ev1 ev2 _; <recipe>` proof, wrapped in `assume`s for the
+   Π-quantified [binders] (so the lemma is provable over an enclosing tuple). *)
+let toint_eq_proof ~binders ev1 ev2 recipe : L.t =
+  let core =
+    L.Then (L.Refine (L.Name "toint_eq", [ L.Hole; L.Hole; ev1; ev2; L.Hole ]), recipe) in
+  List.fold_right (fun (v, _) acc -> L.Assume (v, acc)) binders core
+
+(* `e1 = e2` proof: the negation/associativity recipe `have` when commutation-free,
+   otherwise the explicit reorder term ([prove_sum_eq]).  [binders] are the
+   term-internal binders the equality sits under (empty in the main proof tree). *)
+let arith_eq_have ctx env ~binders e1 e2 : L.term option =
+  if e1 <> e2 && recipe_closes e1 e2 then
+    let proof =
+      toint_eq_proof ~binders (int_evidence env e1) (int_evidence env e2) recipe_steps in
+    Some (register_have ctx ~binders ~ty:(L.Eq (L.Exp (env, e1), L.Exp (env, e2))) ~proof)
+  else prove_sum_eq env e1 e2
+
+(* `e = from_int c` (with c the literal e cancels/folds to) via a `have` whose ℤ
+   side is closed by the cancel recipe (sort + cancel as targeted rewrites).
+   [None] when the recipe doesn't apply — the caller keeps the explicit term. *)
+let cancel_eq_have ctx env ~binders e : (L.term * int) option =
+  match Arith_proofs.cancel_recipe env e with
+  | None -> None
+  | Some (recipe, c) ->
+    let dec = L.Name (string_of_int c) in
+    let ty = L.Eq (L.Exp (env, e), L.App (L.Name "from_int", [ dec ])) in
+    let proof =
+      toint_eq_proof ~binders (int_evidence env e)
+        (L.App (L.Name "from_int_in_int", [ dec ])) recipe in
+    Some (register_have ctx ~binders ~ty ~proof, c)
+
+(* `π (e > 𝟎)` (AR4's `(E+F) > 𝟎`): transport `positive_lit c` along the
+   cancel-recipe `have` `e = from_int c`.  [None] when e doesn't cancel to a
+   positive literal (caller falls back / fails loud, never trust). *)
+let prove_gt_zero_t ctx env ~binders e : L.term option =
+  match cancel_eq_have ctx env ~binders e with
+  | Some (eq, c) when c >= 1 ->
+    Some (L.App (L.Name "=\xe2\x87\x92",                       (* =⇒ *)
+      [ L.App (L.Name "eq_sym",
+          [ L.App (L.Name "not_cong",
+              [ L.App (L.Name "leq_zero_eq", [ eq ]) ]) ]);
+        Arith_proofs.positive_lit env c ]))
+  (* recipe bailed (a cancellation shape it doesn't realise pattern-free): keep
+     the proven explicit congruence term — correct, just verbose. *)
+  | _ -> Arith_proofs.prove_gt_zero env e
 
 (* ---- NRM29 trust-free dispatch: witness + ⊤-normalisation bridge ----
 

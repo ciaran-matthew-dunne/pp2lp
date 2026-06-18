@@ -1,1 +1,1 @@
-Flag(FileOn("v3_plus_rot3.res")) & Set(Valid.1 | Rule(Implication | (x + y + z <= w => z + x + y <= w) & _delta_e(x) & _delta_e(y) & _delta_e(z) & _delta_e(w) | ? | ? | x + y + z <= w => z + x + y <= w | nn))
+Flag(FileOn("v3_plus_rot3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + y + z <= w => z + x + y <= w | nn))

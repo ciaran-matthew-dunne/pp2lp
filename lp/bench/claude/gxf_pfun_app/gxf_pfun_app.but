@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_pfun_app.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | f: s +-> t & a: dom(f) => f(a): t | nn))

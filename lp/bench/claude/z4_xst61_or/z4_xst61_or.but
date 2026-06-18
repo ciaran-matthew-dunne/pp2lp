@@ -1,1 +1,1 @@
-Flag(FileOn("z4_xst61_or.res")) & Set(Valid.1 | Rule(Implication | _delta_e(a) & _delta_e(s) & _delta_e(t) | ? | ? | a: s or #x.(x: t) => #x.(x: t) or a: s | nn))
+Flag(FileOn("z4_xst61_or.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s or #x.(x: t) => #x.(x: t) or a: s | nn))

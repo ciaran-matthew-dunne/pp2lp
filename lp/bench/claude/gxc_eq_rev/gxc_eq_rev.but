@@ -1,0 +1,1 @@
+Flag(FileOn("gxc_eq_rev.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a = b => b = a | nn))

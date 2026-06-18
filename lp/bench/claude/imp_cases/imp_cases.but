@@ -1,1 +1,1 @@
-Flag(FileOn("imp_cases.res")) & Set(Valid.1 | Rule(Implication | ((a => c) & (b => c) => (a or b => c)) & _delta_p(a) & _delta_p(c) & _delta_p(b) | ? | ? | (a => c) & (b => c) => (a or b => c) | nn))
+Flag(FileOn("imp_cases.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a => c) & (b => c) => (a or b => c) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("fn_app_self.res")) & Set(Valid.1 | Rule(Implication | (x: dom(f) => f(x) = f(x)) & _delta_e(x) & _delta_e(f) | ? | ? | x: dom(f) => f(x) = f(x) | nn))
+Flag(FileOn("fn_app_self.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: dom(f) => f(x) = f(x) | nn))

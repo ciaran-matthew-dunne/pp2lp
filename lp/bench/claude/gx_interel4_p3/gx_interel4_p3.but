@@ -1,0 +1,1 @@
+Flag(FileOn("gx_interel4_p3.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s1 /\ s2 /\ s3 /\ s4 => x: s3 | nn))

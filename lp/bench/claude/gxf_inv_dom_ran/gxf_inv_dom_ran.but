@@ -1,0 +1,1 @@
+Flag(FileOn("gxf_inv_dom_ran.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: dom(r) => a: ran(r~) | nn))

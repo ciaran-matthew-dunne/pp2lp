@@ -1,1 +1,1 @@
-Flag(FileOn("v3_axm_neg_hyp.res")) & Set(Valid.1 | Rule(Implication | (not(a: s) & b: t => not(a: s)) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) | ? | ? | not(a: s) & b: t => not(a: s) | nn))
+Flag(FileOn("v3_axm_neg_hyp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a: s) & b: t => not(a: s) | nn))

@@ -1,1 +1,0 @@
-Flag(FileOn("nrm24_neg_impl_atom.res")) & Set(Valid.1 | Rule(Implication | (!x.not(x: s => x: t)) & _delta_e(s) & _delta_e(t) | ? | ? | !x.not(x: s => x: t) | nn))

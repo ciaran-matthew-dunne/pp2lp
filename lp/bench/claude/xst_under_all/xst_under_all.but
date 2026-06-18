@@ -1,1 +1,1 @@
-Flag(FileOn("xst_under_all.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) => !x.(x: s => #y.(y: t))) & _delta_e(s) & _delta_e(t) | ? | ? | !x.(x: s => x: t) => !x.(x: s => #y.(y: t)) | nn))
+Flag(FileOn("xst_under_all.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: t) => !x.(x: s => #y.(y: t)) | nn))

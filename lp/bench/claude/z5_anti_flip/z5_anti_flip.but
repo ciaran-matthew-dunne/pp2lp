@@ -1,1 +1,1 @@
-Flag(FileOn("z5_anti_flip.res")) & Set(Valid.1 | Rule(Implication | (!x.!y.(x <= y => y <= x => y = x)) | ? | ? | !x.!y.(x <= y => y <= x => y = x) | nn))
+Flag(FileOn("z5_anti_flip.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(!y.((x <= y => (y <= x => y = x)))) | nn))

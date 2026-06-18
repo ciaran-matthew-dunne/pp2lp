@@ -1,1 +1,1 @@
-Flag(FileOn("zq_xst_eq_rev.res")) & Set(Valid.1 | Rule(Implication | _delta_e(a) | ? | ? | #x.(a = x) | nn))
+Flag(FileOn("zq_xst_eq_rev.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(a = x) | nn))

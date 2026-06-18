@@ -1,1 +1,0 @@
-Flag(FileOn("mx_arith_wit_eq.res")) & Set(Valid.1 | Rule(Implication | (a <= b & b <= a => #x.(x = a & x = b)) & _delta_e(a) & _delta_e(b) | ? | ? | a <= b & b <= a => #x.(x = a & x = b) | nn))

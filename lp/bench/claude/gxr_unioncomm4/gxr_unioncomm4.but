@@ -1,0 +1,1 @@
+Flag(FileOn("gxr_unioncomm4.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s1 \/ s2 \/ s3 \/ s4 = s4 \/ s3 \/ s2 \/ s1 | nn))

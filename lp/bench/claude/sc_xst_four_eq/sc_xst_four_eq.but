@@ -1,1 +1,1 @@
-Flag(FileOn("sc_xst_four_eq.res")) & Set(Valid.1 | Rule(Implication | (#w.#x.#y.#z.(w = x & y = z)) | ? | ? | #w.#x.#y.#z.(w = x & y = z) | nn))
+Flag(FileOn("sc_xst_four_eq.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #w.#x.#y.#z.(w = x & y = z) | nn))

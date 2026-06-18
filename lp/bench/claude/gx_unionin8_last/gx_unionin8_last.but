@@ -1,0 +1,1 @@
+Flag(FileOn("gx_unionin8_last.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x: s8 => x: s1 \/ s2 \/ s3 \/ s4 \/ s5 \/ s6 \/ s7 \/ s8 | nn))

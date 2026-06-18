@@ -1,1 +1,1 @@
-Flag(FileOn("pin_two_blocks.res")) & Set(Valid.1 | Rule(Implication | (#x.(x = a) & #y.(y = b) => #x.#y.(x = a & y = b)) & _delta_e(a) & _delta_e(b) | ? | ? | #x.(x = a) & #y.(y = b) => #x.#y.(x = a & y = b) | nn))
+Flag(FileOn("pin_two_blocks.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x = a) & #y.(y = b) => #x.#y.(x = a & y = b) | nn))

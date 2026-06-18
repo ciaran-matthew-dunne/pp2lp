@@ -1,0 +1,1 @@
+Flag(FileOn("gxh_par_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p: (r || s) => p: (r || s) | nn))

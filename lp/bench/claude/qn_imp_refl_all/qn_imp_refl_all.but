@@ -1,1 +1,1 @@
-Flag(FileOn("qn_imp_refl_all.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: s) & a: t => a: t) & _delta_e(s) & _delta_e(a) & _delta_e(t) | ? | ? | !x.(x: s => x: s) & a: t => a: t | nn))
+Flag(FileOn("qn_imp_refl_all.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: s) & a: t => a: t | nn))

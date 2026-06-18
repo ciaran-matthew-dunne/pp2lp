@@ -1,1 +1,1 @@
-Flag(FileOn("xst_pair.res")) & Set(Valid.1 | Rule(Implication | (a: s & b: t => #x.#y.(x: s & y: t)) & _delta_e(a) & _delta_e(s) & _delta_e(b) & _delta_e(t) | ? | ? | a: s & b: t => #x.#y.(x: s & y: t) | nn))
+Flag(FileOn("xst_pair.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a: s & b: t => #x.#y.(x: s & y: t) | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("all_point_trans.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t) & !x.(x: t => x: u) => !x.(x: s => x: u)) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) => !x.(x: s => x: u) | nn))
+Flag(FileOn("all_point_trans.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => x: t) & !x.(x: t => x: u) => !x.(x: s => x: u) | nn))

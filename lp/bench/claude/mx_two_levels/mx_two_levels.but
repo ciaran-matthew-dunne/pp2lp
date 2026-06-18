@@ -1,1 +1,1 @@
-Flag(FileOn("mx_two_levels.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => f(x): t) & !y.(y: t => y: u) & a: s => f(a): u) & _delta_e(s) & _delta_e(f) & _delta_e(t) & _delta_e(u) & _delta_e(a) | ? | ? | !x.(x: s => f(x): t) & !y.(y: t => y: u) & a: s => f(a): u | nn))
+Flag(FileOn("mx_two_levels.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => f(x): t) & !y.(y: t => y: u) & a: s => f(a): u | nn))

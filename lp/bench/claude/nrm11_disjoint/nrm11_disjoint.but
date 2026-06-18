@@ -1,1 +1,0 @@
-Flag(FileOn("nrm11_disjoint.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => x: t => x: u => not(x: s))) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | !x.(x: s => x: t => x: u => not(x: s)) | nn))

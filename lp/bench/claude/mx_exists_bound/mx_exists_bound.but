@@ -1,1 +1,1 @@
-Flag(FileOn("mx_exists_bound.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: s & x <= 3) & !y.(y: s => 0 <= y) => #x.(x: s & x <= 3 & 0 <= x)) & _delta_e(s) | ? | ? | #x.(x: s & x <= 3) & !y.(y: s => 0 <= y) => #x.(x: s & x <= 3 & 0 <= x) | nn))
+Flag(FileOn("mx_exists_bound.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x: s & x <= 3) & !y.(y: s => 0 <= y) => #x.(x: s & x <= 3 & 0 <= x) | nn))

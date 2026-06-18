@@ -1,1 +1,1 @@
-Flag(FileOn("v3_bound_shift.res")) & Set(Valid.1 | Rule(Implication | (x + y <= 5 & 0 <= y => x <= 5) & _delta_e(x) & _delta_e(y) | ? | ? | x + y <= 5 & 0 <= y => x <= 5 | nn))
+Flag(FileOn("v3_bound_shift.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x + y <= 5 & 0 <= y => x <= 5 | nn))

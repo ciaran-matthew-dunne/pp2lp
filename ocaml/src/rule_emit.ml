@@ -329,16 +329,11 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Ar10 ->
     (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).  PP's `solveur(P) = Q`
        is the identity on every corpus occurrence (P ≡ Q — the antecedent equals
-       its own normal form), so the equality is `eq_refl Q`, not `trust`.  Q is
-       supplied explicitly (it can't be inferred from `P ⇒ R`) and carries the
-       tuple-projection env so enclosing-binder vars render as `prj k v`. *)
-    (match arg with
-     | Some (Pred q) ->
-       let qt = pred_term ctx q in
-       L.Refine (L.Expl (L.Name "AR10"),
-         [L.Hole; qt; L.Hole; L.App (L.Name "eq_refl", [qt]); L.Hole])
-     | _ -> failwith "rule_emit: AR10 without a Q (solveur result) argument \
-                      — refusing to emit trust for the P = Q equality")
+       its own normal form), so the equality is `eq_refl` and Q is *inferred* from
+       the goal `P ⇒ R` (which is `Q ⇒ R` since P ≡ Q): `refine AR10 (eq_refl _) _`.
+       The old form spelled Q out twice (explicit arg + `eq_refl Q`), which
+       dominated AR10's emitted size across tens of thousands of sites. *)
+    L.Refine (L.Name "AR10", [L.App (L.Name "eq_refl", [L.Hole]); L.Hole])
   | Rule_db.Nrm20 | Rule_db.Nrm21 ->
     (* NRM20 pins a binder by an `x = E` conjunct, NRM21 by `E = x`.  PP may
        pin *any* binder (not only the leading one), the equality may sit at
@@ -495,21 +490,15 @@ let tactic_for_rule ctx rule arg anno children =
   | Rule_db.Ar2 ->
     (* AR2 leaf: `(leq (from_int a) (from_int b)) ⇒ R`, PP's solver having found
        a > b for concrete ℤ literals a, b (it comes out of AR3's `1−a`, e.g. 2 ≤ 0).
-       The ℤ-literal `AR2` lemma wants `π (Stdlib.Z.> a b)`; for concrete a > b that
-       computes to `¬¬⊤`, so the proof is just `λ k, k ⊤ᵢ` and a, b are inferred
-       from the goal.  No more `prove_gt_zero`/`sub_leq_eq` transport.  Fail loud
-       (never trust) if the comparison isn't between concrete literals; if a ≤ b
-       (PP mis-emitted) the `λ k, k ⊤ᵢ` simply won't type-check — also loud. *)
-    let z_lit = function
-      | Nat n -> L.Name (string_of_int n)
-      | BigNat s -> L.Name s
-      | _ -> assert false                  (* guarded by the match below *)
-    in
+       a, b, R are implicit on the `AR2` lemma: `from_int` is injective, so unifying
+       the goal's `from_int a` / `from_int b` solves them; `Stdlib.Z.> a b` then
+       computes to `¬¬⊤`, so the proof is just `λ k, k ⊤ᵢ`.  Still guard the goal
+       shape: fail loud (never trust) if the comparison isn't between concrete
+       literals; if a ≤ b (PP mis-emitted) the `λ k, k ⊤ᵢ` won't type-check — loud. *)
     (match goal_of_anno anno with
-     | Some (Binary (Imp, Leq ((Nat _ | BigNat _ as a), (Nat _ | BigNat _ as b)), _)) ->
+     | Some (Binary (Imp, Leq ((Nat _ | BigNat _), (Nat _ | BigNat _)), _)) ->
        L.Refine (L.Name rule,
-         [ z_lit a; z_lit b;
-           L.Lambda ("k", None,
+         [ L.Lambda ("k", None,
              L.App (L.Name "k", [ L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ])) ])
      | _ ->
        failwith "rule_emit: AR2 — expected a concrete ℤ-literal comparison \
@@ -555,9 +544,11 @@ let tactic_for_rule ctx rule arg anno children =
           | Leq (f, Nat 0) ->
             Option.map (fun h_gt ->
               (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
-                 both via the B.lp `to_int`/`isGt` unification rules. *)
+                 both via the B.lp `to_int`/`isGt` unification rules.  `(E+F) > 𝟎`
+                 is the cancel-recipe `have` (a compact tactic proof), main-tree
+                 so no Π-binders. *)
               L.Refine (L.Name rule, [L.Name name; h_gt]))
-              (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
+              (prove_gt_zero_t ctx env ~binders:[] (AOp (Add, e, f)))
           | _ -> None) ctx.hyps
       | None -> None
     in

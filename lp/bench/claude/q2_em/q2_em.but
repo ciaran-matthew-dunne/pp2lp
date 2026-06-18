@@ -1,1 +1,1 @@
-Flag(FileOn("q2_em.res")) & Set(Valid.1 | Rule(Implication | (a or not(a)) & _delta_p(a) | ? | ? | a or not(a) | nn))
+Flag(FileOn("q2_em.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | a or not(a) | nn))

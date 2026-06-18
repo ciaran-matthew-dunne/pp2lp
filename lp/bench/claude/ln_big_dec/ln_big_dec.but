@@ -1,1 +1,1 @@
-Flag(FileOn("ln_big_dec.res")) & Set(Valid.1 | Rule(Implication | (x <= 1000 => x <= 1000) & _delta_e(x) | ? | ? | x <= 1000 => x <= 1000 | nn))
+Flag(FileOn("ln_big_dec.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | x <= 1000 => x <= 1000 | nn))

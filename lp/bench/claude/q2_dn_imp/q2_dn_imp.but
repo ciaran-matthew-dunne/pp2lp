@@ -1,1 +1,1 @@
-Flag(FileOn("q2_dn_imp.res")) & Set(Valid.1 | Rule(Implication | (not(not(a => b)) => (not(not(a)) => not(not(b)))) & _delta_p(a) & _delta_p(b) | ? | ? | not(not(a => b)) => (not(not(a)) => not(not(b))) | nn))
+Flag(FileOn("q2_dn_imp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(not(a => b)) => (not(not(a)) => not(not(b))) | nn))

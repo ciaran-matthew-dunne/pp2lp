@@ -1,1 +1,0 @@
-Flag(FileOn("bl_chain.res")) & Set(Valid.1 | Rule(Implication | (bool(x: s) = btrue & bool(y: t) = btrue => x: s & y: t) & _delta_e(x) & _delta_e(s) & _delta_e(btrue) & _delta_e(y) & _delta_e(t) | ? | ? | bool(x: s) = btrue & bool(y: t) = btrue => x: s & y: t | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("v2_dneg_eqv.res")) & Set(Valid.1 | Rule(Implication | (not(not(a)) <=> a) & _delta_p(a) | ? | ? | not(not(a)) <=> a | nn))
+Flag(FileOn("v2_dneg_eqv.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(not(a)) <=> a | nn))

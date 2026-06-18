@@ -1,0 +1,1 @@
+Flag(FileOn("gxh_dprod_mem.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | p: (s * t) => p: (s * t) | nn))

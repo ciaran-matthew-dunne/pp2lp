@@ -1,1 +1,1 @@
-Flag(FileOn("mx_fn_bound_tr.res")) & Set(Valid.1 | Rule(Implication | (!x.(x: s => f(x) <= 7) & a: s & 7 <= z => f(a) <= z) & _delta_e(s) & _delta_e(f) & _delta_e(a) & _delta_e(z) | ? | ? | !x.(x: s => f(x) <= 7) & a: s & 7 <= z => f(a) <= z | nn))
+Flag(FileOn("mx_fn_bound_tr.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | !x.(x: s => f(x) <= 7) & a: s & 7 <= z => f(a) <= z | nn))

@@ -1,1 +1,1 @@
-Flag(FileOn("ec_neq_sym.res")) & Set(Valid.1 | Rule(Implication | (not(a = b) => not(b = a)) & _delta_e(a) & _delta_e(b) | ? | ? | not(a = b) => not(b = a) | nn))
+Flag(FileOn("ec_neq_sym.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | not(a = b) => not(b = a) | nn))

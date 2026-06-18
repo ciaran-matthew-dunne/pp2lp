@@ -1,1 +1,1 @@
-Flag(FileOn("ec_join_at_target.res")) & Set(Valid.1 | Rule(Implication | (s = t & u = t => s = u) & _delta_e(s) & _delta_e(t) & _delta_e(u) | ? | ? | s = t & u = t => s = u | nn))
+Flag(FileOn("ec_join_at_target.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | s = t & u = t => s = u | nn))

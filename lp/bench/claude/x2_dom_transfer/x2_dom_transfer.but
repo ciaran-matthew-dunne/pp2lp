@@ -1,1 +1,1 @@
-Flag(FileOn("x2_dom_transfer.res")) & Set(Valid.1 | Rule(Implication | (#x.(x: dom(f)) & !y.(y: dom(f) => y: s) => #x.(x: s)) & _delta_e(f) & _delta_e(s) | ? | ? | #x.(x: dom(f)) & !y.(y: dom(f) => y: s) => #x.(x: s) | nn))
+Flag(FileOn("x2_dom_transfer.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | #x.(x: dom(f)) & !y.(y: dom(f) => y: s) => #x.(x: s) | nn))
