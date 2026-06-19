@@ -2,18 +2,18 @@
 require open pp2lp.Prelude;
 
 // XST1–4: compound ↔ nested conversions.
-symbol t_XST1 (n : ℕ) (P : Tuple (+1 n) → Prop) (R : Prop)
-  (h : π (¬ (`?? v : Tuple (+1 n), P v) ⇒ R))
-  : π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔ XST1 h;
-symbol t_XST2 (n : ℕ) (P : Tuple (+1 n) → Prop)
-  (h : π (¬ (`?? v : Tuple (+1 n), P v)))
-  : π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))) ≔ XST2 h;
-symbol t_XST3 (n : ℕ) (P : Tuple (+1 n) → Prop) (R : Prop)
-  (h : π ((`?? v : Tuple (+1 n), P v) ⇒ R))
-  : π ((`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔ XST3 h;
-symbol t_XST4 (n : ℕ) (P : Tuple (+1 n) → Prop)
-  (h : π (`?? v : Tuple (+1 n), P v))
-  : π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ≔ XST4 h;
+symbol t_XST1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (h : π (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔ XST1 h;
+symbol t_XST2 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (h : π (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y)) ≔ XST2 h;
+symbol t_XST3 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (h : π ((`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : π ((`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔ XST3 h;
+symbol t_XST4 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (h : π (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : π (`?? w : Tuple n, `?? y : Tuple 1, P w y) ≔ XST4 h;
 
 // XST5–8 (and 51/61): ∃ ↔ ∀ De Morgan and ∃-introduction.
 symbol t_XST5 (n : ℕ) (P : Tuple n → Prop) (R : Prop)
@@ -31,6 +31,19 @@ symbol t_XST8 (n : ℕ) (P : Tuple n → Prop)
   : π (`?? v, P v) ≔ XST8 ρ h;
 
 // _1 (Result-form) variants
+// Curried binder-merge chain forms (XST1_1–XST4_1).
+symbol t_XST1_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (r : Res (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔ XST1_1 r;
+symbol t_XST2_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (r : Res (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y)) ≔ XST2_1 r;
+symbol t_XST3_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (r : Res ((`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res ((`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔ XST3_1 r;
+symbol t_XST4_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (r : Res (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : Res (`?? w : Tuple n, `?? y : Tuple 1, P w y) ≔ XST4_1 r;
 symbol t_XST5_1 (n : ℕ) (P : Tuple n → Prop) (R : Prop)
   (r : Res ((`!! v, ¬ (P v)) ⇒ R)) : Res (¬ (`?? v, P v) ⇒ R) ≔ XST5_1 r;
 symbol t_XST51_1 (n : ℕ) (P : Tuple n → Prop) (R : Prop)

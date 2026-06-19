@@ -47,12 +47,16 @@ val prj : int -> Lp_tree.term -> Lp_tree.term
 (* `eq_refl t` — reflexivity proof of the equality term [t]. *)
 val eq_refl : Lp_tree.term -> Lp_tree.term
 
-(* `extract var conjs k` — a proof of conjunct [k] pulled from the n-element
-   ⋀-list held by [var] (AXM8). *)
-val extract : Lp_tree.term -> prd list -> int -> Lp_tree.term
+(* `conj_prj_at var conjs k` — a proof of conjunct [k] (front-indexed) pulled
+   from the n-element ⋀-list held by [var], via B.lp's back-indexed `conj_prj`.
+   O(1) in the conjunct count (AXM8, AND5). *)
+val conj_prj_at : Lp_tree.term -> prd list -> int -> Lp_tree.term
 
-(* `and5_fwd var conjs ant_positions j` — rebuild the ⋀-list with conjunct
-   [j] (an implication) discharged by its antecedent at [ant_positions]. *)
+(* `and5_fwd var conjs ant_positions j` — the AND5 forward map `π C → π C'`:
+   drop the implication conjunct [j] (`conj_rm`) and append its consequent,
+   derived by applying [j] (`conj_prj`) to its antecedent at [ant_positions].
+   O(1) in the conjunct count (the back-indexed combinators do the walking at
+   reduction time). *)
 val and5_fwd : Lp_tree.term -> prd list -> int list -> int -> Lp_tree.term
 
 (* ---- Goal / annotation helpers ---- *)

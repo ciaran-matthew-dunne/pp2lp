@@ -2,7 +2,8 @@ require open pp2lp.Prelude;
 
 opaque symbol {|21|} (p : Prop) (q : τ ι) :
   π (⋀ (∎
-     ∷ (`!! x_t : Tuple 2, (((x_t ⋕ 0) ↦ (x_t ⋕ 1)) ϵ q))
+     ∷ (`!! x_t : Tuple 1,
+          (`!! y_t : Tuple 1, (((x_t ⋕ 0) ↦ (y_t ⋕ 0)) ϵ q)))
      ∷ (`!! x6_t : Tuple 2,
           (`?? x7_t : Tuple 1,
             ((x6_t ⋕ 0) ↦ (x6_t ⋕ 1) ↦ (x7_t ⋕ 0)) ϵ q)
@@ -11,6 +12,7 @@ opaque symbol {|21|} (p : Prop) (q : τ ι) :
 begin
   assume p q;
   refine AND3 _;
+  refine ALL3 _;
   refine ALL7 (λ _x1, STOP_1) _;
   refine NRM15 _;
   refine ALL9 _;

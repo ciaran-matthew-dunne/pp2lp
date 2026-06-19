@@ -27,9 +27,20 @@ let emit_replay ?map_file fp =
     print_string text;
     Option.iter (fun path -> write_map path prov) map_file)
 
+(* Classify a replay as PP's FOL+LIA+membership core or not, for the gen-phase
+   apero suite filter.  Prints `CORE` or `NONCORE <construct> <line>` to stdout
+   (exit 0); a parse failure dies via [with_replay_open] (exit 1). *)
+let core_check fp =
+  with_replay_open fp (fun fp ->
+    let r = Pp2lp.Parse_replay.parse_file fp in
+    match Pp2lp.Core_check.first_noncore_line r with
+    | None -> print_endline "CORE"
+    | Some (line, c) -> Printf.printf "NONCORE\t%s\t%d\n" c line)
+
 let usage () =
   prerr_endline "Usage:";
   prerr_endline "  pp2lp emit [--map F] REPLAY  clean Lambdapi to stdout (+ provenance TSV to F)";
+  prerr_endline "  pp2lp core-check REPLAY      CORE | NONCORE <construct> <line> (gen-phase filter)";
   prerr_endline "  pp2lp REPLAY          alias for: pp2lp emit REPLAY";
   prerr_endline "  pp2lp -h | --help     this help"
 
@@ -38,5 +49,6 @@ let () =
   | [_; ("--help" | "-help" | "-h")]      -> usage ()
   | [_; "emit"; "--map"; path; fp]        -> emit_replay ~map_file:path fp
   | [_; "emit"; fp]                       -> emit_replay fp
+  | [_; "core-check"; fp]                 -> core_check fp
   | [_; fp] when fp <> "" && fp.[0] <> '-' -> emit_replay fp
   | _ -> usage (); exit 1

@@ -32,12 +32,12 @@ type emit =
   | Opr of bool    (* equality rewrite; [true] = right-to-left (OPR2) *)
   | Axm8
   | Nrm20 | Nrm21 | Nrm22 | Nrm23
-  | Nrm26          (* binder drop at the position PP names (annotation diff
-                      against the child's binder list): slot 0 → NRM26S,
-                      slot 1 → NRM26M, last-listed → NRM26 (tuple_prepend) *)
+  | Nrm26          (* binder drop at the slot PP names (`NRM26 k`, the slot read
+                      off the annotation diff against the child's binder list) *)
   | Nrm2730        (* NRM27-30: trust-free solver dispatch — peel the pinned
                       binder at the witness `b`, ⊤-normalise the substituted
-                      conjunction (see [Emit_ctx.nrm29_witness_bridge]) *)
+                      conjunction (see [Emit_ctx.nrm29_witness_bridge]).  One
+                      lemma, NRM29; NRM27/28/30 fold onto it (untriggered) *)
   | Ar2            (* AR2: leaf `(leq a b) ⇒ R` with a > b concrete ℤ literals —
                       the ℤ-literal `AR2` lemma, closed by `λ k, k ⊤ᵢ` *)
   | Ar3 | Ar3_f | Ar4 | Ar5_6 | Ar7_8 | Ar9 | Ar10
@@ -55,10 +55,6 @@ type rule_info = {
   emit: emit;                (* how to build the rule's refine arguments *)
   hoas_identity: bool;       (* transformation is LP-definitional (ALL6: ¬Q ≡ Q⇒⊥);
                                 parent and child goals convert, so skip to the child. *)
-  binder_merge: bool;        (* quantifier-regrouping rule (ALL1–4 / XST1–4, §A.7–8):
-                                skipped in the main tree because [Syntax_pp.flatten_binds]
-                                pre-merges the binders at the AST level — NOT because it is
-                                LP-definitional.  See the §A.7 note + [Translate.tree]. *)
   intro_antecedent: bool;    (* rule introduces an antecedent hyp (IMP4, ALL9…) *)
   binds_var: bool;           (* rule introduces a tuple binder via `assume` (ALL8) *)
   chain_form: bool;          (* has a Res-chain `_1` lemma in lp/rules.  PP emits NRM
@@ -71,16 +67,16 @@ type rule_info = {
 
 let rules : (string, rule_info) Hashtbl.t =
   let t = Hashtbl.create 150 in
-  let r ?(emit=Default) ?(hoas_identity=false) ?(binder_merge=false)
+  let r ?(emit=Default) ?(hoas_identity=false)
         ?(intro_antecedent=false) ?(binds_var=false) ?(chain_form=false) name arity =
     Hashtbl.replace t name
-      { arity = Some arity; emit; hoas_identity; binder_merge;
+      { arity = Some arity; emit; hoas_identity;
         intro_antecedent; binds_var; chain_form }
   in
   let phantom name =
     Hashtbl.replace t name
       { arity = None; emit = Default; hoas_identity = false;
-        binder_merge = false; intro_antecedent = false; binds_var = false;
+        intro_antecedent = false; binds_var = false;
         chain_form = false }
   in
   let leaf   = Arity [] in
@@ -124,27 +120,26 @@ let rules : (string, rule_info) Hashtbl.t =
   r "AXM9" leaf ~emit:Witness_hyp;
   (* §A.7 Universal quantification.
      ALL1–4 are quantifier *regroupement* (§A.7): they merge `∀x·∀y·P` into the
-     compound `∀(x,y)·P`.  Marked [binder_merge], NOT [hoas_identity]: they are not
-     LP-definitional.  The merge is performed at the AST level by
-     [Syntax_pp.flatten_binds] (so the goal already carries one compound `Tuple n`
-     binder), and the rule is then skipped — see [Translate.tree] for why we keep the
-     LP merge lemma off the emitter's path.  ALL6 *is* LP-definitional
-     (¬Q ≡ Q⇒⊥) → genuine [hoas_identity]. *)
-  r "ALL1" pass ~binder_merge:true;
-  r "ALL2" pass ~binder_merge:true;
-  r "ALL3" pass ~binder_merge:true;
-  r "ALL4" pass ~binder_merge:true;
+     compound `∀(x,y)·P`.  They are plain `pass` rules, emitted for real (`refine
+     ALLn _`, P inferred from the curried `!! w, !! y, P w y` conclusion in
+     rules/All.lp); the goal renders with binders nested (flatten_binds is gone),
+     and the take/drop premise reduces to the compound slot order downstream wants.
+     ALL6 *is* LP-definitional (¬Q ≡ Q⇒⊥) → genuine [hoas_identity], still skipped. *)
+  r "ALL1" pass;
+  r "ALL2" pass;
+  r "ALL3" pass;
+  r "ALL4" pass;
   r "ALL5" pass;
   r "ALL6" pass ~hoas_identity:true;
   r "ALL7" branch;
   r "ALL8" pass ~binds_var:true;
   r "ALL9" pass ~intro_antecedent:true;
   (* §A.8 Existential quantification.  XST1–4 are the existential regroupement,
-     handled exactly like ALL1–4 ([binder_merge], via flatten_binds). *)
-  r "XST1" pass ~binder_merge:true;
-  r "XST2" pass ~binder_merge:true;
-  r "XST3" pass ~binder_merge:true;
-  r "XST4" pass ~binder_merge:true;
+     emitted for real exactly like ALL1–4 (curried `_1`/base forms in rules/Xst.lp). *)
+  r "XST1" pass;
+  r "XST2" pass;
+  r "XST3" pass;
+  r "XST4" pass;
   r "XST5" pass;
   r "XST51" pass;
   r "XST6" pass;
@@ -372,7 +367,6 @@ let lookup_flag f name =
   match lookup name with Some r -> f r | None -> false
 
 let is_hoas_identity = lookup_flag (fun r -> r.hoas_identity)
-let is_binder_merge = lookup_flag (fun r -> r.binder_merge)
 let intro_antecedent = lookup_flag (fun r -> r.intro_antecedent)
 let binds_var = lookup_flag (fun r -> r.binds_var)
 let has_chain_form = lookup_flag (fun r -> r.chain_form)

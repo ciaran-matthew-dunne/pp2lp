@@ -1,0 +1,1 @@
+Flag(FileOn("bm_dom_comp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | dom(r ; s) <: dom(r) | nn))

@@ -96,28 +96,17 @@ let rec ar3f_cong ctx env binders prd a_exp r_exp : L.term option =
 let rec tree ctx node =
   match node with
   | P.Apply { rule; children = [c]; _ }
-    when Rule_db.is_hoas_identity (base rule)
-      || Rule_db.is_binder_merge (base rule) ->
-    (* Skip to the child — the rule emits no tactic of its own.  Two distinct
-       justifications, both leaving the live goal unchanged:
+    when Rule_db.is_hoas_identity (base rule) ->
+    (* Skip to the child — [hoas_identity] (ALL6): the transformation is
+       LP-definitional (¬Q ≡ Q⇒⊥), so parent and child goals are convertible and
+       the rule emits no tactic of its own.
 
-       - [hoas_identity] (ALL6): the transformation is LP-definitional
-         (¬Q ≡ Q⇒⊥), so parent and child goals are convertible.
-
-       - [binder_merge] (ALL1–4 / XST1–4): PP *regroups* `∀x·∀y·P` into the
-         compound `∀(x,y)·P` (spec §A.7–8, "regroupement des quantifications").
-         We perform that merge at the AST level in [Syntax_pp.flatten_binds]
-         instead of via the LP `ALLn`/`XSTn` lemma, so both goals already render
-         to the same compound `Tuple n` binder and the rule has nothing to do.
-         Why skip rather than emit the lemma?  ALL3 has been re-encoded curried
-         (`!! w, !! y, P w y`, All.lp) where P is a *pattern*, so it CAN be
-         emitted with P inferred — [branch_cont] does exactly that (`refine
-         ALL3 _`) when a branch continuation's nested antecedent escaped
-         flattening.  The other merge rules still carry the compound-tuple
-         encoding (`P (w ⨾ prj 0 y)`), where P sits at a non-pattern position
-         lambdapi cannot invert, so the [Default] hole-emit leaves P unsolved;
-         emitting them would need an explicit predicate at every site — the
-         complexity flatten_binds buys us out of until they too are curried. *)
+       The §A.7–8 quantifier regroupement rules (ALL1–4 / XST1–4) are NOT skipped:
+       they are emitted for real.  Goals render with their binders nested
+       (flatten_binds is gone), and each merge rule is curried (`!! w, !! y, P w y`,
+       a pattern → `refine NAME _` infers P), so it flows through the [Default] path
+       below as `refine NAME _; <child>` — the take/drop premise reduces to exactly
+       the compound `Tuple n` slot order the downstream ALL7/NRM/… already expect. *)
     tree ctx c
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar10 ->
@@ -338,7 +327,7 @@ and default ctx rule arg anno children =
         Option.map
           (fun cong ->
             L.Refine (L.Name "=⇒", [L.App (L.Name "eq_sym", [cong]); L.Hole]))
-          (ar3f_cong ctx (proj_env_of_ctx ctx) [] (flatten_binds g) a_exp r_exp)
+          (ar3f_cong ctx (proj_env_of_ctx ctx) [] g a_exp r_exp)
       | _ -> None
     in
     (match tactic_opt with
@@ -496,30 +485,15 @@ and branching ctx rule anno chain_node cont =
       L.Lambda (v, None, chain_term ctx chain_node)))
   in
   let tactic = L.Refine (L.Name (base rule), [rho; L.Hole]) in
-  let cont_proof = scoped_hyps ctx (fun () -> branch_cont ctx cont) in
+  (* The continuation goal is `(!! v, res_tm (ρ v)) ⇒ R`.  When the chain result
+     is itself a (nested) quantifier, that antecedent renders nested (`!! w, !! y,
+     …`) — flatten_binds only ever merged *goal-level* binders, never one born
+     inside a `res_tm`.  [tree] emits the §A.7–8 merge for real there (`refine
+     ALL3/XST4/… _`, P inferred from the curried pattern conclusion), peeling one
+     `Tuple n × Tuple 1 → Tuple (n+1)` level per node down to the ALL7/XST8 it then
+     consumes — the same path it now takes for every main-tree merge. *)
+  let cont_proof = scoped_hyps ctx (fun () -> tree ctx cont) in
   L.Then (tactic, cont_proof)
-
-(* A branching continuation's goal is `(!! v, res_tm (ρ v)) ⇒ R`.  When the
-   chain result is itself a universal, that antecedent is *structurally
-   nested* (`!! w, !! y, …`) — unlike everywhere else, where the renderer
-   already merges nested PP binders into one compound tuple (the `binder_merge`
-   skip).  Here PP's ALL3 merge must be emitted for real.  The curried `ALL3`
-   (All.lp) states the nested conclusion as `!! w, !! y, P w y`, a *pattern* in
-   P, so `refine ALL3 _` infers P from the goal — no explicit predicate — and
-   its take/drop compound premise already matches the renderer's slot order
-   (which is why the old explicit-P `ALL3R` variant is gone). *)
-and branch_cont ctx cont =
-  match cont with
-  | P.Apply { rule; children = [c]; src_line; anno; _ }
-    when base rule = "ALL3"
-         && (match c with
-             | P.Apply { anno = canno; _ } ->
-               (match goal_of_anno canno with
-                | Some (Binary (Imp, Bind (_, _, _), _)) -> true
-                | _ -> false)) ->
-    let tactic = L.Refine (L.Name "ALL3", [L.Hole]) in
-    L.Commented (prov_of rule src_line anno, L.Then (tactic, tree ctx c))
-  | _ -> tree ctx cont
 
 (* The Res-chain handed to ALL7/XST8 has type `Π v : Tuple n, Res (P v)`.
    Build it as an explicit *term*: chains are purely applicative (each step
@@ -724,18 +698,17 @@ and chain_term ctx node : L.term =
      | _ ->
        Errors.fail "E_EMIT"
          "NRM2_1: expected a (♢v, P ⇒ Q v) ⇒ S chain annotation")
-  | P.Apply { rule; _ }
-    when Rule_db.is_binder_merge rule || base rule = "ALL5" ->
-    (* Primed binder-merge chain rule (ALL1_1–ALL5_1 / XST1_1–XST4_1).  PP's
-       §A.7–8 regroupement is pre-flattened at the AST level (flatten_binds),
-       so these chain shapes are never produced by the corpus; their LP lemmas
-       were only trust-bodied placeholders and were removed 2026-06-12.  Fail
-       loud rather than refine against a now-absent lemma.  Re-derivable via the
-       compound↔nested currying route (the curried base ALL3 is the precedent)
-       should a merge ever need emitting inside a Res chain. *)
+  (* Chain-form binder merges (`[XST4_1]`, `[ALL3_1]`, …) are NOT special-cased:
+     they fall through to the generic single-child chain case below, which emits
+     `<NAME>_1 child` (n/P inferred from the now-nested result type — flatten_binds
+     is gone).  Their curried `_1` lemmas are in rules/All.lp, rules/Xst.lp. *)
+  | P.Apply { rule; _ } when base rule = "ALL5" ->
+    (* ALL5 has no Res-chain `_1` form (its trust-bodied placeholder was removed
+       2026-06-12 and not re-derived — a De Morgan rule, not a §A.7–8 binder
+       merge), so fail loud rather than refine against an absent lemma. *)
     Errors.fail "E_DISPATCH"
-      "%s chain form unsupported — binder merges are pre-flattened \
-       (flatten_binds); the trust-bodied _1 lemma was removed 2026-06-12" rule
+      "%s chain form unsupported — no Res-chain `_1` lemma (De Morgan, not a \
+       binder merge; its placeholder was removed 2026-06-12)" rule
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP4"
          && (match goal_of_anno anno with

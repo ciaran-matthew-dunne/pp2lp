@@ -1,0 +1,1 @@
+Flag(FileOn("bm_comp_back.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (#x.((a, x): r & (x, c): s)) => (a, c): (r ; s) | nn))

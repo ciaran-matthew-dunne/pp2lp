@@ -83,10 +83,13 @@ let meta_ops =
   [ "card"; "dom"; "ran"; "perm"; "iseq"; "seq"; "seq1";
     "POW"; "POW1"; "FIN"; "FIN1"; "id"; "sz"; "func" ]
 
-(* Collapse consecutive same-binder Binds into one compound Bind.
-   `!x. !y. P` parses as nested; PP's ALL2/ALL3 normalize that to a
-   single compound `!(x,y). P`. We do the same at the goal level so
-   the LP-side ALL7 and friends see a single Tuple n binder. *)
+(* Collapse consecutive same-binder Binds into one compound Bind
+   (`!x. !y. P` ↦ `!(x,y). P`).  NO LONGER applied to the rendered goal: PP's
+   §A.7–8 regroupement (ALL1–4 / XST1–4) is now emitted for real (curried merge
+   rules, `refine NAME _`), so goals render with their binders nested exactly as
+   PP records them.  Retained only as a *local* normalization inside
+   [Emit_ctx.nrm29_witness_bridge], which matches the NRM29 cancelling-bounds
+   ♡-block as a single compound `Forall2` block regardless of how it nests. *)
 let rec flatten_binds = function
   | Bind (b, xs, Bind (b', ys, body)) when b = b' ->
     flatten_binds (Bind (b, xs @ ys, body))

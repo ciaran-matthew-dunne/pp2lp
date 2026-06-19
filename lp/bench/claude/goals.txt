@@ -2771,3 +2771,26 @@ gxn_fun_pair               | expr | f: s --> t & a: s => (a, f(a)): f
 gxn_rel_dom                | expr | r: s <-> t & (a, b): r => a: s
 gxn_rel_ran                | expr | r: s <-> t & (a, b): r => b: t
 gxn_pfun_uniq              | expr | f: s +-> t & (a, b): f & (a, c): f => b = c
+
+# bm_* — binder-merge probes (Phase 2 of the curried-merge-rule work).  These
+# exercise the §A.7–8 quantifier regroupement at sites flatten_binds reaches
+# AND ones it cannot:
+#   - relation identities (composition / inverse / dom / ran) whose proofs fan
+#     out through branching quantifiers; the merges land in the main tree (ALL3
+#     in a Res-chain continuation, exercised by branch_cont) or are flattened.
+#   - universal-antecedent goals `(!x.#y.#z.…) ⇒ …`: PP runs the antecedent
+#     through ALL7 and merges the per-tuple `#y.#z` inside a Res chain (`XST4_1`).
+#     Under flatten_binds the chain merge is a no-op, so the emitter skips it
+#     (Translate.chain_term); before that fix these were E_DISPATCH.
+# bm_allxst reaches the E_INS frontier *after* the merge (a separate gap), so it
+# stays red — kept as a frontier probe.
+bm_rc_invcomp        | expr | (r ; s)~ = (s~ ; r~)
+bm_comp_unfold2      | expr | (a, d): ((r ; s) ; t) => #x.#y.((a, x): r & (x, y): s & (y, d): t)
+bm_comp_back2        | expr | (#x.#y.((a, x): r & (x, y): s & (y, d): t)) => (a, d): ((r ; s) ; t)
+bm_comp_back         | expr | (#x.((a, x): r & (x, c): s)) => (a, c): (r ; s)
+bm_dom_comp          | expr | dom(r ; s) <: dom(r)
+bm_ran_comp          | expr | ran(r ; s) <: ran(s)
+bm_allid             | expr | (!x.#y.#z.r(x,y,z)) => (!x.#y.#z.r(x,y,z))
+bm_allweak           | expr | (!x.#y.#z.r(x,y,z)) => (!x.#y.#z.(r(x,y,z) or s))
+bm_allconj           | expr | (!x.#y.#z.(r(x,y,z) & t(x))) => (!x.#y.#z.r(x,y,z))
+bm_allxst            | expr | (!x.#y.#z.(p(x,y) & q(y,z))) => (!x.#y.p(x,y))

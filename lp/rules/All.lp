@@ -5,50 +5,40 @@
 // (ALL5_2, ALL7_2, ALL7_3, ALL7_2i, ALL7_3i, …) is gone: the uniform
 // tuple-indexed forms below subsume every arity.
 //
-// ALL1–4 are compound↔nested conversions. Per the spec convention,
-// `x` is an n-tuple bundle and `y` is the singleton trailing var,
-// so the rule peels one layer at a time:
+// ALL1–4 are compound↔nested conversions (§A.7 regroupement).  All four are now
+// CURRIED, like ALL3: P : Tuple n → Tuple 1 → Prop, so the nested conclusion is
 //
-//   compound : `!! v : Tuple (+1 n), P v
-//   nested   : `!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)
+//   nested   : `!! w : Tuple n, `!! y : Tuple 1, P w y
 //
-// Tuple (+1 n) constructors are exactly `(w ⨾ a)`, so the harder
-// direction (nested → compound) is provable by a rewrite rule that
-// pattern-matches on the constructor.
+// where `P w y` is a *pattern* (P applied to the distinct bound tuples) — hence
+// `refine ALLn _` infers P, no explicit predicate.  The compound premise splits
+// v : Tuple (n ++ 1) with take/drop:
+//
+//   compound : `!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)
+//
+// The two forms are equal (`!!_split_eq`, lemmas/Tuple.lp, proved once by propExt
+// over reconstruction `tcat` + projection `take`/`drop`), so ALL1/2/4 are one-line
+// transports of it; ALL3 keeps its direct projection proof.  Replaces the previous
+// compound-`P (w ⨾ prj 0 y)` encoding (non-pattern, so unemittable).
 
 require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
-// Helper: nested → compound. Defined by rewrite rule on the
-// tuple constructor `($w ⨾ $a)`. Used by ALL2 (ALL3 is now curried, below).
-symbol nested_to_compound [n] (P : Tuple (+1 n) → Prop)
-  (h : π (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)))
-  : Π v : Tuple (+1 n), π (P v);
-rule nested_to_compound [$n] $P $h ($w ⨾ $a) ↪
-  !!_to_pi (λ y, $P ($w ⨾ prj 0 y))
-           (!!_to_pi (λ w, `!! y : Tuple 1, $P (w ⨾ prj 0 y)) $h $w)
-           (unit ⨾ $a);
-
 // ALL1: H ⊢ ¬(∀(x,y)·P) ⇒ R → H ⊢ ¬(∀x·∀y·P) ⇒ R
-opaque symbol ALL1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  : π (¬ (`!! v : Tuple (+1 n), P v) ⇒ R)
-  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
+opaque symbol ALL1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  : π (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R)
+  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R) ≔
 begin
-  assume n P R h hnnested;
-  refine h _;
-  assume hcompound;
-  refine hnnested _;
-  refine pi_to_!! _ _; assume w;
-  refine pi_to_!! _ _; assume y;
-  refine !!_to_pi P hcompound (w ⨾ prj 0 y)
+  assume n P R h;
+  refine =⇒ (imp_cong_l (not_cong (!!_split_eq P))) h
 end;
 
 // ALL2: H ⊢ ¬(∀(x,y)·P) → H ⊢ ¬(∀x·∀y·P)
-opaque symbol ALL2 [n] [P : Tuple (+1 n) → Prop]
-  : π (¬ (`!! v : Tuple (+1 n), P v))
-  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y))) ≔
+opaque symbol ALL2 [n] [P : Tuple n → Tuple 1 → Prop]
+  : π (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  → π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y)) ≔
 begin
-  assume n P h hnested;
-  refine h (pi_to_!! P (nested_to_compound P hnested))
+  assume n P h;
+  refine =⇒ (not_cong (!!_split_eq P)) h
 end;
 
 // ALL3: H ⊢ (∀(x,y)·P) ⇒ R → H ⊢ (∀x·∀y·P) ⇒ R   (§A.7 regroupement)
@@ -74,14 +64,12 @@ begin
 end;
 
 // ALL4: H ⊢ ∀(x,y)·P → H ⊢ ∀x·∀y·P
-opaque symbol ALL4 [n] [P : Tuple (+1 n) → Prop]
-  : π (`!! v : Tuple (+1 n), P v)
-  → π (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ≔
+opaque symbol ALL4 [n] [P : Tuple n → Tuple 1 → Prop]
+  : π (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))
+  → π (`!! w : Tuple n, `!! y : Tuple 1, P w y) ≔
 begin
   assume n P h;
-  refine pi_to_!! _ _; assume w;
-  refine pi_to_!! _ _; assume y;
-  refine !!_to_pi P h (w ⨾ prj 0 y)
+  refine =⇒ (!!_split_eq P) h
 end;
 
 // ALL5: H ⊢ ∀-block, ¬P ⇒ R → H ⊢ ¬(∀-block, P) ⇒ R
@@ -146,17 +134,39 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// The chain (Res-typed) forms of the §A.7–8 quantifier regroupement
-// `∀x·∀y·P ↦ ∀(x,y)·P` (ALL1_1–ALL5_1) were removed 2026-06-12.  The merge is
-// pre-flattened at the AST level by the emitter's `flatten_binds` (the
-// `binder_merge` skip in rule_db.ml), so neither the base nor the `_1` form is
-// ever emitted, and their `res_tm` bridge was only a `trust` placeholder.  They
-// are re-derivable — the compound↔nested currying `Tuple (+1 n) ≅ Tuple n ×
-// Tuple 1` is provable by `propExt` over the two directions the base ALL1–4
-// already contain (forward = ALL4, backward = nested_to_compound), the curried
-// base ALL3 being the worked precedent — should a merge ever need emitting
-// inside a Res chain.  The chain dispatch now fails loud on these shapes
-// (Translate.chain_term).
+// ALL1_1–ALL4_1 are the Res-chain forms of the §A.7 quantifier regroupement.  PP
+// emits them PRIMED inside a result chain (`[ALL3_1]`, …), where flatten_binds
+// cannot reach — the merged binder is born inside `res_tm`, not in the goal.  Each
+// transports the curried base rule's compound↔nested equality (`!!_split_eq`,
+// lemmas/Tuple.lp) through the Schema-1 result bridge `mk_1 (res_tm r) (eq_trans
+// <concl = prem> (res_eq r))` — trust-free.  (They replace the trust-bodied
+// placeholders deleted 2026-06-12, now that the base rules are curried.)
+
+// ALL1_1: chain form of ALL1 (¬(∀-merge) ⇒ R).
+symbol ALL1_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R)
+  ≔ mk_1 (res_tm r)
+      (eq_trans (eq_sym (imp_cong_l (not_cong (!!_split_eq P)))) (res_eq r));
+
+// ALL2_1: chain form of ALL2 (¬(∀-merge)).
+symbol ALL2_1 [n] [P : Tuple n → Tuple 1 → Prop]
+  (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y))
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (not_cong (!!_split_eq P))) (res_eq r));
+
+// ALL3_1: chain form of ALL3 ((∀-merge) ⇒ R).
+symbol ALL3_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  (r : Res ((`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res ((`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (imp_cong_l (!!_split_eq P))) (res_eq r));
+
+// ALL4_1: chain form of ALL4 (∀-merge).
+symbol ALL4_1 [n] [P : Tuple n → Tuple 1 → Prop]
+  (r : Res (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : Res (`!! w : Tuple n, `!! y : Tuple 1, P w y)
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (!!_split_eq P)) (res_eq r));
+
 // ALL6: Schema 1 — passthrough through `¬P ≡ P ⇒ ⊥` (a genuine HOAS identity).
 // ALL7' / ALL8' / ALL9': special cases (see spec §8.13).
 

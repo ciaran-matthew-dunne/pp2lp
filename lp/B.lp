@@ -89,6 +89,19 @@ with take [+1 $n] [$m] ($v ⨾ $x)  ↪ take [$n] [$m] $v ⨾ $x;
 rule prj $k (take [$n] [$m] $v) ↪ prj $k $v
 with prj $k (drop [$n] [$m] $v) ↪ prj ($n ++ $k) $v;
 
+// tcat: the append, inverse of take/drop, used to *reconstruct* a compound tuple
+// from its parts in the binder-merge rules (ALL1/ALL4/XST2/XST3 build the merged
+// `v : Tuple (n ++ 1)` back from the nested `w : Tuple n`, `y : Tuple 1`).  It
+// recurses on the first tuple's constructors, so `tcat (w ⨾ x) y` is a visible `⨾`
+// and take/drop reduce on it.  The round-trip laws `take_tcat`/`drop_tcat`
+// (lemmas/Tuple.lp) are proved by induction, NOT stated as rewrite rules
+// (`take (tcat …) ↪ …` would overlap take/drop's _0/⨾ cases — the critical pair the
+// take/drop n=0 base cases create).  tcat's own rules are orthogonal (no other rule
+// mentions tcat), so they add no critical pair.
+symbol tcat [n m] : Tuple n → Tuple m → Tuple (n ++ m);
+rule tcat unit $y ↪ $y
+with tcat ($w ⨾ $x) $y ↪ tcat $w $y ⨾ $x;
+
 // ---- Tuple value destructor + η ----
 // Set-code for Tuple (mirrors list* for 𝕃*), so the polymorphic `=` (over τ a)
 // reaches tuple values — otherwise inexpressible on `Tuple n : TYPE`.
@@ -102,44 +115,37 @@ rule init ($v ⨾ _) ↪ $v;
 // prj through init on an abstract tuple: drops slot 0, shifts the rest down.
 rule prj $k (init $v) ↪ prj (+1 $k) $v;
 
-// ---- Slot surgery: rm1/rm2, tuple_insert1/2, tuple_prepend ----
-// NRM20/21 may pin (NRM26 may drop) the binder at slot 1 or 2, not just slot 0
-// (init/⨾) or the leftmost (tuple_prepend). rmK removes slot K, tuple_insertK
-// inserts there; the prj-commute rules keep projections reducible on abstract v.
-symbol rm1 [n] : Tuple (+1 (+1 n)) → Tuple (+1 n);
-rule rm1 ($v ⨾ $y) ↪ (init $v) ⨾ $y;
-rule prj _0 (rm1 $v) ↪ prj _0 $v
-with prj (+1 $k) (rm1 $v) ↪ prj (+1 (+1 $k)) $v;
+// ---- Slot surgery: ins / rm at an arbitrary ℕ slot ----
+// `ins k x v` inserts x at slot k; `rm k v` removes slot k.  Both are OPAQUE on
+// the tuple (no ⨾-spine reduction), so they apply to an abstract v: `prj`
+// commutes through them by arithmetic on the *index* alone — exactly as it
+// already does through drop (`prj k (drop[n][m] v) ↪ prj (n++k) v`).  The offset
+// helpers recurse on both indices at once — `ins_prj o j k x v ≡ prj (o++j)
+// (ins (o++k) x v)` — the accumulator o letting the (j+1,k+1) case fold back.
+// One symbol covers every slot, replacing the old per-slot rm1/rm2/
+// tuple_insert1/2/tuple_prepend.  Projection indices and slots are concrete
+// literals at emission, so ins_prj/rm_prj just compute; the abstract-index
+// round-trip `prj k (ins k x v) = x` is the lemma `prj_ins` (lemmas/Tuple.lp).
+// (NB: a bare numeral ≥1 in a rule pattern is a wildcard — spell a successor `+1 …`.)
+symbol ins [n] : ℕ → τ ι → Tuple n → Tuple (+1 n);
+symbol rm  [n] : ℕ → Tuple (+1 n) → Tuple n;
 
-symbol tuple_insert1 [n] : τ ι → Tuple (+1 n) → Tuple (+1 (+1 n));
-rule tuple_insert1 $x ($v ⨾ $y) ↪ ($v ⨾ $x) ⨾ $y;
-// NB: a bare numeral ≥1 in a rule pattern is a wildcard — spell slot 1 `+1 _0`.
-rule prj _0 (tuple_insert1 _ $w) ↪ prj _0 $w
-with prj (+1 _0) (tuple_insert1 $x _) ↪ $x
-with prj (+1 (+1 $k)) (tuple_insert1 _ $w) ↪ prj (+1 $k) $w
-with rm1 (tuple_insert1 _ $w) ↪ $w;
+symbol ins_prj [n] : ℕ → ℕ → ℕ → τ ι → Tuple n → τ ι;
+rule prj $j (ins $k $x $v) ↪ ins_prj _0 $j $k $x $v;
+rule ins_prj _   _0      _0      $x _  ↪ $x                     // j = k → the inserted slot
+with ins_prj $o _0      (+1 _)  _  $v ↪ prj $o $v              // j < k → below, unshifted
+with ins_prj $o (+1 $j) _0      _  $v ↪ prj ($o ++ $j) $v      // j > k → above, shifted down 1
+with ins_prj $o (+1 $j) (+1 $k) $x $v ↪ ins_prj (+1 $o) $j $k $x $v;
 
-symbol rm2 [n] : Tuple (+1 (+1 (+1 n))) → Tuple (+1 (+1 n));
-rule rm2 ($v ⨾ $y) ↪ (rm1 $v) ⨾ $y;
-rule prj _0 (rm2 $v) ↪ prj _0 $v
-with prj (+1 _0) (rm2 $v) ↪ prj (+1 _0) $v
-with prj (+1 (+1 $k)) (rm2 $v) ↪ prj (+1 (+1 (+1 $k))) $v;
+symbol rm_prj [n] : ℕ → ℕ → ℕ → Tuple (+1 n) → τ ι;
+rule prj $j (rm $k $v) ↪ rm_prj _0 $j $k $v;
+rule rm_prj $o $j      _0      $v ↪ prj (+1 ($o ++ $j)) $v     // k = 0 → every slot is ≥ k
+with rm_prj $o _0      (+1 _)  $v ↪ prj $o $v                  // j < k → below, unshifted
+with rm_prj $o (+1 $j) (+1 $k) $v ↪ rm_prj (+1 $o) $j $k $v;
 
-symbol tuple_insert2 [n] : τ ι → Tuple (+1 (+1 n)) → Tuple (+1 (+1 (+1 n)));
-rule tuple_insert2 $x ($v ⨾ $y) ↪ (tuple_insert1 $x $v) ⨾ $y;
-rule prj _0 (tuple_insert2 _ $w) ↪ prj _0 $w
-with prj (+1 _0) (tuple_insert2 _ $w) ↪ prj (+1 _0) $w
-with prj (+1 (+1 _0)) (tuple_insert2 $x _) ↪ $x
-with prj (+1 (+1 (+1 $k))) (tuple_insert2 _ $w) ↪ prj (+1 (+1 $k)) $w
-with rm2 (tuple_insert2 _ $w) ↪ $w;
-
-// Prepend at the leftmost slot (the last-listed binder; historical NRM26 form).
-// The k = 0 commute is sound (prepending never displaces the rightmost slot).
-symbol tuple_prepend [n] : τ ι → Tuple n → Tuple (+1 n);
-rule tuple_prepend [_0] $x unit ↪ unit ⨾ $x
-with tuple_prepend [+1 $n] $x ($w ⨾ $y) ↪ tuple_prepend [$n] $x $w ⨾ $y;
-rule prj _0 (tuple_prepend [+1 _] _ $v) ↪ prj _0 $v
-with prj _0 (tuple_prepend [_0] $x _) ↪ $x;
+// Round-trip: removing the just-inserted slot returns the tuple (the generic
+// analogue of the old `rm1 (tuple_insert1 _ w) ↪ w`).  Non-linear in the slot k.
+rule rm $k (ins $k $x $v) ↪ $v;
 
 // Motive for tuple η (proved as tuple_eta in lemmas/Tuple.lp): ⊤ at index 0, the
 // η statement at a successor, so init/prj 0 apply only where well-typed.
@@ -423,3 +429,31 @@ symbol ⋀_nil_prf : π (⋀ ∎);
 symbol ⋀_intro [ps : 𝕃* o] [P : Prop] : π (⋀ ps) → π P → π (⋀ (ps ∷ P));
 symbol ⋀_init  [ps : 𝕃* o] [P : Prop] : π (⋀ (ps ∷ P)) → π (⋀ ps);
 symbol ⋀_last  [ps : 𝕃* o] [P : Prop] : π (⋀ (ps ∷ P)) → π P;
+
+// ---- Indexed access into a conjunction (back-indexed, like Tuple's prj) ----
+// k counts from the back: index 0 is the last (rightmost) conjunct.  cprj/crm
+// recurse on the list structure; conj_prj/conj_rm carry the proof alongside,
+// reducing to ⋀_last/⋀_init/⋀_intro compositions.  ps is explicit on the proof
+// combinators so the rules can match the list (a proof can't be destructured);
+// the emitter passes `_`, inferring ps from the conjunction's type.  Used by
+// AND5 to drop one conjunct and project two in O(1) emitted size.
+
+// k-th conjunct from the back.
+symbol cprj : ℕ → 𝕃* o → Prop;
+rule cprj (+1 $k) ($ps ∷ _) ↪ cprj $k $ps
+with cprj _0       (_  ∷ $p) ↪ $p;
+
+// list with the k-th-from-back conjunct removed.
+symbol crm : ℕ → 𝕃* o → 𝕃* o;
+rule crm (+1 $k) ($ps ∷ $p) ↪ (crm $k $ps) ∷ $p
+with crm _0       ($ps ∷ _)  ↪ $ps;
+
+// project conjunct k out of a conjunction proof.
+symbol conj_prj (ps : 𝕃* o) (k : ℕ) : π (⋀ ps) → π (cprj k ps);
+rule conj_prj (_  ∷ _)  _0      $h ↪ ⋀_last $h
+with conj_prj ($ps ∷ _) (+1 $k) $h ↪ conj_prj $ps $k (⋀_init $h);
+
+// the conjunction survives dropping conjunct k.
+symbol conj_rm (ps : 𝕃* o) (k : ℕ) : π (⋀ ps) → π (⋀ (crm k ps));
+rule conj_rm ($ps ∷ _) _0      $h ↪ ⋀_init $h
+with conj_rm ($ps ∷ _) (+1 $k) $h ↪ ⋀_intro (conj_rm $ps $k (⋀_init $h)) (⋀_last $h);

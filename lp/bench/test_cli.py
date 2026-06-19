@@ -139,6 +139,28 @@ if eng.exists():
 else:
     print("  skip  E_* prefix contract (build the engine first)")
 
+# ── contract: core-check drives the apero gen-phase FOL+LIA+membership gate ──
+# `pp.core_check` parses the engine's `CORE` / `NONCORE <construct> <line>`
+# stdout; a drift in either side silently stops the gate from dropping
+# contaminated apero replays, so pin both ends here.
+if eng.exists():
+    rep = ROOT / "lp" / "bench" / "og" / "01" / "01.replay"
+    if rep.exists():
+        check("core-check: a fully-normalised replay is core",
+              pp.core_check(rep) == (True, "", 0))
+    noncore = write_tmp("[AND3] <s <: t>\n", ".replay")
+    verdict = pp.core_check(noncore)
+    noncore.unlink()
+    check("core-check: a retained set operator is non-core",
+          verdict == (False, "subset", 1))
+    coeff = write_tmp("[AND3] <50*x <= y>\n", ".replay")
+    verdict_c = pp.core_check(coeff)
+    coeff.unlink()
+    check("core-check: coefficient n*x is core, not a set product",
+          verdict_c == (True, "", 0))
+else:
+    print("  skip  core-check contract (build the engine first)")
+
 # ── resolver: suite enumeration (powers the "available: …" recovery hint) ────
 suites = pp._suite_names()
 check("suite_names lists og + claude", "og" in suites and "claude" in suites)

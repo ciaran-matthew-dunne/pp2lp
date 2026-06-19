@@ -53,34 +53,16 @@ symbol t_NRM19 (n : ℕ) (Q : Prop) (R : Tuple n → Prop) (v : Tuple n)
   (h : π (R v)) : π ((`♡ u, ¬ ⋀_snoc ⊤ (R u)) ⇒ Q) ≔ NRM19 v h;
 
 // ---- NRM20-23: substitution (binder pinned by an equality conjunct) ----
-symbol t_NRM20 (n : ℕ) (ps : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : τ ι)
+symbol t_NRM20 (n k : ℕ) (qs : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : Tuple n → τ ι)
+  (h : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v'))) ⇒ Q))
+  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj k v = E (rm k v)))) ⇒ Q) ≔ NRM20 k E h;
+symbol t_NRM21 (n k : ℕ) (qs : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : Tuple n → τ ι)
+  (h : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v'))) ⇒ Q))
+  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (E (rm k v) = prj k v))) ⇒ Q) ≔ NRM21 k E h;
+symbol t_NRM20H (n : ℕ) (ps : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : τ ι)
   (heq : Π v', π (popl (ps v') = (prj 0 v' = E)))
   (h : π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔ NRM20 E heq h;
-symbol t_NRM21 (n : ℕ) (ps : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : τ ι)
-  (heq : Π v', π (popl (ps v') = (E = prj 0 v')))
-  (h : π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔ NRM21 E heq h;
-symbol t_NRM20S (n : ℕ) (qs : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : Tuple n → τ ι)
-  (h : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj 0 v = E (init v)))) ⇒ Q) ≔ NRM20S E h;
-symbol t_NRM21S (n : ℕ) (qs : Tuple (+1 n) → 𝕃* o) (Q : Prop) (E : Tuple n → τ ι)
-  (h : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (E (init v) = prj 0 v))) ⇒ Q) ≔ NRM21S E h;
-symbol t_NRM20P (n : ℕ) (qs : Tuple (+1 (+1 n)) → 𝕃* o) (Q : Prop) (E : Tuple (+1 n) → τ ι)
-  (h : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (prj 1 v = E (rm1 v)))) ⇒ Q) ≔ NRM20P E h;
-symbol t_NRM21P (n : ℕ) (qs : Tuple (+1 (+1 n)) → 𝕃* o) (Q : Prop) (E : Tuple (+1 n) → τ ι)
-  (h : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (E (rm1 v) = prj 1 v))) ⇒ Q) ≔ NRM21P E h;
-symbol t_NRM20P2 (n : ℕ) (qs : Tuple (+1 (+1 (+1 n))) → 𝕃* o) (Q : Prop)
-  (E : Tuple (+1 (+1 n)) → τ ι)
-  (h : π ((`♡ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 (+1 n))), ¬ ⋀ (qs v ∷ (prj 2 v = E (rm2 v)))) ⇒ Q) ≔ NRM20P2 E h;
-symbol t_NRM21P2 (n : ℕ) (qs : Tuple (+1 (+1 (+1 n))) → 𝕃* o) (Q : Prop)
-  (E : Tuple (+1 (+1 n)) → τ ι)
-  (h : π ((`♡ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v'))) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 (+1 n))), ¬ ⋀ (qs v ∷ (E (rm2 v) = prj 2 v))) ⇒ Q) ≔ NRM21P2 E h;
+  : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔ NRM20H E heq h;
 symbol t_NRM22 (Q : Prop) (ps : Tuple 1 → 𝕃* o) (E : τ ι)
   (h : π (¬ ⋀ (ps (unit ⨾ E)) ⇒ Q))
   : π ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q) ≔ NRM22 E h;
@@ -94,33 +76,14 @@ symbol t_NRM23G (Q : Prop) (ps : Tuple 1 → 𝕃* o) (E : τ ι)
 symbol t_NRM24 (n : ℕ) (P : Tuple n → Prop) (Q : Prop)
   (h : π ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)) ⇒ Q)) : π ((`♡ v, ¬ (P v)) ⇒ Q) ≔ NRM24 h;
 symbol t_NRM25 (n : ℕ) (P Q : Prop) (h : π (P ⇒ Q)) : π ((`♡ _ : Tuple n, P) ⇒ Q) ≔ NRM25 h;
-symbol t_NRM26 (n : ℕ) (P : Tuple (+1 n) → Prop) (Q : Prop)
-  (h : π ((`♡ v' : Tuple n, P (tuple_prepend 𝟎 v')) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔ NRM26 h;
-symbol t_NRM26S (n : ℕ) (P : Tuple (+1 n) → Prop) (Q : Prop)
-  (h : π ((`♡ v' : Tuple n, P (v' ⨾ 𝟎)) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔ NRM26S h;
-symbol t_NRM26M (n : ℕ) (P : Tuple (+1 (+1 n)) → Prop) (Q : Prop)
-  (h : π ((`♡ v' : Tuple (+1 n), P (tuple_insert1 𝟎 v')) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 n)), P v) ⇒ Q) ≔ NRM26M h;
-symbol t_NRM26M2 (n : ℕ) (P : Tuple (+1 (+1 (+1 n))) → Prop) (Q : Prop)
-  (h : π ((`♡ v' : Tuple (+1 (+1 n)), P (tuple_insert2 𝟎 v')) ⇒ Q))
-  : π ((`♡ v : Tuple (+1 (+1 (+1 n))), P v) ⇒ Q) ≔ NRM26M2 h;
+symbol t_NRM26 (n k : ℕ) (P : Tuple (+1 n) → Prop) (Q : Prop)
+  (h : π ((`♡ v' : Tuple n, P (ins k (el ι) v')) ⇒ Q))
+  : π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔ NRM26 k h;
 
-// ---- NRM27-30: arithmetic solver dispatch ----
-symbol t_NRM27 (n : ℕ) (ps : Tuple (+1 n) → 𝕃* o)
-  (hint : Π v, π (prj 0 v ϵ INT))
-  (hpos : Π v, π (mem (leq (prj 0 v) 𝟎) (ps v)))
-  (hneg : Π v, π (mem (leq (neg (prj 0 v)) 𝟎) (ps v)))
-  (h : π (`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎))))
-  : π (`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ≔ NRM27 hint hpos hneg h;
-symbol t_NRM28 (ps : τ ι → 𝕃* o) (R : Prop) (h : π (¬ ⋀ (ps 𝟎) ⇒ R))
-  : π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔ @NRM28 ps R h;
+// ---- NRM29: arithmetic solver dispatch (NRM27/28/30 fold onto this) ----
 symbol t_NRM29 (n : ℕ) (ps : Tuple (+1 n) → 𝕃* o) (R : Prop) (b : Tuple n → τ ι)
   (h : π ((`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ b v'))) ⇒ R))
   : π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ R) ≔ NRM29 b h;
-symbol t_NRM30 (ps : τ ι → 𝕃* o) (R : Prop) (b : τ ι) (h : π (¬ ⋀ (ps b) ⇒ R))
-  : π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔ @NRM30 ps R b h;
 
 // ---- _1 (Result-form) variants ----
 symbol t_NRM1_1 (n : ℕ) (P Q : Prop) (r : Res (P ⇒ Q))

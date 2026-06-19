@@ -1,0 +1,1 @@
+Flag(FileOn("bm_rc_invcomp.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (r ; s)~ = (s~ ; r~) | nn))

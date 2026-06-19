@@ -219,10 +219,10 @@ let tactic_for_witness_hyp ctx rule anno =
     | Some (witness, h) -> L.Refine (L.Name rule, [witness; L.Name h])
     | None -> fallback
 
-(* The AXM8 extraction function `λ h, <∧ₑ chain pulling conjunct k>` : π C → π r,
-   where the goal is `C ⇒ r` and r is the conjunct at position k of C.  Shared
-   by the base AXM8 tactic and the chain-form AXM8_1 (which wraps it in
-   `mk_0 ∘ prop_eq_top`).  [None] when the goal isn't `C ⇒ r` with r a conjunct. *)
+(* The AXM8 extraction function `λ h, conj_prj h k` : π C → π r, where the goal
+   is `C ⇒ r` and r is the conjunct at position k of C.  Shared by the base AXM8
+   tactic and the chain-form AXM8_1 (which wraps it in `mk_0 ∘ prop_eq_top`).
+   [None] when the goal isn't `C ⇒ r` with r a conjunct. *)
 let axm8_extraction ctx anno : L.term option =
   match goal_of_anno anno with
   | Some (Binary (Imp, lhs, rhs)) ->
@@ -231,7 +231,7 @@ let axm8_extraction ctx anno : L.term option =
      | Some k ->
        ctx.n <- ctx.n + 1;
        let h = Printf.sprintf "_h%d" ctx.n in
-       Some (L.Lambda (h, None, extract (L.Name h) conjs k))
+       Some (L.Lambda (h, None, conj_prj_at (L.Name h) conjs k))
      | None -> None)
   | _ -> None
 
@@ -342,19 +342,16 @@ let tactic_for_rule ctx rule arg anno children =
        dominated AR10's emitted size across tens of thousands of sites. *)
     L.Refine (L.Name "AR10", [L.App (L.Name "eq_refl", [L.Hole]); L.Hole])
   | Rule_db.Nrm20 | Rule_db.Nrm21 ->
-    (* NRM20 pins a binder by an `x = E` conjunct, NRM21 by `E = x`.  PP may
-       pin *any* binder (not only the leading one), the equality may sit at
-       the head or the tail of the conjunct list, and E may mention the
-       *other* still-bound vars (`#x.#y.(x = y)` pins x at y).  Dispatch:
-
-         head equality, leading binder, block-closed E
-           → NRM20/NRM21 (popl/dropl head forms; E + eq_refl witness)
-         tail equality, pin slot 0 / slot 1
-           → NRM20S/21S / NRM20P/21P (E a function of the remaining tuple)
-
-       The pinned var is read off the annotation diff against the child's
-       binder list (fallback: the first orientation-matching equality whose
-       var is in the block). *)
+    (* Drop a binder pinned by an `x = E` (NRM20) / `E = x` (NRM21) conjunct.
+       PP may pin *any* binder at *any* slot k, with E mentioning the other
+       still-bound vars (`#x.#y.(x = y)` pins x at y).  One generic lemma covers
+       every slot: emit the slot k and E as a function of the remaining tuple
+       (the pinned var removed, the rest projected in `rvars` order: index i ↦
+       `prj i w` — removing slot k makes each remaining binder land at its own
+       index).  The pinning equality must be the conjunct list's tail, so bubble
+       it there first (generated swap-congruence) when it isn't.  The pinned var
+       is read off the annotation diff against the child's binder list (fallback:
+       the first orientation-matching equality whose var is in-block). *)
     let rev = Rule_db.emit rule = Rule_db.Nrm21 in
     let rule_name = if rev then "NRM21" else "NRM20" in
     (match goal_of_anno anno with
@@ -390,50 +387,41 @@ let tactic_for_rule ctx rule arg anno children =
           let e_vars =
             (Free_vars.free_vars_of_prd (Eq (e, Lit "0"))).Free_vars.exp_vars in
           let head_ok =
-            j = 0 && k = 0 && n_cs > 1
+            (not rev) && j = 0 && k = 0 && n_cs > 1
             && not (List.exists (fun v -> Free_vars.SS.mem v e_vars) vars)
           in
-          if head_ok then begin
-            (* head form (the original popl/dropl lemmas, block-closed E). *)
+          if head_ok then
+            (* Fast path for the dominant shape (all of prv): slot-0 head equality
+               with block-closed E.  NRM20H peels the head equality with popl/dropl
+               — no rotation, the per-site cost that otherwise pushes NRM20-dense
+               proofs over the check budget.  Semantically the slot-0 head case of
+               the general NRM20 below. *)
             let env = pp_env_of ctx in
             let v = fresh_x_local ctx in
-            let heq_eq =
-              if rev then L.Eq (L.Exp (env, e), prj 0 (L.Name v))
-              else L.Eq (prj 0 (L.Name v), L.Exp (env, e))
-            in
-            L.Refine (L.Name rule_name,
+            let heq_eq = L.Eq (prj 0 (L.Name v), L.Exp (env, e)) in
+            L.Refine (L.Name "NRM20H",
               [ L.Exp (env, e);
                 L.Lambda (v, None, eq_refl heq_eq);
                 L.Hole ])
-          end
-          else if k <= 2 then begin
-            (* tail form: E a function of the remaining tuple.  When the
-               equality isn't the last conjunct, first bubble it to the end
-               with a generated swap-congruence chain and transport the goal
-               (`=⇒ (eq_sym cong)`); the lifted lemmas' implicits are all
-               inferred from the goal term, so the chain is built bare. *)
+          else begin
+            (* General: `ins`/`rm` at slot k; E is a function of the remaining tuple
+               (the pinned var removed, the rest projected in `rvars` order —
+               removing slot k makes each remaining binder land at its own index).
+               The pinning equality must be the conjunct-list tail, so bubble it
+               there (generated swap-congruence) when it isn't already. *)
             let rvars = List.filter (fun v -> v <> pinned) vars in
-            let name =
-              rule_name ^ (match k with 0 -> "S" | 1 -> "P" | _ -> "P2") in
             let w = fresh_x_local ctx in
             let env' =
               List.mapi (fun i v -> (v, L.Proj (i, w))) rvars @ pp_env_of ctx in
-            let tail_app hole_or_args =
-              ( [ L.Lambda (w, None, L.Exp (env', e)) ] @ hole_or_args )
-            in
-            if j = n_cs - 1 then
-              L.Refine (L.Name name, tail_app [ L.Hole ])
+            let args =
+              [ L.Name (string_of_int k);
+                L.Lambda (w, None, L.Exp (env', e)); L.Hole ] in
+            if j = n_cs - 1 then L.Refine (L.Name rule_name, args)
             else
               L.Refine (L.Name "=⇒",
                 [ L.App (L.Name "eq_sym", [ conj_bubble_goal_cong ctx n_cs j ]);
-                  L.App (L.Name name, tail_app [ L.Hole ]) ])
+                  L.App (L.Name rule_name, args) ])
           end
-          else
-            failwith (Printf.sprintf
-              "translate: %s equality conjunct at position %d/%d pinning \
-               slot %d — only slots 0/1/2 have substitution lemmas \
-               (%sS/%sP/%sP2, after tail rotation)"
-              rule_name j n_cs k rule_name rule_name rule_name)
         | None ->
           failwith (Printf.sprintf
             "translate: %s annotation lacks an `%s` equality conjunct \
@@ -443,28 +431,25 @@ let tactic_for_rule ctx rule arg anno children =
        failwith (Printf.sprintf
          "translate: %s expected a `forall2(…)·¬(…) ⇒ Q` annotation" rule_name))
   | Rule_db.Nrm26 ->
-    (* Binder drop at the position PP names: slot 0 → NRM26S, slot 1 →
-       NRM26M, last-listed (the leftmost slot) → NRM26 (tuple_prepend).
-       Position = annotation diff against the child's binder list; without
-       a usable child annotation keep the historical NRM26. *)
-    let fallback = L.Refine (L.Name "NRM26", [L.Hole]) in
-    (match forall2_vars_of_goal (goal_of_anno anno), children with
-     | Some vars, [c] ->
-       (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
-        | Some cvars when List.length cvars = List.length vars - 1 ->
-          (match dropped_var_pos vars cvars with
-           | Some (k, v) ->
-             if k = List.length vars - 1 then fallback
-             else if k = 0 then L.Refine (L.Name "NRM26S", [L.Hole])
-             else if k = 1 then L.Refine (L.Name "NRM26M", [L.Hole])
-             else if k = 2 then L.Refine (L.Name "NRM26M2", [L.Hole])
-             else
-               failwith (Printf.sprintf
-                 "translate: NRM26 drops binder %s at slot %d — only slots \
-                  0/1/2/last have LP forms (NRM26S/NRM26M/NRM26M2/NRM26)" v k)
-           | None -> fallback)
-        | _ -> fallback)
-     | _, _ -> fallback)
+    (* Drop an unused binder at the slot PP names; one generic lemma, the emitter
+       supplies k (annotation diff against the child's binder list).  Without a
+       usable child annotation, default to the last-listed binder (slot |vars|-1)
+       — the position the historical tuple_prepend form dropped. *)
+    let emit k = L.Refine (L.Name "NRM26", [L.Name (string_of_int k); L.Hole]) in
+    (match forall2_vars_of_goal (goal_of_anno anno) with
+     | Some vars ->
+       let default_k = List.length vars - 1 in
+       let k =
+         match children with
+         | [c] ->
+           (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
+            | Some cvars when List.length cvars = List.length vars - 1 ->
+              (match dropped_var_pos vars cvars with
+               | Some (k, _) -> k | None -> default_k)
+            | _ -> default_k)
+         | _ -> default_k
+       in emit k
+     | None -> emit 0)
   | Rule_db.Nrm22 | Rule_db.Nrm23 ->
     (* Single-binder pins.  NRM22 [ps] [Q] (E) concludes
        `(♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q` (NRM23G the

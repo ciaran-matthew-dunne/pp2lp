@@ -64,11 +64,6 @@ val emit : string -> emit
     parent and child goals convert and emit can skip to the child? *)
 val is_hoas_identity : string -> bool
 
-(** Is the rule a quantifier-regrouping merge (ALL1–4 / XST1–4)?  Such rules are
-    skipped in the main tree — not because they are LP-definitional, but because
-    [Syntax_pp.flatten_binds] pre-merges the binders at the AST level. *)
-val is_binder_merge : string -> bool
-
 (** Does the rule have a Res-chain [_1] lemma in [lp/rules]?  PP emits NRM rules
     unprimed even inside result chains; the emitter primes only the ones flagged
     here and fails loud on the rest rather than emit an undefined symbol. *)

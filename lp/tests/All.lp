@@ -4,18 +4,18 @@
 require open pp2lp.Prelude;
 
 // ALL1–4: compound ↔ nested conversions.
-symbol t_ALL1 (n : ℕ) (P : Tuple (+1 n) → Prop) (R : Prop)
-  (h : π (¬ (`!! v : Tuple (+1 n), P v) ⇒ R))
-  : π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔ ALL1 h;
-symbol t_ALL2 (n : ℕ) (P : Tuple (+1 n) → Prop)
-  (h : π (¬ (`!! v : Tuple (+1 n), P v)))
-  : π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y))) ≔ ALL2 h;
+symbol t_ALL1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (h : π (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R) ≔ ALL1 h;
+symbol t_ALL2 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (h : π (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : π (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y)) ≔ ALL2 h;
 symbol t_ALL3 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
   (h : π ((`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
   : π ((`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R) ≔ ALL3 h;
-symbol t_ALL4 (n : ℕ) (P : Tuple (+1 n) → Prop)
-  (h : π (`!! v : Tuple (+1 n), P v))
-  : π (`!! w : Tuple n, `!! y : Tuple 1, P (w ⨾ prj 0 y)) ≔ ALL4 h;
+symbol t_ALL4 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (h : π (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : π (`!! w : Tuple n, `!! y : Tuple 1, P w y) ≔ ALL4 h;
 
 // ALL5–9.
 symbol t_ALL5 (n : ℕ) (P : Tuple n → Prop) (R : Prop)
@@ -31,6 +31,19 @@ symbol t_ALL9 (n : ℕ) (T : Tuple n → Prop) (Q : Prop)
   (h : π (`!! v, T v) → π Q) : π ((`♡ v, T v) ⇒ Q) ≔ ALL9 h;
 
 // _1 (Result-form) variants
+// Curried binder-merge chain forms (ALL1_1–ALL4_1).
+symbol t_ALL1_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R) ≔ ALL1_1 r;
+symbol t_ALL2_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y)) ≔ ALL2_1 r;
+symbol t_ALL3_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop) (R : Prop)
+  (r : Res ((`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res ((`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R) ≔ ALL3_1 r;
+symbol t_ALL4_1 (n : ℕ) (P : Tuple n → Tuple 1 → Prop)
+  (r : Res (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : Res (`!! w : Tuple n, `!! y : Tuple 1, P w y) ≔ ALL4_1 r;
 symbol t_ALL6_1 (n : ℕ) (P : Tuple n → Prop)
   (r : Res ((`!! v, P v) ⇒ ⊥)) : Res (¬ (`!! v, P v)) ≔ ALL6_1 r;
 symbol t_ALL7_1 (n : ℕ) (P : Tuple n → Prop) (Q : Prop)

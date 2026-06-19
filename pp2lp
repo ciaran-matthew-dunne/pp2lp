@@ -284,7 +284,12 @@ def diag_loc(ev: dict) -> tuple[str, int | None, int | None]:
 # ── Check one trace (emit + check + provenance join) ───────────────────────
 def check_one(replay: Path) -> dict:
     out = replay.with_suffix(".lp")
-    for stale in (*out.parent.glob(f"{out.stem}.lp.*"),       # legacy debug-trace + probe
+    # Clear any stale per-benchmark artifacts up front so a run always emits and
+    # checks from scratch: the `.lp` (re-emitted below) and its `.lpo` object cache
+    # (lambdapi reuses a `.lpo` newer than its source, and a stale one survives an
+    # engine/lp change otherwise), plus legacy debug-trace / probe leftovers.
+    for stale in (out, out.with_suffix(".lpo"),
+                  *out.parent.glob(f"{out.stem}.lp.*"),       # legacy debug-trace + probe
                   *out.parent.glob(f"{out.stem}.probe.lp*")):  # artifacts from older runs
         stale.unlink(missing_ok=True)
     t0 = time.monotonic()
@@ -989,7 +994,12 @@ def _strip_flags(content):
 #   traces  PP — gen_apero_traces proves the .but files in parallel
 #           (PP2LP_GEN_JOBS, timer PP2LP_APERO_TIMER, default R45) → .trace.
 #   replays REPLAY → .replay (shared gen_replays); a .trace with no .replay is a
-#           REPLAY loss, left in place and simply skipped by `run`.
+#           REPLAY loss, left in place and simply skipped by `run`.  Two gates
+#           drop a replay from the apero suite here: a truncated replay (REPLAY
+#           lost the ALL7/XST8 continuation, unemittable) and — apero-only — a
+#           non-core replay (PP left a set operator unfolded, so it is not in the
+#           FOL+LIA+membership core; see `core_check` and the engine's
+#           `core-check`).  Both leave the .trace in place.
 # Then `run` emits .lp and type-checks (stages 4–5).  State is per-dir on disk
 # (no central ledger): each stage skips inputs whose output is already current.
 # The ~600k-goal corpus is gitignored and reproducible from the dataset + cap.
@@ -1002,24 +1012,31 @@ class _AperoUnsupported(Exception):
 _APERO_CMP = {":": ":", "/:": "/:", "<:": "<:", "/<:": "/<:", "<<:": "<<:",
               "/<<:": "/<<:", "=": "=", "/=": "/=",
               "<=i": "<=", "<i": "<", ">=i": ">=", ">i": ">",
-              "<=f": "<=", "<f": "<", ">=f": ">=", ">f": ">",
               "<=": "<=", "<": "<", ">=": ">=", ">": ">"}
 _APERO_BIN = {"+i": "+", "-i": "-", "*i": "*", "/i": "/", "**i": "**",
-              "+f": "+", "-f": "-", "*f": "*", "/f": "/",
               "-s": "-", "*s": "*", "+s": "+"}
-_APERO_UN = {"imax": "max", "imin": "min", "rmax": "max", "rmin": "min"}
+_APERO_UN = {"imax": "max", "imin": "min"}
 
-# Optional hypothesis-size cap.  OFF by default (0 = the full convertible corpus).
-# PP proves ~98% of converted obligations regardless of size, but REPLAY truncates
-# and lambdapi times out as the hypothesis context grows: measured replay-
-# completeness is 72% at <=5 premises, 46% at 25-50, 25% at 50-100, and 0% at
-# >=1000 (corpus median is ~580).  The cap was a blunt way to keep gen on the
-# tractable band; with the suite now generated smallest-first and resumable, the
-# tractable goals are processed first anyway and the big-context monsters self-
-# eliminate (REPLAY-truncation drop, then lambdapi timeout at run).  Set
-# PP2LP_APERO_MAX_PREMISE=N to re-cap (counts top-level & '&'-conjuncts of the
-# rendered hypothesis) if a full gen is too slow.
-_APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "0"))
+# Real/float arithmetic — rejected, not coerced.  PP/B's real operators do not
+# faithfully correspond to the integer-overloaded surface symbols (+, *, <=, …);
+# coercing a real op onto its integer spelling would feed PP a different theorem
+# than the obligation states (a faithful proof of the wrong, integerised goal).
+# We only emit what faithfully corresponds to a PP goal, so these drop cleanly at
+# conversion rather than silently coercing.  (Tiny volume — the corpus is
+# overwhelmingly integer/set.)
+_APERO_REAL_OPS = frozenset({
+    "+f", "-f", "*f", "/f", "+r", "-r", "*r", "/r", "**r",
+    "<=f", "<f", ">=f", ">f", "<=r", "<r", ">=r", ">r", "rmax", "rmin"})
+
+# Hypothesis-size cap (counts top-level & '&'-conjuncts of the rendered
+# hypothesis).  PP proves ~98% of converted obligations regardless of size, but
+# REPLAY truncates and lambdapi times out as the context grows: measured replay-
+# completeness is 72% at <=5 premises, 46% at 25-50, 25% at 50-100, and ~0% by
+# >=500 (corpus median is ~580).  ~95% of the uncapped corpus sits in the >=100
+# band where REPLAY produces nothing usable, so the cap keeps gen on the
+# replayable band: <=100 premises is ~14k goals (the realistic suite) vs ~207k
+# uncapped, almost all dead weight.  0 = no cap (the full convertible corpus).
+_APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "100"))
 
 
 def _apero_src() -> Path:
@@ -1049,6 +1066,8 @@ def _ap_exp(el) -> str:
         return f"bool({_ap_prd(el[0])})"
     if t == "Unary_Exp":
         op = el.get("op")
+        if op in _APERO_REAL_OPS:
+            raise _AperoUnsupported(f"real arithmetic {op!r}")
         a = _ap_exp(el[0])
         if op == "~":
             return f"({a})~"
@@ -1057,6 +1076,8 @@ def _ap_exp(el) -> str:
         return f"{_APERO_UN.get(op, op)}({a})"
     if t == "Binary_Exp":
         op = el.get("op")
+        if op in _APERO_REAL_OPS:
+            raise _AperoUnsupported(f"real arithmetic {op!r}")
         a, b = _ap_exp(el[0]), _ap_exp(el[1])
         if op == "(":
             return f"{a}({b})"
@@ -1101,6 +1122,8 @@ def _ap_prd(el) -> str:
     t = _ap_tag(el)
     if t == "Exp_Comparison":
         op = el.get("op")
+        if op in _APERO_REAL_OPS:
+            raise _AperoUnsupported(f"real arithmetic {op!r}")
         if op not in _APERO_CMP:
             raise _AperoUnsupported(f"comparison {op!r}")
         return f"({_ap_exp(el[0])} {_APERO_CMP[op]} {_ap_exp(el[1])})"
@@ -1389,6 +1412,29 @@ def gen_traces(suite, krt, force=False):
     return ok, fail, skip
 
 
+def core_check(replay: Path) -> tuple[bool, str, int]:
+    """Classify a replay as PP's FOL+LIA+membership core (the apero suite gate).
+
+    Returns (is_core, construct, replay_line).  A non-core replay retained a set
+    operator PP did not unfold (a function space, subset, product, dom/ran/card/
+    perm/POW, set enumeration, comprehension, …), so its proof would rest on
+    uninterpreted B.lp symbols rather than the core.  On any engine hiccup
+    (missing binary, timeout, unparsable replay) we return core=True — a
+    classifier failure must never silently delete a benchmark; such a replay is
+    surfaced by the emit probe / `run` instead."""
+    try:
+        r = engine("core-check", rel(replay), timeout=EMIT_TIMEOUT)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return True, "", 0
+    out = (r.stdout or "").strip()
+    if r.returncode != 0 or out == "CORE" or not out:
+        return True, "", 0
+    parts = out.split("\t")
+    if parts[0] == "NONCORE" and len(parts) >= 3:
+        return False, parts[1], int(parts[2])
+    return True, "", 0
+
+
 def gen_replays(suite, krt, force=False):
     replay_kin = find_kin([ROOT / "vendor/atelierb/linux_x64/REPLAY.kin",
                            "/opt/atelierb-free-24.04.2/bin/REPLAY.kin"])
@@ -1396,14 +1442,15 @@ def gen_replays(suite, krt, force=False):
         sys.exit("pp2lp: REPLAY.kin not found")
     here = BENCH / suite
     traces = sorted(here.rglob("*.trace"), key=lambda p: p.stat().st_size)   # small→big
-    ok = fail = skip = dropped = 0
+    ok = fail = skip = dropped = noncore = 0
     done, t0 = 0, time.time()
     last_line = last_tty = 0.0
 
     def _line(stem):
         el = (time.time() - t0) / 60
+        nc = f"{noncore} non-core · " if noncore else ""
         return (f"replays {done}/{len(traces)} · {ok} ok · {dropped} dropped · "
-                f"{fail} failed · {skip} up-to-date · {el:.0f}m · {stem}")
+                f"{nc}{fail} failed · {skip} up-to-date · {el:.0f}m · {stem}")
 
     def progress(stem, force_draw=False):
         nonlocal last_tty, last_line
@@ -1461,15 +1508,32 @@ def gen_replays(suite, krt, force=False):
                 print(yellow(f"  ⚠ dropped {stem}: truncated replay "
                              f"(REPLAY dropped the ALL7/XST8 continuation; {hint})"))
                 dropped += 1
-            else:
-                ok += 1
+                continue
+            # apero suite gate: keep only replays PP reduced to its FOL+LIA+
+            # membership core.  A retained set operator (function space, subset,
+            # product, dom/ran/card/perm/POW, set enumeration, comprehension, …)
+            # means PP did not unfold it, so the proof would rest on uninterpreted
+            # B.lp symbols rather than the core — drop it from the suite.  Other
+            # suites are curated (their rare card/dom are deliberate), so the gate
+            # is apero-only.
+            if suite == "apero":
+                is_core, construct, cline = core_check(replay)
+                if not is_core:
+                    replay.unlink(missing_ok=True)
+                    clear_progress()
+                    print(yellow(f"  ⚠ dropped {stem}: non-core symbol "
+                                 f"'{construct}' (replay line {cline}) — "
+                                 f"not FOL+LIA+membership"))
+                    noncore += 1
+                    continue
+            ok += 1
     except KeyboardInterrupt:
         clear_progress()
         print(yellow(f"  replays: interrupted at {done}/{len(traces)} — the stage is "
                      f"incremental; rerun `pp2lp gen {suite} --only replays` to resume"))
         sys.exit(130)
     clear_progress()
-    return ok, fail, skip, dropped
+    return ok, fail, skip, dropped, noncore
 
 
 def cmd_gen(args) -> int:
@@ -1542,8 +1606,9 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             okb, errb = ensure_build()      # replay hygiene shells out to the engine
             if not okb:
                 sys.exit(f"pp2lp: engine build failed (needed for replay hygiene):\n{errb}")
-            ok, fail, skip, dropped = gen_replays(suite, get_krt(), force=force)
+            ok, fail, skip, dropped, noncore = gen_replays(suite, get_krt(), force=force)
             tail = f", {dropped} dropped (truncated)" if dropped else ""
+            tail += f", {noncore} dropped (non-core)" if noncore else ""
             print(dim(f"  replays: {ok} ok, {fail} failed, {skip} up-to-date{tail}"))
         else:
             sys.exit(f"pp2lp: unknown --gen stage {st!r} (buts|traces|replays)")

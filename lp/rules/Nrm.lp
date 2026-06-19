@@ -257,22 +257,39 @@ begin
   refine ⊥ₑ (♡_to_pi (λ u, ¬ ⋀ (∎ ∷ ⊤ ∷ R u)) hf v (⋀₂_intro ⊤ᵢ hr))
 end;
 
-// ---- NRM20-23: Substitution ----
+// ---- NRM20-23: Substitution (drop a binder pinned by an equality) ----
+//
+// PP pins *whichever* binder an equality conjunct fixes, at *any* slot k of the
+// ♡-block, with the witness E a function of the remaining binders (`#x.#y.(x=y)`
+// pins x at y).  `ins`/`rm` (B.lp) splice slot k in and out and `prj_ins`
+// (lemmas/Tuple.lp) is the round-trip, so one lemma — NRM20 — covers every slot;
+// the emitter supplies k and E, and bubbles the pinning equality to the conjunct
+// list's *tail* (`qs v ∷ eq`) first when PP places it elsewhere.  The one shape it
+// does NOT route here — slot-0 head equality with block-closed E (PP's `¬(x=E ∧ …)`,
+// all of prv) — takes the NRM20H fast path below, which peels the head equality
+// with popl/dropl and so skips that per-site rotation.  NRM21 is the reversed-
+// equality (`E = x`) orientation; NRM22/23 (below) are the unary instances PP
+// emits with no surrounding block.
+//
+//   H ⊢ ♡v'·¬(qs[xₖ:=E v'])        H ⊢ ♡v·¬(qs ∧ (prj k v = E (rm k v)))
+opaque symbol NRM20 [n] (k : ℕ) [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
+  (E : Tuple n → τ ι)
+  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj k v = E (rm k v)))) ⇒ Q) ≔
+begin
+  assume n k qs Q E hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v')))
+    (λ v' hq,
+      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj k v = E (rm k v)))) hbig (ins k (E v') v')
+        (⋀_intro hq (prj_ins k (E v') v'))))
+end;
 
-// NRM20: x not free in E; H ⊢ ♡y · ¬[x:=E]P ⇒ Q
-//        → H ⊢ ♡(x,y) · ¬(x = E ∧ P) ⇒ Q
-//
-//   ∀ (x2,..,xn), ¬ (P2(E,..,xn) ∧ .. ∧ Pn(E,...,xn))
-//   ----------------------------------------------------------
-//   ∀ (x1,..,xn), ¬ ((x1 = E) ∧ P2(x1..xn) ∧ .. ∧ Pn(x1...xn))
-//
-// `ps v` is the *full* conjunct list.  Its head `popl (ps v)` is the leading
-// equality `x1 = E` (≡ `prj 0 v = E`, pinned by the first premise); its tail
-// `dropl (ps v)` is the body `P2 ∧ .. ∧ Pn`.  Instantiating the goal's
-// universal at `v' ⨾ E` performs the substitution x1 := E: the head becomes
-// `E = E` (true by `eq_refl`) and the tail matches the hypothesis's body, so
-// `⋀_pop_intro` rebuilds `⋀ (ps (v' ⨾ E))` to discharge the negation.
-opaque symbol NRM20 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
+// NRM20H: fast path for the common shape — pinning equality at the conjunct
+// *head*, slot 0, E block-closed.  popl/dropl peel the head equality directly (no
+// rotation), and slot 0 is a plain `v' ⨾ E` (no `ins`/`rm`).  Semantically the
+// slot-0 head case of NRM20; kept separate only because the rotation NRM20 would
+// need here is the per-site cost that dominates prv's NRM20-dense proofs.
+opaque symbol NRM20H [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
   : (Π v', π (popl (ps v') = (prj 0 v' = E)))
   → π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q)
   → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔
@@ -286,126 +303,17 @@ begin
           hp)))
 end;
 
-// NRM21 / NRM23 — reversed-equality (`E = x`) duals of NRM20 / NRM22.
-//
-// UNVERIFIED: no replay in the corpus exercises these, so their signatures
-// below are spec-derived and have NOT been checked against PP's actual output.
-// NRM20 and NRM22 both needed rewriting once a real replay showed the spec was
-// wrong (NRM20's head-equality `ps` list; NRM22's literal-⊤ head) — expect the
-// same here.  Before relying on NRM21/23, obtain a triggering trace and re-derive
-// the shape from it; the emitter still emits a bare `refine NRM2{1,3} _` (no E),
-// which will fail loudly rather than silently mis-prove.
-opaque symbol NRM21 [n] [ps : Tuple (+1 n) → 𝕃* o] [Q : Prop] (E : τ ι)
-  (heq : Π v', π (popl (ps v') = (E = prj 0 v')))
-  : π ((`♡ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ⇒ Q) ≔
-begin
-  assume n ps Q E heq hsmall hbig;
-  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ dropl (ps (v' ⨾ E)))
-    (λ v' hp,
-      ♡_to_pi (λ v, ¬ ⋀ (ps v)) hbig (v' ⨾ E)
-        (⋀_pop_intro (ps (v' ⨾ E))
-          (=⇒ (eq_sym (heq (v' ⨾ E))) (eq_refl E))
-          hp)))
-end;
-
-// ---- Tail-equality substitution forms (NRM20/21 over an end-of-list pin) ----
-//
-// PP's NRM20/21 pin *whichever* binder an equality conjunct determines, and
-// the equality may sit at the END of the conjunct list (NRM14 prepends ⊤, so
-// a 2-conjunct body reads `⊤ ∧ (x = E)`).  The head-equality forms above
-// (popl/dropl) cover the head position; these cover the tail position, with
-// the witness E a *function of the remaining tuple* — PP may pin x at another
-// still-bound variable (`#x.#y.(x = y)` pins x at y = prj 0 of what remains).
-//
-// Slot discipline (position i in PP's binder list ↦ prj i): the S forms pin
-// slot 0 (PP's first listed binder, the rightmost ⨾-slot), the P forms pin
-// slot 1 (the second).  The emitter picks by the pinned var's position, read
-// off the rule annotation against its child's binder list.
-
-// NRM20S: pin slot 0 by a tail equality `prj 0 v = E (init v)`.
-opaque symbol NRM20S [n] [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
+// NRM21: NRM20 with the equality reversed (`E (rm k v) = prj k v`).
+opaque symbol NRM21 [n] (k : ℕ) [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
   (E : Tuple n → τ ι)
-  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj 0 v = E (init v)))) ⇒ Q) ≔
+  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v'))) ⇒ Q)
+  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (E (rm k v) = prj k v))) ⇒ Q) ≔
 begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v')))
+  assume n k qs Q E hsmall hbig;
+  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v')))
     (λ v' hq,
-      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj 0 v = E (init v)))) hbig (v' ⨾ E v')
-        (⋀_intro hq (eq_refl (E v')))))
-end;
-
-// NRM21S: NRM20S with reversed equality (`E … = prj 0 v`).
-opaque symbol NRM21S [n] [qs : Tuple (+1 n) → 𝕃* o] [Q : Prop]
-  (E : Tuple n → τ ι)
-  : π ((`♡ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (E (init v) = prj 0 v))) ⇒ Q) ≔
-begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall (pi_to_♡ (λ v' : Tuple n, ¬ ⋀ (qs (v' ⨾ E v')))
-    (λ v' hq,
-      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (init v) = prj 0 v))) hbig (v' ⨾ E v')
-        (⋀_intro hq (eq_refl (E v')))))
-end;
-
-// NRM20P: pin slot 1 by a tail equality `prj 1 v = E (rm1 v)`.
-opaque symbol NRM20P [n] [qs : Tuple (+1 (+1 n)) → 𝕃* o] [Q : Prop]
-  (E : Tuple (+1 n) → τ ι)
-  : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (prj 1 v = E (rm1 v)))) ⇒ Q) ≔
-begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall
-    (pi_to_♡ (λ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v')))
-      (λ v' hq,
-        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj 1 v = E (rm1 v)))) hbig
-          (tuple_insert1 (E v') v')
-          (⋀_intro hq (eq_refl (E v')))))
-end;
-
-// NRM21P: NRM20P with reversed equality.
-opaque symbol NRM21P [n] [qs : Tuple (+1 (+1 n)) → 𝕃* o] [Q : Prop]
-  (E : Tuple (+1 n) → τ ι)
-  : π ((`♡ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 n)), ¬ ⋀ (qs v ∷ (E (rm1 v) = prj 1 v))) ⇒ Q) ≔
-begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall
-    (pi_to_♡ (λ v' : Tuple (+1 n), ¬ ⋀ (qs (tuple_insert1 (E v') v')))
-      (λ v' hq,
-        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (rm1 v) = prj 1 v))) hbig
-          (tuple_insert1 (E v') v')
-          (⋀_intro hq (eq_refl (E v')))))
-end;
-
-// NRM20P2 / NRM21P2: pin slot 2 (tuple_insert2 / rm2).
-opaque symbol NRM20P2 [n] [qs : Tuple (+1 (+1 (+1 n))) → 𝕃* o] [Q : Prop]
-  (E : Tuple (+1 (+1 n)) → τ ι)
-  : π ((`♡ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 (+1 n))), ¬ ⋀ (qs v ∷ (prj 2 v = E (rm2 v)))) ⇒ Q) ≔
-begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall
-    (pi_to_♡ (λ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v')))
-      (λ v' hq,
-        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (prj 2 v = E (rm2 v)))) hbig
-          (tuple_insert2 (E v') v')
-          (⋀_intro hq (eq_refl (E v')))))
-end;
-
-opaque symbol NRM21P2 [n] [qs : Tuple (+1 (+1 (+1 n))) → 𝕃* o] [Q : Prop]
-  (E : Tuple (+1 (+1 n)) → τ ι)
-  : π ((`♡ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v'))) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 (+1 n))), ¬ ⋀ (qs v ∷ (E (rm2 v) = prj 2 v))) ⇒ Q) ≔
-begin
-  assume n qs Q E hsmall hbig;
-  refine hsmall
-    (pi_to_♡ (λ v' : Tuple (+1 (+1 n)), ¬ ⋀ (qs (tuple_insert2 (E v') v')))
-      (λ v' hq,
-        ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (rm2 v) = prj 2 v))) hbig
-          (tuple_insert2 (E v') v')
-          (⋀_intro hq (eq_refl (E v')))))
+      ♡_to_pi (λ v, ¬ ⋀ (qs v ∷ (E (rm k v) = prj k v))) hbig (ins k (E v') v')
+        (⋀_intro hq (eq_sym (prj_ins k (E v') v')))))
 end;
 
 // NRM22: the ♡-body's tail equality pins the binder at E (general list
@@ -471,48 +379,18 @@ begin
   refine hp (♡_to_pi (λ _, P) h♡ (inh_tuple [n]))
 end;
 
-// NRM26: y not free in P; H ⊢ ♡(x,...) · P → H ⊢ ♡(x,y,...) · P
-// (`tuple_prepend` and the rest of the slot surgery live in B.lp.)
-opaque symbol NRM26 [n] [P : Tuple (+1 n) → Prop] [Q : Prop]
-  : π ((`♡ v' : Tuple n, P (tuple_prepend 𝟎 v')) ⇒ Q)
+// NRM26: y not free in P; H ⊢ ♡(x,…)·P → H ⊢ ♡(x,y,…)·P.  PP drops the unused
+// binder at *any* slot k; one lemma covers them all — instantiate the ♡ at
+// `ins k (el ι) v'`.  The dropped slot is never read, so the dummy is `el ι` (the
+// canonical inhabitant), not a misleading 𝟎.  The emitter supplies k (the dropped
+// var's position, read off the annotation diff against the child's binder list).
+opaque symbol NRM26 [n] (k : ℕ) [P : Tuple (+1 n) → Prop] [Q : Prop]
+  : π ((`♡ v' : Tuple n, P (ins k (el ι) v')) ⇒ Q)
   → π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔
 begin
-  assume n P Q hp h♡;
-  refine hp (pi_to_♡ (λ v', P (tuple_prepend 𝟎 v'))
-    (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_prepend 𝟎 v')))
-end;
-
-// PP's NRM26 drops the unused binder *wherever it sits* in the binder list,
-// not only last-listed.  `tuple_prepend` above dummy-fills the leftmost slot
-// (= the last-listed binder); the variants below fill slot 0 (NRM26S — PP's
-// first listed binder) and slot 1 (NRM26M).  With the wrong variant the
-// remaining binders' projections shift onto the dummy slot, so the emitter
-// picks by the dropped var's position (annotation diff against the child).
-opaque symbol NRM26S [n] [P : Tuple (+1 n) → Prop] [Q : Prop]
-  : π ((`♡ v' : Tuple n, P (v' ⨾ 𝟎)) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 n), P v) ⇒ Q) ≔
-begin
-  assume n P Q hp h♡;
-  refine hp (pi_to_♡ (λ v', P (v' ⨾ 𝟎))
-    (λ v', ♡_to_pi (λ v, P v) h♡ (v' ⨾ 𝟎)))
-end;
-
-opaque symbol NRM26M [n] [P : Tuple (+1 (+1 n)) → Prop] [Q : Prop]
-  : π ((`♡ v' : Tuple (+1 n), P (tuple_insert1 𝟎 v')) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 n)), P v) ⇒ Q) ≔
-begin
-  assume n P Q hp h♡;
-  refine hp (pi_to_♡ (λ v', P (tuple_insert1 𝟎 v'))
-    (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_insert1 𝟎 v')))
-end;
-
-opaque symbol NRM26M2 [n] [P : Tuple (+1 (+1 (+1 n))) → Prop] [Q : Prop]
-  : π ((`♡ v' : Tuple (+1 (+1 n)), P (tuple_insert2 𝟎 v')) ⇒ Q)
-  → π ((`♡ v : Tuple (+1 (+1 (+1 n))), P v) ⇒ Q) ≔
-begin
-  assume n P Q hp h♡;
-  refine hp (pi_to_♡ (λ v', P (tuple_insert2 𝟎 v'))
-    (λ v', ♡_to_pi (λ v, P v) h♡ (tuple_insert2 𝟎 v')))
+  assume n k P Q hp h♡;
+  refine hp (pi_to_♡ (λ v', P (ins k (el ι) v'))
+    (λ v', ♡_to_pi (λ v, P v) h♡ (ins k (el ι) v')))
 end;
 
 // ---- NRM27-30: Arithmetic solver dispatch (trust-free) ----
@@ -523,17 +401,15 @@ end;
 // substituted conjunction `[xᵢ := b](P ∧ … ∧ Q)` is satisfiable, so the
 // universal-of-negation is *false* and discharges the sequent.
 //
-// Trust-free realisation: peel the pinned binder by *instantiating* the
-// `♡`-hypothesis at the solver witness `b` (the membership premises the
-// spec carries are solver bookkeeping — unused here).  This leaves the
-// continuation premise `♢v'·¬⋀(ps (v' ⨾ b v')) ⇒ R`; the emitter bridges
-// the literal substituted conjunction `⋀ (ps (v' ⨾ b v'))` to ⊤ with a
-// generated congruence proof (each cancelling bound = ⊤ via `eq_true` +
-// `leq_zero_of_sum_zero` + `prove_sum_eq`), matching PP's ⊤-normalisation.
-//
-//   NRM27 / NRM29 — multi-binder (♡-block) forms, drop one binder.
-//   NRM28 / NRM30 — unary (♡x) forms, drop the binder entirely.
-//   27/28 are the `xᵢ = 𝟎` specialisation (a = b = 𝟎) of 29/30.
+// One lemma, NRM29, realises all four PP rules: peel the pinned binder by
+// *instantiating* the `♡`-hypothesis at the solver witness `b` (the membership
+// premises the spec carries are solver bookkeeping — unused here), leaving the
+// continuation `♢v'·¬⋀(ps (v' ⨾ b v')) ⇒ R`; the emitter bridges the substituted
+// conjunction `⋀ (ps (v' ⨾ b v'))` to ⊤ with a generated congruence proof (each
+// cancelling bound = ⊤ via `eq_true` + `leq_zero_of_sum_zero` + `prove_sum_eq`).
+// NRM27/28 are the `xᵢ := 𝟎` case (b = 𝟎) and NRM30 the unary (♡x) case — the
+// emitter maps all of NRM27/28/30 onto NRM29 with the matching witness.  Only
+// NRM29 is corpus-triggered (apero); the others have no replay.
 
 // ---- helper lemmas for the trust-free solver dispatch ----
 
@@ -554,73 +430,6 @@ begin
   assume E h;
   rewrite h;
   refine leq_refl 𝟎
-end;
-
-// `mem P ps` : `P` occurs (up to propositional equality) in the conjunct
-// list `ps`.  The solver's "(x ≤ 𝟎) est dans (P ∧ … ∧ Q)" side-conditions.
-symbol mem : Prop → 𝕃* o → Prop;
-rule mem _  ∎          ↪ ⊥
-with mem $P ($ps ∷ $Q) ↪ (mem $P $ps) ∨ ($P = $Q);
-
-// If `P ∈ ps` and `⋀ ps` holds, then `P` holds — the membership premises
-// are sound, so NRM27 needs no `trust` to use them.
-opaque symbol mem_sound (P : Prop)
-  : Π ps : 𝕃* o, π (mem P ps) → π (⋀ ps) → π P ≔
-begin
-  assume P;
-  induction
-  { assume hmem hconj; refine ⊥ₑ hmem }
-  { assume ps ih Q hmem hconj;
-    refine ∨ₑ hmem _ _
-    { assume hin; refine ih hin (⋀_init hconj) }
-    { assume heq; refine =⇒ (eq_sym heq) (⋀_last hconj) } }
-end;
-
-// NRM27: bare goal (no `⇒R`), the `xᵢ = 𝟎` case.  The bounds `prj 0 v ≤ 𝟎`
-// and `— prj 0 v ≤ 𝟎` (members of the conjunction) pin `prj 0 v = 𝟎` by
-// antisymmetry; tuple-η (`(init v) ⨾ 𝟎 = v`, via lemmas/Tuple.lp) then transports
-// `⋀ (ps v)` to `⋀ (ps ((init v) ⨾ 𝟎))`, contradicting the premise.  Fully
-// trust-free; untriggered in the corpus (the only NRM2x trace is NRM29).
-opaque symbol NRM27 [n] [ps : Tuple (+1 n) → 𝕃* o]
-  (hint : Π v, π (prj 0 v ϵ INT))
-  (hpos : Π v, π (mem (leq (prj 0 v) 𝟎) (ps v)))
-  (hneg : Π v, π (mem (leq (neg (prj 0 v)) 𝟎) (ps v)))
-  : π (`♢ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎)))
-  → π (`♡ v : Tuple (+1 n), ¬ ⋀ (ps v)) ≔
-begin
-  assume n ps hint hpos hneg h_prem;
-  refine pi_to_♡ (λ v, ¬ ⋀ (ps v)) (λ v hpv, _);
-  have hle : π (leq (prj 0 v) 𝟎)
-    { refine mem_sound _ (ps v) (hpos v) hpv };
-  have hge : π (leq 𝟎 (prj 0 v))
-    { refine neg_leq_zero (prj 0 v) (mem_sound _ (ps v) (hneg v) hpv) };
-  have hz : π (prj 0 v = 𝟎)
-    { refine leq_antisym (prj 0 v) 𝟎 (hint v) zero_in_int hle hge };
-  have heq : π (((init v) ⨾ 𝟎) = v)
-    { rewrite left hz; refine tuple_eta v };
-  have hcontra : π (¬ ⋀ (ps ((init v) ⨾ 𝟎)))
-    { refine ♢_to_pi (λ v' : Tuple n, ¬ ⋀ (ps (v' ⨾ 𝟎))) h_prem (init v) };
-  have hgood : π (⋀ (ps ((init v) ⨾ 𝟎)))
-    { rewrite heq; refine hpv };
-  refine hcontra hgood
-end;
-
-// NRM30: unary ♡x, general witness b.  Instantiate at b, feed the premise.
-opaque symbol NRM30 [ps : τ ι → 𝕃* o] [R : Prop] (b : τ ι)
-  : π (¬ ⋀ (ps b) ⇒ R)
-  → π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔
-begin
-  assume ps R b h_prem h♡;
-  refine h_prem (♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) h♡ (unit ⨾ b))
-end;
-
-// NRM28: x := 𝟎 specialisation of NRM30.
-opaque symbol NRM28 [ps : τ ι → 𝕃* o] [R : Prop]
-  : π (¬ ⋀ (ps 𝟎) ⇒ R)
-  → π ((`♡ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) ⇒ R) ≔
-begin
-  assume ps R h_prem h♡;
-  refine h_prem (♡_to_pi (λ v : Tuple 1, ¬ ⋀ (ps (prj 0 v))) h♡ (unit ⨾ 𝟎))
 end;
 
 // NRM29: multi-binder, pin the prj0 slot to `b v'` (witness a function of

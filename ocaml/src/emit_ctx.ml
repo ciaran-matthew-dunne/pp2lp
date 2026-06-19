@@ -119,8 +119,6 @@ let prj k t =
 
 let conj_intro a b = L.App (L.Name "\xe2\x8b\x80_intro", [a; b]) (* ⋀_intro *)
 let conj_nil_prf = L.Name "\xe2\x8b\x80_nil_prf"                 (* ⋀_nil_prf *)
-let conj_init t = L.App (L.Name "\xe2\x8b\x80_init", [t])        (* ⋀_init *)
-let conj_last t = L.App (L.Name "\xe2\x8b\x80_last", [t])        (* ⋀_last *)
 let true_intro = L.Name "\xe2\x8a\xa4\xe1\xb5\xa2"             (* ⊤ᵢ *)
 let eq_refl t = L.App (L.Name "eq_refl", [t])
 
@@ -132,31 +130,27 @@ let conj_chain = function
   | [t] -> t
   | ts -> List.fold_left conj_intro conj_nil_prf ts
 
-(* Extract conjunct [k] of an n-element ⋀-list held by [var]: peel (n-1-k)
-   elements off the tail with ⋀_init, then take the last with ⋀_last.
-   Element 0 bottoms at ⋀ (∎ ∷ P₀) ≡ P₀, so it needs no ⋀_last. *)
-let rec init_chain var j =
-  if j = 0 then var else conj_init (init_chain var (j - 1))
-
-let extract var conjs k =
+(* Project conjunct [k] (front-indexed, 0 = first) of the n-element ⋀-list held
+   by [var], via B.lp's back-indexed `conj_prj` (index 0 = last, so a front index
+   k is n-1-k).  The ⋀_init/⋀_last walk happens at reduction time, so the emitted
+   term is O(1).  `conj_rm_at` likewise proves the conjunction survives dropping
+   conjunct [k]. *)
+let conj_prj_at var conjs k =
   let n = List.length conjs in
-  if k = 0 then init_chain var (n - 1)
-  else conj_last (init_chain var (n - 1 - k))
+  L.App (L.Name "conj_prj", [L.Hole; L.Name (string_of_int (n - 1 - k)); var])
 
-(* AND5: rebuild the ⋀-list with conjunct [j] (an implication) discharged.
-   [j]'s antecedent is the conjunct(s) at [ant_positions], combined and
-   applied to (extract j); the other conjuncts pass through unchanged. *)
+let conj_rm_at var conjs k =
+  let n = List.length conjs in
+  L.App (L.Name "conj_rm", [L.Hole; L.Name (string_of_int (n - 1 - k)); var])
+
+(* AND5: modus ponens within a conjunction.  PP drops the implication conjunct
+   [j] and appends its consequent, derived by applying [j] to its antecedent
+   (the conjunct(s) at [ant_positions]).  O(1) emitted size: `conj_rm_at` drops
+   conjunct [j], `conj_prj_at` pulls [j] and each antecedent leaf. *)
 let and5_fwd var conjs ant_positions j =
-  let n = List.length conjs in
-  let others =
-    List.filter (fun k -> k <> j) (List.init n Fun.id)
-    |> List.map (fun k -> extract var conjs k)
-  in
-  let ant_proof =
-    conj_chain (List.map (fun i -> extract var conjs i) ant_positions)
-  in
-  let discharged = L.App (extract var conjs j, [ant_proof]) in
-  conj_chain (others @ [discharged])
+  let ant_proof = conj_chain (List.map (conj_prj_at var conjs) ant_positions) in
+  let discharged = L.App (conj_prj_at var conjs j, [ant_proof]) in
+  conj_intro (conj_rm_at var conjs j) discharged
 
 (* ---- Goal extraction from rule annotations ---- *)
 
@@ -1019,20 +1013,112 @@ let find_ins_contradiction ctx =
       (L.App (L.Name "\xe2\xa8\xbe", [L.Name "unit"; L.Exp (proj_env, e)]), [e]))
       (applied_terms @ lit_terms)
   in
-  let candidates =
-    List.concat_map (fun x ->
-      List.map (fun (t, vs) -> (t, List.map (fun v -> Var v) vs))
-        (witness_candidates x)) ctx.xs
-    @ List.concat_map
-        (fun n -> if n >= 2 then List.map build_witness (products n) else [])
-        arities
-    @ synth_cands
+  (* The old search built *every* `products n` = |atoms|^N composite N-tuple and
+     classified each — exponential in N, so a length-k relational composition
+     (whose universal has arity k) timed out past k ≈ 6.  Keep that enumeration
+     only while it is cheap (a no-regression safety net for the small composites
+     that already worked), bounded by [products_cap]; larger arities fall to the
+     E-matching below.  [pow_le b e c] tests `bᵉ ≤ c` without overflowing. *)
+  let pow_le base exp cap =
+    let rec go acc i =
+      if i = 0 then acc <= cap
+      else if acc > cap then false
+      else go (acc * base) (i - 1)
+    in go 1 exp
   in
-  (* The (witness, universal-hyp) pairs are fixed; only the per-leaf evidence
-     shifts as the pool grows, so enumerate the pairs once and re-classify them
-     each round. *)
-  let pairs =
+  let products_cap = 4096 in
+  let small_products =
+    List.concat_map
+      (fun n ->
+        if n >= 2 && pow_le (List.length atoms) n products_cap
+        then List.map build_witness (products n) else [])
+      arities
+  in
+  (* Pool-independent candidates — single-/whole-binder tuples, the bounded
+     `products` enumeration, and the synthesised applied/literal tuples — paired
+     with every hyp ([classify] rejects an arity mismatch).  These don't change as
+     the saturation pool grows, so build them once. *)
+  let base_pairs =
+    let candidates =
+      List.concat_map (fun x ->
+        List.map (fun (t, vs) -> (t, List.map (fun v -> Var v) vs))
+          (witness_candidates x)) ctx.xs
+      @ small_products
+      @ synth_cands
+    in
     List.concat_map (fun w -> List.map (fun h -> (w, h)) ctx.hyps) candidates
+  in
+  (* ---- E-matching: unification-guided composite-witness discovery ----
+
+     Rather than enumerate all |atoms|^N tuples and test each, read the witness
+     off the hypotheses the way an SMT solver instantiates a quantifier
+     (E-matching): match the universal's conjuncts against the in-scope facts
+     (hyps + the derived pool), solving for the binder vars.  For
+     `!!(x$2,x$3,x$4)·¬((x0,x$4):r1 ∧ (x$4,x$3):r2 ∧ (x$3,x$2):r3 ∧ (x$2,x4):r4)`,
+     `(x0,x$4):r1` matched against hyp `(x0,x1):r1` pins `x$4 := x1`, then
+     `(x$4,x$3):r2 = (x1,x$3):r2` against `(x1,x2):r2` pins `x$3 := x2`, and so on
+     — the witness for a length-k chain falls out in O(leaves × facts × vars),
+     linear in k rather than |atoms|^k.  A conjunct that matches no fact
+     (arithmetic-trivial, reflexive, or the one gap of a saturation step) is left
+     for [classify] / the saturation loop; a binder var only such a conjunct
+     constrains stays unbound and is filled from [atoms] (the residual
+     enumeration — empty for a fully relational chain). *)
+  let ematch h_vars leaves facts =
+    (* [spec] caps speculative skips of a conjunct that *did* match a fact (needed
+       only if that conjunct is alternatively dischargeable by arithmetic at a
+       different binding); a conjunct matching no fact is skipped for free. *)
+    let rec go sigma spec = function
+      | [] -> [ sigma ]
+      | leaf :: rest ->
+        let leaf' = subst_prd sigma leaf in
+        let free = List.filter (fun v -> not (List.mem_assoc v sigma)) h_vars in
+        let exts =
+          List.filter_map (fun fact ->
+            match match_pattern free leaf' fact with
+            | Some ext -> Some (sigma @ ext)
+            | None -> None) facts
+          |> List.sort_uniq compare
+        in
+        if exts = [] then go sigma spec rest
+        else
+          List.concat_map (fun s -> go s spec rest) exts
+          @ (if spec > 0 then go sigma (spec - 1) rest else [])
+    in
+    go [] 1 leaves |> List.sort_uniq compare
+  in
+  (* residual enumeration of the binder vars E-matching left unbound, over
+     [atoms]; bounded by [products_cap] so a universal no fact constrains can't
+     reintroduce the |atoms|^N blow-up. *)
+  let rec products_over = function
+    | [] -> [ [] ]
+    | v :: rest ->
+      List.concat_map (fun (_, e) ->
+        List.map (fun tl -> (v, e) :: tl) (products_over rest)) atoms
+  in
+  (* the (E-matched composite witness, source universal hyp) pairs for one
+     saturation round, re-derived each round because the pool grows. *)
+  let composite_pairs pool =
+    let facts = List.map snd ctx.hyps @ List.map fst pool in
+    List.concat_map (fun (h_name, h_pred) ->
+      match ins_hyp_shape h_pred with
+      | Some (_, h_vars, h_body) when List.length h_vars >= 2 ->
+        let leaves = collect_conj_leaves h_body in
+        List.concat_map (fun sigma ->
+          let unbound =
+            List.filter (fun v -> not (List.mem_assoc v sigma)) h_vars in
+          if not (pow_le (List.length atoms) (List.length unbound) products_cap)
+          then []
+          else
+            List.map (fun fill ->
+              let full = sigma @ fill in
+              let atom_list =
+                List.map (fun v ->
+                  let e = List.assoc v full in (L.Exp (proj_env, e), e)) h_vars
+              in
+              (build_witness atom_list, (h_name, h_pred)))
+              (products_over unbound))
+          (ematch h_vars leaves facts)
+      | _ -> []) ctx.hyps
   in
   let unmatched_count (_, _, _, _, _, evs) =
     List.length (List.filter Option.is_none evs) in
@@ -1075,6 +1161,7 @@ let find_ins_contradiction ctx =
   let rec saturate pool fuel =
     if fuel <= 0 then None
     else
+      let pairs = base_pairs @ composite_pairs pool in
       let cs = List.filter_map (fun (w, h) -> classify pool w h) pairs in
       match List.find_opt (fun c -> unmatched_count c = 0) cs with
       | Some c -> Some (terminal c)

@@ -4,81 +4,50 @@
 // `#(x)` is arity-1), but we encode the compound↔nested conversions
 // XST1–4 for completeness.
 //
-// As with ALL1–4, we read `(x,y)` in the spec as "n-tuple x + 1-tuple
-// y", so the rule peels one variable at a time. Unlike `!!`, `??` is
-// a defined symbol that reduces to nested ∃, so the compound and
-// nested forms are *definitionally equal* — XST1–4 are identity in
-// HOAS.
+// As with ALL1–4 (All.lp) these are now CURRIED: P : Tuple n → Tuple 1 → Prop,
+// nested conclusion `?? w, ?? y, P w y` (P at a pattern position → `refine XSTn _`
+// infers P), compound premise `?? v : Tuple (n ++ 1), P (take v) (drop v)`.  The
+// two forms are equal (`??_split_eq`, lemmas/Tuple.lp), so each rule is a one-line
+// transport.  Replaces the previous compound-`P (w ⨾ prj 0 y)` encoding (P
+// non-pattern, so unemittable) and its `compound_to_nested_∃`/`nested_to_compound_∃`
+// helpers.
 
 require open pp2lp.B pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.rules.Res;
 
-// Helper: compound → nested for `??`. Defined by rewrite rule on
-// the tuple constructor; pattern-match exposes (w ⨾ a) shape.
-symbol compound_to_nested_∃ [n] (P : Tuple (+1 n) → Prop)
-  : Π v : Tuple (+1 n), π (P v)
-  → π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y));
-rule compound_to_nested_∃ [$n] $P ($w ⨾ $a) $h ↪
-  pi_to_??_intro (λ w', `?? y : Tuple 1, $P (w' ⨾ prj 0 y))
-                 $w
-                 (pi_to_??_intro (λ y, $P ($w ⨾ prj 0 y))
-                                 (unit ⨾ $a) $h);
-
-// Helper: nested → compound for `??`.
-opaque symbol nested_to_compound_∃ [n] (P : Tuple (+1 n) → Prop)
-  : π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
-  → π (`?? v : Tuple (+1 n), P v) ≔
-begin
-  assume n P h;
-  refine pi_to_??_elim
-    (λ w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))
-    _ h;
-  assume w hw;
-  refine pi_to_??_elim (λ y : Tuple 1, P (w ⨾ prj 0 y)) _ hw;
-  assume y hy;
-  refine pi_to_??_intro P (w ⨾ prj 0 y) hy
-end;
-
 // XST1: H ⊢ ¬(∃(x,y)·P) ⇒ R → H ⊢ ¬(∃x·∃y·P) ⇒ R
-opaque symbol XST1 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  : π (¬ (`?? v : Tuple (+1 n), P v) ⇒ R)
-  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
+opaque symbol XST1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  : π (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R)
+  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔
 begin
-  assume n P R h hnnested;
-  refine h _;
-  assume hcompound;
-  refine hnnested _;
-  refine pi_to_??_elim P _ hcompound;
-  assume v hv;
-  refine compound_to_nested_∃ P v hv
+  assume n P R h;
+  refine =⇒ (imp_cong_l (not_cong (??_split_eq P))) h
 end;
 
 // XST2: H ⊢ ¬(∃(x,y)·P) → H ⊢ ¬(∃x·∃y·P)
-opaque symbol XST2 [n] [P : Tuple (+1 n) → Prop]
-  : π (¬ (`?? v : Tuple (+1 n), P v))
-  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y))) ≔
+opaque symbol XST2 [n] [P : Tuple n → Tuple 1 → Prop]
+  : π (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  → π (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y)) ≔
 begin
-  assume n P h hnested;
-  refine h (nested_to_compound_∃ P hnested)
+  assume n P h;
+  refine =⇒ (not_cong (??_split_eq P)) h
 end;
 
-// XST3: H ⊢ (∃(x,y)·P) ⇒ R → H ⊢ (∃x·∃y·P) ⇒ R
-opaque symbol XST3 [n] [P : Tuple (+1 n) → Prop] [R : Prop]
-  : π ((`?? v : Tuple (+1 n), P v) ⇒ R)
-  → π ((`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ⇒ R) ≔
+// XST3: H ⊢ (∃(x,y)·P) ⇒ R → H ⊢ (∃x·∃y·P) ⇒ R  (existential mirror of ALL3)
+opaque symbol XST3 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  : π ((`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R)
+  → π ((`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R) ≔
 begin
-  assume n P R h hnested;
-  refine h (nested_to_compound_∃ P hnested)
+  assume n P R h;
+  refine =⇒ (imp_cong_l (??_split_eq P)) h
 end;
 
 // XST4: H ⊢ ∃(x,y)·P → H ⊢ ∃x·∃y·P
-opaque symbol XST4 [n] [P : Tuple (+1 n) → Prop]
-  : π (`?? v : Tuple (+1 n), P v)
-  → π (`?? w : Tuple n, `?? y : Tuple 1, P (w ⨾ prj 0 y)) ≔
+opaque symbol XST4 [n] [P : Tuple n → Tuple 1 → Prop]
+  : π (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))
+  → π (`?? w : Tuple n, `?? y : Tuple 1, P w y) ≔
 begin
   assume n P h;
-  refine pi_to_??_elim P _ h;
-  assume v hv;
-  refine compound_to_nested_∃ P v hv
+  refine =⇒ (??_split_eq P) h
 end;
 
 // ---- Negative side: ¬(∃ …) ⇒ R / ¬(∃ …) ----------------------
@@ -161,16 +130,40 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// The chain forms of the §A.8 existential regroupement `∃x·∃y·P ↦ ∃(x,y)·P`
-// (XST1_1–XST4_1) were removed 2026-06-12.  As with ALL1–4 (All.lp) the merge is
-// pre-flattened at the AST level by `flatten_binds` (the `binder_merge` skip in
-// rule_db.ml), so they were never emitted and their `res_tm` bridge was only a
-// `trust` placeholder.  Re-derivable via the `??`-currying equality (propExt
-// over the compound↔nested directions) if a merge ever needs emitting in a Res
-// chain.  The chain dispatch now fails loud on these shapes (Translate.chain_term).
+// XST1_1–XST4_1 are the Res-chain forms of the §A.8 existential regroupement.  PP
+// emits them PRIMED inside a result chain (`[XST4_1]`, …), where flatten_binds
+// cannot reach (the merged binder is born inside `res_tm`).  Each transports the
+// curried base rule's compound↔nested equality (`??_split_eq`, lemmas/Tuple.lp)
+// through the Schema-1 result bridge — trust-free.  (They replace the trust-bodied
+// placeholders deleted 2026-06-12, now that the base rules are curried.)
 // XST5–XST6 and XST51/XST61: Schema 1 passthrough.
 // XST7_1: Schema 1 via the `xst7_eq` bridge.
 // XST8_1: special — chain-shaped, see below.
+
+// XST1_1: chain form of XST1 (¬(∃-merge) ⇒ R).
+symbol XST1_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  (r : Res (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R)
+  ≔ mk_1 (res_tm r)
+      (eq_trans (eq_sym (imp_cong_l (not_cong (??_split_eq P)))) (res_eq r));
+
+// XST2_1: chain form of XST2 (¬(∃-merge)).
+symbol XST2_1 [n] [P : Tuple n → Tuple 1 → Prop]
+  (r : Res (¬ (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
+  : Res (¬ (`?? w : Tuple n, `?? y : Tuple 1, P w y))
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (not_cong (??_split_eq P))) (res_eq r));
+
+// XST3_1: chain form of XST3 ((∃-merge) ⇒ R).
+symbol XST3_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
+  (r : Res ((`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
+  : Res ((`?? w : Tuple n, `?? y : Tuple 1, P w y) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (imp_cong_l (??_split_eq P))) (res_eq r));
+
+// XST4_1: chain form of XST4 (∃-merge).
+symbol XST4_1 [n] [P : Tuple n → Tuple 1 → Prop]
+  (r : Res (`?? v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
+  : Res (`?? w : Tuple n, `?? y : Tuple 1, P w y)
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym (??_split_eq P)) (res_eq r));
 
 symbol XST5_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`!! v, ¬ (P v)) ⇒ R))

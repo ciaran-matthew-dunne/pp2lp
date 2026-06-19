@@ -95,7 +95,8 @@ lp/
   Prelude.lp             re-exports B + lemmas/* + rules/* — the emitter's sole import
   rules/*.lp             per-section rule lemmas (All, Arith, Axm, Bool, …)
   tests/*.lp             rule-base unit tests (one file per rules/ module; `pp2lp test`)
-  bench/<suite>/<name>/  per-benchmark inputs/artifacts (see Suites)
+  bench/<suite>/<name>/  per-benchmark inputs/artifacts (apero adds a per-project
+                         level: <suite>/<proj>/<name>/; see Suites)
   bench/test_cli.py      CLI self-tests + repo contract checks
   bench/results/         per-run JSON (gitignored)
 vendor/atelierb/       vendored REPLAY.kin (used by gen)
@@ -135,25 +136,13 @@ vendor/apero/pog/      the CLEARSY POG dataset (gitignored)
 
 Industrial proof obligations from CLEARSY's open POG corpus . No Atelier B path goes `.pog → PP`, so apero converts
 each obligation to a `.but` (`gen_apero_buts`: pog2but + dedup + the
-`PP2LP_APERO_MAX_PREMISE` cap, default 50), then runs the usual PP → REPLAY →
-emit → check.
+`PP2LP_APERO_MAX_PREMISE` cap, default 100), then runs the usual PP → REPLAY →
+emit → check.  Benchmarks are grouped per source project and generated
+smallest-first: `lp/bench/apero/<proj>/<name>/<name>.but` (the other suites stay
+flat, `<suite>/<name>/`; discovery is depth-agnostic).  pog2but only renders what
+faithfully corresponds to a PP goal — set comprehensions (`Quantified_Set`),
+records (`Struct`), strings, and real/float arithmetic are rejected at
+conversion, not coerced.
 
-### Known gaps (not regressions; full detail in INTERNALS.md)
-- **REPLAY truncation** — sometimes the replay tool drops subproofs; usually on `ALL7`/`XST8`/`OR3_1`/`XST8_1`/`ALL7_1`. often we can confirm this by comparing the `.replay` and the `.trace` file. such cases should be removed from our benchmark suite. 
-- **`FIN_INS` / `INS_BIS` / `__INSTANCIATION` replay lines** — these record a
-  *multi-step* INS contradiction PP found by chained instantiation (each
-  `FIN_INS(f)` introduces a derived fact `f`, discharged by the next `IMP4`); a
-  plain `[INS]` hides the same chain when it is short.  Both are reconstructed by
-  the saturating search in `Emit_ctx.find_ins_contradiction`: instantiate each
-  universal at a candidate witness (a bound var, a composite N-tuple assembled
-  across binders, or an applied term `f(a)` from the hyps), derive the negation
-  of a lone unmatched conjunct, repeat until one universal closes ⊥.  The chain
-  lines just build (`rule_db`: `FIN_INS`/`INS_BIS` are `pass`) and hang off the
-  `[INS]` node, whose dispatch ignores the recorded subtree.
-- **INS shapes still open** (the residual `claude` + all `apero` `E_INS`, e.g.
-  `ap_0005_00124`) — each wants a mechanism beyond witness enumeration: a
-  *totality* axiom that must introduce a fresh existential image `(a,y₀) ϵ f`
-  (the `fn_*` function cases); a *literal* witness (`16 ϵ 0..255` to contradict
-  `¬(16 ϵ s)`); a non-trivial ground bound like `10 − a ≤ 𝟎` (the saturator only
-  proves `e ≤ 𝟎` where `e` sums to zero); an equality-transitivity close
-  (`a=c`, `b=c` ⊢ `a=b` vs `¬(a=b)`).
+### Known gaps (not regressions)
+- **REPLAY truncation** — sometimes the replay tool drops subproofs; usually on `ALL7`/`XST8`/`OR3_1`/`XST8_1`/`ALL7_1`. often we can confirm this by comparing the `.replay` and the `.trace` file. such cases should be removed from our benchmark suite.

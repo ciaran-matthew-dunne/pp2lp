@@ -1,0 +1,1 @@
+Flag(FileOn("bm_comp_unfold2.res")) & Set(Valid.1 | Rule(Implication | ? | ? | ? | (a, d): ((r ; s) ; t) => #x.#y.((a, x): r & (x, y): s & (y, d): t) | nn))
