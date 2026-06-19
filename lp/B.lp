@@ -223,7 +223,7 @@ constant symbol set_empty : τ ι;                // {}     empty set
 constant symbol total_func : τ ι → τ ι → τ ι;   // s --> t total functions
 constant symbol overriding : τ ι → τ ι → τ ι;   // r <+ s relational override
 constant symbol relcomp : τ ι → τ ι → τ ι;      // r ; s  relational composition
-constant symbol prod : τ ι → τ ι → τ ι;         // s * t  product (set ×, or ·)
+constant symbol prod : τ ι → τ ι → τ ι;         // s * t  Cartesian product (set ×); arithmetic · is `mult`
 constant symbol power : τ ι → τ ι → τ ι;        // a ** b exponentiation
 constant symbol subset : τ ι → τ ι → Prop;      // s <: t
 constant symbol lt : τ ι → τ ι → Prop;          // a < t  strict less-than
@@ -284,6 +284,16 @@ symbol neg_def (x : τ ι) : π (neg x = from_int (— (to_int x)));
 // operands.
 rule to_int (plus $x $y) ↪ to_int $x + to_int $y
 with to_int (neg $x)     ↪ — (to_int $x);
+
+// Arithmetic multiplication, disambiguated from the Cartesian `prod` by the
+// emitter (PP overloads `*` for both; the emitter renders a literal-coefficient
+// `n*x` as `mult`, a set product as `prod`).  `mult` is ALWAYS arithmetic, so its
+// `to_int` rule is unconditional — the same conservative `to_int`-image of mult_def
+// as plus/neg.  Lets the reflective coefficient normalizer (lemmas/Reflect.lp)
+// compute on `k·x` atoms.
+constant symbol mult : τ ι → τ ι → τ ι;
+symbol mult_def (x y : τ ι) : π (mult x y = from_int (to_int x * to_int y));
+rule to_int (mult $x $y) ↪ to_int $x * to_int $y;
 
 symbol minus (x y : τ ι) ≔ plus x (neg y);
 

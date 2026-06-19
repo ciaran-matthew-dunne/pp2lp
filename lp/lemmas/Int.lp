@@ -35,6 +35,8 @@ opaque symbol neg_in_int (a : τ ι) : π (neg a ϵ INT) ≔
 begin assume a; rewrite (neg_def a); refine from_int_in_int (— (to_int a)) end;
 opaque symbol add_in_int (a b : τ ι) : π (plus a b ϵ INT) ≔
 begin assume a b; rewrite (plus_def a b); refine from_int_in_int (to_int a + to_int b) end;
+opaque symbol mult_in_int (a b : τ ι) : π (mult a b ϵ INT) ≔
+begin assume a b; rewrite (mult_def a b); refine from_int_in_int (to_int a * to_int b) end;
 
 // Reflect a τ ι equality onto ℤ: with both sides in INT, `to_int x = to_int y` lifts
 // to `x = y` (int_retract on both sides + feq).  The emitter discharges its generated
@@ -66,35 +68,6 @@ begin assume a b h; rewrite left (Z_sub_add a b); refine ≤_compat_add (a + (�
 
 opaque symbol Z_neg_leq (a : ℤ) : π ((— a) ≤ 0) → π (0 ≤ a) ≔
 begin assume a h; rewrite left (Z_neg_add a); refine ≤_compat_add (— a) 0 a h end;
-
-// ℤ-level congruences for the emitter's to_int-transport arithmetic proofs:
-// the reorder/cancel happens on `to_int e` (Stdlib.Z), so the congruences are
-// on ℤ's `+`/`—` rather than the τ ι `plus`/`neg`.
-opaque symbol Z_congL (b : ℤ) [a a' : ℤ] : π (a = a') → π (a + b = a' + b) ≔
-begin assume b a a' h; rewrite h; reflexivity end;
-opaque symbol Z_congR (a : ℤ) [b b' : ℤ] : π (b = b') → π (a + b = a + b') ≔
-begin assume a b b' h; rewrite h; reflexivity end;
-opaque symbol Z_cong [a a' b b' : ℤ] : π (a = a') → π (b = b') → π (a + b = a' + b') ≔
-begin assume a a' b b' ha hb; rewrite ha; rewrite hb; reflexivity end;
-opaque symbol Z_neg_cong [a a' : ℤ] : π (a = a') → π (— a = — a') ≔
-begin assume a a' h; rewrite h; reflexivity end;
-
-// Single-inverse-pair cancellations on a ℤ `to_int`-image, used by the emitter's
-// cancel recipe.  Each is applied with NO arguments — `rewrite <lemma>` infers the
-// atoms from the goal — so it works on the corpus's `prj k _x` atoms (rendering
-// them into an SSReflect `.[…]` target instead crashes lambdapi's matcher, and a
-// bare-numeral literal there would be read as a wildcard).  Names: n=`—x`, x=`x`,
-// l=a literal, a=an arbitrary prefix; the recipe picks one by the pair's position
-// in the left-nested sum (Z_neg_add/-_same for the front pair, Z_sub_add/Z_add_sub
-// for the end pair, Zc_nlx/Zc_xln for a pair split by one literal).
-opaque symbol Z_add_sub (a x : ℤ) : π ((a + x) + — x = a) ≔   // companion to Z_sub_add
-begin assume a x; rewrite +_assoc; rewrite -_same; reflexivity end;
-opaque symbol Zc_nlx (x l : ℤ) : π ((— x + l) + x = l) ≔
-begin assume x l; rewrite +_assoc; rewrite .[l + x] +_com; rewrite left +_assoc;
-  rewrite Z_neg_add; reflexivity end;
-opaque symbol Zc_xln (x l : ℤ) : π ((x + l) + — x = l) ≔
-begin assume x l; rewrite +_assoc; rewrite .[l + — x] +_com; rewrite left +_assoc;
-  rewrite -_same; reflexivity end;
 
 // ---- Laws — discretely ordered abelian group on τ ι ----
 

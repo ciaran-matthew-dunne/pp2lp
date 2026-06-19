@@ -5,15 +5,9 @@
 
 open Syntax_pp
 
-(* Whether an atom is a foldable literal — a native `Nat` (fits OCaml's int, so a
-   contiguous run computes in `Stdlib.Z`); a `BigNat` is an opaque atom.  Lets the
-   ctx-side recipe guard distinguish the literal part of a signed-atom list. *)
-val is_foldable_lit : exp -> bool
-
 (* Flatten a `+`/`−` expression to its ordered signed-atom list (— pushed to the
-   atoms; each literal a single atom, runs folded by `Stdlib.Z` computation);
-   None if a non-arithmetic node blocks it.  Mirrors the internal [toint_flat]'s
-   recursion (which carries the to_int-transport proof). *)
+   atoms); None if a non-arithmetic node blocks it.  The basis of [lin_normal]'s
+   value comparison and of the witness/reorder searches in [Emit_ctx]. *)
 val flatten_signed : exp -> (exp * int) list option
 
 (* Left-nested sum of a signed-atom list, as a PP expression (`lfold [] ≡ 𝟎`). *)
@@ -30,32 +24,23 @@ val atom_int_ev : (exp -> Lp_tree.term) ref
    guarded arithmetic lemmas (AR5–8). *)
 val int_evidence : Lp_tree.proj_env -> exp -> Lp_tree.term
 
-(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same signed-atom
-   multiset after additive cancellation (`n + —n = 𝟎`); None if either is
-   unsupported or the reduced multisets differ.  Bridges an arithmetic-reorder
-   / normalisation gap (INS conjuncts, AR3_1) without `trust`. *)
+(* `π (e1 = e2)` for two `+`/`−` expressions denoting the same value: the `e1=e2`
+   fast path is `eq_refl`, otherwise the reflective normaliser ([reflect_eq]).
+   None if either is non-linear or they differ.  Bridges arithmetic-reorder /
+   normalisation gaps (INS conjuncts, AR3, Farkas) without `trust`. *)
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
-(* The *tactic* form of the to_int-transport for a one-sided goal `to_int e = c`:
-   a script (`simplify` + negation/associativity prefix + cert-driven bubble-sort
-   `Z_swap2` swaps + `Z_neg_add`/`simpl_inv_right` cancels + `reflexivity`) closing
-   it, paired with the literal c that [e] cancels/folds to.  [None] when a
-   non-literal atom survives or a swap would need an ambiguous all-literal pattern
-   (caller then keeps the explicit congruence term).  Used (via [Emit_ctx]) for
-   AR4's `(E+F) = 𝟏` and NRM29's `e = 𝟎` cancellations. *)
-val cancel_recipe : Lp_tree.proj_env -> exp -> (Lp_tree.t * int) option
-
-(* `π (e = 𝟎)` when [e]'s signed atoms cancel to the empty multiset (e.g.
-   `—a + a`).  [prove_sum_eq … (Nat 0)] can't — `𝟎` is the atom `0`, not the
-   empty list.  Used by the trust-free NRM29 dispatch for the cancelling bounds. *)
+(* `π (e = 𝟎)` when [e]'s atoms cancel to nothing — `reflect_eq e (Nat 0)`.  Used
+   by the trust-free NRM29 dispatch for the cancelling bounds. *)
 val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
 
-(* `π (e > 𝟎)` when [e] cancels to a positive literal (AR4's `(E+F) > 𝟎`). *)
+(* `π (e > 𝟎)` when [e] cancels/folds to a positive literal (AR4's `(E+F) > 𝟎`):
+   transport [positive_lit] along the reflected `e = from_int c`. *)
 val prove_gt_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
 
 (* `π (¬ (from_int c ≤ 𝟎))` for a concrete positive literal c (`one_not_leq_zero`
-   for c = 1).  The positive-constant refutation [prove_gt_zero] transports along
-   its `e = from_int c`; exposed so the cancel-recipe path can reuse it. *)
+   for c = 1).  [prove_gt_zero] transports it along `e = from_int c`; exposed for
+   the Farkas certificate to refute its summed `c ≤ 𝟎`. *)
 val positive_lit : Lp_tree.proj_env -> int -> Lp_tree.term
 
 (* Farkas-style certificate for ⊥ from the `e ≤ 𝟎` hypotheses: small

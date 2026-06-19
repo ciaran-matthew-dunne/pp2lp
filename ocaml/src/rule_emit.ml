@@ -35,7 +35,7 @@ let exp_term ctx e = L.Exp (pp_env_of ctx, e)
 let dynamic_value_args ctx rule arg =
   match Rule_db.emit rule, arg with
   | Rule_db.Ar3, Some (PipeArg (a, _b)) -> [exp_term ctx a]
-  | Rule_db.Ar9, Some (Pred p) -> [pred_term ctx p]
+  | Rule_db.Ar9, Some (ExpArg e) -> [exp_term ctx e]
   | _, _ -> []
 
 (* Proof arguments the LP signature needs *before* the slot holes —
@@ -545,10 +545,9 @@ let tactic_for_rule ctx rule arg anno children =
             Option.map (fun h_gt ->
               (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
                  both via the B.lp `to_int`/`isGt` unification rules.  `(E+F) > 𝟎`
-                 is the cancel-recipe `have` (a compact tactic proof), main-tree
-                 so no Π-binders. *)
+                 is the reflective [prove_gt_zero] term. *)
               L.Refine (L.Name rule, [L.Name name; h_gt]))
-              (prove_gt_zero_t ctx env ~binders:[] (AOp (Add, e, f)))
+              (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
           | _ -> None) ctx.hyps
       | None -> None
     in
@@ -570,13 +569,26 @@ let tactic_for_rule ctx rule arg anno children =
     failwith "translate: AR7/AR8 unsupported — the solver witness (a in a + c = 𝟎) \
               is not recorded in the replay"
   | Rule_db.Ar9 ->
-    (* AR9 (F) : π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R).  Like AR10,
-       PP's `solveur(E) = F` is the identity (E ≡ F on every corpus occurrence),
-       so the equality is `eq_refl F`, not `trust`.  The Seq slot (the
-       continuation) is the remaining hole. *)
-    (match dynamic_value_args ctx rule arg with
-     | [f] -> L.Refine (L.Name "AR9", [f; L.App (L.Name "eq_refl", [f]); L.Hole])
-     | _ -> L.Refine (L.Name rule, default_rule_args ctx rule arg))
+    (* AR9 (F) : π (E = F) → π ((F ≤ 𝟎) ⇒ R) → π ((E ≤ 𝟎) ⇒ R).  PP's `solveur(E) = F`;
+       the `E = F` equality is proved reflectively ([prove_sum_eq]) — `eq_refl` when
+       E ≡ F (the corpus norm), the reflective normaliser when F merely reorders E.
+       The Seq slot (continuation) is the remaining hole.  Falls back to the bare
+       `eq_refl F` when the goal/arg isn't the expected `(E ≤ 𝟎) ⇒ R` with a
+       lifted-expression arg (never `trust`). *)
+    let reflective =
+      match goal_of_anno anno, arg with
+      | Some (Binary (Imp, Leq (e_exp, Nat 0), _)), Some (ExpArg f_exp) ->
+        Option.map
+          (fun eqpf -> L.Refine (L.Name "AR9", [exp_term ctx f_exp; eqpf; L.Hole]))
+          (Arith_proofs.prove_sum_eq (pp_env_of ctx) e_exp f_exp)
+      | _ -> None
+    in
+    (match reflective with
+     | Some t -> t
+     | None ->
+       match dynamic_value_args ctx rule arg with
+       | [f] -> L.Refine (L.Name "AR9", [f; L.App (L.Name "eq_refl", [f]); L.Hole])
+       | _ -> L.Refine (L.Name rule, default_rule_args ctx rule arg))
   | Rule_db.Hyp_search | Rule_db.Axm8 | Rule_db.Ectr  (* children <> [] — leaf rules, so unreached *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Ar3 | Rule_db.Ar3_f
   | Rule_db.Nrm2730   (* expands to tree structure in [Translate.default] *)

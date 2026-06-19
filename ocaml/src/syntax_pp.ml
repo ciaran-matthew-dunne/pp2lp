@@ -53,9 +53,15 @@ and exp =
            SIGMA(xs).(P | E) ↦ ("sigma",…).  Binds xs over both the predicate
            P and the value E; the string is the LP kernel symbol. *)
 
+(* A rule's `[RULE(arg)]` argument from the replay.  [ExpArg] is a bare
+   expression (AR9's solver-normalised F, …) — kept as an [exp], not shoehorned
+   into [Pred] via a `Lift`; a rule that wants it as a proposition re-lifts it.
+   [Pred] is a structured predicate (AR10's `a,b: f`, IMP5's antecedent, …);
+   [PipeArg] the `a | b` two-expression form (AR3). *)
 type arg =
   | Pred of prd
   | PipeArg of exp * exp
+  | ExpArg of exp
 and sequent =
   prd list * prd
 and lhs =

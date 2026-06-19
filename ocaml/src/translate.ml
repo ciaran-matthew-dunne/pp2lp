@@ -16,6 +16,14 @@ module L = Lp_tree
 open Emit_ctx
 open Rule_emit
 
+(* The solver-result *predicate* carried by a rule arg: a [Pred] directly, a bare
+   [ExpArg] re-lifted to a proposition (a boolean expression in prop position).
+   [PipeArg]/absent → None.  Used by AR10/AR10_1's no-op sanity warning. *)
+let arg_prd : arg option -> prd option = function
+  | Some (Pred q) -> Some q
+  | Some (ExpArg e) -> Some (Lift e)
+  | _ -> None
+
 (* Binder vars introduced by a branching quantifier, read from its goal
    annotation: ALL7's goal is `(binder) ⇒ R`, XST8's is the bare binder.
    Shared by the main-tree [branching] and the Res-chain branch case. *)
@@ -57,10 +65,10 @@ let rec ar3f_cong ctx env binders prd a_exp r_exp : L.term option =
     Option.map
       (fun eqpf -> L.App (L.Name "ar3f_eq",
         [ L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf ]))
-      (* `binders` are the enclosing `!!_cong (λ v, …)` binders this occurrence
-         sits under; the equality `have` is Π-quantified over them and applied
-         (`_eqN v…`) right here, so a recipe-closable proof needn't be inlined. *)
-      (arith_eq_have ctx env ~binders (AOp (Sub, Nat 1, a_exp)) r_exp)
+      (* The `𝟏 − a = r` proof is a reflective TERM (`toint_eq … (reflect …)`),
+         so it sits directly inside this enclosing `!!_cong (λ v, …)` occurrence —
+         no Π-quantified `have` to hoist. *)
+      (Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
   | Unary (Not, p) ->
     Option.map (fun c -> L.App (L.Name "not_cong", [c]))
       (ar3f_cong ctx env binders p a_exp r_exp)
@@ -119,8 +127,8 @@ let rec tree ctx node =
        `refine AR10 …` at all.  Guard the assumption: if PP's recorded Q (the
        arg) differs from the goal antecedent P, the no-op is unjustified (the
        skip would then fail loud at the lambdapi check); warn so it's visible. *)
-    (match goal_of_anno anno, arg with
-     | Some (Binary (Imp, p, _)), Some (Pred q) when p <> q ->
+    (match goal_of_anno anno, arg_prd arg with
+     | Some (Binary (Imp, p, _)), Some q when p <> q ->
        Errors.warn
          "AR10 skipped as a no-op, but its solver result Q differs from the goal \
           antecedent P — P ≡ Q is assumed (P = %s ; Q = %s); if they are not \
@@ -129,15 +137,7 @@ let rec tree ctx node =
      | _ -> ());
     tree ctx c
   | P.Apply { rule; src_line; anno; _ } ->
-    (* Emit any arith-equality `have`s this node registers (via [arith_eq_have])
-       right before its tactic.  Save/clear so a child's haves (flushed inside its
-       own [tree] call) don't leak up, and only this node's remain to flush. *)
-    let saved = ctx.pending_haves in
-    ctx.pending_haves <- [];
-    let dispatched = tree_dispatch ctx node in
-    let wrapped = flush_haves ctx dispatched in
-    ctx.pending_haves <- saved;
-    L.Commented (prov_of rule src_line anno, wrapped)
+    L.Commented (prov_of rule src_line anno, tree_dispatch ctx node)
 
 and tree_dispatch ctx = function
   | P.Apply { rule; anno; children = [c]; _ }
@@ -297,7 +297,7 @@ and default ctx rule arg anno children =
     in
     let h = fresh_h ctx eq_pred in
     L.Assume (h,
-      L.Then (L.Rewrite { try_ = true; repeat_ = false; rtl; pat = None; name = h }, tree ctx c))
+      L.Then (L.Rewrite { try_ = true; rtl; name = h }, tree ctx c))
   | [c], Rule_db.Ar3 ->
     (* Main-tree AR3.  PP's solver records the sub-premise `𝟏 - a` in its own
        normalised order `r` (the PipeArg's 2nd component), so the continuation is
@@ -309,7 +309,7 @@ and default ctx rule arg anno children =
     let tactic =
       match goal, arg with
       | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (PipeArg (_, r_exp)) ->
-        (match arith_eq_have ctx env ~binders:[] (AOp (Sub, Nat 1, a_exp)) r_exp with
+        (match Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp with
          | Some eqpf ->
            L.Refine (L.Name "AR3",
              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole])
@@ -626,29 +626,44 @@ and chain_term ctx node : L.term =
        the continuation chain term already has the result type — skip the AR10_1
        wrapper entirely.  Warn if PP's recorded Q diverges from the goal
        antecedent P (the no-op would then be unjustified). *)
-    (match goal_of_anno anno, arg with
-     | Some (Binary (Imp, p, _)), Some (Pred q) when p <> q ->
+    (match goal_of_anno anno, arg_prd arg with
+     | Some (Binary (Imp, p, _)), Some q when p <> q ->
        Errors.warn
          "AR10 (chain) skipped as a no-op, but its solver result Q differs from \
           the goal antecedent P (P = %s ; Q = %s)"
          (Emit_pp.prd_to_pp p) (Emit_pp.prd_to_pp q)
      | _ -> ());
     chain_term ctx c
-  | P.Apply { rule; arg; children = [c]; _ }
+  | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar9 ->
-    (* AR9_1 (F) (he : E = F) (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R).
-       PP's `solveur(E) = F` is the identity (E ≡ F), so `he` is `eq_refl F`,
-       not `trust`.  Mirrors the main-tree AR9 dispatch. *)
-    (match dynamic_value_args ctx rule arg with
-     | [f] ->
-       app (chain_emit_name rule)
-         [f; L.App (L.Name "eq_refl", [f]); chain_term ctx c]
-     | _ ->
-       app (chain_emit_name rule)
-         (plug rule
-            (dynamic_value_args ctx rule arg
-             @ metadata_extra_args rule @ slot_hole_args rule)
-            [chain_term ctx c]))
+    (* AR9_1 (F) (he : E = F) (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R).  `he`
+       is proved reflectively ([prove_sum_eq]) — `eq_refl` when E ≡ F (the corpus
+       norm), the reflective normaliser when F reorders E.  Mirrors the main-tree
+       AR9 dispatch; falls back to the bare `eq_refl` on an unexpected goal/arg
+       shape (never `trust`). *)
+    let env = proj_env_of_ctx ctx in
+    let reflective =
+      match goal_of_anno anno, arg with
+      | Some (Binary (Imp, Leq (e_exp, Nat 0), _)), Some (ExpArg f_exp) ->
+        Option.map
+          (fun eqpf -> app (chain_emit_name rule)
+             [L.Exp (env, f_exp); eqpf; chain_term ctx c])
+          (Arith_proofs.prove_sum_eq env e_exp f_exp)
+      | _ -> None
+    in
+    (match reflective with
+     | Some t -> t
+     | None ->
+       match dynamic_value_args ctx rule arg with
+       | [f] ->
+         app (chain_emit_name rule)
+           [f; L.App (L.Name "eq_refl", [f]); chain_term ctx c]
+       | _ ->
+         app (chain_emit_name rule)
+           (plug rule
+              (dynamic_value_args ctx rule arg
+               @ metadata_extra_args rule @ slot_hole_args rule)
+              [chain_term ctx c]))
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar3 ->
     (* AR3 in a Res chain.  PP's solver records the sub-premise `𝟏 - a` in its own
@@ -658,7 +673,7 @@ and chain_term ctx node : L.term =
        loud if the shape is off or the equality can't be built. *)
     let env = proj_env_of_ctx ctx in
     (match goal_of_anno anno, arg with
-     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (Pred (Lift r_exp)) ->
+     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (PipeArg (_, r_exp)) ->
        (match Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp with
         | Some eqpf ->
           L.App (L.Name "AR3_1",
@@ -666,7 +681,7 @@ and chain_term ctx node : L.term =
         | None -> failwith "translate: chain AR3 — couldn't build the `𝟏 - a = r` \
                             equality (prove_sum_eq), refusing to emit trust")
      | _ -> failwith "translate: chain AR3 — expected a `¬(leq a 𝟎) ⇒ R` goal with \
-                      an `a | r` arg, refusing to emit trust")
+                      an `a | r` PipeArg, refusing to emit trust")
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP5" ->
     (* IMP5_1 (hp : π P) (r : Res Q) : Res (P ⇒ Q) — strips a *known*

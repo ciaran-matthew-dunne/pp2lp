@@ -198,7 +198,10 @@ raw_prd:
 
 lhs_arg:
   | p = prd
-  { Pred p }
+  (* a bare expression arg parses (via [prd]) as `Lift e`; keep it an expression
+     ([ExpArg]) rather than a lifted predicate — the consumer re-lifts if it wants
+     a proposition.  Structured predicates stay [Pred]. *)
+  { match p with Lift e -> ExpArg e | _ -> Pred p }
   | e1 = exp; PIPE; e2 = exp
   { PipeArg (e1, e2) }
 lhs:

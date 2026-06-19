@@ -283,6 +283,12 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
 (* A higher-order set operator applied directly: `(name a b …)`, each argument
    fully parenthesised (default min_bp). *)
 and pp_setop ?(env = []) buf name args =
+  (* `prod` with an integer-literal operand is arithmetic `k·x` (a literal can't be
+     a Cartesian operand), so render it as the arithmetic `mult`; a genuine set
+     product (no literal) stays `prod`.  Keeps B.lp's `mult`/`prod` distinct. *)
+  let name = match name, args with
+    | "prod", ([ Nat _; _ ] | [ _; Nat _ ]) -> "mult"
+    | _ -> name in
   Buffer.add_char buf '(';
   Buffer.add_string buf name;
   List.iter (fun a -> Buffer.add_char buf ' '; pp_exp ~env buf a) args;

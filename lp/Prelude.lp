@@ -5,7 +5,7 @@
 // `require open pp2lp.Prelude;`.
 require open
   pp2lp.B
-  pp2lp.lemmas.Int pp2lp.lemmas.Tuple pp2lp.lemmas.ConjList
+  pp2lp.lemmas.Int pp2lp.lemmas.Zmul pp2lp.lemmas.Reflect pp2lp.lemmas.Tuple pp2lp.lemmas.ConjList
   pp2lp.rules.Res
   pp2lp.rules.Conj pp2lp.rules.Disj
   pp2lp.rules.Impl pp2lp.rules.Equiv

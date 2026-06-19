@@ -59,9 +59,13 @@ and exp =
                                    SIGMA(xs).(P | E) ↦ ("sigma", …).  Binds xs
                                    over both P and E; string is the LP kernel. *)
 
+(* A rule's `[RULE(arg)]` argument.  [ExpArg] is a bare expression (AR9's F) kept
+   as an [exp] rather than a `Pred (Lift e)`; [Pred] a structured predicate;
+   [PipeArg] the `a | b` two-expression form (AR3). *)
 type arg =
   | Pred of prd
   | PipeArg of exp * exp
+  | ExpArg of exp
 and sequent =
   prd list * prd
 and lhs =
