@@ -30,7 +30,13 @@ val int_evidence : Lp_tree.proj_env -> exp -> Lp_tree.term
    normalisation gaps (INS conjuncts, AR3, Farkas) without `trust`. *)
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
-(* `π (e = 𝟎)` when [e]'s atoms cancel to nothing — `reflect_eq e (Nat 0)`.  Used
+(* `π (p = q)` for two predicates differing only by arithmetic normalisation of
+   their `=`/`≤` leaves (AR10's `solveur(p) = q`): congruence down to the leaves,
+   each closed by [prove_sum_eq].  Handles the ¬/=/≤ shapes; None otherwise (the
+   caller falls back to skipping the no-op). *)
+val prove_pred_eq : Lp_tree.proj_env -> prd -> prd -> Lp_tree.term option
+
+(* `π (e = 𝟎)` when [e]'s atoms cancel to nothing — `reflect_eq e (Lit "0")`.  Used
    by the trust-free NRM29 dispatch for the cancelling bounds. *)
 val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
 
@@ -43,10 +49,12 @@ val prove_gt_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
    the Farkas certificate to refute its summed `c ≤ 𝟎`. *)
 val positive_lit : Lp_tree.proj_env -> int -> Lp_tree.term
 
-(* Farkas-style certificate for ⊥ from the `e ≤ 𝟎` hypotheses: small
-   nonnegative multipliers summing the hyps to 𝟏, emitted as a generated
-   add_leq_zero / prove_sum_eq proof (no `trust`).  Takes the projection env
-   and the candidate hyps as `(name, e, signed-atoms)`; [Emit_ctx] supplies
-   them from the context. *)
+(* Farkas certificate for ⊥ from the `e ≤ 𝟎` hypotheses, found by Fourier–Motzkin
+   elimination: a nonnegative integer combination of the hyps summing to a positive
+   constant, emitted as a generated add_leq_zero / prove_sum_eq proof (no `trust`).
+   Complete for ℚ-linear refutation — telescoping chains, sum-positivity and
+   weighted sums alike — and returns None on a genuinely non-linear goal.  Takes the
+   projection env and the candidate hyps as `(name, e, signed-atoms)`; [Emit_ctx]
+   supplies them from the context. *)
 val find_arith_contradiction :
   Lp_tree.proj_env -> (string * exp * (exp * int) list) list -> Lp_tree.tactic option

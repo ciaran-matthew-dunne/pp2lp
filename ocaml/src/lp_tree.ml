@@ -1,15 +1,12 @@
 (* How a PP variable bound by an enclosing compound (n-ary) binder renders —
    defined in [Pp_lp] (the rendering layer) and re-exported here, with its
-   constructors, so proof-side modules building envs can say [L.Proj]/[L.Alias].
-   [Proj (slot, tuple-var)] renders `prj slot tuple-var` (proof context, where
-   the binder introduced a `Tuple n` value assumed under [tuple-var]); [Alias
-   name] renders the bare identifier [name] (goal statement, where the binder
-   body opens with `let name ≔ (prj slot …) in` lines — see
-   [Pp_lp.binder_header]).  Carried on [Pred]/[Exp] so the formula is rendered
-   the right way at print time, not pre-rendered to a string. *)
+   constructor, so proof-side modules building envs can say [L.Proj].
+   [Proj (slot, tuple-var)] renders the infix `tuple-var ⋕ slot` (the binder
+   introduced a `Tuple n` value under [tuple-var]).  Carried on [Pred]/[Exp] so
+   the formula is rendered the right way at print time, not pre-rendered to a
+   string. *)
 type proj_binding = Pp_lp.proj_binding =
   | Proj of int * string
-  | Alias of string
 type proj_env = Pp_lp.proj_env
 
 (* `Pi_pred` annotates a λ-binder with `π (<pred>)` — used when the bound

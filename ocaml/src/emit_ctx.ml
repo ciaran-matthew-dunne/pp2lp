@@ -110,11 +110,12 @@ let chain_emit_name rule =
    with the small ⋀-list proof-term algebra built on them.  Everything
    returns a structured [Lp_tree.term]; nothing renders to a string. *)
 
-(* `prj k t` — the k-th projection.  The index is a bare ℤ decimal (the emitted
-   file is ℤ-global); the `coerce ℤ ℕ ↪ to_nat` rule (B.lp) converts it to the ℕ
-   index `prj` expects, so no explicit `to_nat` wrapper is needed (cf. [Pp_lp.pp_idx]). *)
+(* `prj k t` — the k-th projection, emitted as the infix `t ⋕ k` (B.lp's
+   `⋕ x n ≔ prj (to_nat n) x`), matching how goal statements render tuple slots.
+   The index is a bare ℤ decimal (the file is ℤ-global); `⋕` applies `to_nat`, so
+   no coercion is inserted (cf. [Pp_lp.pp_idx]). *)
 let prj k t =
-  L.App (L.Name "prj", [ L.Name (string_of_int k); t ])
+  L.Infix ("\xe2\x8b\x95" (* ⋕ *), t, L.Name (string_of_int k))
 
 let conj_intro a b = L.App (L.Name "\xe2\x8b\x80_intro", [a; b]) (* ⋀_intro *)
 let conj_nil_prf = L.Name "\xe2\x8b\x80_nil_prf"                 (* ⋀_nil_prf *)
@@ -190,7 +191,7 @@ let find_tuple_slot ctx v =
     | None -> None) ctx.xs
 
 (* The `V ϵ BOOL` discharge term for a BOOL31/32/41/42 split on bound var [v]:
-   a per-(arity,slot) typing premise `Π u : Tuple n, π (prj k u ϵ BOOL)`
+   a per-(arity,slot) typing premise `Π u : Tuple n, π ((u ⋕ k) ϵ BOOL)`
    (registered in [ctx.bool_typings] so [Emit_lp] adds it to the header),
    applied to the in-scope tuple.  [None] when [v] isn't a bound tuple slot. *)
 let bool_typing_term ctx v =
@@ -199,7 +200,7 @@ let bool_typing_term ctx v =
     let name = Printf.sprintf "_bt_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 BOOL)" n k
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((u \xe2\x8b\x95 %d) \xcf\xb5 BOOL)" n k
     in
     if not (List.mem_assoc name ctx.bool_typings) then
       ctx.bool_typings <- ctx.bool_typings @ [ (name, ty) ];
@@ -207,7 +208,7 @@ let bool_typing_term ctx v =
   | None -> None
 
 (* `V ϵ INT` evidence for an integer-typed variable [v]: like [bool_typing_term],
-   a bound tuple slot discharges from a per-(arity,slot) `Π u, prj k u ϵ INT`
+   a bound tuple slot discharges from a per-(arity,slot) `Π u, (u ⋕ k) ϵ INT`
    premise applied to the in-scope tuple; a *free* var (a `(x : τ ι)` symbol
    param) from a per-name `π (x ϵ INT)` premise.  Both injected into
    [ctx.int_typings] for [Emit_lp]'s header — morally true (the var IS an
@@ -218,7 +219,7 @@ let int_typing_term ctx v : L.term =
     let name = Printf.sprintf "_it_%d_%d" n k in
     let ty =
       Printf.sprintf
-        "\xce\xa0 u : Tuple %d, \xcf\x80 ((prj %d u) \xcf\xb5 INT)" n k
+        "\xce\xa0 u : Tuple %d, \xcf\x80 ((u \xe2\x8b\x95 %d) \xcf\xb5 INT)" n k
     in
     if not (List.mem_assoc name ctx.int_typings) then
       ctx.int_typings <- ctx.int_typings @ [ (name, ty) ];
@@ -365,30 +366,28 @@ let find_eqs2_spine e f r =
   walk 0 r
 
 (* ECTR3/4 discharge `¬(P E) ⇒ Q` from store hyps `E = F` (ECTR3) or
-   `F = E` (ECTR4) and `P F`.  From the negated goal atom [g], find an
-   equality hyp one side of which is a variable whose substitution in [g]
-   yields another hyp.  Returns the substituted variable, the equality
-   hyp, whether it is recorded as F = E (→ ECTR4), and the matching
-   hyp. *)
+   `F = E` (ECTR4) and `P F`.  From the negated goal atom [g] = `P E`, find an
+   equality hyp one side of which (the rewritten side `E`, a variable *or* a
+   compound term like `f(x)`) occurs in [g]; rewriting it to the other side `F`
+   must yield another hyp `P F`.  Returns the rewritten sub-expression `E`, the
+   equality hyp, whether it is recorded as F = E (→ ECTR4), and the `P F` hyp. *)
 let find_ectr34 ctx g =
-  let try_dir x y_exp heq swapped =
-    let g' = subst_prd [(x, y_exp)] g in
+  let try_dir e_from e_to heq swapped =
+    let g' = replace_subexp_prd e_from e_to g in
     if g' = g then None
     else
       List.find_map
         (fun (h_name, q) ->
-           if q = g' then Some (x, heq, swapped, h_name) else None)
+           if q = g' then Some (e_from, heq, swapped, h_name) else None)
         ctx.hyps
   in
   List.find_map
     (fun (he, p) ->
        match p with
-       | Eq (Var x, Var y) ->
-         (match try_dir x (Var y) he false with
+       | Eq (e1, e2) ->
+         (match try_dir e1 e2 he false with
           | Some r -> Some r
-          | None -> try_dir y (Var x) he true)
-       | Eq (Var x, e2) -> try_dir x e2 he false
-       | Eq (e1, Var y) -> try_dir y e1 he true
+          | None -> try_dir e2 e1 he true)
        | _ -> None)
     ctx.hyps
 
@@ -451,7 +450,7 @@ let find_ectr56 ctx g =
 let find_leq_zero_hyp ctx =
   List.find_map
     (fun (name, p) -> match p with
-       | Leq (f, Nat 0) -> Some (f, name)
+       | Leq (f, Lit "0") -> Some (f, name)
        | _ -> None) ctx.hyps
 
 (* ---- Alpha + universal-binder-kind-insensitive predicate equality ----
@@ -541,7 +540,7 @@ let match_pattern vars pat_prd tgt_prd : (string * exp) list option =
     | Var v, _ when List.mem v vars -> bind v tgt
     | Var v, Var v' -> if v <> v' then ok := false
     | Var _, _ -> ok := false
-    | Nat n, Nat n' -> if n <> n' then ok := false
+    | Lit s, Lit s' -> if s <> s' then ok := false
     (* Every other shape: congruent iff same head, payload, and arity.  Going
        through [exp_congruence] covers the Range/Maplet/Inverse/SetLit/
        DomRestrict/RanRestrict operators the old hand-rolled cases silently
@@ -690,7 +689,7 @@ let nrm29_witness_bridge ctx goal : (L.term * L.term) option =
   | Binary (Imp, Bind (Forall2, d :: rest, Unary (Not, conj)), _) ->
     let bounds = Pp_lp.conj_children_left conj in
     let bound_lhss =
-      List.filter_map (function Leq (e, Nat 0) -> Some e | _ -> None) bounds in
+      List.filter_map (function Leq (e, Lit "0") -> Some e | _ -> None) bounds in
     if List.length bound_lhss <> List.length bounds then None
     else
       (* witness pins `d`: take a bound `d + r ≤ 𝟎` (d with coeff +1), drop the
@@ -756,7 +755,7 @@ let find_leq_reorder ctx lhs =
   | Some fl ->
     let key = List.sort compare fl in
     List.find_map (fun (name, p) -> match p with
-      | Leq (h_lhs, Nat 0) ->
+      | Leq (h_lhs, Lit "0") ->
         (match flatten_signed h_lhs with
          | Some fh when List.sort compare fh = key -> Some (name, h_lhs)
          | _ -> None)
@@ -799,7 +798,7 @@ let eq_rewrite_evidence ctx needed =
                  (`1 − (0+0)` where PP recorded `1`) — transport, then close
                  the gap with a generated sum equality. *)
               match needed, hp' with
-              | Leq (nl, Nat 0), Leq (hl, Nat 0) ->
+              | Leq (nl, Lit "0"), Leq (hl, Lit "0") ->
                 Option.map
                   (fun eqpf ->
                      L.App (L.Name "leq_subst_l",
@@ -833,7 +832,7 @@ let leaf_evidence ctx env leaf =
          term order than the universal.  Prove `needed = hyp` and transport. *)
       let reorder =
         match needed with
-        | Leq (lhs, Nat 0) ->
+        | Leq (lhs, Lit "0") ->
           (match find_leq_reorder ctx lhs with
            | Some (h, h_lhs) ->
              (match prove_sum_eq (proj_env_of_ctx ctx) lhs h_lhs with
@@ -847,95 +846,273 @@ let leaf_evidence ctx env leaf =
        | Some _ as r -> r
        | None -> eq_rewrite_evidence ctx needed)
 
-let match_conj ctx env body =
-  let leaves = collect_conj_leaves body in
-  let opt_evs = List.map (leaf_evidence ctx env) leaves in
-  if List.for_all Option.is_some opt_evs then
-    Some (conj_chain (List.map Option.get opt_evs))
-  else None
+(* The eliminator that instantiates a normalised universal at a witness: `!!`,
+   `♢`, `♡` all alias one `!!` but keep distinct elim lemmas (lemmas/Tuple.lp). *)
+let elim_of_binder = function
+  | Bang -> "!!_to_pi"
+  | Forall -> "\xe2\x99\xa2_to_pi"   (* ♢_to_pi *)
+  | Forall2 -> "\xe2\x99\xa1_to_pi"  (* ♡_to_pi *)
+  | Exists -> failwith "Exists binder in ins_hyp_shape"
+
+(* Witness terms PP synthesises rather than binds, harvested from the hyps for
+   the INS search: every B-function application (`App`/`EApp`) — the image `f(a)`
+   of an earlier witness, for `∀y·¬(y∈t ∧ ¬(y∈u))` instantiated at `f(a)` — and
+   every integer literal (`Lit`) — the bound a range-membership universal is
+   instantiated at, e.g. `16` from the goal `16 ϵ 0..255`.  Plus the variables of
+   an expression (to keep an applied term over in-scope witness vars). *)
+let rec apps_of_exp acc e =
+  let acc = match e with App _ | EApp _ -> e :: acc | _ -> acc in
+  fold_exp apps_of_exp acc e
+
+let rec lits_of_exp acc e =
+  let acc = match e with Lit _ -> e :: acc | _ -> acc in
+  fold_exp lits_of_exp acc e
+
+(* [of_exp]'s hits over every expression in a predicate (recursively). *)
+let exps_of_prd of_exp p =
+  let rec go acc = function
+    | Lift e -> of_exp acc e
+    | Unary (_, q) -> go acc q
+    | Binary (_, a, b) -> go (go acc a) b
+    | Mem (es, e) -> List.fold_left of_exp (of_exp acc e) es
+    | Eq (a, b) | Leq (a, b) -> of_exp (of_exp acc a) b
+    | Rel (_, es) -> List.fold_left of_exp acc es
+    | Bind (_, _, body) -> go acc body
+  in go [] p
+
+let apps_of_prd = exps_of_prd apps_of_exp
+let lits_of_prd = exps_of_prd lits_of_exp
+
+let rec vars_of_exp acc = function
+  | Var v -> v :: acc
+  | e -> fold_exp vars_of_exp acc e
+
+(* The native-int value of a *ground* `+`/`−` expression (every atom a parseable
+   literal); None if any atom is symbolic or a literal too big to fold.  Lets the
+   INS search decide a ground bound `e ≤ 𝟎` holds before emitting its proof. *)
+let ground_value e =
+  match flatten_signed e with
+  | None -> None
+  | Some atoms ->
+    List.fold_left (fun acc (a, s) ->
+      match acc, a with
+      | Some c, Lit l -> Option.map (fun n -> c + s * n) (int_of_string_opt l)
+      | _ -> None) (Some 0) atoms
 
 let find_ins_contradiction ctx =
-  let try_candidate (lp_witness, pp_vars) (h_name, h_pred) =
+  let proj_env = proj_env_of_ctx ctx in
+  (* ---- forward+backward saturating instantiation search ----
+
+     A single `[INS]` (or a `FIN_INS` chain PP writes out explicitly) can hide a
+     *multi-step* contradiction: `x∈s`, `s⊆t`, `t⊆u`, `x∉u` is inconsistent only
+     after deriving `x∈t` (modus ponens on `s⊆t`).  Saturate: instantiate each
+     universal hyp `!!v·¬⋀(P₁…Pₙ)` at each in-scope witness; once every conjunct
+     matches a hyp or an already-derived fact, that universal closes ⊥ (the
+     terminal).  When exactly one conjunct Pⱼ is missing, derive its negation as
+     a new fact and retry.  Deriving ¬Pⱼ from the rest covers both directions: a
+     missing `¬B` yields `B` (forward MP, via `¬¬ₑ`), a missing positive `A`
+     yields `¬A` (backward MT, a bare λ).  [pool] holds the derived
+     `(pred, evidence)` facts, pred already substituted over the witness vars. *)
+  let match_leaf pool env leaf =
+    let needed = subst_prd env leaf in
+    let from_pool () =
+      List.find_map (fun (p, t) -> if prd_equiv p needed then Some t else None) pool in
+    (* a trivially-true bound `e ≤ 𝟎`, proved rather than matched to a hyp.  Two
+       shapes: a *ground* non-positive `e` (e.g. `−16`, `16−255`, from a range
+       universal instantiated at a literal — `to_int e ≤ 0` COMPUTES in Stdlib.Z,
+       closed by `le_intro _ _ (λ h, h)`); or a symbolic `e` that sums to zero
+       (`x − x`, a min/max instantiation — the reflective `prove_sum_zero`). *)
+    let arith () = match needed with
+      | Leq (e, Lit "0") ->
+        (match ground_value e with
+         | Some c when c <= 0 ->
+           Some (L.App (L.Name "le_intro",
+             [ L.Exp (proj_env, e); L.Name "\xf0\x9d\x9f\x8e" (* 𝟎 *);
+               L.Lambda ("_h", None, L.Name "_h") ]))
+         | _ ->
+           Option.map
+             (fun pf -> L.App (L.Name "leq_zero_of_sum_zero", [L.Hole; pf]))
+             (prove_sum_zero proj_env e))
+      | _ -> None
+    in
+    match needed with
+    (* a refuted existential `∃x·g(x)=c` instantiates at the witness to the
+       reflexive `c=c` — discharged by `eq_refl`, not any hyp.  (xst_app etc.) *)
+    | Eq (a, b) when a = b -> Some (eq_refl (L.Exp (proj_env, a)))
+    | _ ->
+      match leaf_evidence ctx env leaf with
+      | Some _ as r -> r
+      | None ->
+        match from_pool () with
+        | Some _ as r -> r
+        | None -> arith ()
+  in
+  (* (elim, h_name, witness, env, leaves, per-leaf evidence) for one
+     (universal hyp × witness) against [pool]; None on shape/arity mismatch.
+     A candidate's [pp_exps] are the expressions its tuple slots stand for (a
+     bound var `Var v`, or an applied term `f(a)`); [env] substitutes them for
+     the universal's binder vars. *)
+  let classify pool (lp_witness, pp_exps) (h_name, h_pred) =
     match ins_hyp_shape h_pred with
     | Some (binder, h_vars, h_body)
-      when List.length h_vars = List.length pp_vars ->
-      let env = List.map2 (fun v pp -> (v, Var pp)) h_vars pp_vars in
-      (match match_conj ctx env h_body with
-       | Some conj_ev ->
-         let elim_lemma = match binder with
-           | Bang -> "!!_to_pi"
-           | Forall -> "♢_to_pi"
-           | Forall2 -> "♡_to_pi"
-           | Exists -> failwith "Exists binder in ins_hyp_shape"
-         in
-         Some (L.Refine (L.Name elim_lemma,
-           [L.Hole; L.Name h_name; lp_witness; conj_ev]))
-       | None -> None)
+      when List.length h_vars = List.length pp_exps ->
+      let env = List.map2 (fun v e -> (v, e)) h_vars pp_exps in
+      let leaves = collect_conj_leaves h_body in
+      let evs = List.map (match_leaf pool env) leaves in
+      Some (elim_of_binder binder, h_name, lp_witness, env, leaves, evs)
     | _ -> None
   in
-  let single_attempt =
-    List.find_map (fun x ->
-      List.find_map (fun cand ->
-        List.find_map (try_candidate cand) ctx.hyps
-      ) (witness_candidates x)
-    ) ctx.xs
+  (* Witness atoms: each is an `(lp-term, exp)` standing for one tuple slot — a
+     binder projection `(prj i x, Var pp)`, or an applied term `(f(a), f(a))`
+     drawn from the hyps over in-scope witness vars.  PP instantiates a universal
+     at the image `f(a)` of an earlier witness (composition chains), and may
+     split a `forall2(x,y)` witness across two 1-tuple binders, so a slot can be
+     either; [products] assembles them into N-tuples. *)
+  let ppset = List.concat_map snd ctx.xs in
+  let applied_terms =
+    List.concat_map (fun (_, p) -> apps_of_prd p) ctx.hyps
+    |> List.sort_uniq compare
+    |> List.filter (fun e ->
+         let vs = vars_of_exp [] e in
+         vs <> [] && List.for_all (fun v -> List.mem v ppset) vs)
   in
-  match single_attempt with
-  | Some _ as r -> r
-  | None ->
-    (* No single in-scope binder supplies a witness of the universal's arity.
-       PP's solver may have split the witness across binders — e.g. a
-       `forall2(x,y)` hyp discharged by a pair `(x$12, x$13)` drawn from two
-       separate 1-tuple binders.  Assemble composite N-tuples from the pool of
-       single-element witnesses (one `prj i x` per atom) and retry; [match_conj]
-       still demands a real hyp (or reorder proof) for every conjunct, so a
-       composite is only accepted when the contradiction genuinely holds. *)
-    let atoms =
-      List.concat_map (fun (x_name, x_pp_vars) ->
-        List.mapi (fun i pp -> (prj i (L.Name x_name), pp)) x_pp_vars) ctx.xs
-    in
-    let rec products n =
-      if n <= 0 then [ [] ]
-      else List.concat_map
-             (fun a -> List.map (fun rest -> a :: rest) (products (n - 1))) atoms
-    in
-    let build_witness atom_list =
-      (* The normalised body addresses PP binder var #i via the take/drop split
-         (NRM8/9): var #0 lands in the `take` slot, which `take`/`prj 0` resolve
-         to the *rightmost* tuple element (`prj 0 (… ⨾ x) ↪ x`), var #1 the
-         next-rightmost, etc.  So pp_vars[i] must sit at tuple position counted
-         from the right — i.e. fold the atoms in reversed order so pp_vars[0]
-         ends up rightmost.  [pp_vars] stays in PP-binder order for [match_conj]'s
-         env. *)
-      let tup = List.fold_left
-        (fun acc (e, _) -> L.App (L.Name "\xe2\xa8\xbe", [ acc; e ]))
-        (L.Name "unit") (List.rev atom_list) in
-      (tup, List.map snd atom_list)
-    in
-    List.find_map (fun (h_name, h_pred) ->
-      match ins_hyp_shape h_pred with
-      | Some (_, h_vars, _) when List.length h_vars >= 2 ->
-        List.find_map (fun atoms_n -> try_candidate (build_witness atoms_n) (h_name, h_pred))
-          (products (List.length h_vars))
-      | _ -> None
-    ) ctx.hyps
+  (* literal witnesses: each integer literal in the hyps (the `N` of a goal-side
+     `¬(N ϵ S)`).  A range-membership universal `∀x·¬((lo≤x ∧ x≤hi) ∧ ¬(x∈S))`
+     instantiated at `N` discharges to the ground bounds + the `¬(N∈S)` hyp — the
+     apero `N ϵ 0..hi` register-width checks, where no witness is in scope. *)
+  let lit_terms =
+    List.concat_map (fun (_, p) -> lits_of_prd p) ctx.hyps
+    |> List.sort_uniq compare
+  in
+  let atoms =
+    List.concat_map (fun (x_name, x_pp_vars) ->
+      List.mapi (fun i pp -> (prj i (L.Name x_name), Var pp)) x_pp_vars) ctx.xs
+    @ List.map (fun e -> (L.Exp (proj_env, e), e)) applied_terms
+  in
+  let rec products n =
+    if n <= 0 then [ [] ]
+    else List.concat_map
+           (fun a -> List.map (fun rest -> a :: rest) (products (n - 1))) atoms
+  in
+  let build_witness atom_list =
+    (* slot #i lands at the tuple position counted from the right (NRM8/9
+       take/drop; `prj 0 (… ⨾ x) ↪ x`), so fold the atoms reversed; the exps
+       stay in PP-binder order for [classify]'s env. *)
+    let tup = List.fold_left
+      (fun acc (e, _) -> L.App (L.Name "\xe2\xa8\xbe", [ acc; e ]))
+      (L.Name "unit") (List.rev atom_list) in
+    (tup, List.map snd atom_list)
+  in
+  (* the arities that some universal hyp actually needs — only build composites
+     for those (≥2; arity 1 is the single-binder / arity-1 applied candidates). *)
+  let arities =
+    List.sort_uniq compare
+      (List.filter_map (fun (_, p) ->
+         match ins_hyp_shape p with
+         | Some (_, vs, _) -> Some (List.length vs)
+         | None -> None) ctx.hyps)
+  in
+  (* applied terms and literals both instantiate a 1-var universal at a synthesised
+     `unit ⨾ <term>` tuple. *)
+  let synth_cands =
+    List.map (fun e ->
+      (L.App (L.Name "\xe2\xa8\xbe", [L.Name "unit"; L.Exp (proj_env, e)]), [e]))
+      (applied_terms @ lit_terms)
+  in
+  let candidates =
+    List.concat_map (fun x ->
+      List.map (fun (t, vs) -> (t, List.map (fun v -> Var v) vs))
+        (witness_candidates x)) ctx.xs
+    @ List.concat_map
+        (fun n -> if n >= 2 then List.map build_witness (products n) else [])
+        arities
+    @ synth_cands
+  in
+  (* The (witness, universal-hyp) pairs are fixed; only the per-leaf evidence
+     shifts as the pool grows, so enumerate the pairs once and re-classify them
+     each round. *)
+  let pairs =
+    List.concat_map (fun w -> List.map (fun h -> (w, h)) ctx.hyps) candidates
+  in
+  let unmatched_count (_, _, _, _, _, evs) =
+    List.length (List.filter Option.is_none evs) in
+  let rec none_index i = function
+    | [] -> assert false
+    | None :: _ -> i
+    | Some _ :: tl -> none_index (i + 1) tl
+  in
+  (* terminal: every conjunct matched → instantiate the universal to ⊥. *)
+  let terminal (elim, h_name, witness, _env, _leaves, evs) =
+    L.Refine (L.Name elim,
+      [L.Hole; L.Name h_name; witness; conj_chain (List.map Option.get evs)])
+  in
+  (* the fact a one-gap universal derives: the `¬¬`-collapsed negation of the
+     missing conjunct (`¬B` → `B`; positive `A` → `¬A`). *)
+  let derived_pred env pj =
+    match pj with
+    | Unary (Not, b) -> subst_prd env b
+    | _ -> Unary (Not, subst_prd env pj)
+  in
+  (* and its evidence term: the universal instantiated to ⊥ with a fresh `hj`
+     assumed at the gap slot, abstracted back out (and `¬¬ₑ`-eliminated when the
+     gap was a negation, so the result is the positive fact). *)
+  let derive (elim, h_name, witness, env, leaves, evs) j =
+    ctx.n <- ctx.n + 1;
+    let hj = Printf.sprintf "_h%d" ctx.n in
+    let pj = List.nth leaves j in
+    let conj_ev = conj_chain
+      (List.mapi (fun k ev -> if k = j then L.Name hj else Option.get ev) evs) in
+    let inner = L.App (L.Name elim, [L.Hole; L.Name h_name; witness; conj_ev]) in
+    let lam =
+      L.Lambda (hj, Some (L.Pi_pred (proj_env, subst_prd env pj)), inner) in
+    match pj with
+    | Unary (Not, b) ->
+      L.App (L.Name "\xc2\xac\xc2\xac\xe2\x82\x91"  (* ¬¬ₑ *),
+             [L.Pred (proj_env, subst_prd env b); lam])
+    | _ -> lam
+  in
+  let is_new pool pred = not (List.exists (fun (p, _) -> prd_equiv p pred) pool) in
+  let rec saturate pool fuel =
+    if fuel <= 0 then None
+    else
+      let cs = List.filter_map (fun (w, h) -> classify pool w h) pairs in
+      match List.find_opt (fun c -> unmatched_count c = 0) cs with
+      | Some c -> Some (terminal c)
+      | None ->
+        let step =
+          List.find_map (fun c ->
+            if unmatched_count c <> 1 then None
+            else
+              let (_, _, _, env, leaves, evs) = c in
+              let j = none_index 0 evs in
+              let pred = derived_pred env (List.nth leaves j) in
+              if is_new pool pred then Some (c, j, pred) else None
+          ) cs
+        in
+        match step with
+        | Some (c, j, pred) -> saturate ((pred, derive c j) :: pool) (fuel - 1)
+        | None -> None
+  in
+  saturate [] 32
 
 (* ---- ARITH: the ctx side of the Farkas contradiction search ----
-   Extract the in-scope `e ≤ 𝟎` hypotheses (with their signed-atom vectors)
-   and bound the search width; the certificate search itself is ctx-free and
-   lives in [Arith_proofs.find_arith_contradiction]. *)
-let arith_max_hyps = 6
+   Extract the in-scope `e ≤ 𝟎` hypotheses (with their signed-atom vectors);
+   the certificate search itself is ctx-free and lives in
+   [Arith_proofs.find_arith_contradiction] (Fourier–Motzkin elimination, which
+   bounds its own blowup).  The cap here is just a sanity bound on how many
+   hypotheses to feed it — generous enough for a long telescoping chain. *)
+let arith_max_hyps = 32
 
 let arith_leq_hyps ctx =
   let all =
     List.filter_map (fun (name, p) -> match p with
-      | Leq (e, Nat 0) ->
+      | Leq (e, Lit "0") ->
         (match flatten_signed e with
          | Some atoms -> Some (name, e, atoms)
          | None -> None)
       | _ -> None) ctx.hyps
   in
-  (* most-recent-first; bound the search width *)
+  (* most-recent-first; bound the number of hypotheses folded *)
   List.filteri (fun i _ -> i < arith_max_hyps) all
 
 (* Thin ctx wrapper: pull the in-scope `≤ 𝟎` hypotheses, then hand the
@@ -951,7 +1128,7 @@ let arith_diagnostic ctx =
   else
     List.iter (fun (n, e, _) ->
       Buffer.add_string b
-        (Printf.sprintf "\n    %s : %s" n (Emit_pp.prd_to_pp (Leq (e, Nat 0)))))
+        (Printf.sprintf "\n    %s : %s" n (Emit_pp.prd_to_pp (Leq (e, Lit "0")))))
       hyps;
   Buffer.contents b
 

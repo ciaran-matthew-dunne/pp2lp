@@ -66,9 +66,9 @@ exp:
   | x = SYMBOL
   { Var x }
   | i = NATURAL
-  { Nat i }
+  { Lit (string_of_int i) }
   | i = BIGNATURAL
-  { BigNat i }
+  { Lit i }
   (* Function application.  A bare-symbol head keeps the named [App] form
      (preserves existing emission / free-var handling); any other head
      (r~(s), {}(s), (r;s)(x)) becomes a general [EApp]. *)

@@ -61,14 +61,14 @@ let rec chain_looks_up node pred =
    isn't found on a supported path (caller then falls back to a no-op). *)
 let rec ar3f_cong ctx env binders prd a_exp r_exp : L.term option =
   match prd with
-  | Unary (Not, Leq (a', Nat 0)) when a' = a_exp ->
+  | Unary (Not, Leq (a', Lit "0")) when a' = a_exp ->
     Option.map
       (fun eqpf -> L.App (L.Name "ar3f_eq",
         [ L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf ]))
       (* The `𝟏 − a = r` proof is a reflective TERM (`toint_eq … (reflect …)`),
          so it sits directly inside this enclosing `!!_cong (λ v, …)` occurrence —
          no Π-quantified `have` to hoist. *)
-      (Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp)
+      (Arith_proofs.prove_sum_eq env (AOp (Sub, Lit "1", a_exp)) r_exp)
   | Unary (Not, p) ->
     Option.map (fun c -> L.App (L.Name "not_cong", [c]))
       (ar3f_cong ctx env binders p a_exp r_exp)
@@ -121,21 +121,27 @@ let rec tree ctx node =
     tree ctx c
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar10 ->
-    (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R) is a no-op: PP's
+    (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).  Usually PP's
        `solveur(P) = Q` is the identity (P ≡ Q), so the goal `P ⇒ R` and the
        child's `Q ⇒ R` are convertible and we skip straight to the child — no
-       `refine AR10 …` at all.  Guard the assumption: if PP's recorded Q (the
-       arg) differs from the goal antecedent P, the no-op is unjustified (the
-       skip would then fail loud at the lambdapi check); warn so it's visible. *)
+       `refine AR10 …` at all.  When PP's recorded Q diverges from the goal
+       antecedent P, the solver did real arithmetic normalisation (e.g. `-(-x)=x`
+       ↦ `x=x`); P and Q are then not convertible, so emit a genuine `refine AR10
+       <P = Q> _` with the propositional-equality proof from [prove_pred_eq].
+       Fall back to the bare skip (warning) for shapes that helper can't bridge —
+       the skip then fails loud at the lambdapi check rather than silently. *)
     (match goal_of_anno anno, arg_prd arg with
      | Some (Binary (Imp, p, _)), Some q when p <> q ->
-       Errors.warn
-         "AR10 skipped as a no-op, but its solver result Q differs from the goal \
-          antecedent P — P ≡ Q is assumed (P = %s ; Q = %s); if they are not \
-          convertible the skipped child will fail to type-check"
-         (Emit_pp.prd_to_pp p) (Emit_pp.prd_to_pp q)
-     | _ -> ());
-    tree ctx c
+       (match Arith_proofs.prove_pred_eq (proj_env_of_ctx ctx) p q with
+        | Some pf -> L.Then (L.Refine (L.Name "AR10", [pf; L.Hole]), tree ctx c)
+        | None ->
+          Errors.warn
+            "AR10 skipped as a no-op, but its solver result Q differs from the \
+             goal antecedent P — P ≡ Q is assumed (P = %s ; Q = %s); if they are \
+             not convertible the skipped child will fail to type-check"
+            (Emit_pp.prd_to_pp p) (Emit_pp.prd_to_pp q);
+          tree ctx c)
+     | _ -> tree ctx c)
   | P.Apply { rule; src_line; anno; _ } ->
     L.Commented (prov_of rule src_line anno, tree_dispatch ctx node)
 
@@ -308,8 +314,8 @@ and default ctx rule arg anno children =
     let env = proj_env_of_ctx ctx in
     let tactic =
       match goal, arg with
-      | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (PipeArg (_, r_exp)) ->
-        (match Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp with
+      | Some (Binary (Imp, Unary (Not, Leq (a_exp, Lit "0")), _)), Some (PipeArg (_, r_exp)) ->
+        (match Arith_proofs.prove_sum_eq env (AOp (Sub, Lit "1", a_exp)) r_exp with
          | Some eqpf ->
            L.Refine (L.Name "AR3",
              [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; L.Hole])
@@ -386,7 +392,7 @@ and default ctx rule arg anno children =
           else AOp (Sub, rhs_e, lhs_e), L.Hole
         in
         Option.map (fun hb -> (hb, value))
-          (leaf_evidence ctx [] (Leq (hyp_lhs, Nat 0)))
+          (leaf_evidence ctx [] (Leq (hyp_lhs, Lit "0")))
       | _ -> None
     in
     (match hbound_and_val with
@@ -405,7 +411,7 @@ and default ctx rule arg anno children =
              if is_ar7 then Some (AOp (Add, rhs_e, Neg rhs_e))
              else
                (match goal_of_anno anno with
-                | Some (Binary (Imp, Leq (AOp (Add, c_e, b_e), Nat 0), _))
+                | Some (Binary (Imp, Leq (AOp (Add, c_e, b_e), Lit "0"), _))
                   when b_e = lhs_e -> Some (AOp (Add, rhs_e, c_e))
                 | _ -> None)
            in
@@ -430,7 +436,7 @@ and default ctx rule arg anno children =
            let c_exp =
              if is_ar7 then Neg rhs_e
              else (match goal_of_anno anno with
-                   | Some (Binary (Imp, Leq (AOp (Add, c_e, _), Nat 0), _)) -> c_e
+                   | Some (Binary (Imp, Leq (AOp (Add, c_e, _), Lit "0"), _)) -> c_e
                    | _ -> Neg rhs_e)
            in
            [ Arith_proofs.int_evidence env rhs_e; Arith_proofs.int_evidence env lhs_e;
@@ -621,19 +627,23 @@ and chain_term ctx node : L.term =
       (plug rule ([p_lambda] @ slot_hole_args rule) [chain_term ctx c])
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar10 ->
-    (* AR10_1 [P Q R] (P = Q) (Res (Q ⇒ R)) : Res (P ⇒ R) is a no-op like the
-       main-tree AR10: P ≡ Q (identity solver), so Res (Q ⇒ R) ≡ Res (P ⇒ R) and
-       the continuation chain term already has the result type — skip the AR10_1
-       wrapper entirely.  Warn if PP's recorded Q diverges from the goal
-       antecedent P (the no-op would then be unjustified). *)
+    (* AR10_1 [P Q R] (P = Q) (Res (Q ⇒ R)) : Res (P ⇒ R).  Like the main-tree
+       AR10: when P ≡ Q (identity solver) the continuation chain already has the
+       result type, so skip the wrapper.  When PP's Q diverges from the goal
+       antecedent P (real arithmetic normalisation), wrap the chain in `AR10_1
+       <P = Q>` with the [prove_pred_eq] proof; fall back to the bare skip
+       (warning) when that helper can't bridge the shape. *)
     (match goal_of_anno anno, arg_prd arg with
      | Some (Binary (Imp, p, _)), Some q when p <> q ->
-       Errors.warn
-         "AR10 (chain) skipped as a no-op, but its solver result Q differs from \
-          the goal antecedent P (P = %s ; Q = %s)"
-         (Emit_pp.prd_to_pp p) (Emit_pp.prd_to_pp q)
-     | _ -> ());
-    chain_term ctx c
+       (match Arith_proofs.prove_pred_eq (proj_env_of_ctx ctx) p q with
+        | Some pf -> app (chain_emit_name rule) [pf; chain_term ctx c]
+        | None ->
+          Errors.warn
+            "AR10 (chain) skipped as a no-op, but its solver result Q differs \
+             from the goal antecedent P (P = %s ; Q = %s)"
+            (Emit_pp.prd_to_pp p) (Emit_pp.prd_to_pp q);
+          chain_term ctx c)
+     | _ -> chain_term ctx c)
   | P.Apply { rule; arg; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Ar9 ->
     (* AR9_1 (F) (he : E = F) (r : Res ((F ≤ 𝟎) ⇒ R)) : Res ((E ≤ 𝟎) ⇒ R).  `he`
@@ -644,7 +654,7 @@ and chain_term ctx node : L.term =
     let env = proj_env_of_ctx ctx in
     let reflective =
       match goal_of_anno anno, arg with
-      | Some (Binary (Imp, Leq (e_exp, Nat 0), _)), Some (ExpArg f_exp) ->
+      | Some (Binary (Imp, Leq (e_exp, Lit "0"), _)), Some (ExpArg f_exp) ->
         Option.map
           (fun eqpf -> app (chain_emit_name rule)
              [L.Exp (env, f_exp); eqpf; chain_term ctx c])
@@ -673,8 +683,8 @@ and chain_term ctx node : L.term =
        loud if the shape is off or the equality can't be built. *)
     let env = proj_env_of_ctx ctx in
     (match goal_of_anno anno, arg with
-     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Nat 0)), _)), Some (PipeArg (_, r_exp)) ->
-       (match Arith_proofs.prove_sum_eq env (AOp (Sub, Nat 1, a_exp)) r_exp with
+     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Lit "0")), _)), Some (PipeArg (_, r_exp)) ->
+       (match Arith_proofs.prove_sum_eq env (AOp (Sub, Lit "1", a_exp)) r_exp with
         | Some eqpf ->
           L.App (L.Name "AR3_1",
             [L.Exp (env, a_exp); L.Exp (env, r_exp); eqpf; chain_term ctx c])

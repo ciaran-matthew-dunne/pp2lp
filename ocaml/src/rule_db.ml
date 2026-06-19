@@ -161,6 +161,14 @@ let rules : (string, rule_info) Hashtbl.t =
   r "FX3" leaf;
   r "STOP" pass;
   r "INS" pass ~emit:Ins;
+  (* INS_BIS / FIN_INS: PP's instantiation phase records the chain of derived
+     facts behind a multi-step INS contradiction explicitly (each FIN_INS(f)
+     introduces an `__INSTANCIATION(f)` antecedent, discharged by the following
+     IMP4).  The whole chain hangs off an [INS] node, whose dispatch reconstructs
+     the contradiction by saturation and ignores the recorded subtree — so these
+     only need to build (one Seq continuation each), never to emit. *)
+  r "INS_BIS" pass;
+  r "FIN_INS" pass;
   (* Solver terminals.  ARITH: the linear solver closes ⊥ with no recorded
      certificate; the emitter reconstructs a Farkas combination.  EGALITE:
      the equality prover rewrites the store's hyps along the stored

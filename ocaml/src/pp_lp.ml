@@ -1,13 +1,12 @@
 open Syntax_pp
 
-(* How a PP variable bound by an enclosing compound (n-ary) binder renders.
-   See [Lp_tree.proj_binding] for the full contract — [Proj] projects from a
-   tuple (proof context), [Alias] names a `let`-bound destructuring (goal
-   statement).  Defined here because [Pp_lp] is the rendering layer [Lp_tree]
-   builds on; re-exported there as [Lp_tree.proj_binding]. *)
+(* How a PP variable bound by an enclosing compound (n-ary) binder renders:
+   [Proj (k, v)] projects slot k from the tuple variable v, printed with the
+   infix `v ⋕ k`.  Both goal statements and proof terms use it (the binder var
+   is the assumed `Tuple n`).  Defined here because [Pp_lp] is the rendering
+   layer [Lp_tree] builds on; re-exported there as [Lp_tree.proj_binding]. *)
 type proj_binding =
   | Proj of int * string
-  | Alias of string
 type proj_env = (string * proj_binding) list
 
 (* ---- Identifier emission ---- *)
@@ -29,7 +28,7 @@ let pp_ident buf s =
 
 (* Non-negative integer literal as `(from_int <decimal>)`: the file is ℤ-global,
    so the decimal is a `Stdlib.Z.ℤ` and Stdlib.Z computes on it, keeping big apero
-   literals (2³¹/2⁶⁴) a single decimal.  Nat 0/1 keep the `𝟎`/`𝟏` abbreviations. *)
+   literals (2³¹/2⁶⁴) a single decimal.  `Lit "0"`/`Lit "1"` keep the `𝟎`/`𝟏` abbreviations. *)
 let pp_from_int buf decimal =
   Buffer.add_string buf "(from_int ";
   Buffer.add_string buf decimal;
@@ -90,27 +89,6 @@ let rec conj_children_left = function
    `{|…|}` escape, so this only ever improves readability. *)
 let sanitize_var s = String.concat "" (String.split_on_char '$' s)
 
-(* Does PP variable [x] occur in [body], not captured by an inner binder?  Used
-   to drop the `let` for a bound var the body never mentions (so no useless
-   `let`-binding is emitted).  Deliberately raw — it counts every `Var x`, so
-   (unlike [Free_vars], which filters library names) it never reports a
-   referenced var as absent just because it shares a B.lp global's name (a bound
-   `id`, `seq`, …), which would drop a needed `let` and leave it unbound. *)
-let rec occurs_exp x = function
-  | Var s -> s = x
-  | Compr (_, ys, pred, value) ->
-    not (List.mem x ys) && (occurs_prd x pred || occurs_exp x value)
-  | BoolOf pred -> occurs_prd x pred
-  | e -> fold_exp (fun acc e' -> acc || occurs_exp x e') false e
-and occurs_prd x = function
-  | Bind (_, ys, body) -> not (List.mem x ys) && occurs_prd x body
-  | Lift e -> occurs_exp x e
-  | Unary (_, p) -> occurs_prd x p
-  | Binary (_, p1, p2) -> occurs_prd x p1 || occurs_prd x p2
-  | Eq (e1, e2) | Leq (e1, e2) -> occurs_exp x e1 || occurs_exp x e2
-  | Mem (es, e) -> List.exists (occurs_exp x) es || occurs_exp x e
-  | Rel (_, es) -> List.exists (occurs_exp x) es
-
 (* Shared header for an n-ary `Bind`: the quantifier symbol, the arity, the LP
    tuple-variable name, the `(slot, let-name)` destructurings to emit, and the
    body env aliasing each PP var to its `let` name.  Both the inline ([pp_prd])
@@ -120,7 +98,7 @@ and occurs_prd x = function
    the body uses; the env aliases all of them (an unused alias is never looked
    up).  If two vars would sanitize to the same name we keep the exact PP names
    — still pairwise distinct — so no `let` shadows another. *)
-let binder_header binder xs body env =
+let binder_header binder xs env =
   let qsym = match binder with
     | Bang    -> "`!!"
     | Forall  -> "`\xe2\x99\xa2" (* `♢ *)
@@ -132,36 +110,19 @@ let binder_header binder xs body env =
   let distinct l = List.length (List.sort_uniq compare l) = List.length l in
   let lp_names = if distinct sanitized then sanitized else xs in
   let v_name = match lp_names with x :: _ -> x ^ "_t" | [] -> "v" in
-  let env' = List.map2 (fun x lp -> (x, Alias lp)) xs lp_names @ env in
-  let lets =
-    List.filteri (fun k _ -> occurs_prd (List.nth xs k) body)
-      (List.mapi (fun k lp -> (k, lp)) lp_names) in
-  (qsym, n, v_name, lets, env')
-
-(* Emit the `let <name> ≔ (prj k <v_name>) in` destructuring lines that open a
-   compound binder's body.  [lets] is the kept `(slot, name)` pairs.  [sep] is
-   run after each `in` — a single space inline, a newline + indent in block. *)
-let pp_lets buf ~sep v_name lets =
-  List.iter (fun (k, name) ->
-    Buffer.add_string buf "let ";
-    pp_ident buf name;
-    Buffer.add_string buf " \xe2\x89\x94 (prj "; (* ≔ (prj *)
-    pp_idx buf k;
-    Buffer.add_char buf ' ';
-    pp_ident buf v_name;
-    Buffer.add_string buf ") in";
-    sep ()) lets
+  (* each bound var renders inline as `v_name ⋕ k`; no `let`-destructuring (which
+     blows up lambdapi's checking when the body is a long ⋀ peeled by AND3). *)
+  let env' = List.mapi (fun k x -> (x, Proj (k, v_name))) xs @ env in
+  (qsym, n, v_name, env')
 
 (* ---- Expression pretty-printing (shallow encoding) ----
 
    `env` maps a PP variable bound by an enclosing compound binder to how it
-   renders: [Proj (k, v)] → `(prj k v)`, or [Alias name] → the bare identifier
-   `name`.  Compound binders `Bind (_, xs, body)` are rendered as
-   `(\`!! v : Tuple n, let x0 ≔ (prj 0 v) in … body)`: the body opens with one
-   `let` per bound var (so it reads with plain names), and each `xs.(k)` is
-   [Alias]ed to its `let` name in `env`.  In a *proof* term, by contrast, the
-   binder var is `assume`d directly as the tuple, so its env uses [Proj] and the
-   vars render as `prj k v`.  Inner binders shadow outer bindings. *)
+   renders: [Proj (k, v)] → the infix `(v ⋕ k)` (slot k of tuple var v).
+   Compound binders `Bind (_, xs, body)` are rendered as
+   `(\`!! v : Tuple n, … body)` with each `xs.(k)` [Proj]ected to `v ⋕ k` inline
+   throughout the body (and likewise in proof terms, where the binder var is
+   `assume`d directly as the tuple).  Inner binders shadow outer bindings. *)
 
 let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
   (* B-integer operators print as self-parenthesising prefix applications, so
@@ -171,19 +132,17 @@ let rec pp_exp ?(min_bp = bp_max) ?(env = []) buf e =
   | Var s when List.mem_assoc s env ->
     (match List.assoc s env with
      | Proj (k, v) ->
-       Buffer.add_string buf "(prj ";
-       pp_idx buf k;
-       Buffer.add_char buf ' ';
+       Buffer.add_char buf '(';
        pp_ident buf v;
-       Buffer.add_char buf ')'
-     | Alias name -> pp_ident buf name)
+       Buffer.add_string buf " \xe2\x8b\x95 "; (* ⋕ *)
+       pp_idx buf k;
+       Buffer.add_char buf ')')
   | Var "VRAI" | Var "TRUE" -> Buffer.add_string buf "BTRUE"
   | Var "FAUX" | Var "FALSE" -> Buffer.add_string buf "BFALSE"
   | Var s -> pp_ident buf s
-  | BigNat s -> pp_from_int buf s                    (* apero 2⁶⁴ bound, ℤ decimal *)
-  | Nat 0 -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 ≔ from_int 0 *)
-  | Nat 1 -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 ≔ from_int 1 *)
-  | Nat n -> pp_from_int buf (string_of_int n)       (* n ≥ 2 → from_int <decimal> *)
+  | Lit "0" -> Buffer.add_string buf "\xf0\x9d\x9f\x8e" (* 𝟎 ≔ from_int 0 *)
+  | Lit "1" -> Buffer.add_string buf "\xf0\x9d\x9f\x8f" (* 𝟏 ≔ from_int 1 *)
+  | Lit s -> pp_from_int buf s                         (* else from_int <decimal> (incl. apero 2⁶⁴ bound) *)
   | App (f, args) ->
     (* PP writes some primitives `_`-prefixed; map to the B.lp names (mirrors
        the `_eql_set` → `eql_set` case). *)
@@ -287,7 +246,7 @@ and pp_setop ?(env = []) buf name args =
      a Cartesian operand), so render it as the arithmetic `mult`; a genuine set
      product (no literal) stays `prod`.  Keeps B.lp's `mult`/`prod` distinct. *)
   let name = match name, args with
-    | "prod", ([ Nat _; _ ] | [ _; Nat _ ]) -> "mult"
+    | "prod", ([ Lit _; _ ] | [ _; Lit _ ]) -> "mult"
     | _ -> name in
   Buffer.add_char buf '(';
   Buffer.add_string buf name;
@@ -382,7 +341,7 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
   | Rel (name, args) ->         (* uninterpreted Prop operator, applied directly *)
     pp_setop ~env buf name args
   | Bind (binder, xs, body) ->
-    let qsym, n, v_name, lets, env' = binder_header binder xs body env in
+    let qsym, n, v_name, env' = binder_header binder xs env in
     Buffer.add_char buf '(';
     Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';
@@ -390,7 +349,6 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
     Buffer.add_string buf " : Tuple ";
     pp_idx buf n;
     Buffer.add_string buf ", ";
-    pp_lets buf ~sep:(fun () -> Buffer.add_char buf ' ') v_name lets;
     pp_prd ~env:env' buf body;
     Buffer.add_char buf ')'
 
@@ -447,7 +405,7 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
       Buffer.add_string buf "\xe2\x88\xa8 "; (* ∨ *)
       pp_prd_block ~min_bp:6 ~env ind buf p2)
   | Bind (binder, xs, body) ->
-    let qsym, n, v_name, lets, env' = binder_header binder xs body env in
+    let qsym, n, v_name, env' = binder_header binder xs env in
     Buffer.add_char buf '(';
     Buffer.add_string buf qsym;
     Buffer.add_char buf ' ';
@@ -458,9 +416,6 @@ and pp_prd_block_break ?(min_bp = 0) ?(env = []) ind buf p =
     Buffer.add_char buf '\n';
     let inner_pad = String.make (ind + 2) ' ' in
     Buffer.add_string buf inner_pad;
-    pp_lets buf
-      ~sep:(fun () -> Buffer.add_char buf '\n'; Buffer.add_string buf inner_pad)
-      v_name lets;
     pp_prd_block ~env:env' (ind + 2) buf body;
     Buffer.add_char buf ')'
   | _ ->

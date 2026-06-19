@@ -181,6 +181,19 @@ opaque symbol leq_zero_eq [E F : τ ι]
   : π (E = F) → π ((leq E 𝟎) = (leq F 𝟎)) ≔
 begin assume E F h; rewrite h; reflexivity end;
 
+// Equality / ≤ congruence on both operands — the propositional equality
+// `(a ⋈ c) = (b ⋈ d)` from value equalities `a = b`, `c = d`.  Used by AR10's
+// non-trivial solver step, where PP normalises an arithmetic atom inside a
+// `=`/`≤` predicate (e.g. `-(-x) = x` ↦ `x = x`); [Arith_proofs.prove_pred_eq]
+// supplies the operand proofs from the reflective normaliser.
+opaque symbol eq_cong [a b c d : τ ι]
+  : π (a = b) → π (c = d) → π ((a = c) = (b = d)) ≔
+begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+opaque symbol leq_cong [a b c d : τ ι]
+  : π (a = b) → π (c = d) → π ((leq a c) = (leq b d)) ≔
+begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
 // ============================================================
 // Per-connective equality lemmas (§A.1–A.5, A.13)
 //

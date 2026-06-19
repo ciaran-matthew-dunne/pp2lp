@@ -8,13 +8,11 @@
    Lambdapi concrete syntax by [Pp_lp] at print time, not before. *)
 
 (* How a PP variable bound by an enclosing compound (n-ary) binder renders —
-   [Pp_lp.proj_binding] re-exported with its constructors so proof-side env
-   builders can write [Proj]/[Alias].  [Proj (slot, tuple-var)] → `prj slot
-   tuple-var` (proof context); [Alias name] → the `let`-bound identifier [name]
-   (goal statement). *)
+   [Pp_lp.proj_binding] re-exported with its constructor so proof-side env
+   builders can write [Proj].  [Proj (slot, tuple-var)] → the infix
+   `tuple-var ⋕ slot`. *)
 type proj_binding = Pp_lp.proj_binding =
   | Proj of int * string
-  | Alias of string
 type proj_env = Pp_lp.proj_env
 
 (* `Pi_pred` annotates a λ-binder with `π (<pred>)` — pins the bound proof's

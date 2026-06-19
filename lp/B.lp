@@ -329,6 +329,13 @@ with to_nat (Zpos $p) ↪ val $p;
 
 coerce_rule coerce ℤ ℕ $z ↪ to_nat $z;
 
+// Infix projection for emitted goals: `x ⋕ n` is slot n of tuple x, with n a bare
+// ℤ literal.  Bakes in the ℤ→ℕ `to_nat` the index needs, so the emitter writes a
+// readable `x ⋕ 0` and lambdapi inserts no coercion.  Definitionally `prj (to_nat n) x`,
+// so every prj reduction rule fires through it unchanged.
+symbol ⋕ [m] (x : Tuple m) (n : ℤ) : τ ι ≔ prj (to_nat n) x;
+notation ⋕ infix left 10;
+
 
 
 // ======================================================================

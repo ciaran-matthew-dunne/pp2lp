@@ -349,15 +349,20 @@ def _suite_names() -> list[str]:
 
 def resolve_target(target: str):
     """Return ('suite', suite, [replays]) or ('single', suite, replay).
-    Each benchmark lives in its own directory: SUITE/NAME/NAME.replay."""
+    Each benchmark lives in its own directory, at any nesting depth:
+    SUITE/NAME/NAME.replay (og/prv/claude) or SUITE/PROJ/NAME/NAME.replay (apero)."""
     if "/" in target:
         suite, name = target.split("/", 1)
         sdir = BENCH / suite
         if not sdir.is_dir():
             sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
         replay = sdir / name / f"{name}.replay"
+        if not replay.exists():            # nested layout (apero) — find by stem
+            hits = sorted(sdir.rglob(f"{name}.replay"))
+            if hits:
+                replay = hits[0]
         if not replay.exists():
-            names = [p.stem for p in sorted(sdir.glob("*/*.replay"))]
+            names = [p.stem for p in sorted(sdir.rglob("*.replay"))]
             guess = difflib.get_close_matches(name, names, n=1, cutoff=0.6)
             if guess:
                 tail = f" — did you mean '{guess[0]}'?"
@@ -371,7 +376,7 @@ def resolve_target(target: str):
     d = BENCH / suite
     if not d.is_dir():
         sys.exit(f"pp2lp: no such suite '{suite}' (available: {', '.join(_suite_names())})")
-    replays = sorted(d.glob("*/*.replay"))   # one benchmark per subdirectory
+    replays = sorted(d.rglob("*.replay"))   # one benchmark per (possibly nested) subdir
     if not replays:
         sys.exit(f"pp2lp: no .replay files under {rel(d)} (run `pp2lp gen {suite}`)")
     return "suite", suite, replays
@@ -1004,14 +1009,17 @@ _APERO_BIN = {"+i": "+", "-i": "-", "*i": "*", "/i": "/", "**i": "**",
               "-s": "-", "*s": "*", "+s": "+"}
 _APERO_UN = {"imax": "max", "imin": "min", "rmax": "max", "rmin": "min"}
 
-# Hypothesis-size selection.  PP proves ~98% of converted obligations regardless
-# of size, but REPLAY truncates and lambdapi times out as the hypothesis context
-# grows: measured replay-completeness is 72% at <=5 premises, 46% at 25-50, 25%
-# at 50-100, and 0% at >=1000 (corpus median is ~580).  Capping the premise
-# count (top-level & conjuncts of the rendered hypothesis) keeps gen's PP/REPLAY
-# time on the tractable band — ~4k corpus-wide at the default — instead of the
-# big-context monsters that always truncate.  0 = no cap (the full corpus).
-_APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "50"))
+# Optional hypothesis-size cap.  OFF by default (0 = the full convertible corpus).
+# PP proves ~98% of converted obligations regardless of size, but REPLAY truncates
+# and lambdapi times out as the hypothesis context grows: measured replay-
+# completeness is 72% at <=5 premises, 46% at 25-50, 25% at 50-100, and 0% at
+# >=1000 (corpus median is ~580).  The cap was a blunt way to keep gen on the
+# tractable band; with the suite now generated smallest-first and resumable, the
+# tractable goals are processed first anyway and the big-context monsters self-
+# eliminate (REPLAY-truncation drop, then lambdapi timeout at run).  Set
+# PP2LP_APERO_MAX_PREMISE=N to re-cap (counts top-level & '&'-conjuncts of the
+# rendered hypothesis) if a full gen is too slow.
+_APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "0"))
 
 
 def _apero_src() -> Path:
@@ -1075,6 +1083,17 @@ def _ap_exp(el) -> str:
         pred = _ap_prd(el.find(f"{_APERO_NS}Pred")[0])
         body = _ap_exp(el.find(f"{_APERO_NS}Body")[0])
         return f"{name}({vs}).({pred} | {body})"
+    # Set comprehension {vars | Body} renders fine and PP *parses* it (as
+    # `{vars | Body}`), but PP cannot type-resolve it from our bare surface: with
+    # the POG's typref annotations stripped, the comprehension's element type is
+    # ambiguous (e.g. `*` reads as Cartesian product, not integer ×) and PP fails
+    # with "Can't resolve POW(super(...)) = …".  Probed over 40 comprehension-
+    # bearing POGs: 0/genuine-comprehension goals proved.  Left unsupported until
+    # we inject the typrefs PP needs; rendering it only bloats gen with goals PP
+    # rejects.  Re-enable by mirroring the Quantified_Exp branch above:
+    #   if t == "Quantified_Set":
+    #       vs = ",".join(_ap_exp(v) for v in el.find(f"{_APERO_NS}Variables"))
+    #       return f"{{{vs} | {_ap_prd(el.find(f'{_APERO_NS}Body')[0])}}}"
     raise _AperoUnsupported(f"exp node {t}")
 
 
@@ -1157,13 +1176,14 @@ def _apero_goals(pogfile: Path):
 
 
 def gen_apero_buts(force=False):
-    """Stage 1 — pog2but + selection.  Walk the apero POG corpus, render every
-    obligation with the pog2but converter, apply the premise cap
-    (PP2LP_APERO_MAX_PREMISE), dedup identical content, and materialise one
-    NAME/NAME.but per selected goal — wiping apero dirs outside the current
-    selection (the corpus + cap are this suite's source of truth, as goals.txt
-    is for the others).  No Atelier B; deterministic.  Writes are content-aware,
-    so an unchanged .but keeps its mtime and the trace/replay stages can skip it.
+    """Stage 1 — pog2but + selection.  Walk the apero POG corpus smallest-file
+    first, render every obligation with the pog2but converter, apply the premise
+    cap (PP2LP_APERO_MAX_PREMISE), dedup identical content, and materialise one
+    PROJ/NAME/NAME.but per selected goal — grouped by source project, smallest
+    obligations first — wiping apero dirs outside the current selection (the
+    corpus + cap are this suite's source of truth, as goals.txt is for the
+    others).  No Atelier B; deterministic.  Writes are content-aware, so an
+    unchanged .but keeps its mtime and the trace/replay stages can skip it.
     Returns a stats dict."""
     src = _apero_src()
     if not src.is_dir():
@@ -1180,9 +1200,14 @@ def gen_apero_buts(force=False):
         for d in sorted(p for p in here.iterdir() if p.is_dir()):
             _rm_benchmark(d)
         legacy.unlink()
+    # One-time migration off the old flat layout (apero/NAME/) — benchmarks now
+    # live under per-project subdirs (apero/PROJ/NAME/), so wipe the flat ones.
+    for d in sorted(here.glob("ap_*")):
+        if d.is_dir():
+            _rm_benchmark(d)
 
     files = sorted(src.glob("*/*.pog"), key=lambda p: p.stat().st_size)
-    wanted: dict[str, str] = {}        # name -> .but content (deduped by content)
+    wanted: dict[str, tuple[str, str]] = {}   # name -> (proj, .but content), small→big
     seen: set[str] = set()             # content hashes
     stats = {"goals": 0, "unsupported": 0, "capped": 0, "dups": 0, "selected": 0}
     unsup_reasons: dict[str, int] = {}
@@ -1204,6 +1229,7 @@ def gen_apero_buts(force=False):
             print("  " + line, flush=True); last_line = now
 
     for i, pog in enumerate(files, 1):
+        proj = pog.parent.name
         for name, content, drop in _apero_goals(pog):
             stats["goals"] += 1
             if drop is not None:
@@ -1216,21 +1242,26 @@ def gen_apero_buts(force=False):
             h = hashlib.sha1(content.encode()).hexdigest()
             if h in seen:
                 stats["dups"] += 1; continue
-            seen.add(h); wanted[name] = content; stats["selected"] += 1
+            seen.add(h); wanted[name] = (proj, content); stats["selected"] += 1
         progress(i)
     if IS_TTY:
         sys.stdout.write("\r\033[K"); sys.stdout.flush()
 
-    # Wipe dirs outside the selection, then write .but content-aware.
-    for p in here.glob("*/*.but"):
+    # Wipe dirs outside the selection, then write .but content-aware.  Benchmarks
+    # live at apero/PROJ/NAME/NAME.but (any depth via rglob); empty project dirs
+    # left after a wipe are pruned.
+    for p in here.rglob("*.but"):
         if p.stem not in wanted:
             _rm_benchmark(p.parent)
     written = 0
-    for name, content in wanted.items():
-        d = here / name; d.mkdir(parents=True, exist_ok=True)
+    for name, (proj, content) in wanted.items():
+        d = here / proj / name; d.mkdir(parents=True, exist_ok=True)
         bp = d / f"{name}.but"
         if force or not bp.exists() or bp.read_text() != content:
             bp.write_text(content); written += 1
+    for pd in here.iterdir():          # prune project dirs emptied by the wipe
+        if pd.is_dir() and not any(pd.iterdir()):
+            pd.rmdir()
     stats["written"] = written
     stats["unsup_reasons"] = dict(sorted(unsup_reasons.items(), key=lambda kv: -kv[1]))
     return stats
@@ -1269,7 +1300,7 @@ def gen_apero_traces(krt, force=False):
     timer = os.environ.get("PP2LP_APERO_TIMER", "R45")
     jobs = int(os.environ.get("PP2LP_GEN_JOBS") or max(4, (os.cpu_count() or 8) // 2))
     here = BENCH / "apero"
-    buts = sorted(here.glob("*/*.but"))
+    buts = sorted(here.rglob("*.but"), key=lambda p: p.stat().st_size)   # small→big
     stats = {"proved": 0, "no-proof": 0, "pp-timeout": 0, "saturation": 0, "skip": 0}
     todo = []
     for but in buts:
@@ -1338,7 +1369,7 @@ def gen_traces(suite, krt, force=False):
     if not pp_kin:
         sys.exit("pp2lp: PP.kin not found")
     here = BENCH / suite
-    buts = sorted(here.glob("*/*.but"))
+    buts = sorted(here.rglob("*.but"), key=lambda p: p.stat().st_size)   # small→big
     ok = fail = skip = 0
     for but in buts:
         stem, d = but.stem, but.parent
@@ -1364,7 +1395,7 @@ def gen_replays(suite, krt, force=False):
     if not replay_kin:
         sys.exit("pp2lp: REPLAY.kin not found")
     here = BENCH / suite
-    traces = sorted(here.glob("*/*.trace"))
+    traces = sorted(here.rglob("*.trace"), key=lambda p: p.stat().st_size)   # small→big
     ok = fail = skip = dropped = 0
     done, t0 = 0, time.time()
     last_line = last_tty = 0.0
@@ -1481,7 +1512,7 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             print(dim("  buts:    no goals.txt — skipped") if r is None
                   else dim(f"  buts:    {r[0]} written, {r[1] - r[0]} unchanged"))
         elif st == "traces":
-            if not list(here.glob("*/*.but")):
+            if not list(here.rglob("*.but")):
                 hint = "run `gen apero --only buts` first" if suite == "apero" else "skipped"
                 print(dim(f"  traces:  no .but files — {hint}")); continue
             if suite == "apero":
@@ -1497,7 +1528,7 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
             # no .trace — reject it loudly rather than silently shipping a dud.
             # (A REPLAY-truncation drop still has its .trace, so it passes here.)
             if (here / "goals.txt").exists():
-                duds = [b.stem for b in sorted(here.glob("*/*.but"))
+                duds = [b.stem for b in sorted(here.rglob("*.but"))
                         if not (b.parent / f"{b.stem}.trace").exists()]
                 if duds:
                     shown = ", ".join(duds[:20]) + (f" (+{len(duds) - 20} more)"
@@ -1506,7 +1537,7 @@ def _gen_stages(suite: str, stages_str: str, force: bool = False) -> None:
                                  f"by PP — every {suite} goal must be a theorem.\n"
                                  f"             fix (parenthesise?) or drop in goals.txt: {shown}"))
         elif st == "replays":
-            if not list(here.glob("*/*.trace")):
+            if not list(here.rglob("*.trace")):
                 print(dim("  replays: no .trace files — skipped")); continue
             okb, errb = ensure_build()      # replay hygiene shells out to the engine
             if not okb:

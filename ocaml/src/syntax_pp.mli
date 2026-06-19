@@ -30,10 +30,11 @@ type prd =
                                    directly: S <: T ↦ Rel ("subset", [S; T]) *)
 and exp =
   | Var of string
-  | Nat of int
-  | BigNat of string            (* decimal literal too big for native int
-                                   (e.g. 2⁶⁴ uint64 bounds in apero); an opaque
-                                   atom, rendered via B.lp's int_lit coercion *)
+  | Lit of string               (* an integer literal as a canonical decimal
+                                   string.  Folds into an arithmetic constant when
+                                   it fits a native int ([int_of_string_opt]); a
+                                   too-big one (apero's 2⁶⁴ uint64 bounds) stays a
+                                   symbolic atom, rendered via B.lp's int_lit. *)
   | App of string * exp list    (* B-function application f(x): a set of pairs
                                    applied via `eapp` to its argument(s) *)
   | EApp of exp * exp list      (* application of a non-symbol head: r~(s),
@@ -104,6 +105,13 @@ val exp_congruence : exp -> exp -> (exp * exp) list option
     to substitute the solver witness for the pinned binder (NRM29). *)
 val subst_exp : (string * exp) list -> exp -> exp
 val subst_prd : (string * exp) list -> prd -> prd
+
+(** Replace every occurrence of sub-expression [from_e] with [to_e] (first
+    argument [from_e], second [to_e]).  Generalises [subst_exp] from a variable
+    to an arbitrary sub-term; not capture-avoiding, so apply only to
+    quantifier-free predicates.  Drives the ECTR3/4 equality-substitution search. *)
+val replace_subexp : exp -> exp -> exp -> exp
+val replace_subexp_prd : exp -> exp -> prd -> prd
 
 (** The predicate carried by a rule annotation ([Simple] / [Fin]). *)
 val prd_of_rhs : rhs -> prd

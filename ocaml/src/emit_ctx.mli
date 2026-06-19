@@ -102,8 +102,8 @@ val find_eqs2_incl_pair : ctx -> exp -> exp -> (string * string) option
 val find_eqs2_spine : exp -> exp -> prd -> (int * (int * int) list) option
 
 (* ECTR3/4: from the negated goal atom, an (equality hyp × substituted
-   hyp) pair — (substituted var, equality hyp, swapped = ECTR4, hyp). *)
-val find_ectr34 : ctx -> prd -> (string * string * bool * string) option
+   hyp) pair — (rewritten sub-expression E, equality hyp, swapped = ECTR4, hyp). *)
+val find_ectr34 : ctx -> prd -> (exp * string * bool * string) option
 
 (* ECTR1/2: from the equality antecedent (a, b), a (¬-hyp × substituted
    hyp) pair — (E-var, Q's body, ¬-hyp, F-hyp, swapped = ECTR2). *)

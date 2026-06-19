@@ -4,15 +4,13 @@
    exposed.
 
    [env] maps a PP variable bound by an enclosing n-ary quantifier to how it
-   should render: [Proj (k, v)] as `prj k v` (proof context), or [Alias name]
-   as the bare `let`-bound identifier [name] (goal statement — see how the
-   block printer opens each binder body with `let … ≔ (prj …) in` lines). *)
+   should render: [Proj (k, v)] as the infix `v ⋕ k` (slot k of tuple var v),
+   inline throughout the body of both goal statements and proof terms. *)
 
 (** How a compound-binder-bound PP variable renders.  Re-exported as
     [Lp_tree.proj_binding] for proof-side env construction. *)
 type proj_binding =
   | Proj of int * string
-  | Alias of string
 type proj_env = (string * proj_binding) list
 
 (** Is [s] a plain Lambdapi identifier (no `{|…|}` escaping needed)? *)

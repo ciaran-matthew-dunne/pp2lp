@@ -2,11 +2,9 @@ require open pp2lp.Prelude;
 
 opaque symbol {|18|} (p : Prop) :
   π ((`!! a_t : Tuple 1,
-      let a ≔ (prj 0 a_t) in
       (`!! x_t : Tuple 1,
-        let x ≔ (prj 0 x_t) in
-        ¬ (⋀ (∎ ∷ ⊤ ∷ (x = x))))
-      ⇒ a = a ⇒ p)) ≔
+        ¬ (⋀ (∎ ∷ ⊤ ∷ ((x_t ⋕ 0) = (x_t ⋕ 0)))))
+      ⇒ (a_t ⋕ 0) = (a_t ⋕ 0) ⇒ p)) ≔
 begin
   assume p;
   refine ALL8 _;

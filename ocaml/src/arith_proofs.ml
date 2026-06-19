@@ -11,17 +11,26 @@ open Syntax_pp
 module L = Lp_tree
 
 let is_atom_exp = function
-  | Var _ | Nat _ | BigNat _ | App _ | EApp _ | SetOp _ | SetImage _ | Inter _
+  | Var _ | Lit _ | App _ | EApp _ | SetOp _ | SetImage _ | Inter _
   | Union _ | Range _ | Maplet _ | Inverse _ | SetLit _ | DomRestrict _
   | RanRestrict _ | BoolOf _ | Compr _ -> true
   | AOp _ | Neg _ -> false
 
-(* Whether a literal atom folds into the reified constant.  Only `Nat` literals
-   do: they fit OCaml's native `int`, so [lin_normal] sums them into the constant
-   and [reify] emits them as `Llit`.  A `BigNat` (apero's 2⁶⁴ bounds) overflows a
-   native int, so it is left a symbolic atom — reified as a `Lvar`, compared by
-   index, never summed — hence false here. *)
-let is_foldable_lit = function Nat _ -> true | _ -> false
+(* The native-int value of a literal that folds into the reified constant: a
+   `Lit` small enough to fit OCaml's `int`, so [lin_normal] sums it into the
+   constant and [reify] emits an `Llit`.  A too-big `Lit` (apero's 2⁶⁴ bounds)
+   overflows, so it stays a symbolic atom — reified as a `Lvar`, compared by
+   index, never summed — hence None here (apero's 2⁶⁴ bounds). *)
+let fold_val = function Lit s -> int_of_string_opt s | _ -> None
+
+(* `prod(k, a)` / `prod(a, k)` with a *foldable* literal coefficient: its decimal
+   string and the scaled operand.  Two arms (not one `|`-pattern) so each operand
+   position is guarded independently; a too-big coefficient leaves the whole
+   `prod` a symbolic atom. *)
+let prod_coeff = function
+  | SetOp ("prod", [ Lit ks; a ]) when int_of_string_opt ks <> None -> Some (ks, a)
+  | SetOp ("prod", [ a; Lit ks ]) when int_of_string_opt ks <> None -> Some (ks, a)
+  | _ -> None
 
 (* A non-negative PP literal as a bare `Stdlib.Z.ℤ` decimal term.  The emitted
    file is ℤ-global (`Int` opens `Stdlib.Z`), so the decimal parses as a ℤ and
@@ -45,14 +54,13 @@ let atom_int_ev : (exp -> L.term) ref =
 let int_evidence env e : L.term =
   let ex t = L.Exp (env, t) in
   match e with
-  | Nat 0 | Neg (Nat 0) -> L.Name "zero_in_int"
-  | Nat n -> L.App (L.Name "from_int_in_int", [z_dec (string_of_int n)])
-  | BigNat s -> L.App (L.Name "from_int_in_int", [z_dec s])
+  | Lit "0" | Neg (Lit "0") -> L.Name "zero_in_int"
+  | Lit s -> L.App (L.Name "from_int_in_int", [z_dec s])
   | Neg a -> L.App (L.Name "neg_in_int", [ex a])
   | AOp (Add, x, y) -> L.App (L.Name "add_in_int", [ex x; ex y])
   | AOp (Sub, x, y) -> L.App (L.Name "add_in_int", [ex x; ex (Neg y)])
   (* literal-coefficient product `n*x` (rendered `mult`): integer-valued by mult_def. *)
-  | SetOp ("prod", [ (Nat _ as k); x ]) | SetOp ("prod", [ x; (Nat _ as k) ]) ->
+  | SetOp ("prod", [ (Lit _ as k); x ]) | SetOp ("prod", [ x; (Lit _ as k) ]) ->
     L.App (L.Name "mult_in_int", [ex k; ex x])
   (* `card(s)` is integer-valued (B typing); discharge via the card_in_int
      postulate rather than searching for an (impossible) typing premise.
@@ -68,11 +76,14 @@ let rec flatten_signed e : (exp * int) list option =
   let negate = Option.map (List.map (fun (a, s) -> (a, -s))) in
   let app o p = match o, p with Some a, Some b -> Some (a @ b) | _ -> None in
   match e with
-  | Nat 0 -> Some []
-  (* `prod(k, e)` / `prod(e, k)` with a literal coefficient k is arithmetic scaling
-     k·e (a literal can't be a Cartesian operand): scale e's atom coefficients by k.
-     Before the `is_atom_exp` catch — a `prod` is a SetOp, hence an atom otherwise. *)
-  | SetOp ("prod", [ Nat k; a ]) | SetOp ("prod", [ a; Nat k ]) ->
+  | Lit "0" -> Some []
+  (* `prod(k, e)` / `prod(e, k)` with a foldable literal coefficient k is arithmetic
+     scaling k·e (a literal can't be a Cartesian operand): scale e's atom coefficients
+     by k.  Before the `is_atom_exp` catch — a `prod` is a SetOp, hence an atom
+     otherwise; a too-big coefficient ([prod_coeff] = None) takes that atom path. *)
+  | _ when prod_coeff e <> None ->
+    let (ks, a) = Option.get (prod_coeff e) in
+    let k = int_of_string ks in
     Option.map (List.map (fun (x, s) -> (x, k * s))) (flatten_signed a)
   | AOp (Add, a, b) -> app (flatten_signed a) (flatten_signed b)
   | AOp (Sub, a, b) -> app (flatten_signed a) (negate (flatten_signed b))
@@ -84,7 +95,7 @@ let signed_exp (a, s) = if s >= 0 then a else Neg a
 
 (* Left-nested sum of a (non-empty) signed-atom list, as a PP expression. *)
 let lfold_exp = function
-  | [] -> Nat 0
+  | [] -> Lit "0"
   | s0 :: rest ->
     List.fold_left (fun acc s -> AOp (Add, acc, signed_exp s)) (signed_exp s0) rest
 
@@ -99,7 +110,7 @@ let lfold_exp = function
    ==================================================================== *)
 
 (* Net signed-atom multiset + integer constant of a linear expr: `Nat` literals
-   fold into the constant, every other atom (incl `BigNat`) stays symbolic and is
+   fold into the constant, every other atom (incl a too-big literal) stays symbolic and is
    compared structurally.  Two exprs denote the same value iff their [lin_normal]s
    are equal.  None if [e] is not `+`/`−`-linear. *)
 let lin_normal e : ((exp * int) list * int) option =
@@ -107,13 +118,14 @@ let lin_normal e : ((exp * int) list * int) option =
   | None -> None
   | Some atoms ->
     let const =
-      List.fold_left (fun c (a, s) -> match a with Nat n -> c + (s * n) | _ -> c)
+      List.fold_left
+        (fun c (a, s) -> match fold_val a with Some n -> c + (s * n) | None -> c)
         0 atoms in
     let net =
       List.fold_left (fun acc (a, s) ->
-        match a with
-        | Nat _ -> acc
-        | _ ->
+        match fold_val a with
+        | Some _ -> acc
+        | None ->
           let cur = try List.assoc a acc with Not_found -> 0 in
           (a, cur + s) :: List.remove_assoc a acc)
         [] atoms in
@@ -128,15 +140,15 @@ let collect_atoms es : exp list =
     match e with
     | AOp ((Add | Sub), a, b) -> go (go acc a) b
     | Neg a -> go acc a
-    | SetOp ("prod", [ Nat _; a ]) | SetOp ("prod", [ a; Nat _ ]) -> go acc a
-    | Nat _ -> acc
+    | _ when prod_coeff e <> None -> go acc (snd (Option.get (prod_coeff e)))
+    | _ when fold_val e <> None -> acc        (* foldable literal: folds, not an atom *)
     | _ when is_atom_exp e -> if List.mem e acc then acc else acc @ [ e ]
     | _ -> acc
   in
   List.fold_left go [] es
 
 (* Reify a linear expr to an `LE` term, mirroring its `+`/`−`/`neg` structure so
-   `den ρ (reify e) ≡ to_int e` by reduction.  `Nat` → `Llit`; any other atom →
+   `den ρ (reify e) ≡ to_int e` by reduction.  a foldable literal → `Llit`; any other atom →
    `Lvar <its index>`. *)
 let rec reify idx e : L.term =
   match e with
@@ -144,9 +156,10 @@ let rec reify idx e : L.term =
   | AOp (Sub, a, b) ->
     L.App (L.Name "Ladd", [ reify idx a; L.App (L.Name "Lneg", [ reify idx b ]) ])
   | Neg a -> L.App (L.Name "Lneg", [ reify idx a ])
-  | SetOp ("prod", [ Nat k; a ]) | SetOp ("prod", [ a; Nat k ]) ->
-    L.App (L.Name "Lmul", [ z_dec (string_of_int k); reify idx a ])
-  | Nat n -> L.App (L.Name "Llit", [ z_dec (string_of_int n) ])
+  | _ when prod_coeff e <> None ->
+    let (ks, a) = Option.get (prod_coeff e) in
+    L.App (L.Name "Lmul", [ z_dec ks; reify idx a ])
+  | Lit n when int_of_string_opt n <> None -> L.App (L.Name "Llit", [ z_dec n ])
   | _ when is_atom_exp e ->
     L.App (L.Name "Lvar", [ L.Name (string_of_int (idx e)) ])
   | _ -> failwith "reflect_eq: non-linear expression"
@@ -187,7 +200,7 @@ let positive_lit env c : L.term =
   else
     L.Lambda ("_h", None,
       L.App (L.Name "le_elim",
-        [ L.Exp (env, Nat c); L.Exp (env, Nat 0); L.Name "_h";
+        [ L.Exp (env, Lit (string_of_int c)); L.Exp (env, Lit "0"); L.Name "_h";
           L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ]))
 
 (* `π (e1 = e2)` for two `+`/`−` exprs denoting the same value: the `e1 = e2`
@@ -197,16 +210,38 @@ let prove_sum_eq env e1 e2 : L.term option =
   if e1 = e2 then Some (L.App (L.Name "eq_refl", [ L.Exp (env, e1) ]))
   else reflect_eq env e1 e2
 
+(* `π (p = q)` for two predicates differing only by arithmetic normalisation of
+   their leaf expressions — AR10's solver step `solveur(p) = q` (e.g. `¬(-(-x) = x)`
+   ↦ `¬(x = x)`).  Recurse through the `¬`/`=`/`≤` shapes PP's arithmetic
+   simplifier produces, composing one congruence lemma per connective and closing
+   each `=`/`≤` leaf with [prove_sum_eq].  None for any other shape or a
+   non-linear leaf, so the caller can fall back to the plain no-op skip. *)
+let rec prove_pred_eq env p q : L.term option =
+  let ( let* ) = Option.bind in
+  match p, q with
+  | Unary (Not, p'), Unary (Not, q') ->
+    let* h = prove_pred_eq env p' q' in
+    Some (L.App (L.Name "not_cong", [ h ]))
+  | Eq (a, c), Eq (b, d) ->
+    let* h1 = prove_sum_eq env a b in
+    let* h2 = prove_sum_eq env c d in
+    Some (L.App (L.Name "eq_cong", [ h1; h2 ]))
+  | Leq (a, c), Leq (b, d) ->
+    let* h1 = prove_sum_eq env a b in
+    let* h2 = prove_sum_eq env c d in
+    Some (L.App (L.Name "leq_cong", [ h1; h2 ]))
+  | _ -> None
+
 (* `π (e = 𝟎)` when [e]'s atoms cancel to nothing: reflect against the literal 0
-   (`Exp (Nat 0) ≡ 𝟎`). *)
-let prove_sum_zero env e : L.term option = reflect_eq env e (Nat 0)
+   (`Exp (Lit "0") ≡ 𝟎`). *)
+let prove_sum_zero env e : L.term option = reflect_eq env e (Lit "0")
 
 (* `π (e > 𝟎)` when [e] cancels/folds to a positive literal c: transport
    `¬(from_int c ≤ 𝟎)` (`positive_lit`) along the reflected `e = from_int c`. *)
 let prove_gt_zero env e : L.term option =
   match lin_normal e with
   | Some ([], c) when c >= 1 ->
-    (match reflect_eq env e (Nat c) with
+    (match reflect_eq env e (Lit (string_of_int c)) with
      | Some e_eq_c ->                                  (* e_eq_c : e = from_int c *)
        Some (L.App (L.Name "=\xe2\x87\x92",            (* =⇒ : π (A = B) → π A → π B *)
          [ L.App (L.Name "eq_sym",
@@ -216,93 +251,143 @@ let prove_gt_zero env e : L.term option =
      | None -> None)
   | _ -> None
 
-(* ---- ARITH: Farkas-style linear-combination contradiction ----
+(* ---- ARITH: Fourier–Motzkin refutation with a Farkas certificate ----
 
    PP's linear solver closes ⊥ from the `eᵢ ≤ 𝟎` hypotheses in scope without
-   recording a certificate.  Reconstruct one: search small nonnegative
-   multipliers λᵢ so that Σ λᵢ·eᵢ has every symbolic atom cancel and its literal
-   part fold to a positive constant c — then emit
+   recording how.  Reconstruct the certificate by Fourier–Motzkin elimination:
+   carry on every derived constraint the *nonnegative integer combination* of the
+   original hypotheses that produced it.  Eliminating the variable atoms one by
+   one, an infeasible system collapses to `c ≤ 𝟎` with a positive constant c, and
+   that constraint's recorded combination Σ λᵢ·eᵢ = c is the witness.  Emit
 
      positive_lit c (leq_subst_l (c = Σ…) (add_leq_zero … hᵢ …))
 
-   i.e. `Σ ≤ 𝟎` substituted to `c ≤ 𝟎`, refuted by `c > 𝟎`.  The Σ-equality is
-   generated by [prove_sum_eq] (which folds the literals via `Stdlib.Z`); no
-   `trust`. *)
-let arith_max_lambda = 8
+   i.e. `Σ ≤ 𝟎` substituted to `c ≤ 𝟎`, refuted by `c > 𝟎`; the Σ-equality comes
+   from [prove_sum_eq] (folds the literals via `Stdlib.Z`), no `trust`.  Complete
+   for ℚ-linear refutation, so telescoping ≤/< chains, sum-positivity and weighted
+   sums (distinct literal coefficients) all fall out of one elimination — no
+   multiplier enumeration, no length cap.  A genuinely non-linear goal (a product
+   of two variables, e.g. `x·z ≤ y·z`) leaves an atom that never cancels, so the
+   search correctly returns None. *)
+let rec gcd a b = if b = 0 then abs a else gcd b (a mod b)
+
+(* A Fourier–Motzkin constraint `Σ vars[a]·a + cst ≤ 𝟎`, equal by construction to
+   `Σ org[i]·eᵢ` over the original hypotheses with every org[i] ≥ 0.  [vars] holds
+   only non-foldable atoms — foldable literals fold into [cst] — and never a zero
+   coefficient. *)
+type fm_con = { vars : (exp * int) list; cst : int; org : int array }
 
 let find_arith_contradiction env hyps =
-  let vec atoms =
-    List.fold_left (fun acc (a, s) ->
-      let cur = try List.assoc a acc with Not_found -> 0 in
-      (a, cur + s) :: List.remove_assoc a acc) [] atoms
-  in
-  let vecs = Array.of_list (List.map (fun (_, _, ats) -> vec ats) hyps) in
+  let n_h = List.length hyps in
   let names = Array.of_list (List.map (fun (n, e, _) -> (n, e)) hyps) in
-  let n_h = Array.length vecs in
-  (* the combination's net vector must reduce to a positive constant: every
-     non-literal atom cancels, and the constant is the signed sum of the
-     foldable `Nat` literals' values (weighted by their net coefficients) *)
-  let pos_const lambdas =
-    let total = Hashtbl.create 8 in
-    Array.iteri (fun j v ->
-      if lambdas.(j) > 0 then
-        List.iter (fun (a, c) ->
-          let cur = try Hashtbl.find total a with Not_found -> 0 in
-          Hashtbl.replace total a (cur + lambdas.(j) * c)) v) vecs;
-    let ok = Hashtbl.fold (fun a c ok -> ok && (c = 0 || is_foldable_lit a))
-               total true in
-    let const = Hashtbl.fold (fun a c acc ->
-                  match a with Nat v -> acc + c * v | _ -> acc) total 0 in
-    if ok && const >= 1 then Some const else None
+  (* fold a signed-atom list into (non-foldable atoms, folded constant) *)
+  let split_atoms atoms =
+    let tbl = Hashtbl.create 8 in
+    List.iter (fun (a, s) ->
+      Hashtbl.replace tbl a ((try Hashtbl.find tbl a with Not_found -> 0) + s)) atoms;
+    Hashtbl.fold (fun a c (vars, cst) ->
+      if c = 0 then (vars, cst)
+      else match fold_val a with
+        | Some v -> (vars, cst + c * v)
+        | None -> ((a, c) :: vars, cst)) tbl ([], 0)
   in
-  let lambdas = Array.make n_h 0 in
-  (* Per-hypothesis multiplier cap.  A `−x ≤ 𝟎` cancelling a `k·x` needs λ = k, so
-     coefficient-k Farkas wants a cap ≥ k; the search is O((cap+1)^n_h), so raise
-     it only when there are few hypotheses (the coefficient cases have 2). *)
-  let cap = if n_h <= 2 then 16 else if n_h <= 4 then 10 else arith_max_lambda in
-  let rec search i =
-    if i = n_h then
-      if Array.exists (fun l -> l > 0) lambdas
-      then Option.map (fun c -> (Array.copy lambdas, c)) (pos_const lambdas)
-      else None
-    else
-      let rec try_l l =
-        if l > cap then None
-        else begin
-          lambdas.(i) <- l;
-          match search (i + 1) with
-          | Some r -> Some r
-          | None -> try_l (l + 1)
-        end
+  (* k1·v1 + k2·v2 over atom lists, zero coefficients dropped *)
+  let lin_comb k1 v1 k2 v2 =
+    let tbl = Hashtbl.create 8 in
+    let add k = List.iter (fun (a, c) ->
+      Hashtbl.replace tbl a ((try Hashtbl.find tbl a with Not_found -> 0) + k * c)) in
+    add k1 v1; add k2 v2;
+    Hashtbl.fold (fun a c acc -> if c = 0 then acc else (a, c) :: acc) tbl []
+  in
+  (* Build the refutation term from a multiplier vector [ls] whose weighted sum
+     folds to the positive constant [c]: `Σ ≤ 𝟎` substituted to `c ≤ 𝟎`, refuted
+     by `c > 𝟎`.  The Σ-equality `from_int c = combined` is generated by
+     [prove_sum_eq] (which folds the literals via `Stdlib.Z`); no `trust`. *)
+  let build_cert ls c =
+    let uses =
+      List.concat
+        (List.init n_h (fun j ->
+           List.init ls.(j) (fun _ -> names.(j))))
+    in
+    match uses with
+    | [] -> None
+    | (n0, e0) :: rest ->
+      let hsum, combined =
+        List.fold_left (fun (pf, acc_e) (n, e) ->
+          (L.App (L.Name "add_leq_zero",
+             [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name n ]),
+           AOp (Add, acc_e, e)))
+          (L.Name n0, e0) rest
       in
-      let r = try_l 0 in
-      lambdas.(i) <- 0;
-      r
+      Option.map
+        (fun eqpf ->
+           (* eqpf : from_int c = combined ; hsum : combined ≤ 𝟎.  leq_subst_l
+              substitutes to `c ≤ 𝟎`, refuted by positive_lit c. *)
+           L.Refine (positive_lit env c,
+             [ L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) ]))
+        (prove_sum_eq env (Lit (string_of_int c)) combined)
   in
   if n_h = 0 then None
-  else
-    match search 0 with
+  else begin
+    let cons0 =
+      List.mapi (fun i (_, _, atoms) ->
+        let (vars, cst) = split_atoms atoms in
+        { vars; cst; org = Array.init n_h (fun j -> if j = i then 1 else 0) })
+        hyps
+    in
+    (* divide a constraint through by the gcd of all its coefficients — smaller
+       integers, identical meaning and (scaled) certificate *)
+    let reduce c =
+      let g = List.fold_left (fun g (_, k) -> gcd g k) c.cst c.vars in
+      let g = Array.fold_left gcd g c.org in
+      let g = if g = 0 then 1 else g in
+      if g = 1 then c
+      else { vars = List.map (fun (a, k) -> (a, k / g)) c.vars;
+             cst = c.cst / g; org = Array.map (fun k -> k / g) c.org }
+    in
+    let cv v c = match List.assoc_opt v c.vars with Some k -> k | None -> 0 in
+    (* eliminate the atom that forks the fewest new constraints (|pos|·|neg|) *)
+    let pick_atom cons =
+      let atoms =
+        List.sort_uniq compare (List.concat_map (fun c -> List.map fst c.vars) cons) in
+      let scored = List.map (fun v ->
+        let p = List.length (List.filter (fun c -> cv v c > 0) cons) in
+        let n = List.length (List.filter (fun c -> cv v c < 0) cons) in
+        (p * n, v)) atoms in
+      match List.sort (fun (a, _) (b, _) -> compare a b) scored with
+      | (_, v) :: _ -> Some v
+      | [] -> None
+    in
+    (* guards: bail (→ no certificate, as before) on a constraint explosion or an
+       integer grown implausibly large, rather than chase a pathological system *)
+    let big = 1 lsl 40 in
+    let huge c = abs c.cst > big || List.exists (fun (_, k) -> abs k > big) c.vars in
+    let rec loop cons =
+      match List.find_opt (fun c -> c.vars = [] && c.cst >= 1) cons with
+      | Some c -> Some (c.org, c.cst)
+      | None ->
+        begin match pick_atom cons with
+        | None -> None
+        | Some v ->
+          let pos = List.filter (fun c -> cv v c > 0) cons in
+          let neg = List.filter (fun c -> cv v c < 0) cons in
+          let zero = List.filter (fun c -> cv v c = 0) cons in
+          if List.length pos * List.length neg + List.length zero > 4096 then None
+          else
+            let combos =
+              List.concat_map (fun p ->
+                List.map (fun n ->
+                  let cp = cv v p and cn = cv v n in   (* cp > 0, cn < 0 *)
+                  reduce {
+                    vars = lin_comb (- cn) p.vars cp n.vars;
+                    cst  = (- cn) * p.cst + cp * n.cst;
+                    org  = Array.init n_h (fun i -> (- cn) * p.org.(i) + cp * n.org.(i));
+                  }) neg) pos
+            in
+            if List.exists huge combos then None else loop (zero @ combos)
+        end
+    in
+    match loop cons0 with
     | None -> None
-    | Some (ls, c) ->
-      let uses =
-        List.concat
-          (List.init n_h (fun j ->
-             List.init ls.(j) (fun _ -> names.(j))))
-      in
-      (match uses with
-       | [] -> None
-       | (n0, e0) :: rest ->
-         let hsum, combined =
-           List.fold_left (fun (pf, acc_e) (n, e) ->
-             (L.App (L.Name "add_leq_zero",
-                [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name n ]),
-              AOp (Add, acc_e, e)))
-             (L.Name n0, e0) rest
-         in
-         Option.map
-           (fun eqpf ->
-              (* eqpf : Nat c = combined ; hsum : combined ≤ 𝟎.  leq_subst_l
-                 substitutes to `c ≤ 𝟎`, refuted by positive_lit c. *)
-              L.Refine (positive_lit env c,
-                [ L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) ]))
-           (prove_sum_eq env (Nat c) combined))
+    | Some (org, c) -> build_cert org c
+  end

@@ -25,10 +25,11 @@ type prd =
                                    directly: S <: T ↦ Rel ("subset", [S; T]) *)
 and exp =
   | Var of string
-  | Nat of int
-  | BigNat of string            (* decimal literal too big for native int
-                                   (e.g. 2⁶⁴ uint64 bounds in apero); an opaque
-                                   atom, rendered via B.lp's int_lit coercion *)
+  | Lit of string               (* an integer literal as a canonical decimal
+                                   string.  Folds into an arithmetic constant when
+                                   it fits a native int ([int_of_string_opt]); a
+                                   too-big one (apero's 2⁶⁴ uint64 bounds) stays a
+                                   symbolic atom, rendered via B.lp's int_lit. *)
   | App of string * exp list    (* B-function application f(x): a set of pairs
                                    applied via `eapp` to its argument(s) *)
   | EApp of exp * exp list      (* application of a non-symbol head: r~(s),
@@ -128,7 +129,7 @@ let rec fold_prd_exp f acc = function
   | Rel (_, es) -> List.fold_left f acc es
 
 let map_exp f = function
-  | Var _ | Nat _ | BigNat _ as e -> e
+  | Var _ | Lit _ as e -> e
   | App (g, args) -> App (g, List.map f args)
   | EApp (h, args) -> EApp (f h, List.map f args)
   | SetOp (g, args) -> SetOp (g, List.map f args)
@@ -147,7 +148,7 @@ let map_exp f = function
   | Compr (op, xs, pred, value) -> Compr (op, xs, map_prd_exp f pred, f value)
 
 let fold_exp f acc = function
-  | Var _ | Nat _ | BigNat _ -> acc
+  | Var _ | Lit _ -> acc
   | App (_, args) -> List.fold_left f acc args
   | EApp (h, args) -> List.fold_left f (f acc h) args
   | SetOp (_, args) -> List.fold_left f acc args
@@ -161,12 +162,12 @@ let fold_exp f acc = function
 
 (* Structural congruence for first-order matching: [Some] of the paired
    sub-expressions when [a] and [b] share the same constructor, payload, and
-   arity; [None] otherwise (the leaves [Var]/[Nat] included — the matcher
+   arity; [None] otherwise (the leaves [Var]/[Lit] included — the matcher
    discriminates those itself).  Exhaustive, so a new constructor forces an
    update here too rather than silently failing to match. *)
 let exp_congruence a b : (exp * exp) list option =
   match a, b with
-  | Var _, _ | Nat _, _ | BigNat _, _ -> None
+  | Var _, _ | Lit _, _ -> None
   | App (f, xs), App (g, ys) when f = g && List.length xs = List.length ys ->
     Some (List.combine xs ys)
   | EApp (h, xs), EApp (h', ys) when List.length xs = List.length ys ->
@@ -210,6 +211,20 @@ and subst_prd env = function
   | Eq (e1, e2) -> Eq (subst_exp env e1, subst_exp env e2)
   | Leq (e1, e2) -> Leq (subst_exp env e1, subst_exp env e2)
   | Rel (op, es) -> Rel (op, List.map (subst_exp env) es)
+
+(* Replace every occurrence of the sub-expression [from_e] with [to_e]
+   throughout an expression / predicate.  First-order and structural: an
+   expression equal to [from_e] is rewritten wholesale, otherwise we recurse
+   into its children.  This generalises [subst_exp] from a variable to an
+   arbitrary sub-term — used by the ECTR3/4 equality-substitution search where
+   the rewritten side may be a compound term (e.g. `f(x)`), not just a
+   variable.  Unlike [subst_exp] it is not capture-avoiding; callers apply it
+   to quantifier-free goal atoms. *)
+let rec replace_subexp from_e to_e e =
+  if e = from_e then to_e else map_exp (replace_subexp from_e to_e) e
+
+let replace_subexp_prd from_e to_e p =
+  map_prd_exp (replace_subexp from_e to_e) p
 
 let prd_of_rhs = function
   | Simple p -> p

@@ -140,4 +140,20 @@ emit → check.
 
 ### Known gaps (not regressions; full detail in INTERNALS.md)
 - **REPLAY truncation** — sometimes the replay tool drops subproofs; usually on `ALL7`/`XST8`/`OR3_1`/`XST8_1`/`ALL7_1`. often we can confirm this by comparing the `.replay` and the `.trace` file. such cases should be removed from our benchmark suite. 
-- **`FIN_INS` / `__INSTANCIATION` replay lines** — novel INS-evidence markers that we only find in the `apero` suite. unsure how they differ from `INS`.
+- **`FIN_INS` / `INS_BIS` / `__INSTANCIATION` replay lines** — these record a
+  *multi-step* INS contradiction PP found by chained instantiation (each
+  `FIN_INS(f)` introduces a derived fact `f`, discharged by the next `IMP4`); a
+  plain `[INS]` hides the same chain when it is short.  Both are reconstructed by
+  the saturating search in `Emit_ctx.find_ins_contradiction`: instantiate each
+  universal at a candidate witness (a bound var, a composite N-tuple assembled
+  across binders, or an applied term `f(a)` from the hyps), derive the negation
+  of a lone unmatched conjunct, repeat until one universal closes ⊥.  The chain
+  lines just build (`rule_db`: `FIN_INS`/`INS_BIS` are `pass`) and hang off the
+  `[INS]` node, whose dispatch ignores the recorded subtree.
+- **INS shapes still open** (the residual `claude` + all `apero` `E_INS`, e.g.
+  `ap_0005_00124`) — each wants a mechanism beyond witness enumeration: a
+  *totality* axiom that must introduce a fresh existential image `(a,y₀) ϵ f`
+  (the `fn_*` function cases); a *literal* witness (`16 ϵ 0..255` to contradict
+  `¬(16 ϵ s)`); a non-trivial ground bound like `10 − a ≤ 𝟎` (the saturator only
+  proves `e ≤ 𝟎` where `e` sums to zero); an equality-transitivity close
+  (`a=c`, `b=c` ⊢ `a=b` vs `¬(a=b)`).

@@ -256,6 +256,13 @@ let tactic_for_ectr ctx rule anno =
     let z = fresh_x_local ctx in
     L.Lambda (z, Some L.Tau_i, pred_term ctx (subst_prd [(x, Var z)] g))
   in
+  (* ECTR3/4: the rewritten side may be a compound sub-term, so abstract the
+     whole expression (not just a variable) out of the goal atom. *)
+  let abstract_exp e_from g =
+    let z = fresh_x_local ctx in
+    L.Lambda (z, Some L.Tau_i,
+              pred_term ctx (replace_subexp_prd e_from (Var z) g))
+  in
   match goal_of_anno anno with
   | Some (Binary (Imp, Eq (a, b), _)) ->
     (match find_ectr12 ctx a b with
@@ -266,9 +273,9 @@ let tactic_for_ectr ctx rule anno =
        fail "no ¬(Q E) / Q F hyp pair matches the equality antecedent")
   | Some (Binary (Imp, Unary (Not, g), _)) ->
     (match find_ectr34 ctx g with
-     | Some (x, heq, swapped, hh) ->
+     | Some (e_from, heq, swapped, hh) ->
        L.Refine (L.Name (if swapped then "ECTR4" else "ECTR3"),
-                 [abstract x g; L.Name heq; L.Name hh])
+                 [abstract_exp e_from g; L.Name heq; L.Name hh])
      | None ->
        fail "no (equality hyp × substituted hyp) pair matches the negated \
              goal atom")
@@ -381,7 +388,7 @@ let tactic_for_rule ctx rule arg anno children =
         | Some (pinned, j, e) ->
           let k = Option.get (pos_of pinned) in
           let e_vars =
-            (Free_vars.free_vars_of_prd (Eq (e, Nat 0))).Free_vars.exp_vars in
+            (Free_vars.free_vars_of_prd (Eq (e, Lit "0"))).Free_vars.exp_vars in
           let head_ok =
             j = 0 && k = 0 && n_cs > 1
             && not (List.exists (fun v -> Free_vars.SS.mem v e_vars) vars)
@@ -496,7 +503,7 @@ let tactic_for_rule ctx rule arg anno children =
        shape: fail loud (never trust) if the comparison isn't between concrete
        literals; if a ≤ b (PP mis-emitted) the `λ k, k ⊤ᵢ` won't type-check — loud. *)
     (match goal_of_anno anno with
-     | Some (Binary (Imp, Leq ((Nat _ | BigNat _), (Nat _ | BigNat _)), _)) ->
+     | Some (Binary (Imp, Leq (Lit _, Lit _), _)) ->
        L.Refine (L.Name rule,
          [ L.Lambda ("k", None,
              L.App (L.Name "k", [ L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ])) ])
@@ -512,8 +519,8 @@ let tactic_for_rule ctx rule arg anno children =
        child.  The leading `hai : π (a ϵ INT)` lets `leq_antisym` recover `a = 𝟎`. *)
     let a_and_bound =
       match base rule, goal_of_anno anno with
-      | "AR5", Some (Binary (Imp, Leq (Neg a, Nat 0), _)) -> Some (a, Leq (a, Nat 0))
-      | "AR6", Some (Binary (Imp, Leq (a, Nat 0), _)) -> Some (a, Leq (Neg a, Nat 0))
+      | "AR5", Some (Binary (Imp, Leq (Neg a, Lit "0"), _)) -> Some (a, Leq (a, Lit "0"))
+      | "AR6", Some (Binary (Imp, Leq (a, Lit "0"), _)) -> Some (a, Leq (Neg a, Lit "0"))
       | _ -> None
     in
     let con, hai =
@@ -536,12 +543,12 @@ let tactic_for_rule ctx rule arg anno children =
        that cancels; fail loud if none does (never trust). *)
     let env = proj_env_of_ctx ctx in
     let e_opt = match goal_of_anno anno with
-      | Some (Binary (Imp, Leq (e, Nat 0), _)) -> Some e | _ -> None in
+      | Some (Binary (Imp, Leq (e, Lit "0"), _)) -> Some e | _ -> None in
     let generated =
       match e_opt with
       | Some e ->
         List.find_map (fun (name, p) -> match p with
-          | Leq (f, Nat 0) ->
+          | Leq (f, Lit "0") ->
             Option.map (fun h_gt ->
               (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
                  both via the B.lp `to_int`/`isGt` unification rules.  `(E+F) > 𝟎`
@@ -577,7 +584,7 @@ let tactic_for_rule ctx rule arg anno children =
        lifted-expression arg (never `trust`). *)
     let reflective =
       match goal_of_anno anno, arg with
-      | Some (Binary (Imp, Leq (e_exp, Nat 0), _)), Some (ExpArg f_exp) ->
+      | Some (Binary (Imp, Leq (e_exp, Lit "0"), _)), Some (ExpArg f_exp) ->
         Option.map
           (fun eqpf -> L.Refine (L.Name "AR9", [exp_term ctx f_exp; eqpf; L.Hole]))
           (Arith_proofs.prove_sum_eq (pp_env_of ctx) e_exp f_exp)

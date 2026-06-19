@@ -2,13 +2,10 @@ require open pp2lp.Prelude;
 
 opaque symbol {|26|} :
   π ((`!! a_t : Tuple 2,
-      let a ≔ (prj 0 a_t) in
-      let b ≔ (prj 1 a_t) in
-      a = b
+      (a_t ⋕ 0) = (a_t ⋕ 1)
       ⇒ (`!! x_t : Tuple 2,
-        let x ≔ (prj 0 x_t) in
-        let y ≔ (prj 1 x_t) in
-        x = y ⇒ x = a ⇒ y = b))) ≔
+        (x_t ⋕ 0) = (x_t ⋕ 1)
+        ⇒ (x_t ⋕ 0) = (a_t ⋕ 0) ⇒ (x_t ⋕ 1) = (a_t ⋕ 1)))) ≔
 begin
   refine ALL8 _;
   assume _x1;
