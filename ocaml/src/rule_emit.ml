@@ -254,7 +254,11 @@ let tactic_for_ectr ctx rule anno =
   in
   let abstract x g =
     let z = fresh_x_local ctx in
-    L.Lambda (z, Some L.Tau_i, pred_term ctx (subst_prd [(x, Var z)] g))
+    (* [replace_subexp_prd] so a function-symbol [x] applied in [g] gets its
+       App head abstracted too (matching [find_ectr56]); equivalent to
+       [subst_prd] for an ordinary variable occurrence. *)
+    L.Lambda (z, Some L.Tau_i,
+              pred_term ctx (replace_subexp_prd (Var x) (Var z) g))
   in
   (* ECTR3/4: the rewritten side may be a compound sub-term, so abstract the
      whole expression (not just a variable) out of the goal atom. *)

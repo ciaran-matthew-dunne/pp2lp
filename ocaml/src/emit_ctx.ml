@@ -343,7 +343,10 @@ let find_ectr12 ctx a b =
    hyp, the ¬-hyp, swapped = ECTR6). *)
 let find_ectr56 ctx g =
   let try_dir x y_exp heq swapped =
-    let g' = subst_prd [(x, y_exp)] g in
+    (* [replace_subexp_prd], not [subst_prd]: the rewritten side may be a
+       function symbol applied in [g] (`s27(s32)`), whose head a variable
+       substitution misses — see [replace_subexp]'s App-head case. *)
+    let g' = replace_subexp_prd (Var x) y_exp g in
     if g' = g then None
     else
       List.find_map

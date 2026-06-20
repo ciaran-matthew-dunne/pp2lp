@@ -224,7 +224,20 @@ and subst_prd env = function
    variable.  Unlike [subst_exp] it is not capture-avoiding; callers apply it
    to quantifier-free goal atoms. *)
 let rec replace_subexp from_e to_e e =
-  if e = from_e then to_e else map_exp (replace_subexp from_e to_e) e
+  if e = from_e then to_e
+  else match e with
+    (* A B-function symbol may itself be the rewritten side: PP can record an
+       equality between two functions (`f = g`) and apply one of them (`f(x)`).
+       `App (f, _)` carries the head as a bare string, so the generic [map_exp]
+       descent (args only) misses it; treat the head as an occurrence of
+       [Var f].  Both forms emit the same `eapp` application, so rewriting to a
+       symbol head stays in [App]; a non-symbol target moves to [EApp]. *)
+    | App (h, args) when from_e = Var h ->
+      let args' = List.map (replace_subexp from_e to_e) args in
+      (match to_e with
+       | Var g -> App (g, args')
+       | _ -> EApp (to_e, args'))
+    | _ -> map_exp (replace_subexp from_e to_e) e
 
 let replace_subexp_prd from_e to_e p =
   map_prd_exp (replace_subexp from_e to_e) p
