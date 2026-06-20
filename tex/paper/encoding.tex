@@ -230,12 +230,8 @@ $h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$, the multipliers $1$ and
 $2$ add the bound of $h_2$ to twice that of $h_1$, giving
 $(\mathbf{1} - (x + x)) + x + x \leq \mathbf{0}$; the generated equality
 $e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ rewrites this to the
-false $\mathbf{1} \leq \mathbf{0}$:
-\[
-	\mathsf{one\_not\_leq\_zero}\,\bigl(\mathsf{leq\_subst\_l}\ e\
-	(\mathsf{add\_leq\_zero}\ \_\ \_\ (\mathsf{add\_leq\_zero}\ \_\ \_\ h_2\ h_1)\ h_1)\bigr)
-	: \Prf\,\bot .
-\]
+false $\mathbf{1} \leq \mathbf{0}$, closed by the order lemma
+$\mathsf{one\_not\_leq\_zero}$ over a fold of $\mathsf{add\_leq\_zero}$.
 Here $e$ is itself closed by reflection, so \pp's sum reorderings need no
 bespoke permutation lemmas.
 
