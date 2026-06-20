@@ -39,18 +39,20 @@ let prod_coeff = function
    (`Pp_lp.pp_from_int`). *)
 let z_dec (decimal : string) : L.term = L.Name decimal
 
-(* `ϵ INT` evidence for a τ ι *atom* (a bound tuple slot / free integer var):
-   an injected typing premise.  The only ctx-dependent part of [int_evidence],
-   so it is set once per emission by [Translate] (single-threaded) rather than
-   threaded through every arith helper.  ponytail: dynamically-scoped ref over
-   one emission; thread it as a param if emission ever goes concurrent. *)
+(* `ϵ INT` evidence for a τ ι *atom* (a bound tuple slot / free var / compound
+   image): the typing oracle `trust_int` applied to the atom (see [Emit_ctx]).
+   The only ctx-dependent part of [int_evidence], so it is set once per emission
+   by [Translate] (single-threaded) rather than threaded through every arith
+   helper.  ponytail: dynamically-scoped ref over one emission; thread it as a
+   param if emission ever goes concurrent. *)
 let atom_int_ev : (exp -> L.term) ref =
   ref (fun _ -> failwith "arith_proofs: atom_int_ev unset")
 
-(* `π (e ϵ INT)` for a τ ι expression.  Compound terms are structurally in INT
-   (`—`/`+` land in from_int's range; a literal is from_int of a ℤ), so their
-   side-conditions discharge without a premise; an atom defers to [atom_int_ev].
-   Mirrors the BOOL precedent — morally-true premises, never a postulate. *)
+(* `π (e ϵ INT)` for a τ ι expression.  A compound arithmetic term is provably
+   in INT (`—`/`+`/`*` land in from_int's range, a literal is from_int of a ℤ),
+   so it discharges with a real proof and no trust; an irreducible atom (a bare
+   projection, free var, `card s`, function image …) defers to [atom_int_ev],
+   the ctx-side resolver that applies the typing oracle (B.lp `trust_int`). *)
 let int_evidence env e : L.term =
   let ex t = L.Exp (env, t) in
   match e with
@@ -62,10 +64,6 @@ let int_evidence env e : L.term =
   (* literal-coefficient product `n*x` (rendered `mult`): integer-valued by mult_def. *)
   | SetOp ("prod", [ (Lit _ as k); x ]) | SetOp ("prod", [ x; (Lit _ as k) ]) ->
     L.App (L.Name "mult_in_int", [ex k; ex x])
-  (* `card(s)` is integer-valued (B typing); discharge via the card_in_int
-     postulate rather than searching for an (impossible) typing premise.
-     `card(s)` parses as the generic application `App ("card", …)`. *)
-  | App ("card", [ s ]) | SetOp ("card", [ s ]) -> L.App (L.Name "card_in_int", [ex s])
   | _ -> !atom_int_ev e
 
 (* Flatten a `+`/`−` expression to its ordered signed-atom list, pushing unary
@@ -210,12 +208,120 @@ let prove_sum_eq env e1 e2 : L.term option =
   if e1 = e2 then Some (L.App (L.Name "eq_refl", [ L.Exp (env, e1) ]))
   else reflect_eq env e1 e2
 
+(* The PP→LP renaming of a B-function head (mirrors [Pp_lp]); the [meta_ops]
+   guard keys on the renamed name. *)
+let lp_head = function
+  | "_pj1" -> "pj1" | "_pj2" -> "pj2" | "_sz" -> "sz" | "_func" -> "func" | s -> s
+
+(* Right-fold a multi-argument application's argument list into the single
+   `↦`-paired expression it emits as (`pp_exp_args`): `[a;b;c] ↦ a ↦ (b ↦ c)`. *)
+let rec fold_maplet = function
+  | [ e ] -> e
+  | e :: rest -> Maplet (e, fold_maplet rest)
+  | [] -> failwith "fold_maplet: empty argument list"
+
+(* `π (e1 = e2)` for two τ ι expressions denoting the same value.  Generalises
+   [prove_sum_eq]: PP's arithmetic normaliser may rewrite a leaf buried under a
+   function image / pair (`s9(x+1)` ↦ `s9(1+x)`), so the two sides are not
+   themselves linear and reflection alone fails.  Try structural congruence first
+   — descend through the application / pairing / `+`/`−`/neg constructors PP
+   leaves intact, recursing on the differing child and composing one congruence
+   lemma per node — then fall back to reflective ℤ-linear equality ([reflect_eq])
+   for a genuinely arithmetic difference (commutation, reassociation, constant
+   folding).  None when neither bridges the shape, so the caller stays sound. *)
+let rec prove_exp_eq env e1 e2 : L.term option =
+  if e1 = e2 then Some (L.App (L.Name "eq_refl", [ L.Exp (env, e1) ]))
+  else
+    match structural_cong env e1 e2 with
+    | Some _ as pf -> pf
+    | None ->
+      (match reflect_eq env e1 e2 with
+       | Some _ as pf -> pf
+       | None -> reflect_atom_cong env e1 e2)
+
+(* Same-constructor congruence: descend through the application / pairing /
+   `+`/`−`/neg nodes PP's normaliser rewrites *through*, recursing on the
+   children and composing one congruence lemma (lemmas/Res.lp).  None when the
+   heads differ or a child can't be bridged — the caller then tries reflection. *)
+and structural_cong env e1 e2 : L.term option =
+  let ( let* ) = Option.bind in
+  match e1, e2 with
+  | App (f, a1), App (g, a2)
+    when f = g && a1 <> [] && List.length a1 = List.length a2
+         && not (List.mem (lp_head f) meta_ops) ->
+    let* harg = prove_exp_eq env (fold_maplet a1) (fold_maplet a2) in
+    Some (L.App (L.Name "eapp_arg_cong", [ harg ]))
+  | EApp (h1, a1), EApp (h2, a2) when a1 <> [] && List.length a1 = List.length a2 ->
+    let* hh = prove_exp_eq env h1 h2 in
+    let* harg = prove_exp_eq env (fold_maplet a1) (fold_maplet a2) in
+    Some (L.App (L.Name "eapp_cong", [ hh; harg ]))
+  | Maplet (a1, b1), Maplet (a2, b2) ->
+    let* h1 = prove_exp_eq env a1 a2 in
+    let* h2 = prove_exp_eq env b1 b2 in
+    Some (L.App (L.Name "maplet_cong", [ h1; h2 ]))
+  | AOp (Add, a1, b1), AOp (Add, a2, b2) ->
+    let* h1 = prove_exp_eq env a1 a2 in
+    let* h2 = prove_exp_eq env b1 b2 in
+    Some (L.App (L.Name "plus_cong", [ h1; h2 ]))
+  | AOp (Sub, a1, b1), AOp (Sub, a2, b2) ->
+    let* h1 = prove_exp_eq env a1 a2 in
+    let* h2 = prove_exp_eq env b1 b2 in
+    Some (L.App (L.Name "minus_cong", [ h1; h2 ]))
+  | Neg a1, Neg a2 ->
+    let* h = prove_exp_eq env a1 a2 in
+    Some (L.App (L.Name "neg_cong", [ h ]))
+  | _ -> None
+
+(* Reflection when the two linear sides share equal *values* but a differing
+   *atom* (PP reassociated a sum around a function image whose argument it also
+   normalised — `(-a - f(x+1)) + b` ↦ `(-a + b) - f(1+x)`).  Reflection alone
+   fails: `f(x+1)` and `f(1+x)` are distinct opaque atoms.  Bridge by pairing
+   each unmatched atom of [e2] with a congruent atom of [e1] ([structural_cong]),
+   substituting them so the atoms line up, reflecting the now-aligned sides, and
+   transporting back over the substitution (structural congruence — same shape,
+   so no re-entry here).  None if the atoms don't pair or still differ. *)
+and reflect_atom_cong env e1 e2 : L.term option =
+  let ( let* ) = Option.bind in
+  match lin_normal e1, lin_normal e2 with
+  | Some _, Some _ ->
+    let a1 = collect_atoms [ e1 ] and a2 = collect_atoms [ e2 ] in
+    let extra1 = List.filter (fun x -> not (List.mem x a2)) a1 in
+    let extra2 = List.filter (fun x -> not (List.mem x a1)) a2 in
+    (* Greedily pair each unmatched [e2] atom with a congruent unmatched [e1]
+       atom, returning the substitutions [x ↦ y] applied to [e2]. *)
+    let rec pair used = function
+      | [] -> Some []
+      | x :: rest ->
+        (* Require *structural* congruence (a function image with a normalised
+           argument), never bare reflection — two distinct irreducible atoms
+           (`Var a`/`Var b`) would otherwise re-enter [reflect_atom_cong] on the
+           same pair and diverge. *)
+        let cand =
+          List.find_opt
+            (fun y -> not (List.mem y used) && structural_cong env y x <> None)
+            extra1
+        in
+        (match cand with
+         | None -> None
+         | Some y ->
+           let* more = pair (y :: used) rest in
+           Some ((x, y) :: more))
+    in
+    (match pair [] extra2 with
+     | None | Some [] -> None
+     | Some subs ->
+       let e2star = List.fold_left (fun e (x, y) -> replace_subexp x y e) e2 subs in
+       let* pr = reflect_eq env e1 e2star in     (* e1 = e2★ (atoms aligned) *)
+       let* ps = structural_cong env e2star e2 in (* e2★ = e2 (atoms congruent) *)
+       Some (L.App (L.Name "eq_trans", [ pr; ps ])))
+  | _ -> None
+
 (* `π (p = q)` for two predicates differing only by arithmetic normalisation of
    their leaf expressions — AR10's solver step `solveur(p) = q` (e.g. `¬(-(-x) = x)`
-   ↦ `¬(x = x)`).  Recurse through the `¬`/`=`/`≤` shapes PP's arithmetic
-   simplifier produces, composing one congruence lemma per connective and closing
-   each `=`/`≤` leaf with [prove_sum_eq].  None for any other shape or a
-   non-linear leaf, so the caller can fall back to the plain no-op skip. *)
+   ↦ `¬(x = x)`, or `s9(x+1) : s10` ↦ `s9(1+x) : s10`).  Recurse through the
+   `¬`/`=`/`≤`/`ϵ` shapes PP's arithmetic simplifier produces, composing one
+   congruence lemma per connective and closing each operand with [prove_exp_eq].
+   None for any other shape, so the caller can fall back to the plain no-op skip. *)
 let rec prove_pred_eq env p q : L.term option =
   let ( let* ) = Option.bind in
   match p, q with
@@ -223,13 +329,18 @@ let rec prove_pred_eq env p q : L.term option =
     let* h = prove_pred_eq env p' q' in
     Some (L.App (L.Name "not_cong", [ h ]))
   | Eq (a, c), Eq (b, d) ->
-    let* h1 = prove_sum_eq env a b in
-    let* h2 = prove_sum_eq env c d in
+    let* h1 = prove_exp_eq env a b in
+    let* h2 = prove_exp_eq env c d in
     Some (L.App (L.Name "eq_cong", [ h1; h2 ]))
   | Leq (a, c), Leq (b, d) ->
-    let* h1 = prove_sum_eq env a b in
-    let* h2 = prove_sum_eq env c d in
+    let* h1 = prove_exp_eq env a b in
+    let* h2 = prove_exp_eq env c d in
     Some (L.App (L.Name "leq_cong", [ h1; h2 ]))
+  | Mem (es1, s1), Mem (es2, s2)
+    when es1 <> [] && List.length es1 = List.length es2 ->
+    let* h1 = prove_exp_eq env (fold_maplet es1) (fold_maplet es2) in
+    let* h2 = prove_exp_eq env s1 s2 in
+    Some (L.App (L.Name "mem_cong", [ h1; h2 ]))
   | _ -> None
 
 (* `π (e = 𝟎)` when [e]'s atoms cancel to nothing: reflect against the literal 0
@@ -391,3 +502,102 @@ let find_arith_contradiction env hyps =
     | None -> None
     | Some (org, c) -> build_cert org c
   end
+
+(* ---- Farkas certificate for an *implied* bound `target ≤ 𝟎` ----
+
+   Where [find_arith_contradiction] refutes an infeasible system, this proves a
+   bound the ≤-hypotheses entail: find a nonnegative integer combination
+   `Σ λⱼ·hypⱼ = target`, fold the `add_leq_zero` chain to `Σ ≤ 𝟎`, then
+   `leq_subst_l` it onto [target] via [prove_sum_eq].  The INS search calls it to
+   discharge a universal's arithmetic gap conjunct — `!x·(x∈s ⇒ x≤9)` instantiated
+   at `a` leaves `10−a ≤ 𝟎`, which `(9−y)+(1+y−a)` (the in-scope `9≤y`, `a>y`)
+   proves.  Solved by Gaussian elimination over the atom coefficients, then the
+   rounded solution is verified with exact integer arithmetic (so a fractional or
+   spurious certificate is rejected, never emitted); only nonnegative integer
+   combinations are accepted. *)
+let farkas_prove_leq env hyps target =
+  match flatten_signed target with
+  | None -> None
+  | Some tatoms ->
+    let n = List.length hyps in
+    if n = 0 then None else
+    let names = Array.of_list (List.map (fun (nm, e, _) -> (nm, e)) hyps) in
+    let hatoms = Array.of_list (List.map (fun (_, _, a) -> a) hyps) in
+    (* atom→coefficient table, foldable literals collapsed into one constant key *)
+    let const_key = Lit "" in
+    let vmap atoms =
+      let tbl = Hashtbl.create 8 in
+      List.iter (fun (a, s) ->
+        let key, v = match fold_val a with Some k -> const_key, k | None -> a, 1 in
+        Hashtbl.replace tbl key
+          ((try Hashtbl.find tbl key with Not_found -> 0) + s * v)) atoms;
+      tbl in
+    let get tbl k = try Hashtbl.find tbl k with Not_found -> 0 in
+    let tv = vmap tatoms in
+    let hvm = Array.map vmap hatoms in
+    let keys =
+      let s = Hashtbl.create 16 in
+      Hashtbl.iter (fun k _ -> Hashtbl.replace s k ()) tv;
+      Array.iter (Hashtbl.iter (fun k _ -> Hashtbl.replace s k ())) hvm;
+      Hashtbl.fold (fun k () acc -> k :: acc) s [] in
+    let m = List.length keys in
+    (* M·λ = b : row per atom key, column per hypothesis *)
+    let a = Array.make_matrix m n 0. and b = Array.make m 0. in
+    List.iteri (fun r k ->
+      b.(r) <- float_of_int (get tv k);
+      for j = 0 to n - 1 do a.(r).(j) <- float_of_int (get hvm.(j) k) done) keys;
+    (* Gauss–Jordan to reduced row echelon; free columns read as 0 *)
+    let lam = Array.make n 0. in
+    let pivcol = Array.make m (-1) in     (* leading column of each pivot row *)
+    let prow = ref 0 in
+    for col = 0 to n - 1 do
+      if !prow < m then begin
+        let piv = ref (-1) and best = ref 1e-9 in
+        for r = !prow to m - 1 do
+          if Float.abs a.(r).(col) > !best then (best := Float.abs a.(r).(col); piv := r)
+        done;
+        if !piv >= 0 then begin
+          let tmp = a.(!prow) in a.(!prow) <- a.(!piv); a.(!piv) <- tmp;
+          let tb = b.(!prow) in b.(!prow) <- b.(!piv); b.(!piv) <- tb;
+          let p = a.(!prow).(col) in
+          for c = 0 to n - 1 do a.(!prow).(c) <- a.(!prow).(c) /. p done;
+          b.(!prow) <- b.(!prow) /. p;
+          for r = 0 to m - 1 do
+            if r <> !prow then begin
+              let f = a.(r).(col) in
+              if Float.abs f > 1e-12 then begin
+                for c = 0 to n - 1 do a.(r).(c) <- a.(r).(c) -. f *. a.(!prow).(c) done;
+                b.(r) <- b.(r) -. f *. b.(!prow)
+              end
+            end
+          done;
+          pivcol.(!prow) <- col;
+          incr prow
+        end
+      end
+    done;
+    (* a pivot row reads its variable straight off [b]; free columns stay 0 *)
+    for r = 0 to m - 1 do
+      if pivcol.(r) >= 0 then lam.(pivcol.(r)) <- b.(r) done;
+    let ls = Array.map (fun x -> int_of_float (Float.round x)) lam in
+    if Array.exists (fun k -> k < 0) ls then None
+    else if List.for_all (fun k ->
+              let lhs = ref 0 in
+              for j = 0 to n - 1 do lhs := !lhs + ls.(j) * get hvm.(j) k done;
+              !lhs = get tv k) keys
+    then
+      let uses =
+        List.concat (List.init n (fun j -> List.init ls.(j) (fun _ -> names.(j)))) in
+      match uses with
+      | [] -> None
+      | (n0, e0) :: rest ->
+        let hsum, combined =
+          List.fold_left (fun (pf, acc_e) (nm, e) ->
+            (L.App (L.Name "add_leq_zero",
+               [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name nm ]),
+             AOp (Add, acc_e, e)))
+            (L.Name n0, e0) rest in
+        Option.map
+          (fun eqpf -> L.App (L.Name "leq_subst_l", [ eqpf; hsum ]))
+          (prove_sum_eq env target combined)
+    else None

@@ -47,6 +47,10 @@ type t =
   | Assume of string * t
   | Assume_then of tactic * string * t
   | Branches of tactic * t * t
+  (* `have name : ty { refine proof }; rest` — name a derived fact with an
+     explicit type and inline one-tactic subproof, then continue with it in
+     scope (the INS contradiction script). *)
+  | Have of string * binder_ty * term * t
   | Commented of prov * t
 
 (* Render [t] into [buf].  [pad] indents every line; [lead_pad] overrides

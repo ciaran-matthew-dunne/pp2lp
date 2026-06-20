@@ -102,8 +102,8 @@ its interactive front end~\cite{hondet:hal-02981561}.
 %
 Replaying automated provers inside such checkers is an active line of
 work: SMT proofs have been reconstructed in
-\lp~\cite{coltellacci2026acta} — including proofs of TLAPS obligations,
-TLA$^+$'s proof system~\cite{coltellacci2023abz} — and in
+\lp~\cite{coltellacci2026acta} (including proofs of TLAPS obligations,
+TLA$^+$'s proof system~\cite{coltellacci2023abz}) and in
 Lean~\cite{mohamed25leansmt}.
 %
 The same idea underlies \emph{hammer} tools, which discharge a goal with
@@ -134,12 +134,12 @@ against rule lemmas that are themselves proved sound.
 %
 The BWare project~\cite{bware2014} took a different route to the same
 trust concern: it discharged B proof obligations with external provers
---- notably Zenon Modulo, whose proofs are checked by
-\dedukti~\cite{bury2015bset} --- thereby replacing \pp{} rather than
+(notably Zenon Modulo, whose proofs are checked by
+\dedukti~\cite{bury2015bset}), thereby replacing \pp{} rather than
 formally verifying its output.
 In the same spirit, Trélat's BEer~\cite{trelat2025smt} gives a provably
-sound encoding of B proof obligations into SMT-LIB --- as does
-Defourné~\cite{defourne2025scp} for TLA$^+$ obligations --- while Bergeron
+sound encoding of B proof obligations into SMT-LIB, as does
+Defourné~\cite{defourne2025scp} for TLA$^+$ obligations, while Bergeron
 and Trélat's BARReL~\cite{bergeron2026barrel} reimplements \ab's proof
 backend in Lean.
 %

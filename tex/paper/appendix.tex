@@ -49,6 +49,69 @@ it silently applies the rewrite rules of \autoref{sec:enc-formulas} during
 type-checking.
 
 
+\section{LambdaPi Syntax}\label{app:syntax}
+
+We reproduce the fragment of \lp's concrete syntax~\cite{hondet:hal-02981561}
+used to write the developments in this paper, eliding only the interactive
+query and search commands.  Identifiers $x$ may be qualified; $n$ and $s$
+range over integer and string literals.  In the meta-notation, ${(\cdots)}^{?}$
+marks an optional item and ${(\cdots)}^{*}$, ${(\cdots)}^{+}$ repetition;
+all other brackets and punctuation are concrete syntax.
+
+\paragraph{Terms and parameters.}
+\[
+\begin{array}{rcll}
+  t, u & \Coloneqq & a\;{(→ t)}^{?} \;\mid\; a^{?}\,\mathit{bt} & \text{term} \\
+  a    & \Coloneqq & h\;\mathit{arg}^{*} & \text{application} \\
+  \mathit{bt} & \Coloneqq & \mathit{bd}\;\mathit{abs} \;\mid\; \kw{let}\;x\;p^{*}\,{(:\,t)}^{?}\,{≔}\;t\;\kw{in}\;t & \text{binder term} \\
+  \mathit{bd} & \Coloneqq & λ \;\mid\; Π \;\mid\; \text{\textasciigrave}\,@^{?}\,x & \text{binder} \\
+  h    & \Coloneqq & @^{?}\,x \;\mid\; \_ \;\mid\; \TYPE \;\mid\; (t) \;\mid\; n \;\mid\; s \;\mid\; \$x\,\mathit{env}^{?} \;\mid\; \mathord{?}x\,\mathit{env}^{?} & \text{head} \\
+  \mathit{arg} & \Coloneqq & h \;\mid\; [\,t\,] & \text{argument} \\
+  \mathit{abs} & \Coloneqq & p^{+}\,,\,t \;\mid\; p :\, t\,,\,t & \text{abstraction} \\
+  \mathit{env} & \Coloneqq & .\,[\;{(t\;{(,\,t)}^{*})}^{?}\;] & \text{metavariable env.} \\
+  p    & \Coloneqq & (x^{+} :\, t) \;\mid\; [\,x^{+}\,{(:\,t)}^{?}\,] \;\mid\; x \;\mid\; \_ & \text{parameter} \\
+\end{array}
+\]
+
+\paragraph{Commands.}  Each command is terminated by a semicolon.
+\[
+\begin{array}{rcll}
+  \mathit{cmd} & \Coloneqq & \mathit{exp}^{?}\,m^{*}\;\kw{symbol}\;x\;p^{*} :\, t\;{(\mathit{pf} \mid {≔}\;\mathit{tp})}^{?} & \text{declaration} \\
+       & \mid & \mathit{exp}^{?}\,m^{*}\;\kw{symbol}\;x\;p^{*}\,{≔}\;t\;\mathit{pf}^{?} & \\
+       & \mid & \mathit{exp}^{?}\,p^{*}\;\kw{inductive}\;\mathit{ind}\;{(\kw{with}\;\mathit{ind})}^{*} & \text{inductive} \\
+       & \mid & \kw{rule}\;r\;{(\kw{with}\;r)}^{*} \;\mid\; \kw{coerce\_rule}\;r & \text{rewriting} \\
+       & \mid & \kw{notation}\;x\;\mathit{nota} \;\mid\; \kw{opaque}\;x & \\
+       & \mid & \kw{require}\;{({(\kw{private})}^{?}\,\kw{open})}^{?}\;x^{+} & \text{import} \\
+       & \mid & {(\kw{private})}^{?}\,\kw{open}\;x^{+} & \\
+  \mathit{exp} & \Coloneqq & \kw{private} \;\mid\; \kw{protected} & \text{exposition} \\
+  m    & \Coloneqq & \mathit{side}^{?}\,\md{associative} \;\mid\; \md{commutative} \;\mid\; \md{constant} & \text{modifier} \\
+       & \mid & \md{injective} \;\mid\; \md{opaque} \;\mid\; \md{sequential} & \\
+  \mathit{side} & \Coloneqq & \kw{left} \;\mid\; \kw{right} & \text{side} \\
+  \mathit{ind} & \Coloneqq & x\;p^{*} :\, t\;{≔}\;{|}^{?}\,{(\mathit{con}\;{(|\,\mathit{con})}^{*})}^{?} & \text{inductive def.} \\
+  \mathit{con} & \Coloneqq & x\;p^{*} :\, t & \text{constructor} \\
+  r    & \Coloneqq & t\;↪\;t & \text{rewrite rule} \\
+  \mathit{nota} & \Coloneqq & \kw{infix}\;\mathit{side}^{?}\,f \;\mid\; \kw{prefix}\;f \;\mid\; \kw{postfix}\;f \;\mid\; \kw{quantifier} & \text{notation} \\
+\end{array}
+\]
+
+\paragraph{Proofs and tactics.}
+\[
+\begin{array}{rcll}
+  \mathit{tp} & \Coloneqq & t \;\mid\; \mathit{pf} \;\mid\; t\;\mathit{pf} & \text{term-proof} \\
+  \mathit{pf} & \Coloneqq & \kw{begin}\;(\mathit{sub}^{+} \mid \mathit{ss}^{?})\;\mathit{pe} & \text{proof} \\
+  \mathit{sub} & \Coloneqq & \{\;\mathit{ss}^{?}\;\} & \text{subproof} \\
+  \mathit{ss}  & \Coloneqq & \mathit{st}\;{;}^{?} \;\mid\; \mathit{st}\;;\;\mathit{ss} & \text{steps} \\
+  \mathit{st}  & \Coloneqq & \mathit{tac}\;\mathit{sub}^{*} & \text{step} \\
+  \mathit{pe}  & \Coloneqq & \kw{end} \;\mid\; \kw{abort} \;\mid\; \kw{admitted} & \text{closer} \\
+  \mathit{tac} & \Coloneqq & \kw{admit} \;\mid\; \kw{apply}\;t \;\mid\; \kw{assume}\;p^{+} \;\mid\; \kw{change}\;t & \text{tactic} \\
+       & \mid & \kw{fail} \;\mid\; \kw{generalize}\;x \;\mid\; \kw{have}\;x :\, t \;\mid\; \kw{induction} & \\
+       & \mid & \kw{refine}\;t \;\mid\; \kw{reflexivity} \;\mid\; \kw{remove}\;x^{+} \;\mid\; \kw{symmetry} & \\
+       & \mid & \kw{rewrite}\;\mathit{side}^{?}\,{(.\,[\,\mathit{rw}\,])}^{?}\,t \;\mid\; \kw{simplify}\;x^{?} & \\
+       & \mid & \kw{set}\;x\,{≔}\;t \;\mid\; \kw{try}\;\mathit{tac} \;\mid\; \kw{repeat}\;\mathit{tac} \;\mid\; \kw{orelse}\;\mathit{tac}\;\mathit{tac} & \\
+  \mathit{rw}  & \Coloneqq & t \;\mid\; \kw{in}\;t \;\mid\; \kw{in}\;x\;\kw{in}\;t \;\mid\; t\;\kw{in}\;t\,{(\kw{in}\;t)}^{?} \;\mid\; t\;\kw{as}\;x\;\kw{in}\;t & \text{rw.\ pattern} \\
+\end{array}
+\]
+
 \section{Surviving Set-theoretic Operators}\label{app:operators}
 
 The operators below are the set-theoretic constructs that the pre-processing of

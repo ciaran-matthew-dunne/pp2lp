@@ -157,8 +157,8 @@ reconstructing its proofs in \lp.
 %
 Unlike approaches that postulate each rule as an axiom, every \pp{} rule
 is encoded as a symbol whose body \emph{proves} the rule sound against a
-small axiomatic base, and the reconstructed corpus — including \ab's own
-rule-validation suite, arithmetic included — type-checks without a
+small axiomatic base, and the reconstructed corpus (including \ab's own
+rule-validation suite, arithmetic included) type-checks without a
 single appeal to an oracle.
 %
 The remainder of this section discusses what limits coverage today and
@@ -171,12 +171,12 @@ final continuation of an \rn{ALL7} or \rn{XST8} step, and for others it
 aborts mid-file.
 %
 Both defects are detected at generation time and the affected goals
-dropped loudly.
+dropped and reported.
 %
 They are not random: set-extensionality and equality-prover-heavy goals
-are disproportionately affected — no complete \rn{EGALITE} replay can be
+are disproportionately affected (no complete \rn{EGALITE} replay can be
 produced from our goal suites, so that emission path is validated
-against a hand-completed replay — which means the suites under-test
+against a hand-completed replay), which means the suites under-test
 exactly the rules the equality prover would exercise.
 
 \paragraph{Spec mismatches.}
@@ -195,7 +195,7 @@ pinning a binder beyond the third slot of a compound binder, and the
 result forms of two arithmetic rules that no replay in our suites
 exercises.
 %
-All of these fail loudly at emission; none silently degrade.
+All of these are rejected at emission with an error; none silently degrade.
 
 \paragraph{Raw proof obligations.}
 We also probed \pp{} on raw industrial obligations from CLEARSY's

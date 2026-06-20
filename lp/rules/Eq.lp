@@ -234,6 +234,24 @@ begin
     refine !!_to_pi _ h2 (unit ⨾ a) (⋀₂_intro hf hne) }
 end;
 
+// eql_set from the two *implication*-form inclusions (E ⊆ F and F ⊆ E).  This is
+// the form PP leaves when the set equality `E = F` is proven directly: both
+// inclusions are sibling subgoals of an AND4 (not assumed hyps), so the emitter
+// reuses their proof and assembles the marker here.  E, F explicit (the goal's
+// `eql_set E F` alone doesn't fix them through the instantiated arguments).  The
+// set-algebra membership-unfolding rules in B.lp make the inclusions PP renders
+// (memberships unfolded to ∨/∧) convertible to the `prj 0 v ϵ E/F` form below.
+opaque symbol eql_set_of_incls (E F : τ ι)
+  (hEF : π (`!! v : Tuple 1, (prj 0 v ϵ E) ⇒ (prj 0 v ϵ F)))
+  (hFE : π (`!! v : Tuple 1, (prj 0 v ϵ F) ⇒ (prj 0 v ϵ E)))
+  : π (eql_set E F) ≔
+begin
+  assume E F hEF hFE a;
+  refine ∧ᵢ _ _
+  { assume ha; refine !!_to_pi _ hEF (unit ⨾ a) ha }
+  { assume hb; refine !!_to_pi _ hFE (unit ⨾ a) hb }
+end;
+
 // ---- ECTR (contradiction due to equalities) ----
 // These rules use substitution: "replacing E by F in Q gives R"
 // means R = [E→F]Q. In HOAS, Q(E) is the original, Q(F) is the

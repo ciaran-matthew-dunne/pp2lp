@@ -77,6 +77,27 @@ begin
     (ind_eq (take_tcat w y) (λ z, P z y) h)
 end;
 
+// m-general reconstruction transports (`take_tcat`/`drop_tcat` are already
+// m-general; these just lift the `Tuple 1` specialisation).  Feed `!!_split_eq_m`
+// below, used by the NRM8/NRM9 chain bridges (rules/Res.lp).
+opaque symbol tcat_recon_m [n m] (P : Tuple n → Tuple m → Prop)
+  (w : Tuple n) (y : Tuple m)
+  : π (P (take [n] [m] (tcat w y)) (drop [n] [m] (tcat w y))) → π (P w y) ≔
+begin
+  assume n m P w y h;
+  refine ind_eq (eq_sym (drop_tcat w y)) (λ z, P w z)
+    (ind_eq (eq_sym (take_tcat w y)) (λ z, P z (drop [n] [m] (tcat w y))) h)
+end;
+
+opaque symbol tcat_recon_inv_m [n m] (P : Tuple n → Tuple m → Prop)
+  (w : Tuple n) (y : Tuple m)
+  : π (P w y) → π (P (take [n] [m] (tcat w y)) (drop [n] [m] (tcat w y))) ≔
+begin
+  assume n m P w y h;
+  refine ind_eq (drop_tcat w y) (λ z, P (take [n] [m] (tcat w y)) z)
+    (ind_eq (take_tcat w y) (λ z, P z y) h)
+end;
+
 // ---- compound ↔ nested binder equality (§A.7–8 regroupement) ----
 // The single fact behind every curried merge rule: a compound `Tuple (n ++ 1)`
 // binder splitting v with take/drop is *equal* (propExt) to the nested
@@ -103,6 +124,26 @@ begin
     refine !!_to_pi (λ y, P (take [n] [1] v) y)
              (!!_to_pi (λ w, `!! y : Tuple 1, P w y) hN (take [n] [1] v))
              (drop [n] [1] v) }
+end;
+
+// m-general split (the `Tuple 1` `!!_split_eq` for any inner arity m).  Same
+// proof, with the m-general `tcat_recon_m`.  Used by the NRM8/NRM9 chain bridges.
+opaque symbol !!_split_eq_m [n m] (P : Tuple n → Tuple m → Prop)
+  : π ((`!! v : Tuple (n ++ m), P (take [n] [m] v) (drop [n] [m] v))
+       = (`!! w : Tuple n, `!! y : Tuple m, P w y)) ≔
+begin
+  assume n m P;
+  refine propExt _ _ _ _
+  { assume hC;
+    refine pi_to_!! _ _; assume w;
+    refine pi_to_!! _ _; assume y;
+    refine tcat_recon_m P w y
+      (!!_to_pi (λ v, P (take [n] [m] v) (drop [n] [m] v)) hC (tcat w y)) }
+  { assume hN;
+    refine pi_to_!! _ _; assume v;
+    refine !!_to_pi (λ y, P (take [n] [m] v) y)
+             (!!_to_pi (λ w, `!! y : Tuple m, P w y) hN (take [n] [m] v))
+             (drop [n] [m] v) }
 end;
 
 opaque symbol ??_split_eq [n] (P : Tuple n → Tuple 1 → Prop)

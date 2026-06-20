@@ -31,9 +31,11 @@ val int_evidence : Lp_tree.proj_env -> exp -> Lp_tree.term
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
 (* `π (p = q)` for two predicates differing only by arithmetic normalisation of
-   their `=`/`≤` leaves (AR10's `solveur(p) = q`): congruence down to the leaves,
-   each closed by [prove_sum_eq].  Handles the ¬/=/≤ shapes; None otherwise (the
-   caller falls back to skipping the no-op). *)
+   their leaf expressions (AR10's `solveur(p) = q`): congruence down to the
+   operands, each closed by [prove_exp_eq] (structural congruence through the
+   function-image / pair / `+`/`−`/neg constructors PP rewrites *through*, then
+   reflective ℤ-linear equality).  Handles the ¬/=/≤/ϵ shapes; None otherwise
+   (the caller falls back to skipping the no-op). *)
 val prove_pred_eq : Lp_tree.proj_env -> prd -> prd -> Lp_tree.term option
 
 (* `π (e = 𝟎)` when [e]'s atoms cancel to nothing — `reflect_eq e (Lit "0")`.  Used
@@ -58,3 +60,11 @@ val positive_lit : Lp_tree.proj_env -> int -> Lp_tree.term
    supplies them from the context. *)
 val find_arith_contradiction :
   Lp_tree.proj_env -> (string * exp * (exp * int) list) list -> Lp_tree.tactic option
+
+(* Prove `π (target ≤ 𝟎)` as a nonnegative integer combination of the `e ≤ 𝟎`
+   hypotheses (the implied-bound dual of [find_arith_contradiction]).  Used by the
+   INS search to discharge a universal's arithmetic gap conjunct.  Same hyp form;
+   None when no nonnegative *integer* combination yields [target]. *)
+val farkas_prove_leq :
+  Lp_tree.proj_env -> (string * exp * (exp * int) list) list -> exp ->
+  Lp_tree.term option

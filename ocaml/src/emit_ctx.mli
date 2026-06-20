@@ -15,12 +15,9 @@ type ctx = {
   mutable n : int;
   mutable hyps : (string * prd) list;
   mutable xs : (string * string list) list;
-  mutable bool_typings : (string * string) list;
-  mutable int_typings : (string * string) list;
-  int_free_vars : Free_vars.SS.t;
 }
 
-val create_ctx : ?int_free_vars:Free_vars.SS.t -> unit -> ctx
+val create_ctx : unit -> ctx
 
 (* Allocate a fresh `_hN` / `_xN` and register it in the context.
    [fresh_x_local] allocates a `_xN` *without* registering — for a chain's
@@ -64,20 +61,21 @@ val and5_fwd : Lp_tree.term -> prd list -> int list -> int -> Lp_tree.term
 val goal_of_anno : rhs option -> prd option
 val binder_vars_of : prd -> string list option
 
+(* True iff the predicate is the `⊤`/VRAI atom (e.g. the leading conjunct of a
+   `¬(⊤ ∧ …)` normalisation body). *)
+val is_true_atom : prd -> bool
+
+(* The projection environment for the in-scope binders (each packed PP var →
+   its `tuple ⋕ k` projection); a PP expression renders against it. *)
+val proj_env_of_ctx : ctx -> Lp_tree.proj_env
+
 (* The discharge term for a BOOL31/32/41/42 rule's `V ϵ BOOL` side-condition on
-   bound var [v] — a per-(arity,slot) typing premise registered in
-   [ctx.bool_typings] and applied to the in-scope tuple ([None] if [v] isn't a
-   bound tuple slot). *)
+   var [v]: the typing oracle `trust_bool` applied to the atom in scope.  Total
+   (always [Some _]); the option is kept for the caller's existing shape. *)
 val bool_typing_term : ctx -> string -> Lp_tree.term option
 
-(* The `V ϵ INT` discharge term for an integer-typed var [v]: a per-(arity,slot)
-   premise (bound tuple slot) or per-name `π (v ϵ INT)` premise (free var),
-   registered in [ctx.int_typings].  A goal free var injects its own premise;
-   a witness / locally bound var (not in [ctx.int_free_vars]) raises [E_EMIT]. *)
-val int_typing_term : ctx -> string -> Lp_tree.term
-
 (* The ctx-side atom resolver bound into [Arith_proofs.atom_int_ev] each
-   emission: a variable atom's `ϵ INT` premise, else a loud failure. *)
+   emission: the typing oracle `trust_int` applied to the atom in scope. *)
 val atom_int_evidence : ctx -> exp -> Lp_tree.term
 
 (* ---- Searches over the context ---- *)
@@ -117,10 +115,6 @@ val find_ectr12 : ctx -> exp -> exp -> (string * prd * string * string * bool) o
    — (E-var, equality hyp, ¬-hyp, swapped = ECTR6). *)
 val find_ectr56 : ctx -> prd -> (string * string * string * bool) option
 
-(* The tuple-projection env (witness var → `prj k x`) for rendering PP
-   expressions; built from the in-scope binders.  Mirrors [Rule_emit.pp_env_of]. *)
-val proj_env_of_ctx : ctx -> Lp_tree.proj_env
-
 (* The sum-equality / sum-zero / positivity provers (now reflective) live in
    [Arith_proofs] (ctx-free); the emitter calls them directly.  Their results are
    pure proof TERMS, so they also sit inside under-binder `!!_cong (λ v, …)` terms
@@ -145,9 +139,11 @@ val nrm29_witness_bridge : ctx -> prd -> (Lp_tree.term * Lp_tree.term) option
 val find_axm9_match : ctx -> prd -> (Lp_tree.term * string) option
 val find_nrm19_match : ctx -> prd -> (Lp_tree.term * string) option
 
-(* INS: the `!!_to_pi …` contradiction tactic, if a universal hyp × witness
-   pair matches every conjunct. *)
-val find_ins_contradiction : ctx -> Lp_tree.tactic option
+(* INS: the universal-instantiation contradiction, as a tactic *script* proving
+   `π ⊥` — derived facts as named `have`s, existential raises as
+   `refine … ; assume …` blocks, the close a `refine`.  [None] if no
+   (universal hyp × witness) discharges the contradiction. *)
+val find_ins_contradiction : ctx -> Lp_tree.t option
 
 (* A human-readable diagnostic for when [find_ins_contradiction] returns
    [None]: the hypotheses and witnesses in scope, and per universal hyp the

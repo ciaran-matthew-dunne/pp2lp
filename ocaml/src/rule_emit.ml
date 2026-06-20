@@ -55,7 +55,7 @@ let metadata_extra_args rule =
      reach the generic path, so they need no metadata here. *)
   | Rule_db.Default | Rule_db.Trust_cons | Rule_db.Hyp_search | Rule_db.Ins
   | Rule_db.And5 | Rule_db.Opr _ | Rule_db.Axm8 | Rule_db.Nrm20 | Rule_db.Nrm21 | Rule_db.Nrm22 | Rule_db.Nrm23
-  | Rule_db.Nrm26 | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Ectr | Rule_db.Arith
+  | Rule_db.Nrm26 | Rule_db.Nrm2730 | Rule_db.Eqs2 | Rule_db.Eimp5 | Rule_db.Ectr | Rule_db.Arith
   | Rule_db.Egalite
   | Rule_db.Ar2
   | Rule_db.Ar3 | Rule_db.Ar3_f | Rule_db.Ar4 | Rule_db.Ar5_6 | Rule_db.Ar7_8 | Rule_db.Ar10
@@ -333,6 +333,29 @@ let tactic_for_rule ctx rule arg anno children =
       | _ -> no_bool_typing ()
     in
     L.Refine (L.Name rule, [con; L.Hole])
+  | Rule_db.Eimp5 ->
+    (* EIMP51 [E F] : π (¬ (F = E)) → π P → π (¬ (E = F) ⇒ P)
+       EIMP52 [E F] : π (F = E)     → π P → π ((E = F) ⇒ P)
+       PP discharges the implication using the *swapped-orientation* equality
+       already in its store (introduced by the enclosing IMP4 / assumed): the
+       goal carries `E = F`, the hyp carries `F = E`.  Supply that hyp as the
+       explicit first argument; the Seq child proves P.  Fail loud (never
+       trust) if the swapped equality is not in scope. *)
+    let ev =
+      match base rule, goal_of_anno anno with
+      | "EIMP51", Some (Binary (Imp, Unary (Not, Eq (e, f)), _)) ->
+        find_hyp_by_pred ctx (Unary (Not, Eq (f, e)))
+      | "EIMP52", Some (Binary (Imp, Eq (e, f), _)) ->
+        find_hyp_by_pred ctx (Eq (f, e))
+      | _ -> None
+    in
+    (match ev with
+     | Some h -> L.Refine (L.Name (base rule), [L.Name h; L.Hole])
+     | None ->
+       failwith (Printf.sprintf
+         "rule_emit: %s — the swapped-orientation equality (the hyp PP commutes \
+          the goal's equality against) is not in scope, refusing to emit trust"
+         (base rule)))
   | Rule_db.Ar10 ->
     (* AR10 [P Q R] : π (P = Q) → π (Q ⇒ R) → π (P ⇒ R).  PP's `solveur(P) = Q`
        is the identity on every corpus occurrence (P ≡ Q — the antecedent equals

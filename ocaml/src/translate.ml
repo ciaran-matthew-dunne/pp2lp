@@ -41,7 +41,7 @@ let rec chain_looks_up node pred =
   | P.Apply { rule; anno; children; _ } ->
     let here =
       (match base rule with
-       | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" ->
+       | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" | "IMP5" ->
          (match goal_of_anno anno with
           | Some g -> expected_hyp_pred rule g = Some pred
           | None -> false)
@@ -85,13 +85,36 @@ let rec ar3f_cong ctx env binders prd a_exp r_exp : L.term option =
     let v = fresh_x_local ctx in
     let env' = List.mapi (fun k var -> (var, L.Proj (k, v))) vars @ env in
     (* Register the binder in ctx.xs (not just the render env) so an integer-typed
-       bound var used arithmetically under here resolves its `ϵ INT` evidence to
-       the `_it_n_k v` typing premise; thread it onto [binders] too so the equality
-       `have` quantifies it (the proof lives at tactic scope, applied to v here). *)
+       bound var used arithmetically under here resolves its `ϵ INT` evidence
+       against the in-scope projection (the typing oracle applies to `v ⋕ k`);
+       thread it onto [binders] too so the equality `have` quantifies it (the
+       proof lives at tactic scope, applied to v here). *)
     Option.map (fun c -> L.App (L.Name "!!_cong", [L.Lambda (v, None, c)]))
       (with_x ctx v vars (fun () ->
          ar3f_cong ctx env' (binders @ [ (v, List.length vars) ]) body a_exp r_exp))
   | _ -> None
+
+(* Closer for a residual bool-literal disequality `¬(b1 = b2)` (b1 ≠ b2):
+   `bool_distinct` proves `¬(BTRUE = BFALSE)`, its `eq_sym` mirror the reverse
+   orientation.  Terminal OPR1/OPR2 (after rewriting x ↦ E) and terminal EVR3
+   (after the trivial `E = E` antecedent) land on such a residual when PP closes
+   a boolean goal in one step.  None ⇒ not trivially closable. *)
+let bool_diseq_closer : prd -> L.term option = function
+  | Unary (Not, Eq (Var ("TRUE" | "VRAI"), Var ("FALSE" | "FAUX"))) ->
+    Some (L.Name "bool_distinct")
+  | Unary (Not, Eq (Var ("FALSE" | "FAUX"), Var ("TRUE" | "VRAI"))) ->
+    Some (L.Lambda ("h", None,
+      L.App (L.Name "bool_distinct", [ L.App (L.Name "eq_sym", [ L.Name "h" ]) ])))
+  | _ -> None
+
+(* Does an expression contain an arithmetic operator?  A set-equality marker side
+   that does is a misparse (e.g. set difference `s - t` lexes as arithmetic
+   `minus`), which has no membership-unfolding rule — proving the marker from the
+   inclusions would then leave lambdapi churning, so [eqs2_marker_reuse] skips it. *)
+let rec exp_has_arith e =
+  match e with
+  | AOp _ | Neg _ -> true
+  | _ -> fold_exp (fun acc sub -> acc || exp_has_arith sub) false e
 
 let rec tree ctx node =
   match node with
@@ -157,7 +180,7 @@ and tree_dispatch ctx = function
   | P.Apply { rule; anno; children = [_]; _ }
     when Rule_db.emit rule = Rule_db.Ins ->
     (match find_ins_contradiction ctx with
-     | Some tactic -> L.Step tactic
+     | Some script -> script
      | None ->
        let goal = match goal_of_anno anno with
          | Some g -> Emit_pp.prd_to_pp g
@@ -204,6 +227,23 @@ and tree_dispatch ctx = function
        in
        L.Then (L.Refine (cut, [L.Hole]), tree ctx c)
      | None -> failwith "translate: EGALITE child has no annotation")
+  | P.Apply { rule; anno; children = [c]; _ }
+    when base rule = "EQS1" ->
+    (* EQS1 lifts `eql_set E F ⇒ R` to `(E = F) ⇒ R`.  `eql_set E F` unfolds to
+       `∀a, a ϵ E ⇔ a ϵ F`, and when F is a set-algebra op (union/inter/diff/∅)
+       the membership `a ϵ F` unfolds further (∨ / ⋀ / ⊥), so lambdapi can't infer
+       the implicit F from the goal — `a ϵ ?F` won't unify against the unfolded
+       body.  Supply E and F explicitly (`@EQS1 E F _ _`); R is inferred from the
+       goal and the trailing hole is the `(E = F) ⇒ R` child.  (For an irreducible
+       F — `interval …` — plain `refine EQS1 _` also works, but the explicit form
+       is uniform and equally valid.) *)
+    (match goal_of_anno anno with
+     | Some (Binary (Imp, Lift (App (g, [e; f])), _))
+       when g = "_eql_set" || g = "eql_set" ->
+       L.Then (L.Refine (L.Expl (L.Name "EQS1"),
+                         [exp_term ctx e; exp_term ctx f; L.Hole; L.Hole]),
+               tree ctx c)
+     | _ -> default ctx rule None anno [c])
   | P.Apply { rule; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Eqs2 ->
     (* PP's EQS2 (spec p.98) discharges ¬eql_set(E,F) with a FAUX ⇒ R
@@ -272,11 +312,77 @@ and tree_dispatch ctx = function
                 assumed `E = F`/marker hyp nor a marker antecedent in R's \
                 spine)\n  hyps in scope:\n%s" hyps)))
      | _ -> default ctx rule None anno [c])
+  | P.Apply { rule; arg; anno; children = ([_; c1] as children); _ }
+    when base rule = "AND4" ->
+    (* Set-equality `E = F` proven directly: PP splits it into the two inclusions
+       (sibling subgoals, the `⋀ ps` slot) plus an `eql_set` marker discharged by
+       a STOP→EQS2 it skips.  There's no assumed evidence to feed EQS2, so instead
+       reuse the inclusions: bind the `⋀ ps` proof once and assemble the marker
+       from it via [eql_set_of_incls].  Falls back to the normal AND4 emit when the
+       goal isn't this shape (the old EQS2 store-evidence path still applies). *)
+    (match eqs2_marker_reuse ctx anno c1 with
+     | Some t -> t
+     | None -> default ctx rule arg anno children)
   | P.Apply { rule; anno; children = [c0; c1]; _ }
     when Rule_db.is_branching (base rule) ->
     branching ctx rule anno c0 c1
   | P.Apply { rule; arg; anno; children; _ } ->
     default ctx rule arg anno children
+
+(* AND4 over a set-equality `E = F`: goal `⋀(∎ ∷ inclA ∷ inclB ∷ eql_set E F)`,
+   where inclA/inclB are the two inclusion universals (`∀v. v ∈ X ⇒ v ∈ Y`).  PP
+   proves both inclusions in the `⋀ ps` slot ([c1]) and skips the marker via EQS2;
+   we instead bind that proof and build the marker from it with [eql_set_of_incls].
+   Returns the assembled term, or None when the goal isn't this shape (e.g. the
+   inclusion direction can't be matched), leaving the caller to fall back. *)
+and eqs2_marker_reuse ctx anno c1 : L.t option =
+  (* the marker `_eql_set(E,F)` parses as the pair-membership `(E,F) ϵ _eql_set` *)
+  let marker_sides = function
+    | Mem ([ e_exp; f_exp ], Var ("_eql_set" | "eql_set")) -> Some (e_exp, f_exp)
+    | Lift (App (("_eql_set" | "eql_set"), [ e_exp; f_exp ])) -> Some (e_exp, f_exp)
+    | _ -> None
+  in
+  match goal_of_anno anno with
+  | Some g ->
+    let conjs = Pp_lp.conj_children_left g in
+    (match List.rev conjs, conjs with
+     | marker :: _, incl0 :: incl1 :: _
+       when List.length conjs = 3 && marker_sides marker <> None
+            && (let (e, f) = Option.get (marker_sides marker) in
+                not (exp_has_arith e) && not (exp_has_arith f)) ->
+       let e_exp, f_exp = Option.get (marker_sides marker) in
+       (* `!v. _ ⇒ (v ∈ X)` has consequent-membership target X *)
+       let con_target = function
+         | Bind ((Bang | Forall), [ v ], Binary (Imp, _, Mem ([ Var v' ], x)))
+           when v' = v -> Some x
+         | _ -> None
+       in
+       (* projections of pf : π (⋀ (∎ ∷ incl0 ∷ incl1)) *)
+       let pf = L.Name "pf" in
+       let last t = L.App (L.Name "\xe2\x8b\x80_last", [ t ]) in
+       let init t = L.App (L.Name "\xe2\x8b\x80_init", [ t ]) in
+       let p0 = last (init pf) and p1 = last pf in
+       (* assign (hEF, hFE): E⊆F's consequent is `v ∈ F`, F⊆E's is `v ∈ E` *)
+       let assignment =
+         match con_target incl0, con_target incl1 with
+         | Some t, _ when t = e_exp -> Some (p1, p0)
+         | Some t, _ when t = f_exp -> Some (p0, p1)
+         | _, Some t when t = e_exp -> Some (p0, p1)
+         | _, Some t when t = f_exp -> Some (p1, p0)
+         | _ -> None
+       in
+       Option.map
+         (fun (h_ef, h_fe) ->
+            let marker =
+              L.App (L.Name "eql_set_of_incls",
+                [ exp_term ctx e_exp; exp_term ctx f_exp; h_ef; h_fe ]) in
+            let lam =
+              L.Lambda ("pf", None, L.App (L.Name "AND4", [ marker; pf ])) in
+            L.Then (L.Refine (lam, [ L.Hole ]),
+                    scoped_hyps ctx (fun () -> tree ctx c1)))
+         assignment
+     | _ -> None)
+  | None -> None
 
 and default ctx rule arg anno children =
   let goal = goal_of_anno anno in
@@ -293,6 +399,44 @@ and default ctx rule arg anno children =
     let h = fresh_h ctx eq_pred in
     L.Assume (h,
       L.Then (L.Rewrite { try_ = true; rtl; name = h }, tree ctx c))
+  | [], Rule_db.Opr rtl ->
+    (* Terminal OPR (no continuation in the replay): PP's rewrite x ↦ E lands on a
+       goal it discharges in one step — a bool-literal disequality.  Rewrite as
+       usual, then close the residual `P[x ↦ E]` with [bool_diseq_closer].  Fail
+       loud (never trust) if that residual isn't a closable bool disequality — the
+       missing child is then a genuine REPLAY truncation. *)
+    let eq_pred, residual =
+      match goal with
+      | Some (Binary (Imp, (Eq (l, r) as eq), body)) ->
+        let e_val, x_side = if rtl then l, r else r, l in
+        let res = match x_side with
+          | Var x -> subst_prd [ (x, e_val) ] body
+          | _ -> body in
+        eq, res
+      | _ -> failwith (Printf.sprintf
+          "translate: terminal %s expected an `(x = E) ⇒ P` annotation" rule)
+    in
+    (match bool_diseq_closer residual with
+     | Some closer ->
+       let h = fresh_h ctx eq_pred in
+       L.Assume (h,
+         L.Then (L.Rewrite { try_ = true; rtl; name = h },
+                 L.Step (L.Refine (closer, []))))
+     | None -> failwith (Printf.sprintf
+         "translate: terminal %s — residual goal is not a closable bool \
+          disequality (likely a REPLAY truncation); refusing to emit trust" rule))
+  | [], Rule_db.Default when base rule = "EVR3" ->
+    (* Terminal EVR3: `(E = E) ⇒ P` with no continuation — the trivial reflexive
+       antecedent and a one-step bool close.  EVR3 : π P → π ((E = E) ⇒ P); supply
+       the closer for the consequent disequality P directly.  Fail loud otherwise. *)
+    (match goal with
+     | Some (Binary (Imp, _, p)) ->
+       (match bool_diseq_closer p with
+        | Some closer -> L.Step (L.Refine (L.Name "EVR3", [ closer ]))
+        | None -> failwith
+            "translate: terminal EVR3 — consequent is not a closable bool \
+             disequality (likely a REPLAY truncation); refusing to emit trust")
+     | _ -> failwith "translate: terminal EVR3 expected an `(E = E) ⇒ P` annotation")
   | [c], Rule_db.Ar3 ->
     (* Main-tree AR3.  PP's solver records the sub-premise `𝟏 - a` in its own
        normalised order `r` (the PipeArg's 2nd component), so the continuation is
@@ -534,6 +678,42 @@ and chain_term ctx node : L.term =
           failwith "translate: AXM9_1 — no (witness × universal hyp) match for \
                     the chain antecedent")
      | None -> assert false)
+  | P.Apply { rule; anno; _ } when base rule = "NRM19" ->
+    (* Chain-form NRM19 (Witness_hyp discharge).  NRM19_1 wraps `NRM19 v hr` in
+       `mk_0 ∘ prop_eq_top` (a Res seed); PP's ⊤/VR4 child carries no premise so
+       it's dropped.  Two evidence shapes:
+        1. a real in-scope hyp `R v` ([find_nrm19_match], as the base rule does);
+        2. a *reflexive self-pin* `forall2(x)·¬(⊤ ∧ (x = E)) ⇒ _`: the single
+           binder is pinned to E, witnessed by `unit ⨾ E` with `R (unit⨾E)`
+           reducing to `E = E`, discharged by `eq_refl E`.  (The witness E is the
+           equality's constant side, which `ctx.xs` can't supply.) *)
+    (match goal_of_anno anno with
+     | Some goal ->
+       (match find_nrm19_match ctx goal with
+        | Some (witness, h) ->
+          L.App (L.Name (chain_emit_name rule), [witness; L.Name h])
+        | None ->
+          let pin =
+            match goal with
+            | Binary (Imp, Bind (Forall2, [x],
+                        Unary (Not, Binary (And, t, eqp))), _)
+              when is_true_atom t ->
+              (match eqp with
+               | Eq (Var x', e) when x' = x -> Some e
+               | Eq (e, Var x') when x' = x -> Some e
+               | _ -> None)
+            | _ -> None
+          in
+          (match pin with
+           | Some e ->
+             let et = exp_term ctx e in
+             L.App (L.Name (chain_emit_name rule),
+               [ L.App (L.Name "⨾", [L.Name "unit"; et]);
+                 L.App (L.Name "eq_refl", [et]) ])
+           | None ->
+             failwith "translate: NRM19_1 — no in-scope hyp `R v` and not a \
+                       reflexive single-binder pin `x = E`"))
+     | None -> failwith "translate: NRM19_1 expected an implication annotation")
   | P.Apply { rule; anno; children = []; _ }
     when (match base rule with
           | "AXM1" | "AXM2" | "AXM3" | "AXM4" | "AXM5" | "AXM6" -> true
@@ -677,8 +857,16 @@ and chain_term ctx node : L.term =
         | Some h ->
           L.App (L.Name (chain_emit_name rule), [L.Name h; chain_term ctx c])
         | None ->
-          failwith "translate: IMP5_1 — the known-antecedent hyp is not in \
-                    scope")
+          let hyps =
+            String.concat "\n"
+              (List.map (fun (n, q) ->
+                 Printf.sprintf "    %s : %s" n (Emit_pp.prd_to_pp q))
+                 ctx.hyps)
+          in
+          failwith (Printf.sprintf
+            "translate: IMP5_1 — the known-antecedent hyp is not in \
+             scope\n  antecedent P: %s\n  hyps in scope (%d):\n%s"
+            (Emit_pp.prd_to_pp p) (List.length ctx.hyps) hyps))
      | _ ->
        failwith "translate: IMP5_1 expected an implication annotation")
   | P.Apply { rule; anno; children = [c]; _ }
@@ -698,17 +886,12 @@ and chain_term ctx node : L.term =
      | _ ->
        Errors.fail "E_EMIT"
          "NRM2_1: expected a (♢v, P ⇒ Q v) ⇒ S chain annotation")
-  (* Chain-form binder merges (`[XST4_1]`, `[ALL3_1]`, …) are NOT special-cased:
-     they fall through to the generic single-child chain case below, which emits
-     `<NAME>_1 child` (n/P inferred from the now-nested result type — flatten_binds
-     is gone).  Their curried `_1` lemmas are in rules/All.lp, rules/Xst.lp. *)
-  | P.Apply { rule; _ } when base rule = "ALL5" ->
-    (* ALL5 has no Res-chain `_1` form (its trust-bodied placeholder was removed
-       2026-06-12 and not re-derived — a De Morgan rule, not a §A.7–8 binder
-       merge), so fail loud rather than refine against an absent lemma. *)
-    Errors.fail "E_DISPATCH"
-      "%s chain form unsupported — no Res-chain `_1` lemma (De Morgan, not a \
-       binder merge; its placeholder was removed 2026-06-12)" rule
+  (* Chain-form binder merges (`[XST4_1]`, `[ALL3_1]`, …) and the De Morgan
+     `[ALL5_1]` are NOT special-cased: they fall through to the generic
+     single-child chain case below, which emits `<NAME>_1 child` (n/P/R inferred
+     from the now-nested result type — flatten_binds is gone).  Their `_1` lemmas
+     are in rules/All.lp, rules/Xst.lp; ALL5_1 transports the classical
+     equivalence `all5_eq` (not a §A.7–8 congruence). *)
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP4"
          && (match goal_of_anno anno with
@@ -766,15 +949,9 @@ and chain_term ctx node : L.term =
       "translate: chain %s arity %d unsupported"
       rule (List.length children)
 
-(* The BOOL31/32/41/42 emit accumulates its `V ϵ BOOL` typing premises into
-   [ctx.bool_typings] as it fires (it needs the in-scope tuple binder, only
-   known mid-walk); return them alongside the script so [Emit_lp] adds them to
-   the symbol header. *)
-let translate ?(int_free_vars = Free_vars.SS.empty) (pp_tree : P.pp_tree)
-    : L.t * (string * string) list * (string * string) list =
-  let ctx = create_ctx ~int_free_vars () in
+let translate (pp_tree : P.pp_tree) : L.t =
+  let ctx = create_ctx () in
   (* [Arith_proofs.int_evidence] resolves atomic `ϵ INT` evidence through this
      ref; bind it to this emission's ctx (single-threaded). *)
   Arith_proofs.atom_int_ev := atom_int_evidence ctx;
-  let script = tree ctx pp_tree in
-  (script, ctx.bool_typings, ctx.int_typings)
+  tree ctx pp_tree

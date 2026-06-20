@@ -194,6 +194,43 @@ opaque symbol leq_cong [a b c d : τ ι]
   : π (a = b) → π (c = d) → π ((leq a c) = (leq b d)) ≔
 begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
 
+// Membership congruence: `(a ϵ S) = (b ϵ T)` from `a = b`, `S = T`.  AR10's
+// solver step also fires inside a *membership* predicate (`s9(x+1) : s10` ↦
+// `s9(1+x) : s10`), where the normalised atom sits under a function image.
+opaque symbol mem_cong [a b S T : τ ι]
+  : π (a = b) → π (S = T) → π ((a ϵ S) = (b ϵ T)) ≔
+begin assume a b S T h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+// Expression-level congruence for the compound atoms PP's arithmetic normaliser
+// rewrites *through* (the differing leaf is buried under a function image / pair,
+// so the whole `=`/`≤`/`ϵ` operand is not itself a linear term and the reflective
+// normaliser must recurse): function application on the argument ([eapp_arg_cong])
+// and on both head and argument ([eapp_cong], for a non-symbol head r~(·)),
+// pairing, and the `+`/`−`/neg arithmetic constructors.
+opaque symbol eapp_arg_cong [f a b : τ ι]
+  : π (a = b) → π (eapp f a = eapp f b) ≔
+begin assume f a b h; rewrite h; reflexivity end;
+
+opaque symbol eapp_cong [f g a b : τ ι]
+  : π (f = g) → π (a = b) → π (eapp f a = eapp g b) ≔
+begin assume f g a b h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+opaque symbol maplet_cong [a b c d : τ ι]
+  : π (a = b) → π (c = d) → π ((a ↦ c) = (b ↦ d)) ≔
+begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+opaque symbol plus_cong [a b c d : τ ι]
+  : π (a = b) → π (c = d) → π (plus a c = plus b d) ≔
+begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+opaque symbol minus_cong [a b c d : τ ι]
+  : π (a = b) → π (c = d) → π (minus a c = minus b d) ≔
+begin assume a b c d h1 h2; rewrite h1; rewrite h2; reflexivity end;
+
+opaque symbol neg_cong [a b : τ ι]
+  : π (a = b) → π (neg a = neg b) ≔
+begin assume a b h; rewrite h; reflexivity end;
+
 // ============================================================
 // Per-connective equality lemmas (§A.1–A.5, A.13)
 //
@@ -575,6 +612,58 @@ begin
   rewrite hpred; reflexivity
 end;
 
+// NRM5 bridge: ((♢v·(P v ⇒ Q v ⇒ R v)) ⇒ S) = ((♢v·(⋀_snoc (P v) (Q v) ⇒ R v)) ⇒ S).
+// Body equivalence is curry/uncurry — (P ⇒ Q ⇒ R) ⟺ ((P ∧ Q) ⇒ R) — constructive.
+// Both sides ♢.  Used by NRM5_1.
+opaque symbol nrm5_eq [n] [P Q R : Tuple n → Prop] [S : Prop]
+  : π (((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S)
+       = ((`♢ v, ⋀_snoc (P v) (Q v) ⇒ R v) ⇒ S)) ≔
+begin
+  assume n P Q R S;
+  have hbody : Π v, π ((P v ⇒ Q v ⇒ R v) = (⋀_snoc (P v) (Q v) ⇒ R v))
+    { assume v;
+      refine propExt _ _
+        (λ hpqr hpq, hpqr (⋀₂_hd hpq) (⋀₂_snd hpq))
+        (λ hcr hp hq, hcr (⋀₂_intro hp hq)) };
+  have hpred : π ((`♢ v, P v ⇒ Q v ⇒ R v) = (`♢ v, ⋀_snoc (P v) (Q v) ⇒ R v))
+    { refine eq_trans (♢_eq_!! (λ v, P v ⇒ Q v ⇒ R v))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♢_eq_!! (λ v, ⋀_snoc (P v) (Q v) ⇒ R v)))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM10 bridge: ((♢v·(⋀(Ps v ∷ Q v) ⇒ ⊥)) ⇒ R) = ((♡v·¬⋀(Ps v ∷ Q v)) ⇒ R).
+// The body `(C ⇒ ⊥) = ¬C` is reflexivity (¬ ≔ ⇒⊥); ♢/♡ both reduce to !!.  NRM10_1.
+opaque symbol nrm10_eq [n] [Ps : Tuple n → 𝕃* o] [Q : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥) ⇒ R)
+       = ((`♡ v, ¬ ⋀ (Ps v ∷ Q v)) ⇒ R)) ≔
+begin
+  assume n Ps Q R;
+  have hpred : π ((`♢ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥) = (`♡ v, ¬ ⋀ (Ps v ∷ Q v)))
+    { refine eq_trans (♢_eq_!! (λ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥))
+        (eq_sym (♡_eq_!! (λ v, ¬ ⋀ (Ps v ∷ Q v)))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM24 bridge: ((♡v·¬(P v)) ⇒ Q) = ((♡v·¬⋀(∎ ∷ ⊤ ∷ P v)) ⇒ Q).  Body: ¬P ⟺
+// ¬(⊤ ∧ P) (drop the leading ⊤).  Both sides ♡.  Used by NRM24_1.
+opaque symbol nrm24_eq [n] [P : Tuple n → Prop] [Q : Prop]
+  : π (((`♡ v, ¬ (P v)) ⇒ Q)
+       = ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)) ⇒ Q)) ≔
+begin
+  assume n P Q;
+  have hbody : Π v, π ((¬ (P v)) = (¬ ⋀ (∎ ∷ ⊤ ∷ P v)))
+    { assume v;
+      refine propExt _ _
+        (λ hnp hcon, hnp (⋀₂_snd hcon))
+        (λ hncon hp, hncon (⋀₂_intro ⊤ᵢ hp)) };
+  have hpred : π ((`♡ v, ¬ (P v)) = (`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)))
+    { refine eq_trans (♡_eq_!! (λ v, ¬ (P v)))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v))))) };
+  rewrite hpred; reflexivity
+end;
+
 // NRM15 bridge: ((♢v·P v) ⇒ R) = ((♡v·¬(⊤ ∧ ¬P v)) ⇒ R).  The body
 // equivalence P ⟺ ¬(⊤ ∧ ¬P) is classical (¬¬ₑ).  Used by NRM15_1.
 opaque symbol nrm15_eq [n] [P : Tuple n → Prop] [R : Prop]
@@ -637,4 +726,130 @@ begin
         (λ hnp, pi_to_♡ (λ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E)))
                         (nrm22_pin ps E hnp)) };
   rewrite hpred; reflexivity
+end;
+
+// NRM4 bridge: ((♢v·(P v ⇒ Q ⇒ R v)) ⇒ S) = ((Q ⇒ (♢v·(P v ⇒ R v))) ⇒ S), Q is
+// v-free.  Not a per-v body congruence: Q pulls *out* of the ♢ (∀v·(Q⇒X v) ⟺
+// Q⇒∀v·X v), composed with antecedent-swap (P⇒Q⇒R ⟺ Q⇒P⇒R).  Used by NRM4_1.
+opaque symbol nrm4_eq [n] [P R : Tuple n → Prop] [Q S : Prop]
+  : π (((`♢ v, P v ⇒ Q ⇒ R v) ⇒ S) = ((Q ⇒ (`♢ v, P v ⇒ R v)) ⇒ S)) ≔
+begin
+  assume n P R Q S;
+  have hpred : π ((`♢ v, P v ⇒ Q ⇒ R v) = (Q ⇒ (`♢ v, P v ⇒ R v)))
+    { refine propExt _ _
+        (λ hall hq, pi_to_♢ (λ v, P v ⇒ R v)
+           (λ v hpv, ♢_to_pi (λ v', P v' ⇒ Q ⇒ R v') hall v hpv hq))
+        (λ himp, pi_to_♢ (λ v, P v ⇒ Q ⇒ R v)
+           (λ v hpv hq, ♢_to_pi (λ v', P v' ⇒ R v') (himp hq) v hpv)) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM7 bridge: ((♢v·⋀(Qs v ∷ P v)) ⇒ S) = ((♢v·⋀(Qs v)) ⇒ ((♢v·P v) ⇒ S)).
+// ∀ distributes over ∧ and ⋀(Qs∷P) splits init/last, so the single ♢ premise
+// curries into two; whole-implication propExt.  Used by NRM7_1.
+opaque symbol nrm7_eq [n] [Qs : Tuple n → 𝕃* o] [P : Tuple n → Prop] [S : Prop]
+  : π (((`♢ v, ⋀ (Qs v ∷ P v)) ⇒ S)
+       = ((`♢ v, ⋀ (Qs v)) ⇒ ((`♢ v, P v) ⇒ S))) ≔
+begin
+  assume n Qs P S;
+  refine propExt _ _
+    (λ hres hqs hp, hres (pi_to_♢ (λ v, ⋀ (Qs v ∷ P v))
+       (λ v, ⋀_intro (♢_to_pi (λ v', ⋀ (Qs v')) hqs v) (♢_to_pi P hp v))))
+    (λ hcur hc, hcur
+       (pi_to_♢ (λ v, ⋀ (Qs v))
+          (λ v, ⋀_init (♢_to_pi (λ v', ⋀ (Qs v' ∷ P v')) hc v)))
+       (pi_to_♢ P
+          (λ v, ⋀_last (♢_to_pi (λ v', ⋀ (Qs v' ∷ P v')) hc v))))
+end;
+
+// NRM11 bridge: ((♢v·(P v ⇒ ⊥)) ⇒ R) = ((♡v·¬⋀_snoc ⊤ (P v)) ⇒ R).  Body
+// (P⇒⊥) ⟺ ¬(⊤∧P) (¬ ≔ ⇒⊥, drop the ⊤); ♢/♡ both reduce to !!.  Used by NRM11_1.
+opaque symbol nrm11_eq [n] [P : Tuple n → Prop] [R : Prop]
+  : π (((`♢ v, P v ⇒ ⊥) ⇒ R) = ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R)) ≔
+begin
+  assume n P R;
+  have hbody : Π v, π ((P v ⇒ ⊥) = (¬ ⋀_snoc ⊤ (P v)))
+    { assume v;
+      refine propExt _ _
+        (λ hpb hcon, hpb (⋀₂_snd hcon))
+        (λ hncon hp, hncon (⋀₂_intro ⊤ᵢ hp)) };
+  have hpred : π ((`♢ v, P v ⇒ ⊥) = (`♡ v, ¬ ⋀_snoc ⊤ (P v)))
+    { refine eq_trans (♢_eq_!! (λ v, P v ⇒ ⊥))
+        (eq_trans (!!_cong hbody)
+                  (eq_sym (♡_eq_!! (λ v, ¬ ⋀_snoc ⊤ (P v))))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM25 bridge: ((♡_:Tuple n, P) ⇒ Q) = (P ⇒ Q), P x-free (the ♡ mirror of
+// nrm1_eq).  Used by NRM25_1.
+opaque symbol nrm25_eq [n] [P Q : Prop]
+  : π (((`♡ _ : Tuple n, P) ⇒ Q) = (P ⇒ Q)) ≔
+begin
+  assume n P Q;
+  have h1 : π ((`♡ _ : Tuple n, P) = P)
+    { refine eq_trans (♡_eq_!! (λ _ : Tuple n, P)) (!!_const [n] P) };
+  rewrite h1; reflexivity
+end;
+
+// NRM8 bridge: ((♢x·!!y·Q x y) ⇒ S) = ((♢v:n++m·Q(take v)(drop v)) ⇒ S).  The
+// compound↔nested split for the general inner arity m (`!!_split_eq_m`,
+// lemmas/Tuple.lp), sandwiched between ♢↔!! on each binder.  Used by NRM8_1.
+opaque symbol nrm8_eq [n m] [Q : Tuple n → Tuple m → Prop] [S : Prop]
+  : π (((`♢ x : Tuple n, `!! y : Tuple m, Q x y) ⇒ S)
+       = ((`♢ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v)) ⇒ S)) ≔
+begin
+  assume n m Q S;
+  have hpred : π ((`♢ x : Tuple n, `!! y : Tuple m, Q x y)
+                  = (`♢ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v)))
+    { refine eq_trans (♢_eq_!! (λ x : Tuple n, `!! y : Tuple m, Q x y))
+        (eq_trans (eq_sym (!!_split_eq_m Q))
+          (eq_sym (♢_eq_!!
+            (λ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v))))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM9 bridge: ((♢x·(P x ⇒ !!y·Q x y)) ⇒ S) = ((♢v·(P(take v) ⇒ Q(take v)(drop v))) ⇒ S).
+// Pull the inner `!!y` out of the implication (y ∉ P), then NRM8's split.  NRM9_1.
+opaque symbol nrm9_eq [n m] [P : Tuple n → Prop] [Q : Tuple n → Tuple m → Prop] [S : Prop]
+  : π (((`♢ x : Tuple n, P x ⇒ (`!! y : Tuple m, Q x y)) ⇒ S)
+       = ((`♢ v : Tuple (n ++ m),
+            P (take [n] [m] v) ⇒ Q (take [n] [m] v) (drop [n] [m] v)) ⇒ S)) ≔
+begin
+  assume n m P Q S;
+  have hbody : Π x, π ((P x ⇒ (`!! y : Tuple m, Q x y))
+                       = (`!! y : Tuple m, P x ⇒ Q x y))
+    { assume x;
+      refine propExt _ _
+        (λ h, pi_to_!! (λ y, P x ⇒ Q x y) (λ y hp, !!_to_pi (Q x) (h hp) y))
+        (λ h hp, pi_to_!! (Q x) (λ y, !!_to_pi (λ y', P x ⇒ Q x y') h y hp)) };
+  have hpred : π ((`♢ x : Tuple n, P x ⇒ (`!! y : Tuple m, Q x y))
+                  = (`♢ v : Tuple (n ++ m),
+                       P (take [n] [m] v) ⇒ Q (take [n] [m] v) (drop [n] [m] v)))
+    { refine eq_trans (♢_eq_!! (λ x : Tuple n, P x ⇒ (`!! y : Tuple m, Q x y)))
+        (eq_trans (!!_cong hbody)
+          (eq_trans (eq_sym (!!_split_eq_m (λ x y, P x ⇒ Q x y)))
+            (eq_sym (♢_eq_!!
+              (λ v : Tuple (n ++ m),
+                 P (take [n] [m] v) ⇒ Q (take [n] [m] v) (drop [n] [m] v)))))) };
+  rewrite hpred; reflexivity
+end;
+
+// NRM6 bridge: ((♢v·(R v ⇒ ⋀(Qs v ∷ P v))) ⇒ S)
+//            = ((♢v·(R v ⇒ ⋀(Qs v))) ⇒ ((♢v·(R v ⇒ P v)) ⇒ S)).
+// Like NRM7 with the `R ⇒` guard: ∀ distributes over the ⋀ init/last split, so
+// the single premise curries into two.  Whole-implication propExt.  Used by NRM6_1.
+opaque symbol nrm6_eq [n] [Qs : Tuple n → 𝕃* o] [P R : Tuple n → Prop] [S : Prop]
+  : π (((`♢ v, R v ⇒ ⋀ (Qs v ∷ P v)) ⇒ S)
+       = ((`♢ v, R v ⇒ ⋀ (Qs v)) ⇒ ((`♢ v, R v ⇒ P v) ⇒ S))) ≔
+begin
+  assume n Qs P R S;
+  refine propExt _ _
+    (λ hres hqs hp, hres (pi_to_♢ (λ v, R v ⇒ ⋀ (Qs v ∷ P v))
+       (λ v hr, ⋀_intro (♢_to_pi (λ v', R v' ⇒ ⋀ (Qs v')) hqs v hr)
+                        (♢_to_pi (λ v', R v' ⇒ P v') hp v hr))))
+    (λ hcur hc, hcur
+       (pi_to_♢ (λ v, R v ⇒ ⋀ (Qs v))
+          (λ v hr, ⋀_init (♢_to_pi (λ v', R v' ⇒ ⋀ (Qs v' ∷ P v')) hc v hr)))
+       (pi_to_♢ (λ v, R v ⇒ P v)
+          (λ v hr, ⋀_last (♢_to_pi (λ v', R v' ⇒ ⋀ (Qs v' ∷ P v')) hc v hr))))
 end;

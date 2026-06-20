@@ -20,6 +20,8 @@ lp/bench/**/*.lp
 # auto-generated lambdapi debug traces (<name>.lp.unif, <name>.lp.rewrite, …)
 lp/bench/**/*.lp.*
 lp/bench/**/*.lpo
+# provenance map `pp2lp run` writes next to each .lp (read back by `pp2lp check`)
+lp/bench/**/*.provmap
 lp/bench/**/*.tmp
 lp/bench/**/*.goal
 lp/bench/**/*.res

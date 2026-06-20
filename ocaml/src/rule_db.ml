@@ -44,6 +44,8 @@ type emit =
   | Bool_split     (* BOOL31/32/41/42: discharge the `V ϵ BOOL` side-condition
                       from an injected typing hypothesis (Emit_ctx.bool_split_var) *)
   | Eqs2           (* EQS2: negated eql_set marker discharged via store evidence *)
+  | Eimp5          (* EIMP51/52: `¬(E=F) ⇒ P` / `(E=F) ⇒ P` discharged with the
+                      swapped-orientation equality hyp found in scope *)
   | Ectr           (* ECTR1-6: equality-substitution contradiction leaves *)
   | Arith          (* ARITH: solver ⊥-terminal — generated Farkas combination
                       of the in-scope ≤-hyps (see [Emit_ctx.find_arith_contradiction]) *)
@@ -179,14 +181,14 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM1" pass ~chain_form:true;
   r "NRM2" pass ~chain_form:true;   (* evidence-form NRM2_1 + translate.ml dispatch *)
   r "NRM3" pass ~chain_form:true;
-  r "NRM4" pass;
-  r "NRM5" pass;
-  r "NRM6" pass;
-  r "NRM7" pass;
-  r "NRM8" pass;
-  r "NRM9" pass;
-  r "NRM10" pass;
-  r "NRM11" pass;
+  r "NRM4" pass ~chain_form:true;
+  r "NRM5" pass ~chain_form:true;
+  r "NRM6" pass ~chain_form:true;
+  r "NRM7" pass ~chain_form:true;
+  r "NRM8" pass ~chain_form:true;
+  r "NRM9" pass ~chain_form:true;
+  r "NRM10" pass ~chain_form:true;
+  r "NRM11" pass ~chain_form:true;
   r "NRM12" pass ~chain_form:true;
   r "NRM13" pass ~chain_form:true;
   r "NRM14" pass ~chain_form:true;
@@ -194,13 +196,13 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM16" leaf;
   r "NRM17" pass;
   r "NRM18" pass;
-  r "NRM19" pass ~emit:Witness_hyp;
+  r "NRM19" pass ~emit:Witness_hyp ~chain_form:true;
   r "NRM20" (Arity [Con; Seq]) ~emit:Nrm20;
   r "NRM21" (Arity [Con; Seq]) ~emit:Nrm21;
   r "NRM22" pass ~emit:Nrm22 ~chain_form:true;
   r "NRM23" pass ~emit:Nrm23 ~chain_form:true;
-  r "NRM24" pass;
-  r "NRM25" pass;
+  r "NRM24" pass ~chain_form:true;
+  r "NRM25" pass ~chain_form:true;
   r "NRM26" pass ~emit:Nrm26;
   (* Arithmetic-solver substitution: a conjunction holds [a + xᵢ ≤ 𝟎] and
      [b − xᵢ ≤ 𝟎] with solveur(a + b) = 𝟎, forcing xᵢ = b; substitute
@@ -225,8 +227,8 @@ let rules : (string, rule_info) Hashtbl.t =
      (resp. negated equality) commuted. *)
   r "EAXM31" leaf ~emit:Hyp_search;
   r "EAXM32" leaf ~emit:Hyp_search;
-  r "EIMP51" pass;
-  r "EIMP52" pass;
+  r "EIMP51" pass ~emit:Eimp5;
+  r "EIMP52" pass ~emit:Eimp5;
   r "EAXM91" pass;
   r "EAXM92" pass;
   r "OPR1" pass ~emit:(Opr false);

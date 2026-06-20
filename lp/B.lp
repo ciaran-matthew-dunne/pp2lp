@@ -14,8 +14,14 @@ require open
 
 
 // ---- set membership ----
-constant symbol ϵ : τ ι → τ ι → τ o;
+// Non-constant: the set-algebra membership-unfolding rules below rewrite it.
+symbol ϵ : τ ι → τ ι → τ o;
 notation ϵ infix 5;
+// Recover the injective-constructor unification that `constant` would give (lost
+// by making ϵ rewritable): membership-unfolding reduces `_ ϵ (union/inter/∅)`
+// before unification, so this hint only fires on the irreducible (atomic-set)
+// memberships, exactly where ϵ behaves like a constructor.
+unif_rule ($x ϵ $a) ≡ ($y ϵ $b) ↪ [ $x ≡ $y, $a ≡ $b ];
 
 // extensionality
 symbol set_ext (A B : τ ι) :
@@ -115,6 +121,7 @@ rule init ($v ⨾ _) ↪ $v;
 // prj through init on an abstract tuple: drops slot 0, shifts the rest down.
 rule prj $k (init $v) ↪ prj (+1 $k) $v;
 
+
 // ---- Slot surgery: ins / rm at an arbitrary ℕ slot ----
 // `ins k x v` inserts x at slot k; `rm k v` removes slot k.  Both are OPAQUE on
 // the tuple (no ⨾-spine reduction), so they apply to an abstract v: `prj`
@@ -209,6 +216,12 @@ constant symbol ♡_to_pi [n] (P : Tuple n → Prop)
 // B-method application f(x).
 constant symbol eapp : τ ι → τ ι → τ ι;
 
+// Pair projections, applied via eapp: _pj1(p) = eapp pj1 p, _pj2(p) = eapp pj2 p
+// (pp_lp renders PP's _pj1/_pj2 to these).  Uninterpreted — proofs treat
+// projection atoms opaquely, PP never computes on them.
+constant symbol pj1 : τ ι;
+constant symbol pj2 : τ ι;
+
 // Set-builder / aggregate binders %(xs).(P | E) and SIGMA(xs).(P | E).
 // Uninterpreted: predicate and value are Tuple n-indexed, so they type-check
 // without a committed semantics.
@@ -220,6 +233,7 @@ constant symbol sigma [n] : (Tuple n → Prop) → (Tuple n → τ ι) → τ ι
 constant symbol set_image : τ ι → τ ι → τ ι;    // r[s]   relational image
 constant symbol inter : τ ι → τ ι → τ ι;        // s /\ t
 constant symbol union : τ ι → τ ι → τ ι;        // s \/ t
+constant symbol set_diff : τ ι → τ ι → τ ι;     // s - t  (set difference)
 constant symbol interval : τ ι → τ ι → τ ι;     // a..b   (apero / EGALITE)
 constant symbol inverse : τ ι → τ ι;            // r~     relational inverse
 constant symbol dom_restrict : τ ι → τ ι → τ ι; // s <| r domain restriction
@@ -249,7 +263,14 @@ constant symbol FIN : τ ι → τ ι;         // FIN(s)    finite subsets
 constant symbol FIN1 : τ ι → τ ι;        // FIN1(s)   non-empty finite subsets
 constant symbol id : τ ι → τ ι;          // id(s)     identity relation
 constant symbol sz : τ ι → τ ι;          // _sz(s)    size
-constant symbol func : τ ι → τ ι → τ ι → τ ι;  // _func(…)  function builder
+// _func(f, dom, ran): the (uninterpreted) function-hood predicate "f is a
+// function with domain dom and range ran".  PP always writes it in predicate
+// position (3-ary), so it is Prop-valued, not an object-builder.
+constant symbol func : τ ι → τ ι → τ ι → Prop;
+
+
+// (set-algebra membership unfolding lives after the ⋀ conj-list machinery below,
+//  since `inter` unfolds to a ⋀-list to match PP's rendering of `and`.)
 
 
 // ======================================================================
@@ -321,9 +342,22 @@ symbol gt ≔ λ x y, ¬ (leq x y);
 symbol ≪ : τ ι → τ ι → Prop ≔ leq;
 notation ≪ infix 5;
 
-// card is integer-valued (B typing card : FIN(s) → ℕ ⊆ INT), so card(s) discharges
-// its `ϵ INT` side-condition. A typing postulate, like the operators themselves.
-symbol card_in_int (s : τ ι) : π (card s ϵ INT);
+// ---- Typing oracle ----------------------------------------------------------
+// The development's only two trusted axioms. PP proves under the B *typing
+// discipline*: every atom in an arithmetic position denotes an integer, every
+// atom in a boolean position a boolean. PP discharges that typing upstream, and
+// its replays no longer carry it — a `: INT`/`: NAT`/`: BOOL` hypothesis is
+// unfolded into bare `to_int`-level bounds (or dropped), which in the uni-typed
+// `τ ι` no longer witness integer-/boolean-hood. So when a guarded lemma
+// (int_retract / leq_antisym / AR5–8, or a BOOL split) needs `<atom> ϵ INT` /
+// `<atom> ϵ BOOL`, that fact is genuinely not reconstructible from the sequent.
+// We name the trust once, here, and apply the oracle to the atom in scope —
+// rather than silently injecting an equivalent (and equally unprovable) per-atom
+// typing premise into each goal's binder, which only hid the same assumption.
+// Everything else in the development is proved. `trust_int` subsumes the former
+// `card_in_int` (card s : ℕ ⊆ INT).
+symbol trust_int  (x : τ ι) : π (x ϵ INT);
+symbol trust_bool (x : τ ι) : π (x ϵ BOOL);
 
 // ---- ℤ → ℕ surface bridge ----
 // The surface is ℤ-global, so a literal Tuple/prj index parses as ℤ; to_nat bridges
@@ -335,10 +369,7 @@ with to_nat (Zpos $p) ↪ val $p;
 
 coerce_rule coerce ℤ ℕ $z ↪ to_nat $z;
 
-// Infix projection for emitted goals: `x ⋕ n` is slot n of tuple x, with n a bare
-// ℤ literal.  Bakes in the ℤ→ℕ `to_nat` the index needs, so the emitter writes a
-// readable `x ⋕ 0` and lambdapi inserts no coercion.  Definitionally `prj (to_nat n) x`,
-// so every prj reduction rule fires through it unchanged.
+// `x ⋕ n` is slot n of tuple x, with n a bare ℤ literal.
 symbol ⋕ [m] (x : Tuple m) (n : ℤ) : τ ι ≔ prj (to_nat n) x;
 notation ⋕ infix left 10;
 
@@ -404,6 +435,19 @@ with ⋀_snoc $p $q ↪ ⋀ (∎ ∷ $p ∷ $q);
 symbol conj : 𝕃* o → τ o;
 rule conj ∎ ↪ ⊤
 with conj ($p ∷ $q) ↪ ite (is_nil $p) ($q) (⋀ ($p ∷ $q));
+
+// ---- membership unfolding for the set-algebra operators ----
+// PP eliminates these operators in predicate position by unfolding membership to
+// FOL; mirror that as reduction so set-extensionality goals (`eql_set`, i.e. the
+// equality of two such sets) reduce to a propositional equivalence over the
+// element memberships.  Sound: each is the defining membership semantics of its
+// operator.  `union` → binary ∨ and `inter` → a two-element ⋀-list, matching how
+// PP renders the `or` / `and` it unfolds these to.  (dom/ran/card/… stay opaque —
+// they survive as atoms, per PP.)
+rule $x ϵ (union $a $b)    ↪ ($x ϵ $a) ∨ ($x ϵ $b);
+rule $x ϵ (inter $a $b)    ↪ ⋀ ((∎ ∷ ($x ϵ $a)) ∷ ($x ϵ $b));
+rule $x ϵ (set_diff $a $b) ↪ ⋀ ((∎ ∷ ($x ϵ $a)) ∷ (¬ ($x ϵ $b)));
+rule $x ϵ set_empty        ↪ ⊥;
 
 injective symbol Res : τ o → TYPE;
 symbol mk_res [t] (ts : 𝕃* o) : π (t = conj ts) → Res t;

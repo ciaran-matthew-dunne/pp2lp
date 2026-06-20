@@ -7,6 +7,7 @@ Run from the repo root:  python3 lp/bench/test_cli.py
 Exit status is non-zero if any check fails.
 """
 import importlib.machinery
+import os
 import re
 import subprocess
 import sys
@@ -160,6 +161,61 @@ if eng.exists():
           verdict_c == (True, "", 0))
 else:
     print("  skip  core-check contract (build the engine first)")
+
+# ── run/check split: phase statuses, timing, and the persisted map ──────────
+check("no_lp counts as a failure status", "no_lp" in pp.FAIL)
+check("histogram counts no_lp failures",
+      pp._failure_histogram([{"status": "no_lp", "error": {"code": "E_NO_LP"}}]) == {"E_NO_LP": 1})
+
+# _timing shows only the phase(s) that ran: run sets emit_ms, check sets check_ms.
+check("_timing shows only emit for an emit result", pp._timing({"emit_ms": 1500.0}) == "  emit 1.5s")
+check("_timing shows only check for a check result", pp._timing({"check_ms": 500.0}) == "  check 500ms")
+check("_timing is empty when neither phase ran", pp._timing({}) == "")
+
+# check_one reports no_lp (not a crash) when the .lp was never emitted — pure,
+# no lambdapi: point it at a replay whose sibling .lp does not exist.
+with tempfile.TemporaryDirectory() as td:
+    rp = Path(td) / "ghost.replay"
+    rp.write_text("[AND1] <a => b>\n")
+    res = pp.check_one(rp)
+    check("check_one → no_lp when the .lp is missing",
+          res["status"] == "no_lp" and res["error"]["code"] == "E_NO_LP")
+
+# contract: `pp2lp run` persists a parseable provenance map next to the .lp, so
+# `pp2lp check` can join a lambdapi error to its PP rule without the engine.
+if eng.exists():
+    rep = ROOT / "lp" / "bench" / "og" / "01" / "01.replay"
+    if rep.exists():
+        with tempfile.TemporaryDirectory() as td:
+            out, mp = Path(td) / "x.lp", Path(td) / "x.provmap"
+            em = pp.emit(rep, out, map_path=mp)
+            check("emit persists the .lp", em["ok"] and out.exists())
+            check("emit persists a parseable provenance map",
+                  mp.exists() and len(pp.read_map(mp)) >= 5)
+        with tempfile.TemporaryDirectory() as td:   # content-aware: re-emit keeps mtime
+            out = Path(td) / "y.lp"
+            a = pp.emit(rep, out)
+            b = pp.emit(rep, out)
+            check("emit reports changed on the first write", a.get("changed") is True)
+            check("emit reports unchanged on an identical re-emit", b.get("changed") is False)
+    else:
+        print("  skip  emit-persist contract (no og/01 replay)")
+else:
+    print("  skip  emit-persist contract (build the engine first)")
+
+# ── incremental check (-i): a fresh .lpo skips lambdapi entirely ─────────────
+# Pure (no lambdapi): a benchmark whose object is newer than its source and the
+# dependency clock is reported cached without invoking the checker.
+with tempfile.TemporaryDirectory() as td:
+    rp = Path(td) / "c.replay"; rp.write_text("[AND1] <a => b>\n")
+    lp = Path(td) / "c.lp"; lp.write_text("// emitted\n")
+    lpo = Path(td) / "c.lpo"; lpo.write_text("obj")
+    os.utime(lp, (1000, 1000)); os.utime(lpo, (2000, 2000))     # object newer than source
+    res = pp.check_one(rp, incremental=True, dep_mtime=0.0)
+    check("check -i skips a fresh .lpo as cached (no lambdapi)",
+          res["status"] == "ok" and res.get("cached") is True and res["check_ms"] == 0.0)
+    res_stale = pp.check_one(rp, incremental=True, dep_mtime=9e9)   # a dep is newer
+    check("check -i does not skip when a dependency is newer", not res_stale.get("cached"))
 
 # ── resolver: suite enumeration (powers the "available: …" recovery hint) ────
 suites = pp._suite_names()

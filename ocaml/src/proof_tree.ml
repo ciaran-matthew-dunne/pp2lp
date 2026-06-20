@@ -113,6 +113,15 @@ let rec parse_prefix mode lines =
       bad "%s appeared before its result-chain child in replay" rule
     else if mode = Res_mode && is_res_rule rule && Rule_db.rule_arity rule > 0 then
       bad "%s appeared before its result-chain children in replay" rule
+    else if (rule = "OPR1" || rule = "OPR2" || rule = "EVR3")
+            && skip_phantoms rest = [] then
+      (* Terminal rewrite/reflexivity rule: when PP discharges a goal in a single
+         step (a bool-literal disequality) — OPR1/OPR2 after rewriting x ↦ E, EVR3
+         after the trivial `E = E` antecedent — both its trace and the replay stop
+         there with no continuation.  Build a childless leaf; the emitter generates
+         the residual closure and fails loud if it isn't trivially closable, so a
+         genuine truncation is still caught downstream. *)
+      make_node ~src_line:line rule arg anno [], rest
     else
       let modes = child_modes mode rule in
       let children, rest = parse_prefix_children rest modes in

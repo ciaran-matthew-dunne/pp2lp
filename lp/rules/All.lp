@@ -134,50 +134,52 @@ end;
 
 // ---- `_1` (Result-form) variants — §8.13 ----
 //
-// ALL1_1–ALL4_1 are the Res-chain forms of the §A.7 quantifier regroupement.  PP
-// emits them PRIMED inside a result chain (`[ALL3_1]`, …), where flatten_binds
-// cannot reach — the merged binder is born inside `res_tm`, not in the goal.  Each
-// transports the curried base rule's compound↔nested equality (`!!_split_eq`,
-// lemmas/Tuple.lp) through the Schema-1 result bridge `mk_1 (res_tm r) (eq_trans
-// <concl = prem> (res_eq r))` — trust-free.  (They replace the trust-bodied
-// placeholders deleted 2026-06-12, now that the base rules are curried.)
-
-// ALL1_1: chain form of ALL1 (¬(∀-merge) ⇒ R).
 symbol ALL1_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
   (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
   : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R)
   ≔ mk_1 (res_tm r)
       (eq_trans (eq_sym (imp_cong_l (not_cong (!!_split_eq P)))) (res_eq r));
 
-// ALL2_1: chain form of ALL2 (¬(∀-merge)).
 symbol ALL2_1 [n] [P : Tuple n → Tuple 1 → Prop]
   (r : Res (¬ (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v))))
   : Res (¬ (`!! w : Tuple n, `!! y : Tuple 1, P w y))
   ≔ mk_1 (res_tm r) (eq_trans (eq_sym (not_cong (!!_split_eq P))) (res_eq r));
 
-// ALL3_1: chain form of ALL3 ((∀-merge) ⇒ R).
 symbol ALL3_1 [n] [P : Tuple n → Tuple 1 → Prop] [R : Prop]
   (r : Res ((`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)) ⇒ R))
   : Res ((`!! w : Tuple n, `!! y : Tuple 1, P w y) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (eq_sym (imp_cong_l (!!_split_eq P))) (res_eq r));
 
-// ALL4_1: chain form of ALL4 (∀-merge).
 symbol ALL4_1 [n] [P : Tuple n → Tuple 1 → Prop]
   (r : Res (`!! v : Tuple (n ++ 1), P (take [n] [1] v) (drop [n] [1] v)))
   : Res (`!! w : Tuple n, `!! y : Tuple 1, P w y)
   ≔ mk_1 (res_tm r) (eq_trans (eq_sym (!!_split_eq P)) (res_eq r));
 
-// ALL6: Schema 1 — passthrough through `¬P ≡ P ⇒ ⊥` (a genuine HOAS identity).
-// ALL7' / ALL8' / ALL9': special cases (see spec §8.13).
+opaque symbol all5_eq [n] [P : Tuple n → Prop] [R : Prop]
+  : π ((`!! v, ¬ (P v) ⇒ R) = (¬ (`!! v, P v) ⇒ R)) ≔
+begin
+  assume n P R;
+  refine propExt _ _ (λ h1, ALL5 h1) _;
+  assume h2;
+  refine pi_to_!! (λ v, ¬ (P v) ⇒ R)
+    (λ v hnpv, h2 (λ hall, hnpv (!!_to_pi P hall v)))
+end;
 
+// ALL5_1: chain form of ALL5 (§8.13 Schema 1).  The prem→concl link is the
+// classical equivalence `all5_eq`, transported onto the result like the merge
+// `_1` forms transport their congruence.
+symbol ALL5_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res (`!! v, ¬ (P v) ⇒ R))
+  : Res (¬ (`!! v, P v) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (eq_sym all5_eq) (res_eq r));
+
+// ALL6: Schema 1 — passthrough through `¬P ≡ P ⇒ ⊥` (a genuine HOAS identity).
 symbol ALL6_1 [n] [P : Tuple n → Prop]
   (r : Res ((`!! v, P v) ⇒ ⊥))
   : Res (¬ (`!! v, P v))
   ≔ mk_1 (res_tm r) (res_eq r);
 
-// ALL7_1 (ALL7'): branching quantifier — per-tuple Res chain ρ +
-// continuation r. The continuation premise uses `♢`
-// (post-normalisation form per spec).
+// ALL7' / ALL8' / ALL9': special cases (see spec §8.13).
 symbol ALL7_1 [n] [P : Tuple n → Prop] [Q : Prop]
   (ρ : Π v : Tuple n, Res (P v))
   (r : Res ((`♢ v, res_tm (ρ v)) ⇒ Q))

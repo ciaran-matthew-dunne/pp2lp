@@ -30,7 +30,12 @@
 
 % Inline LP keywords / modifiers, matching the listings colours (preamble).
 \newcommand{\lpkw}[1]{\textcolor{lpKeyword}{\bfseries\texttt{#1}}}
-\newcommand{\lpmod}[1]{\textcolor{lpModifier}{\texttt{#1}}}
+% Modifiers (constant/injective/opaque/sequential) keep their own colour but
+% match the keyword weight (bold), so styling is uniform in weight.
+\newcommand{\lpmod}[1]{\textcolor{lpModifier}{\bfseries\texttt{#1}}}
+% Keyword / modifier terminals inside a math-mode grammar (\autoref{app:syntax}).
+\newcommand{\kw}[1]{\text{\lpkw{#1}}}
+\newcommand{\md}[1]{\text{\lpmod{#1}}}
 
 % ── Logic / B-Book primitives (math mode) ─────────────────────────────
 \newcommand{\TYPE}{\mathsf{TYPE}}

@@ -282,6 +282,18 @@ and pp_prd ?(min_bp = bp_max) ?(env = []) buf p =
           Buffer.add_char buf ' ';
           pp_exp ~min_bp:6 ~env buf e2)
       | _ -> failwith "pp_lp: eql_set must have exactly 2 arguments"
+    else if f = "_func" || f = "func" then
+      (* _func(f, dom, ran): the 3-ary function-hood predicate (B.lp `func`,
+         Prop-valued), a direct application — NOT a membership like the generic
+         relational `r(a,…) = (a,…) ϵ r` case below. *)
+      (match args with
+       | [e1; e2; e3] ->
+         wrap buf (5 < min_bp) (fun () ->
+           Buffer.add_string buf "func ";
+           pp_exp ~min_bp:6 ~env buf e1; Buffer.add_char buf ' ';
+           pp_exp ~min_bp:6 ~env buf e2; Buffer.add_char buf ' ';
+           pp_exp ~min_bp:6 ~env buf e3)
+       | _ -> failwith "pp_lp: _func must have exactly 3 arguments")
     else
       wrap buf (5 < min_bp) (fun () ->
         pp_exp_args ~env buf args;

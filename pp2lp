@@ -2,9 +2,9 @@
 """pp2lp — translate Atelier B Predicate-Prover replays to Lambdapi and type-check them.
 
 Round trip: formula → PP → .trace → REPLAY → .replay → pp2lp → .lp → lambdapi check.
-Drive it with `pp2lp run` (emit + check) and `pp2lp gen` (regenerate inputs via krt);
-the OCaml engine under ocaml/_build/ is an internal detail.  See CLAUDE.md for the
-design, or `pp2lp run --help` / `pp2lp gen --help` for options.
+Drive it with `pp2lp run` (emit the .lp), then `pp2lp check` (type-check it), and
+`pp2lp gen` (regenerate inputs via krt); the OCaml engine under ocaml/_build/ is an
+internal detail.  See CLAUDE.md for the design, or `pp2lp <cmd> --help` for options.
 """
 from __future__ import annotations
 
@@ -57,7 +57,12 @@ def dim(t):    return _c("2", t)
 def bold(t):   return _c("1", t)
 
 
-ICON = {"ok": green("✓"), "warn": yellow("⚠"), "emit_fail": red("✗"), "lp_fail": red("✗")}
+ICON = {"ok": green("✓"), "warn": yellow("⚠"), "emit_fail": red("✗"),
+        "lp_fail": red("✗"), "no_lp": yellow("⊘")}
+
+# Statuses that count as a benchmark failure (non-zero exit + by-code histogram):
+# emit_fail from `run` (emit), lp_fail/no_lp from `check` (type-check).
+FAIL = ("emit_fail", "lp_fail", "no_lp")
 
 
 def fmt_ms(ms: float) -> str:
@@ -200,23 +205,34 @@ def _collapse(lines: list[str]) -> list[str]:
     return out
 
 
-def emit(replay: Path, out: Path) -> dict:
-    """Emit the clean .lp (no comments) and read the side-channel provenance
-    map.  Returns {ok, warnings, error|None, smap}."""
+def emit(replay: Path, out: Path, map_path: Path | None = None,
+         timeout: float | None = None) -> dict:
+    """Emit the clean .lp (no comments) and the side-channel provenance map.
+    With `map_path` the map is persisted there — so a later `pp2lp check` can
+    join a lambdapi error back to its PP rule — otherwise a temp file is used and
+    discarded.  `timeout` overrides EMIT_TIMEOUT (None ⇒ the default).  The .lp is
+    written content-aware: it is rewritten only when the emitted text differs, so
+    an unchanged emit keeps its mtime (and its `.lpo`) and `check` reuses the
+    cached object instead of re-checking.  Returns {ok, warnings, error|None,
+    smap, changed}."""
     out.parent.mkdir(parents=True, exist_ok=True)
-    fd, mappath = tempfile.mkstemp(suffix=".provmap")
-    os.close(fd)
-    mapfile = Path(mappath)
+    eff = timeout if timeout is not None else EMIT_TIMEOUT
+    if map_path is None:
+        fd, mappath = tempfile.mkstemp(suffix=".provmap")
+        os.close(fd)
+        mapfile, persist = Path(mappath), False
+    else:
+        mapfile, persist = map_path, True
     try:
         try:
-            r = engine("emit", "--map", str(mapfile), rel(replay), timeout=EMIT_TIMEOUT)
+            r = engine("emit", "--map", str(mapfile), rel(replay), timeout=eff)
         except FileNotFoundError:
             return {"ok": False, "warnings": [],
                     "error": {"code": "E_NO_ENGINE", "message": "engine binary missing"}}
         except subprocess.TimeoutExpired:
             return {"ok": False, "warnings": [],
                     "error": {"code": "E_TIMEOUT",
-                              "message": f"emit timed out after {EMIT_TIMEOUT:.0f}s"}}
+                              "message": f"emit timed out after {eff:.0f}s"}}
         warns, errors = [], []
         for l in r.stderr.splitlines():
             if not l:
@@ -229,14 +245,24 @@ def emit(replay: Path, out: Path) -> dict:
                 errors.append(l)
         warnings = _collapse(warns)
         if r.returncode != 0:
+            if persist:
+                mapfile.unlink(missing_ok=True)    # a failed emit leaves no usable map
             msg = "\n".join(_collapse(errors)) or r.stderr.strip()
             code = classify_error(msg)
             return {"ok": False, "warnings": warnings,
                     "error": {"code": code, "message": msg}}
-        out.write_text(r.stdout, encoding="utf-8")
-        return {"ok": True, "warnings": warnings, "error": None, "smap": read_map(mapfile)}
+        # Content-aware: only rewrite (and invalidate the .lpo) when the text
+        # changed.  The provenance map's mtime is irrelevant to lambdapi, so the
+        # engine just overwrites it each time.
+        changed = (not out.exists()) or out.read_text(encoding="utf-8") != r.stdout
+        if changed:
+            out.write_text(r.stdout, encoding="utf-8")
+            out.with_suffix(".lpo").unlink(missing_ok=True)
+        return {"ok": True, "warnings": warnings, "error": None,
+                "smap": read_map(mapfile), "changed": changed}
     finally:
-        mapfile.unlink(missing_ok=True)
+        if not persist:
+            mapfile.unlink(missing_ok=True)
 
 
 def lp_check(lp: Path, timeout: float = CHECK_TIMEOUT, gen_obj: bool = True) -> dict:
@@ -281,31 +307,71 @@ def diag_loc(ev: dict) -> tuple[str, int | None, int | None]:
     return ev.get("file", "?"), start.get("line"), start.get("col")
 
 
-# ── Check one trace (emit + check + provenance join) ───────────────────────
-def check_one(replay: Path) -> dict:
+# ── Phase 1 — emit (`pp2lp run`): parse + translate + write ────────────────
+def emit_one(replay: Path, timeout: float | None = None) -> dict:
+    """Translate one trace to its `.lp` and persist the provenance map alongside
+    it.  No lambdapi.  The `.lp` is written content-aware (rewritten only when the
+    emitted text changes), so an unchanged emit keeps its mtime — which is what
+    lets `check -i` skip it.  `timeout` overrides PP2LP_EMIT_TIMEOUT.  Status:
+    ok / warn (emit warnings) / emit_fail."""
     out = replay.with_suffix(".lp")
-    # Clear any stale per-benchmark artifacts up front so a run always emits and
-    # checks from scratch: the `.lp` (re-emitted below) and its `.lpo` object cache
-    # (lambdapi reuses a `.lpo` newer than its source, and a stale one survives an
-    # engine/lp change otherwise), plus legacy debug-trace / probe leftovers.
-    for stale in (out, out.with_suffix(".lpo"),
-                  *out.parent.glob(f"{out.stem}.lp.*"),       # legacy debug-trace + probe
-                  *out.parent.glob(f"{out.stem}.probe.lp*")):  # artifacts from older runs
+    prov_path = replay.with_suffix(".provmap")
+    # legacy debug-trace / probe debris only — the .lp/.lpo/.provmap are managed
+    # content-aware by emit() (success) or cleared below (failure).
+    for stale in (*out.parent.glob(f"{out.stem}.lp.*"),
+                  *out.parent.glob(f"{out.stem}.probe.lp*")):
         stale.unlink(missing_ok=True)
     t0 = time.monotonic()
-    em = emit(replay, out)
-    t_emit = (time.monotonic() - t0) * 1000
+    em = emit(replay, out, map_path=prov_path, timeout=timeout)
     res = {"name": replay.stem, "lp": rel(out),
-           "emit_ms": t_emit, "check_ms": 0.0, "warnings": em["warnings"]}
+           "emit_ms": (time.monotonic() - t0) * 1000, "warnings": em["warnings"]}
     if not em["ok"]:
-        res["status"] = "emit_fail"
-        res["error"] = em["error"]
+        # Drop any stale artifacts so a now-failing benchmark can't be checked
+        # from a previous run's .lp (check → no_lp, surfacing the emit failure).
+        for f in (out, out.with_suffix(".lpo"), prov_path):
+            f.unlink(missing_ok=True)
+        res["status"], res["error"] = "emit_fail", em["error"]
+    else:
+        res["status"], res["error"] = ("warn" if em["warnings"] else "ok"), None
+        res["changed"] = em.get("changed", True)
+    return res
+
+
+# ── Phase 2 — check (`pp2lp check`): type-check the emitted .lp ─────────────
+def check_one(replay: Path, timeout: float | None = None,
+              incremental: bool = False, dep_mtime: float = 0.0) -> dict:
+    """Type-check one trace's already-emitted `.lp` with lambdapi, joining any
+    error back to its PP rule via the persisted provenance map.  Reports `no_lp`
+    when the `.lp` is missing (emit failed, or `pp2lp run` was never run for it).
+    With `incremental`, a benchmark whose `.lpo` is newer than both its `.lp` and
+    the shared library objects (`dep_mtime`) is skipped as cached — lambdapi only
+    writes a `.lpo` on success, so this skips exactly the unchanged, previously
+    passing benchmarks (a failure left no object, so it always re-runs).  The
+    non-incremental path drops the object first, so a real check always runs and
+    the `.lpo` stays an honest "last check passed" marker.  `timeout` overrides
+    PP2LP_CHECK_TIMEOUT.  Status: ok / lp_fail / no_lp."""
+    out = replay.with_suffix(".lp")
+    prov_path = replay.with_suffix(".provmap")
+    lpo = out.with_suffix(".lpo")
+    res = {"name": replay.stem, "lp": rel(out), "check_ms": 0.0, "warnings": []}
+    if not out.exists():
+        res["status"] = "no_lp"
+        res["error"] = {"code": "E_NO_LP",
+                        "message": "no .lp emitted — run `pp2lp run` first"}
         return res
+    if incremental and lpo.exists():
+        m = lpo.stat().st_mtime
+        if m >= out.stat().st_mtime and m >= dep_mtime:    # unchanged + deps unchanged
+            res["status"], res["error"], res["cached"] = "ok", None, True
+            return res
+    # Real check: drop any prior object so success writes a fresh one and a
+    # failure leaves none — keeping the `.lpo` an honest pass-marker for `-i`.
+    lpo.unlink(missing_ok=True)
+    smap = read_map(prov_path)          # side-channel map; powers the join
 
-    smap = em["smap"]                   # side-channel map; powers the join
-
+    eff = timeout if timeout is not None else CHECK_TIMEOUT
     t1 = time.monotonic()
-    chk = lp_check(out)
+    chk = lp_check(out, timeout=eff)
     res["check_ms"] = (time.monotonic() - t1) * 1000
     if chk.get("no_lambdapi"):
         res["status"] = "lp_fail"
@@ -315,7 +381,7 @@ def check_one(replay: Path) -> dict:
     if chk["timeout"]:
         res["status"] = "lp_fail"
         res["error"] = {"code": "E_LP_TIMEOUT",
-                        "message": f"lambdapi timed out after {CHECK_TIMEOUT:.0f}s"}
+                        "message": f"lambdapi timed out after {eff:.0f}s"}
         return res
     if not chk["ok"]:
         errs = [e for e in chk["diagnostics"] if e.get("severity") != "warning"]
@@ -338,7 +404,7 @@ def check_one(replay: Path) -> dict:
                         "diagnostics": diags,
                         "raw": chk["raw"] if not errs else []}
         return res
-    res["status"] = "warn" if em["warnings"] else "ok"
+    res["status"] = "ok"
     res["error"] = None
     return res
 
@@ -591,17 +657,27 @@ def _rule_signature(rule: str):
 
 
 # ── Per-trace printing + single-trace dossier ──────────────────────────────
+def _timing(res: dict) -> str:
+    """The `emit … / check …` tail, including only the phase(s) that ran (run
+    sets emit_ms, check sets check_ms), with a leading two-space gap or empty."""
+    parts = []
+    if res.get("emit_ms"):
+        parts.append(f"emit {fmt_ms(res['emit_ms'])}")
+    if res.get("check_ms"):
+        parts.append(f"check {fmt_ms(res['check_ms'])}")
+    return "  " + " / ".join(parts) if parts else ""
+
+
 def _print_trace(res: dict, replay: Path, timing: bool = False) -> None:
     """A heavy-ruled header for the trace (so one benchmark is clearly delimited
     from the next), its warnings, and — on failure — the snippet window."""
-    timing_txt = (f"  emit {fmt_ms(res['emit_ms'])} / check {fmt_ms(res['check_ms'])}"
-                  if timing else "")
+    timing_txt = _timing(res) if timing else ""
     visible = 6 + len(res["name"]) + len(timing_txt)   # "━━ " + icon + " " + name + timing + " "
     print(f"━━ {ICON[res['status']]} {bold(res['name'])}{dim(timing_txt)} "
           + "━" * max(3, _TERM_W - visible))
     for w in res["warnings"]:
         print(f"   {dim(w)}")
-    if res["status"] in ("emit_fail", "lp_fail"):
+    if res["status"] in FAIL:
         print_failure(res, replay)
 
 
@@ -616,7 +692,27 @@ def _section(title):
     print(f"   {dim(f'── {title} ' + '─' * pad)}")
 
 
-# ── The `run` command ──────────────────────────────────────────────────────
+# ── --filter (shared by run + check) ───────────────────────────────────────
+def _apply_filter(args, suite: str, replays: list[Path]) -> list[Path]:
+    """Restrict a suite to benchmark names matching --filter (a regex, or with
+    --exact a comma/space-separated literal set), surfacing the matched count so
+    an over-matching substring regex is obvious.  No --filter ⇒ unchanged."""
+    if not getattr(args, "filter", None):
+        return replays
+    n_all = len(replays)
+    if getattr(args, "exact", False):
+        wanted = set(re.split(r"[,\s]+", args.filter.strip()))
+        replays = [r for r in replays if r.stem in wanted]
+    else:
+        rx = re.compile(args.filter)
+        replays = [r for r in replays if rx.search(r.stem)]
+    if not replays:
+        sys.exit(f"pp2lp: --filter {args.filter!r} matched no benchmark in suite {suite!r}")
+    print(dim(f"  filter matched {len(replays)}/{n_all} benchmarks"), file=sys.stderr)
+    return replays
+
+
+# ── The `run` command (emit: parse + translate + write .lp) ────────────────
 def cmd_run(args) -> int:
     if not args.no_build:
         ok, err = ensure_build()
@@ -630,21 +726,29 @@ def cmd_run(args) -> int:
 
     kind, suite, target = resolve_target(args.target)
     if kind == "single":
-        res = check_one(target)
+        res = emit_one(target, timeout=args.timeout)
         if args.json:
             print(json.dumps(res, ensure_ascii=False, indent=2))
         else:
             dossier(target, res)
         return 0 if res["status"] in ("ok", "warn") else 1
+    return _run_suite(args, suite, _apply_filter(args, suite, target), "emit")
 
-    # ── suite: parallel emit+check, strict gate ──
-    if getattr(args, "filter", None):
-        rx = re.compile(args.filter)
-        target = [r for r in target if rx.search(r.stem)]
-        if not target:
-            sys.exit(f"pp2lp: --filter {args.filter!r} matched no benchmark "
-                     f"in suite {suite!r}")
-    return _run_suite(args, suite, target)
+
+# ── The `check` command (type-check the emitted .lp with lambdapi) ──────────
+def cmd_check(args) -> int:
+    # No engine build: check consumes the .lp `run` already wrote — it never
+    # touches the OCaml emitter, only lambdapi.
+    kind, suite, target = resolve_target(args.target)
+    if kind == "single":
+        res = check_one(target, timeout=args.timeout, incremental=args.incremental,
+                        dep_mtime=_lp_dep_mtime() if args.incremental else 0.0)
+        if args.json:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            dossier(target, res)
+        return 0 if res["status"] == "ok" else 1
+    return _run_suite(args, suite, _apply_filter(args, suite, target), "check")
 
 
 class _Stream:
@@ -675,7 +779,7 @@ class _Stream:
         return bool(self.code_rx.search((res.get("error") or {}).get("code") or ""))
 
     def _unfold(self, res: dict, replay: Path) -> None:
-        if res["status"] in ("emit_fail", "lp_fail"):       # a failure
+        if res["status"] in FAIL:                           # a failure
             if not self._matches(res):
                 return                                       # filtered out by --code
             if self.max_windows and self.shown >= self.max_windows:
@@ -690,13 +794,12 @@ class _Stream:
                 print(f"   {dim(w)}")
 
     def _compact(self, res: dict) -> None:                  # a passing trace, one line
-        timing = dim(f"  emit {fmt_ms(res['emit_ms'])} / check {fmt_ms(res['check_ms'])}")
-        print(f"{ICON[res['status']]} {res['name']}{timing}")
+        print(f"{ICON[res['status']]} {res['name']}{dim(_timing(res))}")
 
     def __call__(self, res: dict, replay: Path) -> None:
         self.done += 1
         notable = res["status"] != "ok"                     # failures + warnings get shown
-        self.fail += res["status"] in ("emit_fail", "lp_fail")
+        self.fail += res["status"] in FAIL
         if IS_TTY:
             sys.stdout.write("\r\033[K")                    # drop the counter line first
             if notable:
@@ -721,17 +824,51 @@ class _Stream:
             print(dim("… no failures matched --code; the by-code histogram is below"))
 
 
+class _Heartbeat:
+    """Throttled progress on stderr for -q/--json runs (which don't stream
+    per-result), so a long suite stays observable while stdout/json stay clean.
+    On a TTY it rewrites one line in place; redirected, it prints at most one
+    line every `every` seconds so a piped log stays short."""
+
+    def __init__(self, suite: str, total: int, every: float = 3.0):
+        self.suite, self.total, self.every = suite, total, every
+        self.done = self.fail = 0
+        self.last = time.monotonic()
+
+    def __call__(self, res: dict, replay: Path) -> None:
+        self.done += 1
+        self.fail += res["status"] in FAIL
+        now = time.monotonic()
+        if now - self.last < self.every and self.done != self.total:
+            return
+        self.last = now
+        tail = f"  {self.fail} ✗" if self.fail else ""
+        line = f"  {self.suite}  {self.done}/{self.total}{tail}"
+        sys.stderr.write(("\r\033[K" + line) if sys.stderr.isatty() else line + "\n")
+        sys.stderr.flush()
+
+    def finish(self) -> None:
+        if sys.stderr.isatty():
+            sys.stderr.write("\r\033[K")
+            sys.stderr.flush()
+
+
 def _failure_histogram(goals: list[dict]) -> dict:
     """Counts per error code over the failed goals (emit_fail / lp_fail)."""
     hist: dict[str, int] = {}
     for g in goals:
-        if g["status"] in ("emit_fail", "lp_fail"):
+        if g["status"] in FAIL:
             code = (g.get("error") or {}).get("code") or "E_EMIT"
             hist[code] = hist.get(code, 0) + 1
     return hist
 
 
-def _run_suite(args, suite: str, replays: list[Path]) -> int:
+def _run_suite(args, suite: str, replays: list[Path], phase: str) -> int:
+    """Run one phase over a suite in parallel — `phase="emit"` (`run`, via
+    emit_one) or `phase="check"` (`check`, via check_one) — stream results live,
+    write the per-run JSON, and exit non-zero iff any benchmark failed.  Emit
+    writes `<suite>.json`; check writes `<suite>.check.json` (so the two phases
+    keep separate baselines); a --filter run gets the `.filter.json` variant."""
     t_start = time.monotonic()
     code_rx = None
     if getattr(args, "code", None):
@@ -739,26 +876,49 @@ def _run_suite(args, suite: str, replays: list[Path]) -> int:
             code_rx = re.compile(args.code, re.I)
         except re.error as e:
             sys.exit(f"pp2lp: bad --code regex {args.code!r}: {e}")
-    # human run: stream each result live (completion order); -q and --json don't.
+    # human run: stream each result live (completion order).  -q/--json don't
+    # stream, but still get a throttled progress heartbeat on stderr so long runs
+    # stay observable (stdout/json output stays clean).
     stream = (_Stream(suite, len(replays), code_rx=code_rx)
-              if not (args.json or args.quiet) else None)
-    results = _check_all(replays, on_result=stream)
-    if stream:
-        stream.finish()
+              if not (args.json or args.quiet) else _Heartbeat(suite, len(replays)))
+    to = getattr(args, "timeout", None)
+    if phase == "emit":
+        def worker(r): return emit_one(r, timeout=to)
+    else:
+        # Warm the shared library objects once (serial, before the parallel
+        # workers) and read the dependency clock from them, so an incremental
+        # check can tell a rule edit from an untouched library.
+        _warm_shared_cache()
+        incr = getattr(args, "incremental", False)
+        dep_mtime = _lp_dep_mtime() if incr else 0.0
+        def worker(r): return check_one(r, timeout=to, incremental=incr, dep_mtime=dep_mtime)
+    results = _check_all(replays, worker, on_result=stream)
+    stream.finish()
     elapsed = (time.monotonic() - t_start) * 1000
 
     ordered = [results[r.stem] for r in replays]
-    failures = [r["name"] for r in ordered if r["status"] in ("emit_fail", "lp_fail")]
-    artifact = {"suite": suite,
+    failures = [r["name"] for r in ordered if r["status"] in FAIL]
+    artifact = {"suite": suite, "phase": phase,
                 "ok": sum(r["status"] == "ok" for r in ordered),
                 "warn": sum(r["status"] == "warn" for r in ordered),
                 "fail": len(failures), "failures": failures, "wall_ms": elapsed,
                 "by_code": _failure_histogram(ordered),
-                "emit_ms": sum(r["emit_ms"] for r in ordered),
-                "check_ms": sum(r["check_ms"] for r in ordered), "goals": ordered}
+                # emit only: how many .lp the content-aware write actually rewrote
+                "changed": sum(bool(r.get("changed")) for r in ordered),
+                # check -i only: how many were skipped as cached vs really checked
+                "cached": sum(bool(r.get("cached")) for r in ordered),
+                "checked": sum(r["status"] in ("ok", "lp_fail") and not r.get("cached")
+                               for r in ordered),
+                "emit_ms": sum(r.get("emit_ms", 0.0) for r in ordered),
+                "check_ms": sum(r.get("check_ms", 0.0) for r in ordered), "goals": ordered}
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    (RESULTS_DIR / f"{suite}.json").write_text(
+    # Emit and check keep separate baselines (`<suite>.json` vs
+    # `<suite>.check.json`); a filtered run holds only a subset, so it lands in a
+    # `.filter.json` variant and never clobbers the canonical baseline.
+    base = f"{suite}.check" if phase == "check" else suite
+    out_name = f"{base}.filter.json" if getattr(args, "filter", None) else f"{base}.json"
+    (RESULTS_DIR / out_name).write_text(
         json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.json:
@@ -772,6 +932,7 @@ def _print_summary(artifact: dict) -> None:
     """The trailing one-line tally.  The per-trace output already streamed live
     (unless `-q`, which shows only this line)."""
     suite, failures = artifact["suite"], artifact["failures"]
+    phase = artifact.get("phase")
     print()
     parts = []
     if artifact["ok"]:
@@ -780,7 +941,12 @@ def _print_summary(artifact: dict) -> None:
         parts.append(f"{yellow(artifact['warn'])} ⚠")
     if failures:
         parts.append(f"{red(len(failures))} ✗")
-    breakdown = dim(f"emit {fmt_ms(artifact['emit_ms'])} / check {fmt_ms(artifact['check_ms'])}")
+    if phase == "emit":
+        breakdown = dim(f"emit {fmt_ms(artifact['emit_ms'])}")
+    elif phase == "check":
+        breakdown = dim(f"check {fmt_ms(artifact['check_ms'])}")
+    else:
+        breakdown = dim(f"emit {fmt_ms(artifact['emit_ms'])} / check {fmt_ms(artifact['check_ms'])}")
     print(f"{suite}  {'  '.join(parts)}  {dim(fmt_ms(artifact['wall_ms']))}  {breakdown}")
     if failures:
         hist = artifact.get("by_code") or {}
@@ -788,9 +954,28 @@ def _print_summary(artifact: dict) -> None:
                           sorted(hist.items(), key=lambda kv: (-kv[1], kv[0])))
         if tally:
             print(f"  {red('✗ by code:')} {tally}")
+    if phase == "emit":      # the emitted .lp still needs type-checking
+        done = artifact["ok"] + artifact["warn"]
+        ch = artifact.get("changed", done)
+        unchanged = f", {done - ch} unchanged" if done and ch < done else ""
+        print(dim(f"  {ch} .lp (re)written{unchanged} → type-check with: pp2lp check {suite}"))
+    elif phase == "check" and artifact.get("cached"):
+        print(dim(f"  {artifact['cached']} cached (-i); {artifact['checked']} re-checked"))
 
 
 # ── shared suite evaluation ────────────────────────────────────────────────
+def _lp_dep_mtime() -> float:
+    """Newest mtime among the shared library objects (B, lemmas/*, Prelude,
+    rules/*) — the dependency clock an incremental `check` compares each
+    benchmark's own `.lpo` against, so a rule/lemma edit invalidates the cache.
+    Call after `_warm_shared_cache` so it reflects the current library."""
+    mt = 0.0
+    for pat in ("*.lpo", "lemmas/*.lpo", "rules/*.lpo"):
+        for f in (ROOT / "lp").glob(pat):
+            mt = max(mt, f.stat().st_mtime)
+    return mt
+
+
 def _warm_shared_cache() -> None:
     """Type-check the shared library files (B, lemmas/*, Prelude → all of rules/*)
     once, serially, so their .lpo objects exist before the parallel workers
@@ -814,15 +999,16 @@ def _warm_shared_cache() -> None:
         pass        # a missing/slow lambdapi resurfaces per-trace in the workers below
 
 
-def _check_all(replays, on_result=None) -> dict[str, dict]:
-    """Emit+check every replay in parallel; keyed by stem.  `on_result(res, replay)`
-    fires on the main thread as each trace finishes (completion order) so callers
-    can stream live."""
+def _check_all(replays, worker, on_result=None) -> dict[str, dict]:
+    """Run `worker(replay)` (emit_one or check_one) over every replay in parallel;
+    keyed by stem.  `on_result(res, replay)` fires on the main thread as each trace
+    finishes (completion order) so callers can stream live.  The caller is
+    responsible for any one-off setup (e.g. the check phase warms the shared
+    library objects before calling)."""
     out: dict[str, dict] = {}
-    _warm_shared_cache()
     workers = min(len(replays), (os.cpu_count() or 2))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(check_one, r): r for r in replays}
+        futs = {ex.submit(worker, r): r for r in replays}
         for fut in concurrent.futures.as_completed(futs):
             replay = futs[fut]
             try:
@@ -994,12 +1180,10 @@ def _strip_flags(content):
 #   traces  PP — gen_apero_traces proves the .but files in parallel
 #           (PP2LP_GEN_JOBS, timer PP2LP_APERO_TIMER, default R45) → .trace.
 #   replays REPLAY → .replay (shared gen_replays); a .trace with no .replay is a
-#           REPLAY loss, left in place and simply skipped by `run`.  Two gates
-#           drop a replay from the apero suite here: a truncated replay (REPLAY
-#           lost the ALL7/XST8 continuation, unemittable) and — apero-only — a
-#           non-core replay (PP left a set operator unfolded, so it is not in the
-#           FOL+LIA+membership core; see `core_check` and the engine's
-#           `core-check`).  Both leave the .trace in place.
+#           REPLAY loss, left in place and simply skipped by `run`.  One gate
+#           drops a replay from the apero suite here: a truncated replay (REPLAY
+#           lost the ALL7/XST8 continuation, unemittable), which leaves the
+#           .trace in place.
 # Then `run` emits .lp and type-checks (stages 4–5).  State is per-dir on disk
 # (no central ledger): each stage skips inputs whose output is already current.
 # The ~600k-goal corpus is gitignored and reproducible from the dataset + cap.
@@ -1509,23 +1693,7 @@ def gen_replays(suite, krt, force=False):
                              f"(REPLAY dropped the ALL7/XST8 continuation; {hint})"))
                 dropped += 1
                 continue
-            # apero suite gate: keep only replays PP reduced to its FOL+LIA+
-            # membership core.  A retained set operator (function space, subset,
-            # product, dom/ran/card/perm/POW, set enumeration, comprehension, …)
-            # means PP did not unfold it, so the proof would rest on uninterpreted
-            # B.lp symbols rather than the core — drop it from the suite.  Other
-            # suites are curated (their rare card/dom are deliberate), so the gate
-            # is apero-only.
-            if suite == "apero":
-                is_core, construct, cline = core_check(replay)
-                if not is_core:
-                    replay.unlink(missing_ok=True)
-                    clear_progress()
-                    print(yellow(f"  ⚠ dropped {stem}: non-core symbol "
-                                 f"'{construct}' (replay line {cline}) — "
-                                 f"not FOL+LIA+membership"))
-                    noncore += 1
-                    continue
+
             ok += 1
     except KeyboardInterrupt:
         clear_progress()
@@ -1647,78 +1815,132 @@ def cmd_clean(args) -> int:
     return 0
 
 
-def cmd_test(args) -> int:
-    """Type-check the rule-base unit tests in lp/tests/.
+# ── triage: cluster the last run's failures ────────────────────────────────
+def _triage_signature(msg: str) -> str:
+    """A short cluster key for a failure message: drop the replay-path prefix and
+    the `translate:`/`E_*:` lead-in, then prefer a leading rule/error token
+    (IMP5_1, ALL5_1, ECTR3, …) so same-cause failures group; else the first line."""
+    m = re.sub(r"\S*\.replay:\s*", "", (msg or "").strip()).split("\n")[0]
+    m = re.sub(r"^(translate:|E_[A-Z_]+:)\s*", "", m).strip()
+    tok = re.match(r"([A-Z][A-Z0-9]*(?:_\d+)?)\b", m)
+    return tok.group(1) if tok else (m[:55] or "?")
 
-    One test file per rules/ module; each `t_<RULE>` symbol states a rule's
-    intended type and applies the rule to a goal of that shape, so a file fails
-    to check iff a rule's signature drifts from its spec (the rule's own proof
-    still checking).  Pure lambdapi — no engine build."""
-    tests = sorted((ROOT / "lp" / "tests").glob("*.lp"))
-    if args.filter:
-        rx = re.compile(args.filter)
-        tests = [t for t in tests if rx.search(t.stem)]
-    if not tests:
-        print(red("test: no matching files under lp/tests/"))
-        return 1
-    # Compile Prelude + rules/* once (cold, that exceeds the per-file timeout);
-    # the per-file checks below then only read the shared objects.
-    _warm_shared_cache()
-    failed, n_tests = 0, 0
-    for t in tests:
-        count = sum(1 for ln in t.read_text().splitlines() if ln.startswith("symbol t_"))
-        n_tests += count
-        chk = lp_check(t)
-        if chk.get("no_lambdapi"):
-            print(red("test: lambdapi not found on PATH"))
-            return 1
-        if chk["ok"]:
-            if not args.quiet:
-                print(f"  {green('ok')}   {t.stem:<12} {dim(f'{count} rules')}")
-            continue
-        failed += 1
-        print(f"  {red('FAIL')} {t.stem:<12} {dim(f'{count} rules')}")
-        if chk["timeout"]:
-            print(dim(f"       timed out after {CHECK_TIMEOUT:.0f}s"))
-            continue
-        for e in (d for d in chk["diagnostics"] if d.get("severity") != "warning"):
-            f, line, col = diag_loc(e)
-            msg = (e.get("message") or "").strip().splitlines()
-            print(red(f"       {Path(f).name}:{line}:{col}") + (f"  {msg[0]}" if msg else ""))
-            for extra in msg[1:6]:
-                print(dim(f"         {extra}"))
-    total = len(tests)
-    if failed:
-        print(red(f"test: {failed}/{total} file(s) failed"))
-        return 1
-    print(green(f"test: {total} file(s), {n_tests} rule tests — all pass"))
+
+def _merged_results(suite: str) -> dict[str, dict] | None:
+    """The combined picture across the two phases, keyed by benchmark name: the
+    emit results (`<suite>.json`) overlaid with the check results
+    (`<suite>.check.json`).  A goal's effective result is its check result once it
+    was type-checked, but for a `no_lp` (emit failed, so nothing to check) the
+    emit result is kept — it carries the real emit code (E_TREE_BUILD, …).
+    Either file may be absent; None iff neither exists."""
+    merged: dict[str, dict] = {}
+    pe, pc = RESULTS_DIR / f"{suite}.json", RESULTS_DIR / f"{suite}.check.json"
+    if not pe.exists() and not pc.exists():
+        return None
+    if pe.exists():
+        for g in json.loads(pe.read_text(encoding="utf-8")).get("goals", []):
+            merged[g["name"]] = g
+    if pc.exists():
+        for g in json.loads(pc.read_text(encoding="utf-8")).get("goals", []):
+            if g["status"] == "no_lp" and g["name"] in merged:
+                continue                       # keep the emit result (real code)
+            merged[g["name"]] = g
+    return merged
+
+
+def cmd_triage(args) -> int:
+    """Cluster the last run's failures by error code + message signature,
+    timeouts excluded by default — the view that finds the actionable bucket
+    without a re-run or hand-parsing the JSON.  Spans both phases: emit failures
+    from `run` and type-check failures from `check`."""
+    suite = args.target
+    merged = _merged_results(suite)
+    if merged is None:
+        sys.exit(f"pp2lp: no results for {suite!r} — run `pp2lp run {suite}` "
+                 f"then `pp2lp check {suite}` first")
+    goals = list(merged.values())
+    n_ok = sum(g["status"] == "ok" for g in goals)
+    timeouts = {"E_LP_TIMEOUT", "E_TIMEOUT"}
+    fails = [g for g in goals if g["status"] in FAIL]
+    n_to = sum((g.get("error") or {}).get("code") in timeouts for g in fails)
+    shown = fails if args.all else [
+        g for g in fails if (g.get("error") or {}).get("code") not in timeouts]
+    groups: dict[str, dict[str, list]] = {}
+    for g in shown:
+        code = (g.get("error") or {}).get("code") or "E_EMIT"
+        sig = _triage_signature((g.get("error") or {}).get("message") or "")
+        groups.setdefault(code, {}).setdefault(sig, []).append(g["name"])
+    kind = "total" if args.all else "deterministic"
+    print(bold(f"{suite} — {n_ok} ok / {len(fails)} fail  "
+               f"({n_to} timeouts {'shown' if args.all else 'excluded'} "
+               f"→ {len(shown)} {kind})"))
+    for code in sorted(groups, key=lambda c: -sum(len(v) for v in groups[c].values())):
+        print(f"  {code}  {sum(len(v) for v in groups[code].values())}")
+        for sig, names in sorted(groups[code].items(), key=lambda kv: -len(kv[1])):
+            print(f"     [{len(names)}] {sig}{dim('  e.g. ' + names[0])}")
     return 0
 
 
 # ── argparse ───────────────────────────────────────────────────────────────
+def _add_suite_args(sp, default_target: str) -> None:
+    """The suite-addressing args shared by `run` and `check`: a SUITE or
+    SUITE/NAME target, output mode, and the --filter/--exact/--code selectors."""
+    sp.add_argument("target", nargs="?", default=default_target,
+                    help=f"SUITE or SUITE/NAME (default: {default_target})")
+    sp.add_argument("-q", "--quiet", action="store_true", help="summary only (no live stream)")
+    sp.add_argument("--json", action="store_true", help="machine-readable output")
+    sp.add_argument("--filter", metavar="REGEX", default=None,
+                    help="restrict a suite run to benchmark names matching REGEX "
+                         "(composes with --json/-q); with --exact, a literal name set")
+    sp.add_argument("--exact", action="store_true",
+                    help="treat --filter as a comma/space-separated set of exact "
+                         "benchmark names (no substring/regex match)")
+    sp.add_argument("--code", metavar="REGEX", default=None,
+                    help="only unfold failure windows whose error code matches REGEX "
+                         "(e.g. E_TREE_BUILD); composes with --filter, which bounds "
+                         "which benchmarks actually run")
+    sp.add_argument("--timeout", metavar="SECS", type=float, default=None,
+                    help="per-trace timeout in seconds, overriding PP2LP_EMIT_TIMEOUT "
+                         "(run) / PP2LP_CHECK_TIMEOUT (check); 0 disables it")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="pp2lp",
         description="translate Atelier B Predicate-Prover replays to Lambdapi and type-check them")
     sub = p.add_subparsers(dest="cmd")
 
-    r = sub.add_parser("run", help="emit + type-check a suite or one trace",
-                       description="emit + type-check a SUITE (strict gate) or SUITE/NAME "
-                                   "(dossier).  Results stream live; a failure shows panels "
-                                   "from the related files — the failing `.lp` line, the "
-                                   "lambdapi goal state, the .replay step, and the lp/rules "
-                                   "signature.")
-    r.add_argument("target", nargs="?", default="og", help="SUITE or SUITE/NAME (default: og)")
-    r.add_argument("-q", "--quiet", action="store_true", help="summary only (no live stream)")
-    r.add_argument("--json", action="store_true", help="machine-readable output")
+    r = sub.add_parser("run", help="emit a suite or one trace to Lambdapi (.lp)",
+                       description="parse, translate, and write the `.lp` (and its provenance "
+                                   "map) for a SUITE or SUITE/NAME — the emit phase; no "
+                                   "type-checking (see `pp2lp check`).  Results stream live; "
+                                   "an emit failure shows the .replay step and the lp/rules "
+                                   "signature it blames.")
+    _add_suite_args(r, "og")
     r.add_argument("--no-build", action="store_true", help="skip the implicit dune build")
-    r.add_argument("--filter", metavar="REGEX", default=None,
-                   help="restrict a suite run to benchmark names matching REGEX "
-                        "(composes with --json/-q)")
-    r.add_argument("--code", metavar="REGEX", default=None,
-                   help="only unfold failure windows whose error code matches REGEX "
-                        "(e.g. E_TREE_BUILD); composes with --filter, which bounds "
-                        "which benchmarks actually run")
+
+    c = sub.add_parser("check", help="type-check a suite's emitted .lp with lambdapi",
+                       description="type-check the `.lp` that `pp2lp run` emitted, for a SUITE "
+                                   "(strict gate) or SUITE/NAME (dossier).  Results stream "
+                                   "live; a failure shows panels from the related files — the "
+                                   "failing `.lp` line, the lambdapi goal state, the .replay "
+                                   "step, and the lp/rules signature.  A benchmark with no "
+                                   "`.lp` is reported as no_lp (run `pp2lp run` first).")
+    _add_suite_args(c, "og")
+    c.add_argument("-i", "--incremental", action="store_true",
+                   help="skip benchmarks whose .lpo proves they already passed and "
+                        "nothing they depend on changed (a .lp edit or a rule/lemma "
+                        "rebuild re-checks them); after a lambdapi upgrade run "
+                        "`pp2lp clean` first, since this trusts mtimes, not lambdapi")
+
+    tr = sub.add_parser("triage", help="cluster the last run's failures by code + signature",
+                        description="read lp/bench/results/<suite>.json (emit) and "
+                                    "<suite>.check.json (check) and group the deterministic "
+                                    "failures by error code and message signature (timeouts "
+                                    "excluded) — the actionable view, no re-run.")
+    tr.add_argument("target", nargs="?", default="apero", help="SUITE (default: apero)")
+    tr.add_argument("--all", action="store_true",
+                    help="include timeouts (E_LP_TIMEOUT/E_TIMEOUT), excluded by default")
 
     g = sub.add_parser("gen", help="(re)generate suite inputs via Atelier B krt",
                        description="run PP/REPLAY (krt) to (re)build a suite's "
@@ -1738,15 +1960,6 @@ def build_parser() -> argparse.ArgumentParser:
                    description="delete stale lambdapi `.lpo` objects under lp/ and the "
                                "Stdlib lib_root; they recompile on the next check.  Use "
                                "after a lambdapi rebuild reports an incompatible .lpo.")
-
-    t = sub.add_parser("test", help="type-check the rule-base unit tests (lp/tests/)",
-                       description="type-check lp/tests/*.lp — one file per rules/ module, "
-                                   "each applying every rule (base + _1) to a goal of its "
-                                   "spec shape.  A failure means a rule's stated type drifted. "
-                                   "Pure lambdapi; no engine build.")
-    t.add_argument("--filter", metavar="REGEX", default=None,
-                   help="restrict to test files whose name matches REGEX (e.g. Nrm)")
-    t.add_argument("-q", "--quiet", action="store_true", help="show only failures + summary")
     return p
 
 
@@ -1755,12 +1968,14 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "run":
         return cmd_run(args)
+    if args.cmd == "check":
+        return cmd_check(args)
+    if args.cmd == "triage":
+        return cmd_triage(args)
     if args.cmd == "gen":
         return cmd_gen(args)
     if args.cmd == "clean":
         return cmd_clean(args)
-    if args.cmd == "test":
-        return cmd_test(args)
     parser.print_help(sys.stderr)
     return 2
 

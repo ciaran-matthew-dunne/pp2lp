@@ -16,8 +16,7 @@ let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
   let prop_list = Free_vars.SS.elements fv.prop_vars in
   let exp_list = Free_vars.SS.elements fv.exp_vars in
   let all_params = ref [] in
-  let lp_tree, bool_typings, int_typings =
-    Translate.translate ~int_free_vars:fv.exp_vars pp_tree in
+  let lp_tree = Translate.translate pp_tree in
 
   Buffer.add_string buf "opaque symbol ";
   Buffer.add_string buf name;
@@ -37,19 +36,6 @@ let emit_symbol (name : string) (goal : prd) (pp_tree : Proof_tree.pp_tree)
     Buffer.add_string buf " : \xcf\x84 \xce\xb9)"; (* τ ι *)
     all_params := !all_params @ exp_list
   end;
-  (* Boolean-typing premises (`Π u, prj k u ϵ BOOL`), one per (arity,slot) a
-     BOOL31/32/41/42 split needs — the B-typing goal extraction dropped. *)
-  (* Boolean- then integer-typing premises (`Π u, prj k u ϵ BOOL` / `… ϵ INT`,
-     or `π (x ϵ INT)` for a free var) — the typing the goal extraction dropped,
-     supplied as morally-true premises (the var IS that B-type), not axioms. *)
-  let typing_premises = bool_typings @ int_typings in
-  List.iter (fun (hname, ty) ->
-    Buffer.add_string buf " (";
-    Buffer.add_string buf hname;
-    Buffer.add_string buf " : ";
-    Buffer.add_string buf ty;
-    Buffer.add_string buf ")") typing_premises;
-  all_params := !all_params @ List.map fst typing_premises;
   Buffer.add_string buf " :\n  \xcf\x80 ("; (* π ( *)
   Pp_lp.pp_prd_block 4 buf goal;
   Buffer.add_string buf ") \xe2\x89\x94\n"; (* ≔ *)

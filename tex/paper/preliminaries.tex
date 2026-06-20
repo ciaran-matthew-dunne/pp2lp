@@ -1,0 +1,194 @@
+% ── preliminaries.tex · §2 Preliminaries (PP & LP) ─────────────────
+\section{Preliminaries}\label{sec:prelim}
+
+\subsection{The Predicate Prover}\label{sec:pp-syntax}
+
+The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
+given as follows:
+\begin{align*}
+	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
+	\mid E + F \mid E - F \mid -E                                     \\
+	P, Q & \Coloneqq E \mid E = F \mid E \leq F
+	\mid E_1,\ldots,E_k \in F
+	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
+	\mid P \Leftrightarrow Q
+	\mid \mathcal{Q}\,\vec{x} \cdot P
+\end{align*}
+where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
+function application $F(E_1,\ldots,E_k)$ applies an expression $F$ to the arguments $E_1,\ldots,E_k$,
+membership relates a tuple of expressions to an expression.
+%
+An expression may itself stand as an atomic predicate, shown by the leading
+$E$ in the production for $P$.
+%
+A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
+list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
+	\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
+latter into the former during proof search.
+%
+The quantifiers $\Dia$ and $\Hrt$ are universal quantifiers idiosyncratic
+to \pp's normalisation procedure; semantically both are $\forall$ and differ
+only in the role they play during proof search.
+
+Although B is a set-theoretic formalism, \pp{} itself proves formulas of
+first-order logic with linear arithmetic: a pre-processing step reduces much
+of the set theory of a proof obligation to first-order formulas over
+membership before \pp{} sees it.
+%
+The set-theoretic operators that survive this reduction (intervals, the
+maplet, and the relational operators of \autoref{app:operators}) reach
+\pp{} as uninterpreted function symbols: \pp{} has no set-theory rules, and
+such terms are only ever copied, compared for equality, or instantiated.
+
+\pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
+hypothesis predicates and $P$ a goal predicate.
+%
+\pp's inference rules are specified in the annex of its internal
+documentation~\cite{pp_spec}.  There are roughly \numRulesSpec{} rules,
+grouped into families: propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
+\rn{NOT}), hypothesis discharge (\rn{AXM1--9}), quantifiers
+(\rn{ALL1--9}, \rn{XST1--8}), equality
+(\rn{EQL}, \rn{EAXM}, \rn{EQC}, \rn{ECTR}, \ldots), booleans
+(\rn{BOOL}), linear arithmetic (\rn{AR1--13}),
+and normalisation (\rn{NRM1--30}).
+%
+Each rule reduces the current goal to zero, one, or two
+premises, possibly under computational side-conditions
+(``$P$ occurs in the list of hypotheses $H$'',
+``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
+
+Alongside sequents, \pp's proofs manipulate a second judgment: we write
+$(H \seq P) \yields [Q_1, \ldots, Q_n]$ for ``under $H$, $P$ normalises to
+the list of predicates $[Q_1, \ldots, Q_n]$''.  This list is a
+\emph{result}, whose conjunction is the normal form of $P$.
+%
+Most classical rules come paired with a result form (written with a
+\texttt{\_1} suffix): a rule whose conclusion is a result.  A result rule is
+given by one of three schemas: the empty list (the formula is discharged),
+a singleton $[Q]$ (a single transformed formula), or the concatenation of
+its two premises' lists (a combination).
+%
+For instance, \rn{AND4} introduces a conjunct, and its result form
+\rn{AND4\_1} (the combination schema) concatenates the two premises'
+lists:
+\begin{center}
+  \begin{prooftree}
+    \hypo{H \seq Q} \hypo{H \seq P}
+    \infer2[\rn{AND4}]{H \seq P \land Q}
+  \end{prooftree}
+  \qquad
+  \begin{prooftree}
+    \hypo{(H \seq Q) \yields R_1} \hypo{(H \seq P) \yields R_2}
+    \infer2[\rn{AND4\_1}]{(H \seq P \land Q) \yields R_1 \app R_2}
+  \end{prooftree}
+\end{center}
+
+Only \rn{ALL7} and \rn{XST8} \emph{consume} a result, each turning a
+result derivation back into an ordinary sequent subproof.
+%
+\rn{ALL7} normalises the body of a universal antecedent pointwise to a list
+$R_1,\ldots,R_n$ and continues under its conjunction, beneath the
+post-normalisation universal $\Dia$:
+\begin{center}
+  \begin{prooftree}
+    \hypo{(H \seq P) \yields [R_1,\ldots,R_n]}
+    \hypo{H \seq (\Dia x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow G}
+    \infer2[\rn{ALL7}]{H \seq (\forall x \cdot P) \Rightarrow G}
+  \end{prooftree}
+\end{center}
+%
+\rn{XST8} is its existential dual: to prove $\exists x \cdot P$ it normalises
+$\lnot P$ to a list $R_1,\ldots,R_n$ and continues from a refutation of the
+universally-closed conjunction.
+\begin{center}
+  \begin{prooftree}
+    \hypo{(H \seq \lnot P) \yields [R_1,\ldots,R_n]}
+    \hypo{H \seq (\forall x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow \bot}
+    \infer2[\rn{XST8}]{H \seq \exists x \cdot P}
+  \end{prooftree}
+\end{center}
+
+\pp{} records a \trace{} of the rules it applied; a companion utility
+re-runs the proof and expands the trace into a \replay{} that annotates each
+step with the goal it was applied to (\autoref{fig:replay}).
+%
+Each replay line carries a rule name and, in parentheses, an optional
+argument.
+%
+A rule's line precedes the lines of its subproofs, with two exceptions.
+%
+First, the result derivation feeding \rn{ALL7} or \rn{XST8} appears
+\emph{before} the rule that consumes it.
+%
+Second, the replay interleaves marker lines that do not correspond to
+inference rules: \texttt{NRM} and \texttt{STOP\_NORM}, which bracket
+\pp's normalisation passes, and \texttt{FIN}, which carries the predicate
+such a pass produced.
+%
+\tool{} filters these out while rebuilding the tree.
+%
+
+% --- replay/derivation figure ----------------------------------------
+\input{fig-replay.tex}
+% ---------------------------------------------------------------------
+
+\subsection{\lp}\label{sec:lp}
+
+\lp~\cite{hondet:hal-02981561} is a proof assistant for the
+\lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
+logical framework~\cite{assaf2023dedukti}.
+%
+Unlike \dedukti{}, a bare type-checker for the same calculus, \lp{}
+adds implicit arguments $[x:A]$ and an interactive tactic language.
+%
+The term syntax is given as follows:
+\[
+	t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
+	\mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
+\]
+where $x$ ranges over variables, $c$ ranges over declared constants,
+and terms are identified up to $\alpha$-equivalence.
+%
+Typing is standard for the \lpcmr{} (the full system is in
+\autoref{app:typing}); its \emph{definitional equality} (i.e., $A \Equiv B$)
+is generated by $\beta$-equivalence and the user-declared rewrite rules.
+%
+A \lp{} development is a sequence of declarations:
+\[
+  \begin{array}{rcl}
+    d &\Coloneqq& m^{*}\;\text{\lpkw{symbol}}\;x\;p^{*} : t\;[\,≔ b\,]
+        \;\mid\; \text{\lpkw{rule}}\;\ell ↪ r
+        \;\mid\; \text{\lpkw{inductive}}\;x\;p^{*} : t ≔ \mathit{cons} \\
+    p &\Coloneqq& (x : t) \;\mid\; [x : t] \\
+    m &\Coloneqq& \text{\lpmod{constant}} \;\mid\; \text{\lpmod{injective}} \;\mid\; \text{\lpmod{opaque}} \\
+    b &\Coloneqq& t \;\mid\; \text{\lpkw{begin}}\;\mathit{tac}^{*}\;\text{\lpkw{end}}
+  \end{array}
+\]
+The \lpkw{symbol} command introduces a typed constant with explicit
+$(x : A)$ and implicit $[x : A]$ parameters $p$ and an optional definition
+$b$; \lpkw{rule} adds a rewrite rule over pattern variables \texttt{\$x},
+checked for type-preservation at declaration time; \lpkw{inductive}
+generates an inductive type with constructors $\mathit{cons}$ and a recursor.
+%
+Modifiers $m$ refine a symbol's status: \lpmod{constant} symbols admit no
+rewrite rule at their head, \lpmod{injective} symbols may be inverted
+during unification, and the definition of an \lpmod{opaque} symbol is
+sealed once type-checked.
+%
+A definition $b$ is a term or a proof script (\lpkw{begin} \ldots{}
+\lpkw{end}) whose tactics (e.g., \lpkw{assume}, \lpkw{refine},
+\lpkw{rewrite}, \lpkw{have}, \lpkw{induction}) elaborate to a proof term
+that the kernel re-checks.  The grammars above are abridged to the constructs
+the body uses; \autoref{app:syntax} gives the full grammar of our \lp{}
+fragment, with its inductive and tactic syntax.
+
+We build on \lp's standard library~\cite{Blanqui2021}: object-level types are
+encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \TYPE$
+mapping each set code to its type of inhabitants, and a type $\Prop$ of
+propositions with $\Prf : \Prop \to \TYPE$ mapping each proposition
+to its type of proofs.
+%
+It also supplies the booleans $\mathbb{B}$, integers $\mathbb{Z}$, and
+naturals $\mathbb{N}$ (with integer literals and arithmetic), which our
+encoding builds on (\autoref{sec:enc-formulas}).
+

@@ -504,6 +504,24 @@ symbol NRM15_1 [n] [P : Tuple n → Prop] [R : Prop]
   (r : Res ((`♡ v, ¬ ⋀_snoc ⊤ (¬ (P v))) ⇒ R)) : Res ((`♢ v, P v) ⇒ R)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm15_eq n P R) (res_eq r));
 
+// NRM5_1 — chain (Res) form of NRM5, via the `nrm5_eq` bridge (Res.lp).
+symbol NRM5_1 [n] [P Q R : Tuple n → Prop] [S : Prop]
+  (r : Res ((`♢ v, ⋀_snoc (P v) (Q v) ⇒ R v) ⇒ S))
+  : Res ((`♢ v, P v ⇒ Q v ⇒ R v) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm5_eq n P Q R S) (res_eq r));
+
+// NRM10_1 — chain (Res) form of NRM10, via the `nrm10_eq` bridge (Res.lp).
+symbol NRM10_1 [n] [Ps : Tuple n → 𝕃* o] [Q : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀ (Ps v ∷ Q v)) ⇒ R))
+  : Res ((`♢ v, ⋀ (Ps v ∷ Q v) ⇒ ⊥) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm10_eq n Ps Q R) (res_eq r));
+
+// NRM24_1 — chain (Res) form of NRM24, via the `nrm24_eq` bridge (Res.lp).
+symbol NRM24_1 [n] [P : Tuple n → Prop] [Q : Prop]
+  (r : Res ((`♡ v, ¬ ⋀ (∎ ∷ ⊤ ∷ P v)) ⇒ Q))
+  : Res ((`♡ v, ¬ (P v)) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm24_eq n P Q) (res_eq r));
+
 // NRM3 bridge: ((♢v·(P v ⇒ Q)) ⇒ S) = ((Q ⇒ S) ∧ ((∀v·¬P v) ⇒ S)), Q is v-free.
 // (Lives here, not Res.lp, because the ⇐ direction reuses NRM3 itself; the ⇒
 // direction builds the ♢ witness from Q, or vacuously from ¬P v.)
@@ -538,3 +556,55 @@ symbol NRM22_1 [Q : Prop] [ps : Tuple 1 → 𝕃* o] [E : τ ι]
   (r : Res (¬ ⋀ (ps (unit ⨾ E)) ⇒ Q))
   : Res ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm22_eq Q ps E) (res_eq r));
+
+// NRM4_1 — chain (Res) form of NRM4, via the `nrm4_eq` bridge (Res.lp).
+symbol NRM4_1 [n] [P R : Tuple n → Prop] [Q S : Prop]
+  (r : Res ((Q ⇒ (`♢ v, P v ⇒ R v)) ⇒ S))
+  : Res ((`♢ v, P v ⇒ Q ⇒ R v) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm4_eq n P R Q S) (res_eq r));
+
+// NRM7_1 — chain (Res) form of NRM7, via the `nrm7_eq` bridge (Res.lp).
+symbol NRM7_1 [n] [Qs : Tuple n → 𝕃* o] [P : Tuple n → Prop] [S : Prop]
+  (r : Res ((`♢ v, ⋀ (Qs v)) ⇒ ((`♢ v, P v) ⇒ S)))
+  : Res ((`♢ v, ⋀ (Qs v ∷ P v)) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm7_eq n Qs P S) (res_eq r));
+
+// NRM11_1 — chain (Res) form of NRM11, via the `nrm11_eq` bridge (Res.lp).
+symbol NRM11_1 [n] [P : Tuple n → Prop] [R : Prop]
+  (r : Res ((`♡ v, ¬ ⋀_snoc ⊤ (P v)) ⇒ R))
+  : Res ((`♢ v, P v ⇒ ⊥) ⇒ R)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm11_eq n P R) (res_eq r));
+
+// NRM25_1 — chain (Res) form of NRM25, via the `nrm25_eq` bridge (Res.lp).
+symbol NRM25_1 [n] [P Q : Prop]
+  (r : Res (P ⇒ Q))
+  : Res ((`♡ _ : Tuple n, P) ⇒ Q)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm25_eq n P Q) (res_eq r));
+
+// NRM8_1 — chain (Res) form of NRM8, via the `nrm8_eq` bridge (Res.lp).
+symbol NRM8_1 [n m] [Q : Tuple n → Tuple m → Prop] [S : Prop]
+  (r : Res ((`♢ v : Tuple (n ++ m), Q (take [n] [m] v) (drop [n] [m] v)) ⇒ S))
+  : Res ((`♢ x : Tuple n, `!! y : Tuple m, Q x y) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm8_eq n m Q S) (res_eq r));
+
+// NRM9_1 — chain (Res) form of NRM9, via the `nrm9_eq` bridge (Res.lp).
+symbol NRM9_1 [n m] [P : Tuple n → Prop] [Q : Tuple n → Tuple m → Prop] [S : Prop]
+  (r : Res ((`♢ v : Tuple (n ++ m),
+              P (take [n] [m] v) ⇒ Q (take [n] [m] v) (drop [n] [m] v)) ⇒ S))
+  : Res ((`♢ x : Tuple n, P x ⇒ (`!! y : Tuple m, Q x y)) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm9_eq n m P Q S) (res_eq r));
+
+// NRM6_1 — chain (Res) form of NRM6, via the `nrm6_eq` bridge (Res.lp).
+symbol NRM6_1 [n] [Qs : Tuple n → 𝕃* o] [P R : Tuple n → Prop] [S : Prop]
+  (r : Res ((`♢ v, R v ⇒ ⋀ (Qs v)) ⇒ ((`♢ v, R v ⇒ P v) ⇒ S)))
+  : Res ((`♢ v, R v ⇒ ⋀ (Qs v ∷ P v)) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm6_eq n Qs P R S) (res_eq r));
+
+// NRM19_1 — chain (Res) form of NRM19 (a Witness_hyp *discharge*, not a
+// transport).  Given the witness v and the in-scope hyp `R v`, the antecedent
+// `♡u·¬(⊤∧R u)` is refuted (at u := v), so the implication is provable and
+// `mk_0 ∘ prop_eq_top` seeds the Res at ⊤ — the AXM8_1/AXM9_1 seed pattern.  The
+// emitter recovers (v, hr) with the same [find_nrm19_match] the base rule uses.
+symbol NRM19_1 [n] [Q : Prop] [R : Tuple n → Prop] (v : Tuple n) (hr : π (R v))
+  : Res ((`♡ u, ¬ ⋀_snoc ⊤ (R u)) ⇒ Q)
+  ≔ mk_0 (prop_eq_top (NRM19 v hr));

@@ -51,6 +51,11 @@ type t =
   | Assume of string * t
   | Assume_then of tactic * string * t
   | Branches of tactic * t * t
+  (* `have name : ty { refine proof }; rest` — name a derived fact with an
+     explicit type and an inline one-tactic subproof, then continue with it in
+     scope.  Used by the INS contradiction script so each instantiation step is a
+     small, separately-checked `have` rather than one deeply-nested closed term. *)
+  | Have of string * binder_ty * term * t
   (* Attach provenance to the first emitted line of the wrapped script.
      Exactly one per proof-tree node (its primary tactic). *)
   | Commented of prov * t
@@ -158,6 +163,16 @@ let rec pp ?(pad = "") ?lead_pad ?sink buf t =
     Buffer.add_string buf name;
     Buffer.add_string buf ";\n";
     pp ~pad ?sink buf next
+  | Have (name, ty, proof, rest) ->
+    Buffer.add_string buf lead_pad;
+    Buffer.add_string buf "have ";
+    Buffer.add_string buf name;
+    Buffer.add_string buf " : ";
+    pp_binder_ty buf ty;
+    Buffer.add_string buf " { refine ";
+    pp_term buf proof;
+    Buffer.add_string buf " };\n";
+    pp ~pad ?sink buf rest
   | Branches (tactic, left, right) ->
     Buffer.add_string buf lead_pad;
     pp_tactic buf tactic;

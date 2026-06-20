@@ -37,8 +37,8 @@
 %left OR AND        (* PP spec priority 2: and, or (same level, left-assoc) *)
 %left IFF           (* PP spec priority 1: <=> (tighter than and/or) *)
 %right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
-%left UNION
-%left INTER
+%left UNION INTER   (* same level, left-assoc — like or/and: `s \/ t /\ s` is
+                       `(s \/ t) /\ s`, mirroring how PP unfolds the membership *)
 %left TFUN OVERRIDE SEMI        (* uninterpreted set/relation operators *)
 %left MAPLET DOMRESTR RANRESTR  (* B-Book: set-operator level, looser than .. *)
 %left DOTDOT        (* B-Book: .. looser than +/- — e-f..g+f = (e-f)..(g+f) *)
@@ -79,7 +79,14 @@ exp:
   | e1 = exp; PLUS; e2 = exp
   { AOp (Add, e1, e2) }
   | e1 = exp; MINUS; e2 = exp
-  { AOp (Sub, e1, e2) }
+  { (* `-` is overloaded (arithmetic subtraction vs set difference) and the token
+       is the same.  A set-literal operand can't be arithmetic, so it disambiguates
+       to set difference; otherwise default to arithmetic (the common case).  A
+       `s - t` between two non-literal sets stays ambiguous and remains arithmetic
+       — that needs type information we don't have. *)
+    match e1, e2 with
+    | SetLit _, _ | _, SetLit _ -> SetOp ("set_diff", [e1; e2])
+    | _ -> AOp (Sub, e1, e2) }
   | e1 = exp; TIMES; e2 = exp
   { SetOp ("prod", [e1; e2]) }   (* product (set ×, or arithmetic ·) *)
   | MINUS; e = exp %prec UMINUS

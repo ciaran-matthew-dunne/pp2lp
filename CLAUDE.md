@@ -1,58 +1,97 @@
 # CLAUDE.md
 
-Maintainer notes for **pp2lp** — it translates Atelier B Predicate Prover (PP)
-proof replays to Lambdapi and type-checks them independently.
+Within the B-Method ecosystem, the Predicate Prover (PP) is an automated theorem
+prover for first-order logic and linear arithmetic. Because PP’s source code is
+not publicly available, its results are currently trusted without independent 
+verification. This project develops `pp2lp`, a tool for reconstructing PP proofs
+in LambdaPi, a proof assistant based on the 𝜆Π-calculus modulo rewriting. 
 
-Round trip: `formula → PP → .trace → REPLAY → .replay → pp2lp → .lp → lambdapi check`.
+Each of PP's inference rules is encoded as a LambdaPi symbol in `./lp` whose 
+type captures the rule's premises and conclusion and whose body proves the rule
+sound with respect to a small trusted base built on top of LambdaPi's stdlib. 
 
-**`./pp2lp`** at the repo root does everything: builds the OCaml engine, emits
-Lambdapi, type-checks it, and reports. The binary under `ocaml/_build/` is
-internal — you drive `./pp2lp`. 
+PP is instrumented to emit replays of its proofs; pp2lp parses the replay,
+rebuilds the proof tree, and emits a tactic script that LambdaPi typechecks.
+We prove the soundness of all of PP’s inference rules and reconstruct proofs
+across several real-world (`prv`, `apero`) and synthetic (`claude`) benchmarks.
 
-## Ground rules
+Pipeline: 
+`formula -> .but → PP → .trace → REPLAY → .replay → pp2lp → .lp → lambdapi check`.
 
-- When calling `lambdapi`, use the `--no-colors` flag to avoid ANSI codes,
-  and `-v 0` to avoid the 'Start checking ...' and 'End checking ...' bloat,
-  and `--proof-state-on-error` flag to get better info about in-proof failures,
-  and `-w` to disable warnings about critical pairs, pattern variables, etc.
-- **`pp2lp gen` rewrites a suite**, wiping every benchmark dir not in its source
-  of truth (goals.txt / checked-in `.but`s), tracked orphans included. Run it only
-  when the task *is* corpus generation, never as a debugging reflex.
+The main tool is written in OCaml, but is driven by a Python CLI `./pp2lp`.
+
+- `./doc/pp-spec-full.pdf` is the internal documentation for PP,
+- `./doc/pp-spec-rules.pdf` is a table specifying the rules used by PP.
+
+- Call `lambdapi` with `--no-colors -v 0 -w --proof-state-on-error`: drops ANSI,
+  start/end-checking noise, and critical-pair warnings, and prints goal state on
+  an in-proof failure.
+- **`pp2lp gen` rewrites a suite**. Run it only when the task *is* corpus 
+  generation, never as a debugging reflex.
 - **Suites are tests, not a commit gate.** og/prv/claude/apero failures during
   development are expected — don't chase them or hold up a commit on red. 
-  Live counts are in `lp/bench/results/<suite>.json` after a run.
+  Live counts are in `lp/bench/results/<suite>.json` (emit) and
+  `<suite>.check.json` (check) after a run, don't store counts in CLAUDE.md.
 - Commit messages: plain prose, no Co-Authored-By, no Claude/Anthropic attribution. 
   Don't push unless asked.
-- **Off limits unless asked:** `tex/` (the LPAR-26 paper, deadline 21 Jun 2026 AoE),
-  `notes.md`, `admin/`, `doc/`, `vendor/`.
+- **Off limits unless asked:** `tex/` (the LPAR-26 paper, deadline 21 Jun 2026 AoE).
+  Paper-writing guidance lives in `tex/CLAUDE.md` (auto-loads when a session
+  touches `tex/`).
 
 ## Commands
 
+The pipeline is two decoupled phases: `pp2lp run` parses+translates+writes the
+`.lp` (no lambdapi); `pp2lp check` type-checks the emitted `.lp`. Run them in
+sequence: `pp2lp run <suite> && pp2lp check <suite>`.
+
 ```
-pp2lp run                       # check og (default)
-pp2lp run claude                # check a suite; exits non-zero if any trace fails
-pp2lp run og/01                 # one trace, full failure window
-pp2lp run apero --filter 'ap_0016'   # subset of a suite by name regex
-pp2lp run apero --code E_TREE_BUILD  # unfold only that code's windows (use with --filter)
-pp2lp run og --json             # machine output (also lp/bench/results/og.json)
-pp2lp run og -q                 # summary + by-code histogram only
+pp2lp run                       # emit og → .lp (default suite; parse+translate+write)
+pp2lp check                     # type-check og's emitted .lp with lambdapi
+pp2lp run claude                # emit a suite; exits non-zero iff a trace fails to emit
+pp2lp check claude              # type-check it; exits non-zero iff a .lp fails lambdapi
+pp2lp run og/01                 # emit one trace (dossier)
+pp2lp check og/01               # type-check one trace, full failure window
+pp2lp check apero --filter 'ap_0016'   # subset by name regex → writes <suite>.check.filter.json
+pp2lp check apero --filter a,b --exact # exact name set (no substring/regex over-match)
+pp2lp check apero --code E_LP_CHECK     # unfold only that code's windows (use with --filter)
+pp2lp check og --json           # machine output (also lp/bench/results/og.check.json)
+pp2lp check og -q               # summary + by-code histogram (progress heartbeat on stderr)
+pp2lp check apero -i            # incremental: skip benchmarks unchanged since they last passed
+pp2lp check apero --timeout 30  # override PP2LP_CHECK_TIMEOUT for this run (0 disables)
+
+pp2lp triage apero              # cluster the last run's failures (emit + check) by code+signature (timeouts excluded; --all to include)
 
 pp2lp gen claude                # regen .but/.trace/.replay via krt (PP/REPLAY)
 pp2lp gen prv --only replays    # one stage (buts,traces,replays)
 pp2lp gen apero --only buts     # apero stage 1: pog2but + select (see Apero)
 
 pp2lp clean                     # drop stale .lpo caches (project lp/ + Stdlib)
-
-pp2lp test                      # type-check the rule-base unit tests (lp/tests/)
-pp2lp test --filter Nrm         # one test module; -q for summary only
 ```
 
-`run` auto-builds the engine (`--no-build` to skip), runs suites in parallel
-(shared `lp/` objects compile once up front), and exits non-zero iff any trace
-fails. Child-process caps (env, 0 disables): `PP2LP_CHECK_TIMEOUT`,
-`PP2LP_EMIT_TIMEOUT`, `PP2LP_GEN_TIMEOUT` (all 10 s; the slowest prv trace needs
-~7.4 s, so don't lower them), `PP2LP_CHECK_MEM_GB` (4 GiB). A timeout reports its
-own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real failure.
+`--filter`/`--exact`/`--code`/`--timeout` work on both `run` and `check`. `run`
+auto-builds the engine (`--no-build` to skip) and writes each `.lp` plus a
+`.provmap` next to its `.replay`; the `.lp` write is content-aware (rewritten only
+when the emitted text changes, so an unchanged emit keeps its mtime). `check`
+reads those back, warming the shared `lp/` objects once up front. Both run suites
+in parallel and exit non-zero iff any trace fails. `run` writes
+`lp/bench/results/<suite>.json`, `check` writes `<suite>.check.json`; a `--filter`
+run writes the `.filter.json` variant, so neither clobbers the baseline. A
+benchmark with no `.lp` (emit failed, or `run` not run) is reported by `check` as
+`no_lp` (code `E_NO_LP`).
+
+`check -i` (incremental) skips a benchmark whose `.lpo` is newer than its `.lp`
+and the shared library objects — i.e. it passed last time and nothing it depends
+on changed (lambdapi only writes a `.lpo` on success, so a prior failure always
+re-runs). It trusts mtimes, not lambdapi, so after a lambdapi upgrade run `pp2lp
+clean` (or a plain `check`) once before using `-i` again. The default `check`
+always really checks.
+
+Child-process caps (env, 0 disables): 
+  `PP2LP_CHECK_TIMEOUT`, `PP2LP_EMIT_TIMEOUT`, `PP2LP_GEN_TIMEOUT` 
+   (all 10 s; the slowest prv trace needs ~7.4 s, so don't lower them), 
+   `PP2LP_CHECK_MEM_GB` (4 GiB). 
+`run`/`check --timeout SECS` overrides the emit/check cap for one run (0 disables).
+A timeout reports its own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real failure.
 
 ## Checks (fastest first — climb only as far as the change needs)
 
@@ -61,20 +100,21 @@ own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real failure.
 | `cd ocaml && dune build`                      | seconds | type/exhaustiveness errors (warn 8 fatal) |
 | `cd ocaml && dune runtest`                    | seconds | emitter output drift (replay→.lp)  |
 | `python3 lp/bench/test_cli.py`                | seconds | the OCaml↔Python error-code contract      |
-| `./pp2lp test`                                | <1 s    | rule signatures drifting from their spec  |
-| `./pp2lp run og -q`                           | ~3 s    | end-to-end smoke (30 traces)              |
-| `./pp2lp run prv -q && ./pp2lp run claude -q` | ~5 min  | full regression                           |
+| `./pp2lp run og -q`                           | <1 s    | emit smoke (30 traces → .lp)              |
+| `./pp2lp check og -q`                         | ~3 s    | type-check smoke (30 traces)              |
+| `./pp2lp run <s> -q && ./pp2lp check <s> -q`  | ~5 min  | full regression (s = prv, then claude)    |
 
-Pre-commit minimum: `cd ocaml && dune runtest && ./pp2lp run og -q`. Add prv +
-claude when `ocaml/` or non-bench `lp/` changed. Rough baseline: og 30, prv ~70,
-claude ~1020 of 1129 (every goal is a genuine theorem PP proves bare — see the
-goals.txt header; the ~110 ✗ are the emit/translate frontier those real proofs
-exercise: FIN_INS, INS search, Farkas/AR). Live numbers are in `lp/bench/results/`.
+Pre-commit minimum: `cd ocaml && dune runtest && ./pp2lp run og -q && ./pp2lp
+check og -q`. Add prv + claude when `ocaml/` or non-bench `lp/` changed. Rough
+baseline: og 30/30, prv
+70/70, claude most of ~2300 (every goal is a genuine theorem PP proves bare; the
+suite was scaled to surface failures, so the ✗ are the emit/translate frontier:
+FIN_INS, INS, Farkas/AR, ALL5_1). Live numbers in `lp/bench/results/`.
 
 ## Source layout
 
 ```
-pp2lp                  the single CLI (Python): run, gen, clean.
+pp2lp                  the single CLI (Python): run, check, triage, gen, clean.
 ocaml/src/             the engine (each core module has a .mli):
   parse_replay.ml        .replay → rule lines
   rule_db.ml             rule metadata + the typed emit-dispatch key
@@ -88,17 +128,13 @@ ocaml/src/             the engine (each core module has a .mli):
   + pp_lp, emit_pp, lp_tree, emit_lp, free_vars, lexer.mll, parser.mly, reconstruct, bin/main.ml
 ocaml/test/            tests: replay→.lp vs committed (dune runtest; dune promote)
 lp/
-  B.lp                   trusted base: constants, axioms, defs + reduction rules
-                         (membership, pairs, BOOL, Tuple n, integers, ⋀/Res)
-  lemmas/*.lp            proved lemmas: Int (arith laws), Tuple (η, !!/?? cong,
-                         ♢/♡ bridges), ConjList (⋀ surgery, conj_concat_eq)
+  B.lp                   trusted base: constants, axioms, reduction rules
+  lemmas/*.lp            proved lemmas (Int arith laws, Tuple η/cong, ConjList surgery)
   Prelude.lp             re-exports B + lemmas/* + rules/* — the emitter's sole import
   rules/*.lp             per-section rule lemmas (All, Arith, Axm, Bool, …)
-  tests/*.lp             rule-base unit tests (one file per rules/ module; `pp2lp test`)
-  bench/<suite>/<name>/  per-benchmark inputs/artifacts (apero adds a per-project
-                         level: <suite>/<proj>/<name>/; see Suites)
+  bench/<suite>/<name>/  per-benchmark artifacts (apero nests <suite>/<proj>/<name>/)
   bench/test_cli.py      CLI self-tests + repo contract checks
-  bench/results/         per-run JSON (gitignored)
+  bench/results/         per-run JSON: <suite>.json (emit) + <suite>.check.json (check) (gitignored)
 vendor/atelierb/       vendored REPLAY.kin (used by gen)
 vendor/apero/pog/      the CLEARSY POG dataset (gitignored)
 ```
@@ -110,8 +146,7 @@ vendor/apero/pog/      the CLEARSY POG dataset (gitignored)
 | **og**     | original 30 traces | its `.trace`/`.replay` (no `.but`) | `.trace` + `.replay` |
 | **prv**    | proof-rule-validation suite | checked-in `.but` | `.but` |
 | **claude** | synthetic goals generated by claude | `lp/bench/claude/goals.txt` | `.but` |
-| **apero**  | CLEARSY industrial POs (current work) | (Zenodo
-10.5281/zenodo.7050797) `./vendor/apero/pog` | nothing (regenerable) |
+| **apero**  | CLEARSY industrial POs (current work) | `./vendor/apero/pog` (Zenodo 10.5281/zenodo.7050797) | nothing (regenerable) |
 
 ## LP gotchas
 
@@ -131,18 +166,3 @@ vendor/apero/pog/      the CLEARSY POG dataset (gitignored)
 | `E_EMIT` | other emit-side failure | the message names the rule/variable |
 | `E_LP_CHECK` | lambdapi rejected the emitted `.lp` | the window's goal state |
 | `E_REPLAY_TRUNCATED` | REPLAY dropped the continuation | upstream; dropped at gen |
-
-## Apero (the current work)
-
-Industrial proof obligations from CLEARSY's open POG corpus . No Atelier B path goes `.pog → PP`, so apero converts
-each obligation to a `.but` (`gen_apero_buts`: pog2but + dedup + the
-`PP2LP_APERO_MAX_PREMISE` cap, default 100), then runs the usual PP → REPLAY →
-emit → check.  Benchmarks are grouped per source project and generated
-smallest-first: `lp/bench/apero/<proj>/<name>/<name>.but` (the other suites stay
-flat, `<suite>/<name>/`; discovery is depth-agnostic).  pog2but only renders what
-faithfully corresponds to a PP goal — set comprehensions (`Quantified_Set`),
-records (`Struct`), strings, and real/float arithmetic are rejected at
-conversion, not coerced.
-
-### Known gaps (not regressions)
-- **REPLAY truncation** — sometimes the replay tool drops subproofs; usually on `ALL7`/`XST8`/`OR3_1`/`XST8_1`/`ALL7_1`. often we can confirm this by comparing the `.replay` and the `.trace` file. such cases should be removed from our benchmark suite.
