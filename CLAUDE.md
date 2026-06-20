@@ -86,12 +86,18 @@ re-runs). It trusts mtimes, not lambdapi, so after a lambdapi upgrade run `pp2lp
 clean` (or a plain `check`) once before using `-i` again. The default `check`
 always really checks.
 
-Child-process caps (env, 0 disables): 
-  `PP2LP_CHECK_TIMEOUT`, `PP2LP_EMIT_TIMEOUT`, `PP2LP_GEN_TIMEOUT` 
-   (all 10 s; the slowest prv trace needs ~7.4 s, so don't lower them), 
-   `PP2LP_CHECK_MEM_GB` (4 GiB). 
-`run`/`check --timeout SECS` overrides the emit/check cap for one run (0 disables).
-A timeout reports its own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real failure.
+Child-process caps (env, 0 disables): the timeouts are **CPU-seconds** budgets,
+enforced load-independently via `RLIMIT_CPU` — a benchmark is judged by the
+compute it does, not by how long it waited for a core, so parallel contention
+can neither manufacture spurious timeouts nor mask a deterministic error as one.
+A wall-clock backstop at `PP2LP_WALL_FACTOR`× the budget (default 4×) still kills
+a child wedged without burning CPU.
+  `PP2LP_CHECK_TIMEOUT`, `PP2LP_EMIT_TIMEOUT` (20 s CPU), `PP2LP_GEN_TIMEOUT`
+   (10 s CPU; the slowest prv trace needs ~7.4 s, so don't lower them),
+   `PP2LP_WALL_FACTOR` (4), `PP2LP_CHECK_MEM_GB` (4 GiB).
+`run`/`check --timeout SECS` overrides the emit/check CPU budget for one run (0 disables).
+A timeout reports its own code (`E_LP_TIMEOUT`/`E_TIMEOUT`), distinct from a real
+failure — including a child SIGXCPU'd at the CPU cap (not just the wall backstop).
 
 ## Checks (fastest first — climb only as far as the change needs)
 

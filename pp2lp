@@ -13,6 +13,7 @@ import concurrent.futures
 import difflib
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -35,9 +36,15 @@ BENCH = ROOT / "lp" / "bench"
 RESULTS_DIR = BENCH / "results"
 
 # ── Safety caps for child processes (env-tunable; 0 disables) ──────────────
-CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "10"))   # lambdapi, s
-EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "10"))     # engine emit, s
-GEN_TIMEOUT = float(os.environ.get("PP2LP_GEN_TIMEOUT", "10"))       # krt PP/REPLAY, s
+# The timeouts are CPU-seconds budgets, enforced load-independently via
+# RLIMIT_CPU (a benchmark is judged by the compute it does, not by how long it
+# waited for a core — so parallel contention can't masquerade a heavy emit, or
+# mask a deterministic error, as a timeout).  A wall-clock backstop at
+# WALL_FACTOR× the budget still catches a child wedged without burning CPU.
+CHECK_TIMEOUT = float(os.environ.get("PP2LP_CHECK_TIMEOUT", "20"))   # lambdapi, CPU-s
+EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "20"))     # engine emit, CPU-s
+GEN_TIMEOUT = float(os.environ.get("PP2LP_GEN_TIMEOUT", "10"))       # krt PP/REPLAY, CPU-s
+WALL_FACTOR = float(os.environ.get("PP2LP_WALL_FACTOR", "4"))        # wall backstop = ×budget
 CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
 MAX_FAIL_WINDOWS = int(os.environ.get("PP2LP_MAX_WINDOWS", "15"))    # full failure windows per suite run (0 = no cap)
 
@@ -70,7 +77,12 @@ def fmt_ms(ms: float) -> str:
 
 
 # ── Child-process limits ───────────────────────────────────────────────────
-def _child_limits(timeout: float):
+def _child_limits(cpu_budget: float):
+    """preexec_fn setting the load-independent caps: RLIMIT_AS (memory) and
+    RLIMIT_CPU = the CPU-seconds budget itself (whole seconds; the kernel sends
+    SIGXCPU at the soft limit).  This — not the wall-clock `timeout=` arg — is
+    the binding cap, so a benchmark's verdict doesn't depend on how loaded the
+    machine was."""
     if resource is None or os.name != "posix":
         return None
 
@@ -81,14 +93,29 @@ def _child_limits(timeout: float):
                 resource.setrlimit(resource.RLIMIT_AS, (n, n))
             except (ValueError, OSError):
                 pass
-        if timeout > 0:
-            cpu = int(timeout) + 10
+        if cpu_budget > 0:
+            cpu = max(1, math.ceil(cpu_budget))
             try:
                 resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu))
             except (ValueError, OSError):
                 pass
 
     return apply
+
+
+def _wall(cpu_budget: float) -> float | None:
+    """Wall-clock backstop for a CPU-seconds budget: WALL_FACTOR× the budget, so
+    scheduling contention never trips it (RLIMIT_CPU is the real cap) but a child
+    wedged without burning CPU — blocked on I/O, deadlocked — is still killed."""
+    return cpu_budget * WALL_FACTOR if cpu_budget > 0 else None
+
+
+def _resource_killed(returncode: int) -> bool:
+    """True iff a child was killed by a resource cap: SIGXCPU (RLIMIT_CPU soft
+    limit) or SIGKILL (CPU hard limit / RLIMIT_AS).  A logic error instead exits
+    with a positive code and a message, so this cleanly separates "ran out of
+    budget" from "the proof/translation was rejected"."""
+    return returncode < 0 and -returncode in (signal.SIGXCPU, signal.SIGKILL)
 
 
 def _run_lambdapi(args, timeout=CHECK_TIMEOUT):
@@ -99,7 +126,7 @@ def _run_lambdapi(args, timeout=CHECK_TIMEOUT):
     FileNotFoundError / TimeoutExpired."""
     return subprocess.run(["lambdapi", "check", *args],
                           capture_output=True, text=True,
-                          timeout=timeout or None,
+                          timeout=_wall(timeout),
                           preexec_fn=_child_limits(timeout),
                           start_new_session=True)
 
@@ -180,7 +207,7 @@ def join_prov(lp_line: int, smap: list[dict]) -> dict | None:
 def engine(*engine_args, env=None, timeout=EMIT_TIMEOUT):
     return subprocess.run(
         [str(ENGINE), *engine_args], cwd=ROOT, capture_output=True, text=True,
-        timeout=timeout or None, preexec_fn=_child_limits(timeout),
+        timeout=_wall(timeout), preexec_fn=_child_limits(timeout),
         start_new_session=True, env=env)
 
 
@@ -232,7 +259,8 @@ def emit(replay: Path, out: Path, map_path: Path | None = None,
         except subprocess.TimeoutExpired:
             return {"ok": False, "warnings": [],
                     "error": {"code": "E_TIMEOUT",
-                              "message": f"emit timed out after {eff:.0f}s"}}
+                              "message": f"emit wedged — wall backstop "
+                                         f"{_wall(eff):.0f}s (CPU budget {eff:.0f}s)"}}
         warns, errors = [], []
         for l in r.stderr.splitlines():
             if not l:
@@ -244,6 +272,12 @@ def emit(replay: Path, out: Path, map_path: Path | None = None,
             else:
                 errors.append(l)
         warnings = _collapse(warns)
+        if _resource_killed(r.returncode):         # RLIMIT_CPU/AS, not a logic error
+            if persist:
+                mapfile.unlink(missing_ok=True)
+            return {"ok": False, "warnings": warnings,
+                    "error": {"code": "E_TIMEOUT",
+                              "message": f"emit exceeded CPU budget (~{eff:.0f}s)"}}
         if r.returncode != 0:
             if persist:
                 mapfile.unlink(missing_ok=True)    # a failed emit leaves no usable map
@@ -284,6 +318,8 @@ def lp_check(lp: Path, timeout: float = CHECK_TIMEOUT, gen_obj: bool = True) -> 
         return {"ok": False, "diagnostics": [], "raw": [], "timeout": False,
                 "no_lambdapi": True}
     except subprocess.TimeoutExpired:
+        return {"ok": False, "diagnostics": [], "raw": [], "timeout": True}
+    if _resource_killed(r.returncode):     # RLIMIT_CPU/AS → a budget timeout, not a reject
         return {"ok": False, "diagnostics": [], "raw": [], "timeout": True}
     diagnostics, raw = [], []
     for line in (r.stdout + "\n" + r.stderr).splitlines():
@@ -1068,13 +1104,15 @@ def run_krt(krt, kin, goal_file, cwd, timeout=GEN_TIMEOUT, timer="R45", patterns
     _KRT_LIVE.add(p)
     try:
         try:
-            out, err = p.communicate(timeout=timeout or None)
+            out, err = p.communicate(timeout=_wall(timeout))
         except subprocess.TimeoutExpired:
             p.kill()
             p.communicate()
             return False, "", "timeout"
     finally:
         _KRT_LIVE.discard(p)
+    if _resource_killed(p.returncode):     # RLIMIT_CPU/AS, not a krt failure
+        return False, out or "", "timeout"
     text = (out or "") + "\n" + (err or "")
     for reason, pat in patterns:
         if re.search(pat, text):
@@ -1900,7 +1938,7 @@ def _add_suite_args(sp, default_target: str) -> None:
                          "(e.g. E_TREE_BUILD); composes with --filter, which bounds "
                          "which benchmarks actually run")
     sp.add_argument("--timeout", metavar="SECS", type=float, default=None,
-                    help="per-trace timeout in seconds, overriding PP2LP_EMIT_TIMEOUT "
+                    help="per-trace CPU-seconds budget, overriding PP2LP_EMIT_TIMEOUT "
                          "(run) / PP2LP_CHECK_TIMEOUT (check); 0 disables it")
 
 
