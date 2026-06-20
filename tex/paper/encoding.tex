@@ -198,14 +198,8 @@ Reconstructed, the \rn{ALL7} step becomes the proof term
 			\rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
 		\]}%
 of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
-continuation antecedent $\restm\,(\rho\,v)$ reduces to the conjunction of the
-flat result list ($\rho$ the derivation above, $v$ elided):
-\begin{align*}
-	\restm\,(\rho\,v)
-	 & ≡ \mathsf{conj}\,(\mathsf{res\_ts}\,(\rho\,v))
-	\;≡\; \mathsf{conj}\,(\mathsf{concat}\,(∎ ∷ P_3)\,(∎ ∷ P_2 ∷ P_1))              \\
-	 & ≡ \mathsf{conj}\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) \;≡\; \bwand\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) .
-\end{align*}
+continuation antecedent $\restm\,(\rho\,v)$ reduces to $\bwand$ of the flat list
+$∎ ∷ P_3 ∷ P_2 ∷ P_1$.
 
 
 \paragraph{Arithmetic Side-conditions.}
