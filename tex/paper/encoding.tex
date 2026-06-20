@@ -3,31 +3,41 @@
 
 \subsection{Encoding \pp's Predicates and Expressions}\label{sec:enc-formulas}
 
-The encoding is shallow: \pp's predicates become \lp{} propositions and its
-expressions \lp{} terms, and we assume the standard library's classical
-axioms (excluded middle and propositional extensionality).
+\pp's predicates become \lp{} propositions and its expressions \lp{} terms.
 %
-All B expressions inhabit a single domain, a set code $\iota$, so an
-expression is a term of type $\El\,\iota$ and a predicate a term of type
-$\Prop$.  The library's code $o : \Setu$, with $\El\,o ↪ \Prop$, lets a
-predicate also stand where a `set' element is expected, which the
-conjunction lists below rely on.
+The encoding is shallow and single-sorted: every B expression inhabits one
+domain, a set code $\iota$, so an expression is a term of type $\El\,\iota$
+and a predicate a term of type $\Prop$, and we assume the standard library's
+classical axioms (excluded middle and propositional extensionality).
+%
+The library's code $o : \Setu$, with $\El\,o ↪ \Prop$, lets a predicate also
+stand where a `set' element is expected, which the conjunction lists below
+rely on.
 
-The kernel file \texttt{B.lp} fixes the trusted base.  Pairing $\mapsto$,
-membership $\epsilon$, and B's application $\mathsf{eapp}$ are uninterpreted
-constants over $\El\,\iota$, and the only axioms about them are the
-injectivity and congruence of pairing and set extensionality.  Every
-set-theoretic operator that survives \pp's pre-processing
+The file \texttt{B.lp} fixes the trusted base.
+%
+Pairing, membership, and B's application are uninterpreted constants,
+\[
+	{\mapsto} : \El\,\iota \to \El\,\iota \to \El\,\iota, \qquad
+	{\epsilon} : \El\,\iota \to \El\,\iota \to \Prop, \qquad
+	\mathsf{eapp} : \El\,\iota \to \El\,\iota \to \El\,\iota,
+\]
+and their only axioms are for injectivity and congruence of pairing
+and set extensionality.
+%
+Every set-theoretic operator that survives \pp's pre-processing
 (\autoref{sec:pp-syntax}) is likewise an uninterpreted constant.
 
-Booleans and integers are not axiomatised from scratch but \emph{injected}
-from the library types $\mathbb{B}$ and $\mathbb{Z}$, each by a map with a
-left inverse:
+\paragraph{Booleans and Integers.}
+Neither is axiomatised from scratch; both are injected from the library types
+$\mathbb{B}$ and $\mathbb{Z}$, each by a map with a left inverse:
 \begin{align*}
-  \mathsf{from\_bool} &: \mathbb{B} \to \El\,\iota, &
-  \mathsf{to\_bool}\,(\mathsf{from\_bool}\,b) &↪ b, \\
-  \mathsf{from\_int}  &: \mathbb{Z} \to \El\,\iota, &
-  \mathsf{to\_int}\,(\mathsf{from\_int}\,z)   &↪ z.
+	\mathsf{from\_bool}                              & : \mathbb{B} \to \El\,\iota, &
+	\mathsf{from\_int}                               & : \mathbb{Z} \to \El\,\iota,   \\
+	\mathsf{to\_bool}                                & : \El\,\iota \to \mathbb{B}, &
+	\mathsf{to\_int}                                 & : \El\,\iota \to \mathbb{Z},   \\
+	\mathsf{to\_bool}\,(\mathsf{from\_bool}\,\pv{b}) & ↪ \pv{b},                    &
+	\mathsf{to\_int}\,(\mathsf{from\_int}\,\pv{z})   & ↪ \pv{z}.
 \end{align*}
 $\mathsf{BOOL}$ and $\mathsf{INT}$ name their images; $\mathsf{BTRUE}$,
 $\mathsf{BFALSE}$, $\mathbf{0}$, and $\mathbf{1}$ are the injected library
@@ -36,199 +46,201 @@ domain through $\mathsf{from\_int}$ automatically.
 
 The arithmetic operators ($+$, unary $-$, and $\leq$) stay abstract over
 $\El\,\iota$, so unification still recovers their operands, and take their
-meaning from \emph{defining axioms} that a conservative orientation turns
+meaning from defining axioms that a conservative orientation turns
 into reductions of $\mathsf{to\_int}$:
 \begin{align*}
-  x + y    &= \mathsf{from\_int}(\mathsf{to\_int}\,x + \mathsf{to\_int}\,y), &
-  \mathsf{to\_int}\,(x + y) &↪ \mathsf{to\_int}\,x + \mathsf{to\_int}\,y, \\
-  {-x}     &= \mathsf{from\_int}(-\,\mathsf{to\_int}\,x), &
-  \mathsf{to\_int}\,(-x)    &↪ -\,\mathsf{to\_int}\,x, \\
-  x \leq y &= (\mathsf{to\_int}\,x \leq \mathsf{to\_int}\,y).
+	x + y                               & = \mathsf{from\_int}(\mathsf{to\_int}\,x + \mathsf{to\_int}\,y), &
+	\mathsf{to\_int}\,(\pv{x} + \pv{y}) & ↪ \mathsf{to\_int}\,\pv{x} + \mathsf{to\_int}\,\pv{y},             \\
+	{-x}                                & = \mathsf{from\_int}(-\,\mathsf{to\_int}\,x),                    &
+	\mathsf{to\_int}\,(-\pv{x})         & ↪ -\,\mathsf{to\_int}\,\pv{x},                                     \\
+	x \leq y                            & = (\mathsf{to\_int}\,x \leq \mathsf{to\_int}\,y).
 \end{align*}
-Ground arithmetic therefore \emph{computes} in $\mathbb{Z}$ while the
-operators stay rigid in goals; subtraction is sugar for $x + (-y)$, and
-multiplication enters only as a literal coefficient.  \pp's arithmetic
-rules, the laws of a discretely ordered abelian group, are then
-\emph{proved} from these axioms (in \texttt{lemmas/Int.lp}), not postulated.
-The trusted arithmetic base is thus $\mathsf{from\_int}$, its inverse
-$\mathsf{to\_int}$, the defining axioms, and \lp's $\mathbb{Z}$; it is not a
-bespoke construction of the integers (e.g.\ as equivalence classes of pairs
-of naturals).
+Ground arithmetic therefore computes in $\mathbb{Z}$ while the operators stay
+rigid in goals (the $\leq$ axiom has no companion reduction, landing in
+$\Prop$ rather than a $\mathsf{to\_int}$ position); subtraction is sugar for
+$x + (-y)$, and multiplication enters only as a literal coefficient.  \pp's arithmetic
+rules are then proved from these axioms (through the integer lemmas of
+\texttt{lemmas/Int.lp}), not postulated.
 
 \paragraph{List-based Conjunction.}
 \pp{} treats $\land$ as left-associative, so $p \land q \land r$ parses as
 $(p \land q) \land r$; some rules peel this outermost conjunct, while others
 reach a conjunct at an arbitrary position.  To serve both, we encode a
-conjunction as a snoc list folded by one operator:
+conjunction as a list that grows on the right, folded by one operator:
 \begin{align*}
-  &∎ : \mathbb{L}^{*}\,a, \qquad
-   {∷} : \mathbb{L}^{*}\,a \to \El\,a \to \mathbb{L}^{*}\,a, \qquad
-   \bwand : \mathbb{L}^{*}\,o \to \Prop, \\
-  &\bwand(∎ ∷ p) ↪ p, \qquad \bwand(ps ∷ \top) ↪ \bwand\,ps.
+	\mathbb{L}^{*}         & : \Setu \to \TYPE,                                    &
+	\bwand                 & : \mathbb{L}^{*}\,o \to \Prop,                          \\
+	∎\,[a]                 & : \mathbb{L}^{*}\,a,                                  &
+	\bwand(∎ ∷ \pv{p})     & ↪ \pv{p},                                               \\
+	{∷}\,[a]               & : \mathbb{L}^{*}\,a \to \El\,a \to \mathbb{L}^{*}\,a, &
+	\bwand(\pv{ps} ∷ \top) & ↪ \bwand\,\pv{ps}.
 \end{align*}
-$\mathbb{L}^{*}\,a$ is the type of snoc lists over $\El\,a$ (empty $∎$, right
+$\mathbb{L}^{*}\,a$ is the type of lists over $\El\,a$ (empty $∎$, right
 append $∷$), and the injective $\bwand$ folds a list of propositions
-($a = o$) into their conjunction.  This conjunction stays \emph{abstract}:
+($a = o$) into their conjunction.  This conjunction stays abstract:
 its link to binary $\land$ is not a rewrite rule but a separate
 axiomatisation, used only inside the rules' soundness proofs.  The list form
-surfaces directly in a rule's type; \pp's \rn{AND2}, which refutes
-$\bwand(ps ∷ p)$ by deriving $\lnot p$ from the rest, reads
-\begin{center}
-  \begin{prooftree}
-    \hypo{H \seq \bwand ps \Rightarrow \lnot p}
-    \infer1[\rn{AND2}]{H \seq \lnot\,\bwand (ps ∷ p)}
-  \end{prooftree}
-  \qquad
-  $\rn{AND2} : \Prf\,(\bwand ps \Rightarrow \lnot p)
-             \to \Prf\,(\lnot\,\bwand (ps ∷ p)).$
-\end{center}
+surfaces directly in a rule's type: \rn{AND4} (\autoref{sec:pp-syntax}),
+which extends a conjunction by one conjunct, reads
+\[
+	\rn{AND4}\,[ps : \mathbb{L}^{*}\,o]\,[p : \El\,o] : \Prf\,p
+	\to \Prf\,(\bwand\,ps)
+	\to \Prf\,(\bwand\,(ps ∷ p)).
+\]
 
 \paragraph{Compound Binders.}
 \pp{} distinguishes the compound binder $\forall (x,y) \cdot P$ from the
 nested $\forall x \cdot \forall y \cdot P$ and manipulates the former as a
 unit, so we mirror it with a tuple type and quantifiers over it:
 \begin{align*}
-  \Tuple &: ℕ \to \TYPE, &
-  \prj\,[n] &: ℕ \to \Tuple\,n \to \El\,\iota, \\
-  \allI, \xstI &: (\Tuple\,n \to \Prop) \to \Prop, &
-  \Dia, \Hrt &≔ \allI.
+	\Tuple        & : ℕ \to \TYPE,                                  &
+	\mathsf{unit} & : \Tuple\,0,                                      \\
+	{⨾}           & : \Tuple\,n \to \El\,\iota \to \Tuple\,(n{+}1), &
+	\prj\,[n]     & : ℕ \to \Tuple\,n \to \El\,\iota,                 \\
+	\allI, \xstI  & : (\Tuple\,n \to \Prop) \to \Prop,              &
+	\Dia, \Hrt    & ≔ \allI.
 \end{align*}
-$\Tuple\,n$ holds $n$ elements of $\El\,\iota$ with projection $\prj$;
+$\Tuple\,n$ holds $n$ elements of $\El\,\iota$, built from $\mathsf{unit}$ by
+right append $⨾$ and read back by $\prj$ ($\prj\,0$ the last element);
 $\allI$ and $\xstI$ are the $n$-ary universal and existential; and $\Dia,
-\Hrt$ are aliases of $\allI$ that carry only a proof-search role
-(\autoref{sec:pp-syntax}).  Each quantifier's introduction and elimination
-are \emph{axiomatised} bridges to \lp's $\Pi$-types, e.g.\ for $\allI$
+	\Hrt$ are aliases of $\allI$ that carry only a proof-search role
+(\autoref{sec:pp-syntax}).
+%
+For instance, $\forall (x,y) \cdot (x \mapsto y) \in f$ becomes
+$\allI\,(\lambda v : \Tuple\,2,\ (\prj\,1\,v \mapsto \prj\,0\,v)
+	\mathrel{\epsilon} f)$, the bound pair recovered by projection.
+%
+Each quantifier's introduction and elimination
+are axiomatised \lp's $\Pi$-types, e.g.\ for $\allI$
 \[
-  (\Pi v : \Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v,\,P\,v)
-  \qquad\text{and its converse.}
+	(\Pi v : \Tuple\,n,\ \Prf\,(P\,v)) \to \Prf\,(\allI v,\,P\,v)
+	\qquad\text{and its converse.}
 \]
-They are axioms, not rewrite rules, by design: a rule unfolding $\allI$ to a
-nested $\Pi$ would erase the quantifier from goals before a rule lemma could
-match it, and recovering $P$ at each use would demand the higher-order
-unification \lp{} does not attempt.
+
 
 \subsection{Encoding Rules}\label{sec:enc-rules}
 %
 Each \pp{} rule becomes a \lp{} symbol whose type states the rule and whose
-body \emph{proves} it sound.  Translating a rule's statement into that type
-is positional:
-\begin{align*}
-  \text{a conclusion } H \seq P
-    &\ \text{becomes the result type } \Prf\,P, \\
-  \text{a premise } H, P \seq Q
-    &\ \text{becomes an argument } \Prf\,P \to \Prf\,Q, \\
-  \text{a side-condition (}P \text{ occurs in } H\text{)}
-    &\ \text{becomes an argument } \Prf\,P,
-\end{align*}
-the last supplied by \tool{} at translation time (\autoref{sec:eval}).
+body proves it sound.  Translating a rule's statement into that type is
+positional: a conclusion $H \seq P$ becomes the result type $\Prf\,P$; a
+premise $H, P \seq Q$ an argument $\Prf\,P \to \Prf\,Q$; and a side-condition
+($P$ occurs in $H$) an argument $\Prf\,P$, the last supplied by \tool{} at
+translation time (\autoref{sec:eval}).
+%
 Accordingly \rn{IMP4} (prove $P \Rightarrow Q$ by assuming $P$) takes its
 premise as a function argument, while the discharge rule \rn{AXM1} (close
 $P \Rightarrow Q$ once $\lnot P$ is known) takes its side-condition $\lnot P$
 as a plain one:
-\[
-  \rn{IMP4} : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q)
-  \qquad
-  \rn{AXM1} : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
-\]
+\begin{align*}
+	\rn{IMP4}\,[P\,Q : \Prop] & : (\Prf\,P \to \Prf\,Q) \to \Prf\,(P \Rightarrow Q), \\
+	\rn{AXM1}\,[P\,Q : \Prop] & : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
+\end{align*}
 
 
 \paragraph{Result Derivations.}
 A result derivation (\autoref{sec:pp-syntax}) normalises a formula to a list
-of predicates whose conjunction is its normal form.  Writing
-$\mathsf{conj}\,ts$ for that conjunction ($\top$ when $ts$ is empty), we
-encode the derivation as a type $\Res\,t$ pairing the list with a proof that
-$t$ equals $\mathsf{conj}\,ts$:
+of predicates whose conjunction is its normal form.  We write $\mathsf{conj}$
+for the fold $\bwand$ of \autoref{sec:enc-formulas} on a non-empty list, and
+$\top$ on the empty one (a discharged result).  The derivation is then a type
+$\Res\,t$ pairing the list with a proof that $t$ equals $\mathsf{conj}\,ts$:
 \begin{align*}
-  \Res &: \El\,o \to \TYPE \\
-  \mathsf{mk\_res}\,[t : \El\,o]\,(ts : \mathbb{L}^{*}\,o) &: \Prf\,(t = \mathsf{conj}\,ts) \to \Res\,t \\
-  \mathsf{res\_ts}\,(\mathsf{mk\_res}\,ts\,h) &↪ ts \\
-  \mathsf{res\_eq}\,(\mathsf{mk\_res}\,ts\,h) &↪ h \\
-  \restm\,r &≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)
+	\Res                                              & : \El\,o \to \TYPE,                                 &   & \\
+	\mathsf{mk\_res}\,[t]\,(ts : \mathbb{L}^{*}\,o)   & : \Prf\,(t = \mathsf{conj}\,ts) \to \Res\,t,        &   & \\
+	\mathsf{res\_ts}\,[t]\,(r : \Res\,t)              & : \mathbb{L}^{*}\,o,                                &
+	\mathsf{res\_ts}\,(\mathsf{mk\_res}\,\pv{ts}\,\_) & ↪ \pv{ts},                                                \\
+	\mathsf{res\_eq}\,[t]\,(r : \Res\,t)              & : \Prf\,(t = \mathsf{conj}\,(\mathsf{res\_ts}\,r)), &
+	\mathsf{res\_eq}\,(\mathsf{mk\_res}\,\_\,\pv{h})  & ↪ \pv{h}.
 \end{align*}
 \noindent A result-form rule (suffixed \texttt{\_1} in replays) is a
 \lp{} function over $\Res$ values.  \rn{AND4\_1} realises the combination
 schema of \autoref{sec:pp-syntax}, concatenating its two children's lists;
 \rn{ALL7}, one of the two rules that consume a result, takes a per-instance
-derivation $\rho$ and continues under the conjunction ($\restm$) of its
-result:
-\begin{codeLPmulti}
-\begin{lstlisting}[style=lp]
-symbol AND4_1 [ps : $\mathbb{L}^{*}$ o] [p : Prop]
-    (r1 : Res p) (r2 : Res ($\bigwedge$ ps)) : Res ($\bigwedge$ (ps ∷ p))
-  ≔ mk_res (concat (res_ts r1) (res_ts r2)) (...);
-\end{lstlisting}
-\listsep
-\begin{lstlisting}[style=lp]
-opaque symbol ALL7 [n] [P : Tuple n → Prop] [Q : Prop]
-    (ρ : Π v : Tuple n, Res (P v))
-    : π ((`$\diamondsuit$ v, res_tm (ρ v)) ⇒ Q) → π ((`!! v, P v) ⇒ Q) ≔ ...
-\end{lstlisting}
-\end{codeLPmulti}
+derivation $\rho$ and continues under the conjunction of its result,
+$\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
+\[
+	\begin{aligned}
+		\rn{AND4\_1}\,[ps : \mathbb{L}^{*}\,o]\,[p : \El\,o]
+		 & : \Res\,p \to \Res\,(\bwand\,ps) \to \Res\,(\bwand\,(ps ∷ p))                                                         \\
+		 & ≔ \lambda\,r_1\,r_2,\ \mathsf{mk\_res}\,(\mathsf{concat}\,(\mathsf{res\_ts}\,r_1)\,(\mathsf{res\_ts}\,r_2))\,(\ldots)
+	\end{aligned}
+\]
+\[
+	\begin{aligned}
+		 & \rn{ALL7}\,[n]\,[P : \Tuple\,n \to \Prop]\,[Q : \Prop]\ (\rho : \Pi\,v : \Tuple\,n,\ \Res\,(P\,v)) : {} \\
+		 & \quad \Prf\,((\Dia v,\ \restm\,(\rho\,v)) \Rightarrow Q)
+		\to \Prf\,((\allI v,\ P\,v) \Rightarrow Q)
+	\end{aligned}
+\]
 \noindent For example, consider the result derivation below, for the body
 $P_1 \land P_2 \land P_3$ with each conjunct kept at a \rn{STOP\_1} leaf:
 \begin{center}\footnotesize
-\ebproofset{separation=1em}%
-\begin{prooftree}
-  \infer0[\rn{STOP\_1}]{(\seq P_3) \yields [P_3]}
-  \infer0[\rn{STOP\_1}]{(\seq P_2) \yields [P_2]}
-  \infer0[\rn{STOP\_1}]{(\seq P_1) \yields [P_1]}
-  \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2) \yields [P_2, P_1]}
-  \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2 \land P_3) \yields [P_3, P_2, P_1]}
-  \hypo{}
-  \ellipsis{}{\seq (\Dia x \cdot P_3 \land P_2 \land P_1) \Rightarrow G}
-  \infer2[\rn{ALL7}]{\seq (\forall x \cdot P_1 \land P_2 \land P_3) \Rightarrow G}
-\end{prooftree}
+	\ebproofset{separation=1em}%
+	\begin{prooftree}
+		\infer0[\rn{STOP\_1}]{(\seq P_3) \yields [P_3]}
+		\infer0[\rn{STOP\_1}]{(\seq P_2) \yields [P_2]}
+		\infer0[\rn{STOP\_1}]{(\seq P_1) \yields [P_1]}
+		\infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2) \yields [P_2, P_1]}
+		\infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2 \land P_3) \yields [P_3, P_2, P_1]}
+		\hypo{}
+		\ellipsis{}{\seq (\Dia x \cdot P_3 \land P_2 \land P_1) \Rightarrow G}
+		\infer2[\rn{ALL7}]{\seq (\forall x \cdot P_1 \land P_2 \land P_3) \Rightarrow G}
+	\end{prooftree}
 \end{center}
 The example shows why results are lists, not conjunctions: the two nested
 \rn{AND4\_1} steps concatenate their children's lists into the single flat
 list $[P_3, P_2, P_1]$, which \rn{ALL7} conjoins.  Combining eagerly with
 $\land$ would instead mirror the proof's nesting as $P_3 \land (P_2 \land
-P_1)$; the list defers and flattens the conjunction.
+	P_1)$; the list defers and flattens the conjunction.
 %
 Reconstructed, the \rn{ALL7} step becomes the proof term
-{\small
-\[
-  \rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
-\]}%
+	{\small
+		\[
+			\rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
+		\]}%
 of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
-continuation antecedent $\restm\,(\rho\,v)$ reduces to a plain conjunction
-($\rho$ the derivation above, $v$ elided):
+continuation antecedent $\restm\,(\rho\,v)$ reduces to the conjunction of the
+flat result list ($\rho$ the derivation above, $v$ elided):
 \begin{align*}
-  \restm\,(\rho\,v)
-    &≡ \mathsf{conj}\,(\mathsf{res\_ts}\,(\rho\,v))
-     \;≡\; \mathsf{conj}\,(\mathsf{concat}\,(∎ ∷ P_3)\,(∎ ∷ P_2 ∷ P_1)) \\
-    &≡ \mathsf{conj}\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) \;≡\; P_3 \land P_2 \land P_1 .
+	\restm\,(\rho\,v)
+	 & ≡ \mathsf{conj}\,(\mathsf{res\_ts}\,(\rho\,v))
+	\;≡\; \mathsf{conj}\,(\mathsf{concat}\,(∎ ∷ P_3)\,(∎ ∷ P_2 ∷ P_1))              \\
+	 & ≡ \mathsf{conj}\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) \;≡\; \bwand\,(∎ ∷ P_3 ∷ P_2 ∷ P_1) .
 \end{align*}
 
 
 \paragraph{Arithmetic Side-conditions.}
-A handful of rules carry an arithmetic side-condition that \pp{} discharges
-with its own solver, leaving no subproof in the replay: \rn{AR4} needs
-$(E+F) > \mathbf{0}$ for terms \pp{} believes positive, and the \rn{ARITH}
-terminal closes a goal whose accumulated $\leq$-hypotheses are contradictory.
-In the encoding each is an explicit $\Prf$-argument, so \tool{} must
-\emph{generate} the missing proof at translation time.  A small
-Fourier--Motzkin search over the in-scope hypotheses assembles the
-certificate from the order lemmas of \autoref{sec:enc-formulas}, and any
-linear $\mathbb{Z}$-equality it needs along the way (a reassociated sum, a
-scaled coefficient) is closed by \emph{proof by reflection}, reifying each
-side and comparing normal forms; we take this reflexive procedure from
-Coltellacci and Merz~\cite{coltellacci2025lia} and refer there for its
-construction.
+A few rules carry an arithmetic side-condition that \pp's own solver discharges,
+leaving no subproof in the replay: \pp's contradiction terminal \rn{ARITH}
+closes a goal once its accumulated $\leq$-hypotheses are jointly contradictory,
+and \rn{AR4} needs
+$E + F > \mathbf{0}$ (for a hypothesis $F \leq \mathbf{0}$) to conclude
+$E \leq \mathbf{0} \Rightarrow R$.
+%
+In the encoding each side-condition is an explicit $\Prf$-argument that \tool{}
+must rebuild.
+%
+For \rn{ARITH}, a Fourier--Motzkin elimination over the in-scope
+$\leq$-hypotheses produces a \emph{Farkas certificate}~\cite{schrijver1986} ---
+nonnegative
+multipliers under which the scaled hypotheses sum to a contradiction such as
+$\mathbf{1} \leq \mathbf{0}$ --- assembled in \lp{} from the order lemmas of
+\autoref{sec:enc-formulas}.
+%
+For \rn{AR4}, and for the linear $\mathbb{Z}$-equalities that assembly leaves
+behind (a reassociated sum, a rescaled coefficient), we use \emph{proof by
+	reflection}: each side is reified to a normal form and the two compared, a
+reflexive procedure we take from Coltellacci and Merz~\cite{coltellacci2025lia}.
 
-For \rn{ARITH} the search looks for a nonnegative
-(Farkas-style~\cite{schrijver1986}) combination of the $\leq \mathbf{0}$
-hypotheses that sums to a false literal.  For instance, from
-$h_1 : \Prf\,(x \leq \mathbf{0})$ and
-$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$ the combination
-$h_2 + 2h_1$ yields $\mathbf{1} - (x + x) + x + x \leq \mathbf{0}$, and
-rewriting along the generated equality
-$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ leaves
-$\mathbf{1} \leq \mathbf{0}$:
+Concretely, from $h_1 : \Prf\,(x \leq \mathbf{0})$ and
+$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$, the multipliers $1$ and
+$2$ add the bound of $h_2$ to twice that of $h_1$, giving
+$(\mathbf{1} - (x + x)) + x + x \leq \mathbf{0}$; the generated equality
+$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ rewrites this to the
+false $\mathbf{1} \leq \mathbf{0}$:
 \[
-  \mathsf{one\_not\_leq\_zero}\,\bigl(\mathsf{leq\_subst\_l}\ e\
-    (\mathsf{add\_leq\_zero}\ \_\ \_\ (\mathsf{add\_leq\_zero}\ \_\ \_\ h_2\ h_1)\ h_1)\bigr)
-  : \Prf\,\bot .
+	\mathsf{one\_not\_leq\_zero}\,\bigl(\mathsf{leq\_subst\_l}\ e\
+	(\mathsf{add\_leq\_zero}\ \_\ \_\ (\mathsf{add\_leq\_zero}\ \_\ \_\ h_2\ h_1)\ h_1)\bigr)
+	: \Prf\,\bot .
 \]
 Here $e$ is itself closed by reflection, so \pp's sum reorderings need no
 bespoke permutation lemmas.
@@ -246,4 +258,7 @@ arithmetic rules to the integer laws of \autoref{sec:enc-formulas} (and,
 through them, \lp's $\mathbb{Z}$).  What remains trusted is therefore exactly
 \texttt{B.lp}'s primitives: the pairing and extensionality axioms, the
 boolean and integer injections with their defining axioms, the quantifier
-bridges, and the $\bwand$/$\Res$ interface.
+bridges, the $\bwand$/$\Res$ interface, and a typing oracle supplying the
+$\mathsf{INT}$ and $\mathsf{BOOL}$ memberships \pp{} assumes of its arithmetic
+and boolean terms --- facts about variables that \pp{} types from context,
+which the single-sorted encoding does not record.

@@ -27,16 +27,17 @@ list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \fo
 latter into the former during proof search.
 %
 The quantifiers $\Dia$ and $\Hrt$ are universal quantifiers idiosyncratic
-to \pp's normalisation procedure; semantically both are $\forall$ and differ
-only in the role they play during proof search.
+to \pp's normalisation procedure; semantically both are $\forall$, with
+$\Dia$ marking a normalised universal on the goal side and $\Hrt$ one on the
+hypothesis side.
 
 Although B is a set-theoretic formalism, \pp{} itself proves formulas of
 first-order logic with linear arithmetic: a pre-processing step reduces much
 of the set theory of a proof obligation to first-order formulas over
 membership before \pp{} sees it.
 %
-The set-theoretic operators that survive this reduction (intervals, the
-maplet, and the relational operators of \autoref{app:operators}) reach
+The set-theoretic operators that survive this reduction (intervals, maplets,
+and the set and relational operators of \autoref{app:operators}) reach
 \pp{} as uninterpreted function symbols: \pp{} has no set-theory rules, and
 such terms are only ever copied, compared for equality, or instantiated.
 
@@ -48,9 +49,9 @@ documentation~\cite{pp_spec}.  There are roughly \numRulesSpec{} rules,
 grouped into families: propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
 \rn{NOT}), hypothesis discharge (\rn{AXM1--9}), quantifiers
 (\rn{ALL1--9}, \rn{XST1--8}), equality
-(\rn{EQL}, \rn{EAXM}, \rn{EQC}, \rn{ECTR}, \ldots), booleans
+(\rn{EVR}, \rn{EAXM}, \rn{EQC}, \rn{EQS}, \rn{ECTR}, \ldots), booleans
 (\rn{BOOL}), linear arithmetic (\rn{AR1--13}),
-and normalisation (\rn{NRM1--30}).
+and normalisation (\rn{NRM1--30}), among others.
 %
 Each rule reduces the current goal to zero, one, or two
 premises, possibly under computational side-conditions
@@ -65,8 +66,8 @@ the list of predicates $[Q_1, \ldots, Q_n]$''.  This list is a
 Most classical rules come paired with a result form (written with a
 \texttt{\_1} suffix): a rule whose conclusion is a result.  A result rule is
 given by one of three schemas: the empty list (the formula is discharged),
-a singleton $[Q]$ (a single transformed formula), or the concatenation of
-its two premises' lists (a combination).
+a singleton $[Q]$ (a single transformed formula, produced by a leaf such as
+\rn{STOP\_1}), or the concatenation of its two premises' lists (a combination).
 %
 For instance, \rn{AND4} introduces a conjunct, and its result form
 \rn{AND4\_1} (the combination schema) concatenates the two premises'
@@ -83,7 +84,7 @@ lists:
   \end{prooftree}
 \end{center}
 
-Only \rn{ALL7} and \rn{XST8} \emph{consume} a result, each turning a
+Only \rn{ALL7} and \rn{XST8} consume a result, each turning a
 result derivation back into an ordinary sequent subproof.
 %
 \rn{ALL7} normalises the body of a universal antecedent pointwise to a list
@@ -98,12 +99,12 @@ post-normalisation universal $\Dia$:
 \end{center}
 %
 \rn{XST8} is its existential dual: to prove $\exists x \cdot P$ it normalises
-$\lnot P$ to a list $R_1,\ldots,R_n$ and continues from a refutation of the
-universally-closed conjunction.
+$\lnot P$ to a list $R_1,\ldots,R_n$ and refutes their conjunction closed
+under the same post-normalisation universal $\Dia$.
 \begin{center}
   \begin{prooftree}
     \hypo{(H \seq \lnot P) \yields [R_1,\ldots,R_n]}
-    \hypo{H \seq (\forall x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow \bot}
+    \hypo{H \seq (\Dia x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow \bot}
     \infer2[\rn{XST8}]{H \seq \exists x \cdot P}
   \end{prooftree}
 \end{center}
@@ -113,12 +114,12 @@ re-runs the proof and expands the trace into a \replay{} that annotates each
 step with the goal it was applied to (\autoref{fig:replay}).
 %
 Each replay line carries a rule name and, in parentheses, an optional
-argument.
+rule-specific argument (for instance, an instantiation index).
 %
 A rule's line precedes the lines of its subproofs, with two exceptions.
 %
 First, the result derivation feeding \rn{ALL7} or \rn{XST8} appears
-\emph{before} the rule that consumes it.
+before the rule that consumes it.
 %
 Second, the replay interleaves marker lines that do not correspond to
 inference rules: \texttt{NRM} and \texttt{STOP\_NORM}, which bracket

@@ -1,4 +1,4 @@
-% ── eval.tex · §3 ───────────────────────
+% ── eval.tex · §4 Implementation and Evaluation ───────
 % Table + prose read numbers from results-data.tex — never hard-code a
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
@@ -22,8 +22,8 @@
 % --------------------------------------------------------------------
 The core of
 \tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
-is an OCaml program of about 4600 lines behind a Python command-line
-driver; the rule library of \autoref{sec:encoding} is another 4300
+is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
+driver; the rule library of \autoref{sec:encoding} is another \toolLpLines{}
 lines of \lp.
 %
 A single module holds rule metadata: arity, argument kinds,
@@ -31,7 +31,7 @@ and an emission strategy per rule.
 %
 The pipeline (\autoref{fig:pipeline}) has three stages.
 
-A lexer and a Menhir-generated parser read the \texttt{.replay} file
+A lexer and a Menhir-generated parser read the \replay{} file
 into a flat list of (rule, argument, goal) records.
 %
 This list is then transformed into a proof tree by consuming the prefix stream
@@ -47,24 +47,22 @@ Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
 and whose body is a tactic script.
 %
 Each rule application in the \pp{} proof tree generally corresponds to an
-application of the corresponding \lp{} rule (e.g., $\refine\;\texttt{AND2\,\_}$),
+application of the corresponding rule lemma (e.g., $\refine\;\texttt{AND2\,\_}$),
 although some \pp{} rule applications require bespoke tactic applications.
 %
-Rules that recall in-scope hypothesis receive their $\Prf$-argument
+Rules that invoke in-scope hypotheses receive their $\Prf$-argument
 by hypothesis lookup at the OCaml level; rules that introduce an antecedent
 or a binder push an \texttt{assume}; result derivations are emitted as
 explicit $\Res$-terms and passed as an argument; and arithmetic solver
-side-conditions get proof-terms generated at translation time.
+side-conditions get proof-terms generated at translation time
 (\autoref{sec:enc-rules}).
 %
 The resulting symbol declaration is written to a \lpf{} file which
 may then be type-checked via \texttt{lambdapi check}.
 %
-For debugging purposes, our tool records a table mapping every line of the
-\lp{} file to the replay step and \pp{} goal that produced it.
-%
-When a check fails, the report shows the offending \lp{} line, the replay
-step it came from, and the rule lemma's signature side by side.
+For debugging, \tool{} records a table from each \lp{} line back to the
+replay step and \pp{} goal that produced it, so a failed check reports the
+offending line, its replay step, and the rule lemma's signature together.
 
 % --- reconstruction figure ------------------------------------------
 \begin{figure}[t]
@@ -100,54 +98,77 @@ end;
   \end{minipage}
   \caption{Reconstruction of the benchmark \texttt{zp\_noncontra},
     $\lnot(a \land \lnot a)$.
-    Each replay line maps to one \refine{} of the corresponding rule
-    lemma; the conjunction is the snoc-list $\bwand$ of
-    \autoref{sec:enc-formulas}.
-    The $\mathtt{delta\_pa} = \mathtt{TRUE}$ premise is a definedness
-    flag added by our goal generator; \rn{OPR1} introduces it and
-    rewrites with it.}
+    Most replay lines become a \refine{} of the matching rule lemma; a rule
+    that introduces a hypothesis also emits an \texttt{assume} (here
+    \rn{IMP4}), and \rn{OPR1} discharges the definedness flag
+    $\mathtt{delta\_pa} = \mathtt{TRUE}$ (added by our goal generator) with an
+    \texttt{assume} and a \texttt{rewrite}.
+    The conjunction is the fold $\bwand$ of \autoref{sec:enc-formulas}.}
   \label{fig:reconstruct}
 \end{figure}
 % --------------------------------------------------------------------
 
 \subsection{Benchmarks}\label{sec:bench}
 
-We exercise \tool{} on three suites (\autoref{tab:results}).
+We exercise \tool{} on four suites (\autoref{tab:results}).
 %
 \texttt{og} is a fixed set of \ogReplayed{} replays that served as an
-initial development corpus.
+initial development corpus;
 %
-\texttt{prv} are goals that validate custom proof-rules from real
-\ab{} developments.
+\texttt{prv} validates custom proof-rules from real \ab{} developments;
 %
-\texttt{claude} is a synthetic suite of \claudeGoals{} goals, authored by
-an LLM-based coding agent (Claude Opus 4.8).
+\texttt{claude} is a synthetic suite authored by an LLM agent (Claude
+Opus~4.8);
+%
+and \texttt{apero} samples raw industrial obligations from CLEARSY's public
+proof-obligation dataset~\cite{deharbe2022pog}, translated from its POG
+format into \pp's rule-validation input.
 %
 \begin{table}[t]
   \centering
-  \caption{Results for the \texttt{og}, \texttt{prv}, and \texttt{claude} suites}
+  \caption{Reconstruction per suite, read from the benchmark run logs.
+    \emph{Verified} replays type-check; \emph{timeouts} hit the
+    20\,CPU-second budget for emission or \lp{} checking; \emph{failures}
+    are genuine emit or type-check failures
+    (verified${}+{}$timeouts${}+{}$failures${}={}$replays).}
   \label{tab:results}
-  \begin{tabular}{l r r r}
+  \begin{tabular}{l r r r r}
     \toprule
-    Suite           & Goals        & Replays         & Checked \\
+    Suite           & Replays         & Verified    & Timeouts       & Failures \\
     \midrule
-    \texttt{og}     & ---          & \ogReplayed     & \ogPass \\
-    \texttt{prv}    & \prvGoals    & \prvReplayed    & \prvPass \\
-    \texttt{claude} & \claudeGoals & \claudeReplayed & \claudePass \\
+    \texttt{og}     & \ogReplayed     & \ogPass     & \ogTimeout     & \ogFailed \\
+    \texttt{prv}    & \prvReplayed    & \prvPass    & \prvTimeout    & \prvFailed \\
+    \texttt{claude} & \claudeReplayed & \claudePass & \claudeTimeout & \claudeFailed \\
+    \texttt{apero}  & \aperoReplayed  & \aperoPass  & \aperoTimeout  & \aperoFailed \\
     \midrule
-    total           &              & \allReplayed    & \allPass \\
+    total           & \allReplayed    & \allPass    & \allTimeout    & \allFailed \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Every replay the upstream toolchain produces is reconstructed and
-type-checked: \allPass{} proofs, with no failures.
+On the rule-validation and synthetic suites \tool{} reconstructs and
+type-checks every replay but \claudeFailed{}: \texttt{og} and \texttt{prv}
+in full, and \claudePass{} of \texttt{claude}'s \claudeReplayed{}, the
+exceptions being goals that reach shapes we do not yet support (INS
+contradiction search, nonlinear arithmetic, one result form).
 %
-\numRulesFired{} of the \numRulesCovered{} encoded rules fire in some
-replay.
+\numRulesFired{} of the \numRulesCovered{} encoded rules fire across these
+replays.
 %
-Re-emitting and re-checking the full corpus takes \benchWallAll{} of
+Re-emitting and re-checking the three suites takes \benchWallAll{} of
 wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
+
+\texttt{apero} stresses the pipeline at industrial scale: a sampled
+obligation carries a median of about \aperoMedianHyps{} hypothesis
+predicates, yet \pp{} discharges most of them.
+%
+Of the \aperoReplayed{} replays \tool{} reconstructs, \aperoPass{} type-check
+within the budget and a further \aperoTimeout{} exceed it on the largest
+obligations; only \aperoFailed{} are genuine reconstruction failures.
+%
+These are also the first machine-produced replays to exercise \pp's equality
+store, in surface forms --- strict comparisons, tuple memberships, relational
+inverse --- that no synthetic goal had reached.
 
 
 \subsection{Conclusion and Future Work}\label{sec:conclusion}
@@ -155,29 +176,26 @@ wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
 We have presented \tool, which checks \ab's Predicate Prover by
 reconstructing its proofs in \lp.
 %
-Unlike approaches that postulate each rule as an axiom, every \pp{} rule
-is encoded as a symbol whose body \emph{proves} the rule sound against a
-small axiomatic base, and the reconstructed corpus (including \ab's own
-rule-validation suite, arithmetic included) type-checks without a
-single appeal to an oracle.
-%
-The remainder of this section discusses what limits coverage today and
-where the work goes next.
+Rather than postulating each rule as an axiom, we encode every \pp{} rule as
+a symbol whose body proves it sound against a small axiomatic base; the
+reconstructed corpus (including \ab's own rule-validation suite, arithmetic
+included) type-checks against that base, appealing to an oracle only for the
+membership facts \pp{} assumes of its arithmetic and boolean terms.
 
 \paragraph{Upstream replay losses.}
-The gap between goals and replays in \autoref{tab:results} is upstream
-of \tool: for some provable goals the \textsc{replay} utility omits the
-final continuation of an \rn{ALL7} or \rn{XST8} step, and for others it
-aborts mid-file.
+Fewer replays reach \tool{} than the goals we submit (only \prvReplayed{} of
+\prvGoals{} for \texttt{prv}), and the loss is upstream: for some provable
+goals the \textsc{replay} utility omits the final continuation of an \rn{ALL7}
+or \rn{XST8} step, and for others it aborts mid-file.
 %
-Both defects are detected at generation time and the affected goals
-dropped and reported.
+Both defects are detected at generation time and the affected goals dropped
+and reported.
 %
-They are not random: set-extensionality and equality-prover-heavy goals
-are disproportionately affected (no complete \rn{EGALITE} replay can be
-produced from our goal suites, so that emission path is validated
-against a hand-completed replay), which means the suites under-test
-exactly the rules the equality prover would exercise.
+They fall hardest on set-extensionality and equality-prover goals, and on the
+largest \texttt{apero} obligations, where \textsc{replay} discards most of the
+traces \pp{} produces, so our synthetic suites under-test exactly the equality
+reasoning \pp's store performs --- a gap the surviving \texttt{apero} replays
+begin to close.
 
 \paragraph{Spec mismatches.}
 Encoding every rule against the specification turns the encoding into an
@@ -197,33 +215,14 @@ exercises.
 %
 All of these are rejected at emission with an error; none silently degrade.
 
-\paragraph{Raw proof obligations.}
-We also probed \pp{} on raw industrial obligations from CLEARSY's
-public proof-obligation dataset~\cite{deharbe2022pog}, translating its
-POG format into \pp's rule-validation input.
-%
-A sampled obligation carries a median of roughly \aperoMedianHyps{}
-hypothesis predicates; \pp{} nonetheless proved every convertible
-obligation with at most fifty hypotheses, most sampled goals even with
-all hypotheses removed, and some thousand-hypothesis obligations given
-tens of seconds.
-%
-The bottleneck for certification is again the toolchain around \pp: the
-replay utility lost \aperoSampleLost{} of the \aperoSampleTraces{}
-traces \pp{} produced on our sample, and the replays that remain use
-surface forms no synthetic goal had reached (strict comparisons, tuple
-memberships, relational inverse, sequents inside annotations);
-\aperoSampleVerified{} of them verify end-to-end today, including the
-first machine-produced replays exercising the equality store.
-
 \paragraph{Use of AI.}
 The \texttt{claude} suite was authored by an LLM agent that also helped
-develop the tool, so there is a risk of the suite drifting toward what
-the pipeline already handles.
+develop the tool, so the suite could drift toward what the pipeline already
+handles.
 %
-We mitigate this in two ways: the suite is goal-level only (the agent
-cannot influence which rules \pp{} applies), and the real-world
-\texttt{og} and \texttt{prv} suites gate every change.
+Our main safeguard is that the real-world \texttt{og} and \texttt{prv} suites
+guard every change; the synthetic suite is also goal-level only, so the agent
+sets the goals but not the rules \pp{} applies to them.
 
 \paragraph{Future work.}
 The most direct future work is upstream: repairing the \textsc{replay}

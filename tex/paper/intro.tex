@@ -67,13 +67,13 @@ We evaluate our tool on benchmark suites containing rule validations
 from real-world \ab{} use and a large synthetic suite of goals generated
 by Claude Opus 4.8.
 %
-Every proof accepted by the replay utility (\allReplayed{} in total) is
-reconstructed and type-checked, using no unproved assumption beyond a small,
-fixed axiomatic base.
+Every replay \pp's rule-validation suite produces, and all but \claudeFailed{}
+of our synthetic suite's, are reconstructed and type-checked, using no unproved
+assumption beyond a small, fixed axiomatic base.
 %
-% We additionally probe \tool{} on raw proof obligations from real-world
-% \ab{} developments, where the chief obstacle turns out to be upstream
-% replay loss rather than reconstruction (\autoref{sec:limits}).
+We additionally probe \tool{} on raw industrial proof obligations, where the
+chief obstacle turns out to be upstream replay loss rather than reconstruction
+(\autoref{sec:eval}).
 
 \paragraph{Related Work.}
 This work is carried out within the ANR project ICSPA (\emph{Interoperable
@@ -144,7 +144,7 @@ and Trélat's BARReL~\cite{bergeron2026barrel} reimplements \ab's proof
 backend in Lean.
 %
 Closest to our setting, Stolze et~al.~\cite{stolze2024dedukti} export
-\ab{} proof \emph{obligations} to \dedukti{} and report preliminary
+\ab{} proof obligations to \dedukti{} and report preliminary
 experiments towards sharing \ab{} proofs across the \dedukti{} ecosystem.
 %
 % TODO(authors): confirm with Hermant/D\'eharbe who built the trace
