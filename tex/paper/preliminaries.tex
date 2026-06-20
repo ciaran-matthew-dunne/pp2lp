@@ -100,14 +100,8 @@ post-normalisation universal $\Dia$:
 %
 \rn{XST8} is its existential dual: to prove $\exists x \cdot P$ it normalises
 $\lnot P$ to a list $R_1,\ldots,R_n$ and refutes their conjunction closed
-under the same post-normalisation universal $\Dia$.
-\begin{center}
-  \begin{prooftree}
-    \hypo{(H \seq \lnot P) \yields [R_1,\ldots,R_n]}
-    \hypo{H \seq (\Dia x \cdot R_1 ∧ \ldots ∧ R_n) \Rightarrow \bot}
-    \infer2[\rn{XST8}]{H \seq \exists x \cdot P}
-  \end{prooftree}
-\end{center}
+under the same post-normalisation universal $\Dia$ --- the same shape as
+\rn{ALL7}, with $\bot$ in place of the goal $G$.
 
 \pp{} records a \trace{} of the rules it applied; a companion utility
 re-runs the proof and expands the trace into a \replay{} that annotates each
