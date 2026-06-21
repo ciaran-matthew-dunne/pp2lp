@@ -92,15 +92,13 @@ The work presented here complements these approaches, since \pp{} is
 used in Rodin.
 
 The reduction of proof checking to type checking originates with the
-Edinburgh Logical Framework~\cite{harper1993lf}, whose underlying
-calculus is the dependently-typed $\lambda\Pi$-calculus.
+Edinburgh Logical Framework~\cite{harper1993lf} and its dependently-typed
+$\lambda\Pi$-calculus; \dedukti{} extends this calculus with rewrite rules,
+yielding the \lpcmr~\cite{CousineauDowek, assaf2023dedukti}, of which \lp{} is
+the interactive front end~\cite{hondet:hal-02981561}.
 %
-\dedukti{} extends this calculus with user-declared rewrite rules,
-yielding the \lpcmr~\cite{CousineauDowek, assaf2023dedukti}; \lp{} is
-its interactive front end~\cite{hondet:hal-02981561}.
-%
-Replaying automated provers inside such checkers is an active line of
-work: SMT proofs have been reconstructed in
+Replaying automated provers inside such checkers is active: SMT proofs
+have been reconstructed in
 \lp~\cite{coltellacci2026acta} (including proofs of TLAPS obligations,
 TLA$^+$'s proof system~\cite{coltellacci2023abz}) and in
 Lean~\cite{mohamed25leansmt}.
@@ -131,11 +129,10 @@ actually performs on a given obligation.
 Our work targets exactly that gap: each \pp{} run is re-checked
 against rule lemmas that are themselves proved sound.
 %
-The BWare project~\cite{bware2014} took a different route to the same
-trust concern: it discharged B proof obligations with external provers
-(notably Zenon Modulo, whose proofs are checked by
-\dedukti~\cite{bury2015bset}), thereby replacing \pp{} rather than
-formally verifying its output.
+The BWare project~\cite{bware2014} addressed the same concern differently,
+discharging B proof obligations with external provers (notably Zenon Modulo,
+whose proofs are checked by \dedukti~\cite{bury2015bset}) and thereby replacing
+\pp{} rather than formally verifying its output.
 In the same spirit, Trélat's BEer~\cite{trelat2025smt} gives a provably
 sound encoding of B proof obligations into SMT-LIB, as does
 Defourné~\cite{defourne2025scp} for TLA$^+$ obligations, while Bergeron
