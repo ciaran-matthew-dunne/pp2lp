@@ -137,9 +137,9 @@ as a plain one:
 
 \paragraph{Result Derivations.}
 A result derivation (\autoref{sec:pp-syntax}) normalises a formula to a list
-of predicates whose conjunction is its normal form.  We write $\mathsf{conj}$
-for the fold $\bwand$ of \autoref{sec:enc-formulas} on a non-empty list, and
-$\top$ on the empty one (a discharged result).  The derivation is then a type
+of predicates whose conjunction is its normal form.  Here $\mathsf{conj}$ folds
+$\bwand$ (\autoref{sec:enc-formulas}) on a non-empty list, $\top$ on the empty
+one (a discharged result).  The derivation is then a type
 $\Res\,t$ pairing the list with a proof that $t$ equals $\mathsf{conj}\,ts$:
 \begin{align*}
 	\Res                                              & : \El\,o \to \TYPE,                                 &   & \\
@@ -152,8 +152,8 @@ $\Res\,t$ pairing the list with a proof that $t$ equals $\mathsf{conj}\,ts$:
 \noindent A result-form rule (suffixed \texttt{\_1} in replays) is a
 \lp{} function over $\Res$ values.  \rn{AND4\_1} realises the combination
 schema of \autoref{sec:pp-syntax}, concatenating its two children's lists;
-\rn{ALL7}, one of the two rules that consume a result, takes a per-instance
-derivation $\rho$ and continues under the conjunction of its result,
+\rn{ALL7}, a result-consuming rule, takes a per-instance
+derivation $\rho$ and continues under its conjunction
 $\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
 \[
 	\begin{aligned}
