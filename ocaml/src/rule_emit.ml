@@ -188,10 +188,59 @@ let nrm20_candidate ~rev vars cs children =
     (fun (pinned, j, e) -> (pinned, Option.get (pos_of pinned), j, e))
     candidate
 
-(* NRM20 has no Res-chain form: a `NRM20_1` would lean on the unproved `nrm20_eq`
-   substitution bridge (a postulate).  [Translate]'s chain walker fails E_DISPATCH
-   on a chain-position NRM20 instead.  The shared [nrm20_candidate] above is still
-   used by the main-tree NRM20/21 dispatch in [tactic_for_rule]. *)
+(* Res-chain form of NRM20 (rev=false; NRM21 chains are unfired).  PP leaves
+   NRM20 unprimed inside a result chain, so the emitter primes it to NRM20_1 and
+   supplies the same slot [k] / witness [E] the main-tree dispatch computes; the
+   child sub-chain [child_term] is already a `Res` term.  NRM20_1's result
+   carries the pinning equality at the conjunct *tail* (`qs v ∷ eq`); when PP
+   placed it earlier, transport the result `Res` along the bubble congruence
+   (`mk_1 (res_tm ·) (eq_trans (BIG = BIG_tail) (res_eq ·))` — the Res analogue
+   of the main-tree `=⇒`).  NRM20_1 is now PROVED (its soundness bridge `nrm20_eq`
+   is discharged in lemmas/Tuple.lp via the slot-surgery reassembly identity), so
+   this emits a trust-free chain — no postulate. *)
+let nrm20_chain_term ctx anno children child_term =
+  match goal_of_anno anno with
+  | Some (Binary (Imp, Bind (Forall2, vars, Unary (Not, body)), _)) ->
+    let cs = conjuncts body in
+    let n_cs = List.length cs in
+    (match nrm20_candidate ~rev:false vars cs children with
+     | Some (pinned, k, j, e) ->
+       let rvars = List.filter (fun v -> v <> pinned) vars in
+       let w = fresh_x_local ctx in
+       let env' =
+         List.mapi (fun i v -> (v, L.Proj (i, w))) rvars @ pp_env_of ctx in
+       (* qs : the conjunct list minus the pinning equality, as a function of the
+          full (n+1)-tuple (`λ v, ∎ ∷ c₀ ∷ …`).  Passed explicitly because its
+          premise occurrence `qs (ins k (E v') v')` is non-Miller — left implicit
+          it OOMs lambdapi's unifier; given, the `ins`/`prj` splice just reduces. *)
+       let vfull = fresh_x_local ctx in
+       let env_full =
+         List.mapi (fun i v -> (v, L.Proj (i, vfull))) vars @ pp_env_of ctx in
+       let qs_lam =
+         L.Lambda (vfull, None,
+           List.fold_left
+             (fun acc c ->
+                L.Infix ("\xe2\x88\xb7" (* ∷ *), acc, L.Pred (env_full, c)))
+             (L.Name "\xe2\x88\x8e" (* ∎ *))
+             (List.filteri (fun i _ -> i <> j) cs)) in
+       let base_app =
+         L.App (L.Name "NRM20_1",
+           [ L.Name (string_of_int k);
+             qs_lam;
+             L.Lambda (w, None, L.Exp (env', e));
+             child_term ]) in
+       if j = n_cs - 1 then base_app
+       else
+         (* `res_cong (BIG = BIG_tail) base_app : Res BIG` — base_app occurs once. *)
+         L.App (L.Name "res_cong",
+           [ conj_bubble_goal_cong ctx n_cs j; base_app ])
+     | None ->
+       Errors.fail "E_EMIT"
+         "NRM20_1 (chain): annotation lacks an `x = E` equality conjunct for \
+          the dropped binder")
+  | _ ->
+    Errors.fail "E_EMIT"
+      "NRM20_1 (chain): expected a `forall2(…)·¬(…) ⇒ Q` annotation"
 
 let find_and5_pair conjs =
   let arr = Array.of_list conjs in

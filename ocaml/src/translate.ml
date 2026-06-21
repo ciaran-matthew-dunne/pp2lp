@@ -896,15 +896,13 @@ and chain_term ctx node : L.term =
      | _ ->
        Errors.fail "E_EMIT"
          "NRM2_1: expected a (♢v, P ⇒ Q v) ⇒ S chain annotation")
-  | P.Apply { rule; _ }
+  | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "NRM20" ->
-    (* NRM20 in a Res chain has no SOUND encoding: a `NRM20_1` would lean on the
-       unproved `nrm20_eq` substitution bridge (a postulate).  Refuse rather than
-       trust — these benchmarks time out on check regardless, so this costs no
-       reconstructed goals while keeping the chain trust-free. *)
-    Errors.fail "E_DISPATCH"
-      "NRM20 appears in a result chain but has no trust-free encoding (the \
-       nrm20_eq substitution bridge is unproved); refusing to emit a postulate"
+    (* NRM20 in a Res chain: primed to NRM20_1 (a postulate — its `nrm20_eq`
+       soundness bridge is deferred).  The slot/witness computation and the
+       conjunct-bubble transport live in [Rule_emit.nrm20_chain_term]; the child
+       sub-chain is built here and handed in. *)
+    nrm20_chain_term ctx anno [c] (chain_term ctx c)
   (* Chain-form binder merges (`[XST4_1]`, `[ALL3_1]`, …) and the De Morgan
      `[ALL5_1]` are NOT special-cased: they fall through to the generic
      single-child chain case below, which emits `<NAME>_1 child` (n/P/R inferred
