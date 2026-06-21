@@ -106,14 +106,12 @@ inverse --- that no synthetic goal had reached.
 
 \subsection{Conclusion and Future Work}\label{sec:conclusion}
 
-We have presented \tool, which checks \ab's Predicate Prover by
-reconstructing its proofs in \lp.
-%
-Rather than postulating each rule as an axiom, every \pp{} rule is a symbol
-whose body proves it sound against a small axiomatic base; the reconstructed
-corpus (\ab's own rule-validation suite included, arithmetic and all)
-type-checks against that base, appealing to an oracle only for the membership
-facts \pp{} assumes of its arithmetic and boolean terms.
+We have presented \tool, which checks \ab's Predicate Prover by reconstructing
+its proofs in \lp: rather than postulating each rule as an axiom, every \pp{}
+rule is a symbol whose body proves it sound against a small axiomatic base, and
+the reconstructed corpus (rule-validation suite and arithmetic included)
+type-checks against that base, appealing to an oracle only for the $\mathsf{INT}$
+and $\mathsf{BOOL}$ memberships \pp{} assumes.
 
 \paragraph{Upstream replay losses.}
 Fewer replays reach \tool{} than the goals we submit (only \prvReplayed{} of
