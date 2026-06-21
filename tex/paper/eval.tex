@@ -173,23 +173,16 @@ traces \pp{} produces, so our synthetic suites under-test exactly the equality
 reasoning \pp's store performs --- a gap the surviving \texttt{apero} replays
 begin to close.
 
-\paragraph{Spec mismatches.}
-Encoding every rule against the specification turns the encoding into an
-executable test of that document, and it does not always pass: \rn{NRM20}
-records its pinned equality at a different conjunct position than
-specified, and \rn{OPR1}'s result derivation does not follow the schema
-laid out for it.
+\paragraph{Limitations.}
+Encoding every rule against the specification makes the encoding an executable
+test of that document, which it does not always pass: \rn{NRM20} pins its
+equality at a different conjunct position than specified, and \rn{OPR1}'s result
+derivation departs from its schema; \tool{} implements the observed behaviour, a
+by-product useful to \pp's maintainers.
 %
-\tool{} implements the observed behaviour, and surfaces these discrepancies
-as a by-product useful to \pp's maintainers.
-
-\paragraph{Engine partiality.}
-A few replay shapes are recognised but rejected: substitution rules
-pinning a binder beyond the third slot of a compound binder, and the
-result forms of two arithmetic rules that no replay in our suites
-exercises.
-%
-All of these are rejected at emission with an error; none silently degrade.
+A few replay shapes are recognised but rejected: substitution past a compound
+binder's third slot, and the result forms of two arithmetic rules no suite
+exercises --- always at emission with an error, never a silent degradation.
 
 \paragraph{Use of AI.}
 The \texttt{claude} suite was authored by an LLM agent that also helped
