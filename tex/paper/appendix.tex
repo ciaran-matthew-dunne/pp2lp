@@ -166,3 +166,24 @@ Reconstructed, the \rn{ALL7} step becomes the proof term
 of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
 continuation antecedent $\restm\,(\rho\,v)$ reduces to $\bwand$ of the flat list
 $∎ ∷ P_3 ∷ P_2 ∷ P_1$.
+
+
+
+\section{The \tool{} Pipeline}\label{app:pipeline}
+
+\begin{boxfigure}{fig:pipeline}{%
+		The \tool{} pipeline. A goal in \butf{} format is given to \pp{},
+		which emits a \trace{} of the rules it applied.
+	    The \textsc{replay} utility annotates each step with its intermediate
+		goal, and \tool{} rebuilds the proof tree and emits an \lpf{} tactic
+	    script, which \lp{} checks.}
+	\centering
+	\alttext{Pipeline diagram with two dashed groups. Left, Atelier B: a
+		formula file (.but) maps via PP to a .trace, then via REPLAY to a
+		.replay carrying rule and goal lines. An arrow labelled pp2lp maps
+		the .replay into the right group, LambdaPi, where the emitted .lp
+		file depends on the soundness-proved B.lp and rules/ library; a
+		downward arrow labelled lambdapi check yields a tick-or-cross
+		verdict.}{%
+		\input{fig-pipeline.tex}}
+\end{boxfigure}

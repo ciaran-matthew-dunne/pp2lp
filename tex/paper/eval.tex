@@ -2,24 +2,6 @@
 % Table + prose read numbers from results-data.tex — never hard-code a
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
-% --- pipeline figure ------------------------------------------------
-\begin{boxfigure}{fig:pipeline}{%
-		The \tool{} pipeline. A goal in \butf{} format is given to \pp{},
-		which emits a \trace{} of the rules it applied.
-	    The \textsc{replay} utility annotates each step with its intermediate
-		goal, and \tool{} rebuilds the proof tree and emits an \lpf{} tactic
-	    script, which \lp{} checks.}
-	\centering
-	\alttext{Pipeline diagram with two dashed groups. Left, Atelier B: a
-		formula file (.but) maps via PP to a .trace, then via REPLAY to a
-		.replay carrying rule and goal lines. An arrow labelled pp2lp maps
-		the .replay into the right group, LambdaPi, where the emitted .lp
-		file depends on the soundness-proved B.lp and rules/ library; a
-		downward arrow labelled lambdapi check yields a tick-or-cross
-		verdict.}{%
-		\input{fig-pipeline.tex}}
-\end{boxfigure}
-% --------------------------------------------------------------------
 The core of
 \tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
 is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
