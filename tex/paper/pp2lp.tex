@@ -40,19 +40,17 @@
 	linear integer arithmetic.
 	%
 	Because \pp's source code is not publicly available,
-	its results are currently trusted without independent verification.
+	its results are trusted without independent verification.
+	%
+	% Fortunately, \pp{} can be instrumented to emit \emph{replays} of its proofs.
 	%
 	We present \tool, a tool that reconstructs \pp{} proofs in \lp,
 	a proof assistant based on the \lpcmr.
 	%
-	Each of \pp's inference rules is encoded as a \lp{} symbol whose type
-	captures the rule's premises and conclusion and whose body proves
-	the rule sound with respect to a small trusted core.
-	%
-	\pp{} can be instrumented to emit \emph{replays} of its proofs;
-	\tool{} parses the replay, rebuilds the proof tree,
-	and emits a tactic script that \lp{} typechecks.
-	%
+	% Each inference rule of \pp is encoded as a \lp{} symbol whose type
+	% captures the rule's premises and conclusion and whose body proves
+	% the rule sound with respect to a small trusted core.
+	% %
 	% TODO. How many infernence rules does PP have (including _1 rules)?
 	We prove the soundness of all of \pp's inference rules
 	and reconstruct proofs across several real-world and synthetic

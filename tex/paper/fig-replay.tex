@@ -27,18 +27,6 @@
 			\infer1[\rn{ALL2}]{\seq \lnot \forall x \cdot \forall y \cdot \lnot(x = x)}
 		\end{prooftree}
 	\end{minipage}
-	\caption{Benchmark \texttt{og/22}: a replay (left; \texttt{FIN}
-		annotations elided) and the derivation it denotes (right), reading
-		\texttt{!} as $\forall$, \texttt{forall} as $\Dia$, \texttt{FAUX}
-		as $\bot$, and \texttt{=\parbox{0em}{}>} % hack to
-                                % avoid the replacement
-                as $\Rightarrow$.
-		Each non-marker line is one rule application, in prefix order
-		except for the result derivation (\rn{STOP\_1}, \rn{EVR2\_1}), which is
-		emitted before the \rn{ALL7} that consumes it.
-		\rn{ALL2} regroups the nested binders into a compound one,
-		\rn{ALL6} unfolds the negation, and \rn{ALL7} replaces the
-		universal antecedent's body by its normal form before \rn{NRM1} and
-		\rn{AXM7} close the proof.}
+	\caption{Replay of benchmark \texttt{og/22} and its proof tree.}
 	\label{fig:replay}
 \end{figure}

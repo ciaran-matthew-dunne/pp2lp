@@ -1,3 +1,5 @@
+\begin{figure}[b]
+\centering
 \begin{tikzpicture}[
     item/.style={draw, rounded corners=3pt, font=\scriptsize\ttfamily,
                  align=center, inner sep=4pt, minimum height=6.5mm,
@@ -36,3 +38,12 @@
        {{\color{lpModifier}$\checkmark$}\,/\,{\color{lpKeyword}$\times$}};
   \draw[arr] (lpbox) -- node[tool, right] {lambdapi check} (chk);
 \end{tikzpicture}
+\caption{
+    The \tool{} pipeline. \pp{} takes a goal in \butf{} format
+    and returns a \trace{} of the rules it applied.
+	%
+	The replay utility annotates each step with its intermediate
+	goal, and \tool{} parses the \replay{}, rebuilds the proof tree,
+	and translates to a \lpf{} file, which \lp{} checks.}
+\label{fig:pipeline}
+\end{figure}

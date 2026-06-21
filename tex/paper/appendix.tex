@@ -1,23 +1,6 @@
 % ── appendix.tex ──────────────────────────────
 \appendix
 
-\section{Predicate Prover Syntax}\label{app:ppsyntax}
-
-The syntax of \pp's predicates and expressions (\autoref{sec:pp-syntax}):
-\begin{align*}
-	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
-	\mid E + F \mid E - F \mid -E                                     \\
-	P, Q & \Coloneqq E \mid E = F \mid E \leq F
-	\mid E_1,\ldots,E_k \in F
-	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
-	\mid P \Leftrightarrow Q
-	\mid \mathcal{Q}\,\vec{x} \cdot P
-\end{align*}
-where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
-$F(E_1,\ldots,E_k)$ applies $F$ to arguments, and membership relates a tuple of
-expressions to an expression.
-
-
 \section{Typing Rules for \lp}\label{app:typing}
 
 A signature $\Sigma$ declares typed constants and rewrite rules, and a context
@@ -129,29 +112,29 @@ all other brackets and punctuation are concrete syntax.
 \end{array}
 \]
 
-\section{Surviving Set-theoretic Operators}\label{app:operators}
+% \section{Surviving Set-theoretic Operators}\label{app:operators}
 
-The operators below are the set-theoretic constructs that the pre-processing of
-\autoref{sec:pp-syntax} does \emph{not} unfold to membership; the encoding
-declares each as an uninterpreted constant over the domain $\El\,\iota$, and
-\pp{} only copies, compares, or instantiates them.
+% The operators below are the set-theoretic constructs that the pre-processing of
+% \autoref{sec:pp-syntax} does \emph{not} unfold to membership; the encoding
+% declares each as an uninterpreted constant over the domain $\El\,\iota$, and
+% \pp{} only copies, compares, or instantiates them.
 
-\begin{center}
-  \begin{tabular}{l l l}
-    \toprule
-    Operator              & B notation                 & Reading \\
-    \midrule
-    interval              & $a \mathbin{..} b$          & integer range \\
-    maplet                & $a \mapsto b$               & ordered pair \\
-    set extension         & $\{a_1, \ldots, a_k\}$      & finite set \\
-    union, intersection   & $S \cup T$, \ $S \cap T$    & \\
-    relational image      & $r[S]$                      & image of $S$ under $r$ \\
-    relational inverse    & $r^{-1}$                    & converse relation \\
-    domain restriction    & $S \triangleleft r$         & pairs of $r$ with source in $S$ \\
-    range restriction     & $r \triangleright T$        & pairs of $r$ with target in $T$ \\
-    \bottomrule
-  \end{tabular}
-\end{center}
+% \begin{center}
+%   \begin{tabular}{l l l}
+%     \toprule
+%     Operator              & B notation                 & Reading \\
+%     \midrule
+%     interval              & $a \mathbin{..} b$          & integer range \\
+%     maplet                & $a \mapsto b$               & ordered pair \\
+%     set extension         & $\{a_1, \ldots, a_k\}$      & finite set \\
+%     union, intersection   & $S \cup T$, \ $S \cap T$    & \\
+%     relational image      & $r[S]$                      & image of $S$ under $r$ \\
+%     relational inverse    & $r^{-1}$                    & converse relation \\
+%     domain restriction    & $S \triangleleft r$         & pairs of $r$ with source in $S$ \\
+%     range restriction     & $r \triangleright T$        & pairs of $r$ with target in $T$ \\
+%     \bottomrule
+%   \end{tabular}
+% \end{center}
 
 
 \section{A Worked Result Derivation}\label{app:resderiv}
@@ -183,32 +166,6 @@ Reconstructed, the \rn{ALL7} step becomes the proof term
 of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
 continuation antecedent $\restm\,(\rho\,v)$ reduces to $\bwand$ of the flat list
 $∎ ∷ P_3 ∷ P_2 ∷ P_1$.
-
-
-
-\section{The \tool{} Pipeline}\label{app:pipeline}
-
-\begin{boxfigure}{fig:pipeline}{%
-		The \tool{} pipeline. A goal in \butf{} format is given to \pp{},
-		which emits a \trace{} of the rules it applied.
-	    The \textsc{replay} utility annotates each step with its intermediate
-		goal, and \tool{} rebuilds the proof tree and emits an \lpf{} tactic
-	    script, which \lp{} checks.}
-	\centering
-	\alttext{Pipeline diagram with two dashed groups. Left, Atelier B: a
-		formula file (.but) maps via PP to a .trace, then via REPLAY to a
-		.replay carrying rule and goal lines. An arrow labelled pp2lp maps
-		the .replay into the right group, LambdaPi, where the emitted .lp
-		file depends on the soundness-proved B.lp and rules/ library; a
-		downward arrow labelled lambdapi check yields a tick-or-cross
-		verdict.}{%
-		\input{fig-pipeline.tex}}
-\end{boxfigure}
-
-
-\section{A Sample Replay}\label{app:replay}
-
-\input{fig-replay.tex}
 
 
 

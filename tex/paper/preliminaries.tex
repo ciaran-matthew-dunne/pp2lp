@@ -1,40 +1,42 @@
 % ── preliminaries.tex · §2 Preliminaries (PP & LP) ─────────────────
 \section{Preliminaries}\label{sec:prelim}
-
-\subsection{The Predicate Prover}\label{sec:pp-syntax}
-
+\input{fig-replay.tex}
+\paragraph{The Predicate Prover.}\label{sec:pp-syntax}
+%
+The syntax of \pp{} is given by the following grammar:
+\begin{align*}
+	E, F & \Coloneqq x \mid n \mid b \mid E \mapsto F \mid F(E_1,\ldots,E_k)
+	\mid E + F \mid E - F \mid -E                                     \\
+	P, Q & \Coloneqq E \mid E = F \mid E \leq F
+	\mid E_1,\ldots,E_k \in F
+	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
+	\mid P \Leftrightarrow Q
+	\mid \mathcal{Q}\,\vec{x} \cdot P
+\end{align*}
+where $x$ ranges over identifiers, and $n$ over numerals, and $b$ over booleans.
+%
 \pp's \emph{expressions} $E, F$ are variables, numerals, pairs $E \mapsto F$,
-applications $F(E_1,\ldots,E_k)$, and linear arithmetic ($+$, $-$); its
-\emph{predicates} $P, Q$ are membership $E_1,\ldots,E_k \in F$, equality, $\leq$,
-an expression standing as an atom, the propositional connectives, and
-quantifications $\mathcal{Q}\,\vec{x} \cdot P$ with
-$\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$
-(\autoref{app:ppsyntax} gives the grammar).
+function applications $F(E_1,\ldots,E_k)$, and linear arithmetic ($+$, $-$);
+its \emph{predicates} $P, Q$ are membership $E_1,\ldots,E_k \in F$, equality,
+$\leq$, coerced (boolean) expressions $E$, propositional connectives,
+and quantification $\mathcal{Q}\,\vec{x} \cdot P$ with
+$\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$.
 %
-Each quantifier binds a list of variables;
-$\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
-	\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
-latter into the former during proof search.
+Quantifiers bind a list of variables; $\forall (x,y) \cdot P$ is distinct from
+$\forall x \cdot \forall y \cdot P$, and dedicated rules regroup the latter
+within proofs.
 %
-The quantifiers $\Dia$ and $\Hrt$ arise in \pp's normalisation and are both
-semantically $\forall$, $\Dia$ marking the goal side and $\Hrt$ the hypothesis
-side.
-
-Although B is a set-theoretic formalism, \pp{} proves first-order logic with
-linear arithmetic: pre-processing reduces much of an obligation's set theory to
-formulas over membership before \pp{} sees it.
-%
-The set-theoretic operators that survive this reduction (intervals, maplets,
-and the set and relational operators of \autoref{app:operators}) reach
-\pp{} as uninterpreted function symbols: \pp{} has no set-theory rules, and
-such terms are only ever copied, compared for equality, or instantiated.
+The quantifiers $\Dia$ and $\Hrt$ are idiosyncratic to PP; semantically both
+are $\forall$ and are used only to guide PP's proof search.
 
 \pp{} proves \emph{sequents} $H \seq P$, where $H$ is a list of
 hypothesis predicates and $P$ a goal predicate.
 %
-\pp's inference rules are specified in the annex of its internal
-documentation~\cite{pp_spec}.  There are roughly \numRulesSpec{} rules,
-grouped into families: propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
+The inference rules for deriving sequents are specified in the annex of its
+internal documentation~\cite{pp_spec}.
+%
+There are roughly \numRulesSpec{} rules, grouped into families:
+propositional (\rn{AND}, \rn{OR}, \rn{IMP}, \rn{EQV},
 \rn{NOT}), hypothesis discharge (\rn{AXM1--9}), quantifiers
 (\rn{ALL1--9}, \rn{XST1--8}), equality
 (\rn{EVR}, \rn{EAXM}, \rn{EQC}, \rn{EQS}, \rn{ECTR}, \ldots), booleans
@@ -43,43 +45,61 @@ and normalisation (\rn{NRM1--30}), among others.
 %
 Each rule reduces the current goal to zero, one, or two
 premises, possibly under computational side-conditions
-(``$P$ occurs in the list of hypotheses $H$'',
-``$a$ and $b$ are integer literals such that $a + b < 0$'', etc.).
+(e.g., ``$P$ occurs in the list of hypotheses $H$'',
+``$a$ and $b$ are numerals such that $a > b$'').
 
-Alongside sequents, \pp's proofs manipulate a second judgment: we write
-$(H \seq P) \yields [Q_1, \ldots, Q_n]$ for ``under $H$, $P$ normalises to
-the list of predicates $[Q_1, \ldots, Q_n]$''.  This list is a
-\emph{result}, whose conjunction is the normal form of $P$.
+Alongside sequents, proofs manipulate a second judgment form known as a
+\emph{result}; essentially an equality proof used by \pp{}'s
+normalization procedure.
 %
-Most classical rules come paired with a result form (written with a
-\texttt{\_1} suffix): a rule whose conclusion is a result.  A result rule is
-given by one of three schemas: the empty list (the formula is discharged),
-a singleton $[Q]$ (a single transformed formula, produced by a leaf such as
-\rn{STOP\_1}), or the concatenation of its two premises' lists (a combination).
+We write $(H \seq P) \yields [Q_1, \ldots, Q_n]$ for
+``under $H$, $P$ normalises to the list $[Q_1, \ldots, Q_n]$''.
+The conjunction $Q_1 ∧ \ldots ∧ Q_n$ is the normal form of $P$.
 %
-For instance, \rn{AND4} (conjunction introduction) has the combination-schema
-result form \rn{AND4\_1}, taking $(H \seq Q) \yields R_1$ and
-$(H \seq P) \yields R_2$ to $(H \seq P \land Q) \yields R_1 \app R_2$.
-
-Only \rn{ALL7} and \rn{XST8} consume a result, each turning a
-result derivation back into an ordinary sequent subproof.
+With a few exceptions, each the result form of each inference rule
+(written with a $\mathsf{\_1}$ suffix) is derived by one of three schemas:
+the empty list (the formula is discharged),
+a singleton $[Q]$ (a single transformed formula),
+or the concatenation of its two premises' lists (a combination).
 %
-\rn{ALL7} proves $(\forall x \cdot P) \Rightarrow G$ by normalising $P$'s body
-pointwise to a list $R_1,\ldots,R_n$ and continuing under
-$(\Dia x \cdot R_1 \land \ldots \land R_n) \Rightarrow G$, beneath the
-post-normalisation universal $\Dia$.
+For example, consider the \rn{AND4} rule and its result form \rn{AND4\_1}:
+\[
+\begin{prooftree}
+\hypo{H \seq Q}
+\hypo{H \seq P}
+\infer2[\rn{AND4}]{H \seq P \land Q}
+\end{prooftree}
+\qquad
+\begin{prooftree}
+\hypo{(H \seq Q) \yields R_1}
+\hypo{(H \seq P) \yields R_2}
+\infer2[\rn{AND4\_1}]{(H \seq P \land Q) \yields R_1 \app R_2}
+\end{prooftree}
+\]
 %
-\rn{XST8} is its existential dual: to prove $\exists x \cdot P$ it normalises
-$\lnot P$ to a list $R_1,\ldots,R_n$ and refutes their conjunction closed
-under the same post-normalisation universal $\Dia$ --- the same shape as
-\rn{ALL7}, with $\bot$ in place of the goal $G$.
-
-\pp{} records a \trace{} of the rules it applied; a companion utility
-re-runs the proof and expands the trace into a \replay{} that annotates each
-step with the goal it was applied to (\autoref{fig:replay}).
+The only rules that use a result derivation to derive a sequent
+are \rn{ALL7} and \rn{XST8}, given below:
+\[
+\begin{array}{c}
+\begin{prooftree}
+\hypo{(H \seq P) \yields [R_1, \ldots, R_n]}
+\hypo{H \seq (\Dia x \cdot R_1 \land \ldots \land R_n) \Rightarrow G}
+\infer2[\rn{ALL7}]{H \seq (\forall x \cdot P) \Rightarrow G}
+\end{prooftree}
+\\[5mm]
+\begin{prooftree}
+\hypo{(H \seq \lnot P) \yields [R_1, \ldots, R_n]}
+\hypo{H \seq (\Dia x \cdot R_1 \land \ldots \land R_n) \Rightarrow \bot}
+\infer2[\rn{XST8}]{H \seq \exists x \cdot P}
+\end{prooftree}
+\end{array}
+\]
+%
+\noindent
+\autoref{fig:replay} shows an example of the \replay{} format.
 %
 Each replay line carries a rule name and, in parentheses, an optional
-rule-specific argument (for instance, an instantiation index).
+rule-specific argument.
 %
 A rule's line precedes the lines of its subproofs, with two exceptions.
 %
@@ -87,33 +107,31 @@ First, the result derivation feeding \rn{ALL7} or \rn{XST8} appears
 before the rule that consumes it.
 %
 Second, the replay interleaves marker lines that do not correspond to
-inference rules: \texttt{NRM} and \texttt{STOP\_NORM}, which bracket
+inference rules: \texttt{NRM} and \texttt{STOP\_NORM}, which bookend
 \pp's normalisation passes, and \texttt{FIN}, which carries the predicate
 such a pass produced.
 %
-\tool{} filters these out while rebuilding the tree.
+
+\paragraph{\lp}\label{sec:lp}
 %
-
-\subsection{\lp}\label{sec:lp}
-
 \lp~\cite{hondet:hal-02981561} is a proof assistant for the
-\lpcmr~\cite{CousineauDowek}, the calculus underlying the \dedukti{}
-logical framework~\cite{assaf2023dedukti}.
+\lpcmr~\cite{CousineauDowek}.
 %
-Unlike \dedukti{}, a bare type-checker for the same calculus, \lp{}
-adds implicit arguments $[x:A]$ and an interactive tactic language.
+%
+Unlike \dedukti{}~\cite{assaf2023dedukti}, a bare type-checker for the same
+calculus, \lp{} has implicit arguments and an interactive tactic language.
 %
 The term syntax is given as follows:
 \[
 	t, u \Coloneqq \TYPE \mid \KIND \mid x \mid c
-	\mid t\,u \mid \lambda (x : t),\, u \mid \Pi (x : t),\, u
+	\mid t\,u \mid \lambda\,x : t,\, u \mid \Pi\,x : t,\, u
 \]
 where $x$ ranges over variables, $c$ ranges over declared constants,
 and terms are identified up to $\alpha$-equivalence.
 %
 Typing is standard for the \lpcmr{} (the full system is in
 \autoref{app:typing}); its \emph{definitional equality} (i.e., $A \Equiv B$)
-is generated by $\beta$-equivalence and the user-declared rewrite rules.
+is generated by $\beta$-equivalence and user-declared rewrite rules.
 %
 A \lp{} development is a sequence of declarations:
 \[
@@ -126,10 +144,11 @@ A \lp{} development is a sequence of declarations:
     b &\Coloneqq& t \;\mid\; \text{\lpkw{begin}}\;\mathit{tac}^{*}\;\text{\lpkw{end}}
   \end{array}
 \]
-\lpkw{symbol} introduces a typed constant with explicit $(x : A)$ and implicit
-$[x : A]$ parameters $p$ and an optional definition $b$; \lpkw{rule} adds a
-type-preserving rewrite rule over pattern variables \texttt{\$x}; \lpkw{inductive}
-generates an inductive type with a recursor.
+The \lpkw{symbol} command introduces a typed constant
+with explicit $(x : A)$ and implicit $[x : A]$ parameters $p$
+and an optional definition $b$; \lpkw{rule} adds a
+type-preserving rewrite rule over pattern variables \texttt{\$x};
+\lpkw{inductive} generates an inductive type with an induction principle.
 %
 Modifiers $m$ refine a symbol: \lpmod{constant} symbols admit no rewrite rule at
 their head, \lpmod{injective} ones may be inverted during unification, and an
@@ -137,18 +156,6 @@ their head, \lpmod{injective} ones may be inverted during unification, and an
 %
 A definition $b$ is a term or a proof script (\lpkw{begin} \ldots{}
 \lpkw{end}) whose tactics (e.g., \lpkw{assume}, \lpkw{refine},
-\lpkw{rewrite}, \lpkw{have}, \lpkw{induction}) elaborate to a proof term
-that the kernel re-checks.  The grammars above are abridged to the constructs
-the body uses; \autoref{app:syntax} gives the full grammar of our \lp{}
-fragment, with its inductive and tactic syntax.
-
-We build on \lp's standard library~\cite{Blanqui2021}: object-level types are
-encoded in a Tarski-style universe $\Setu$ with $\El : \Setu \to \TYPE$
-mapping each set code to its type of inhabitants, and a type $\Prop$ of
-propositions with $\Prf : \Prop \to \TYPE$ mapping each proposition
-to its type of proofs.
+\lpkw{rewrite}, \lpkw{have}, \lpkw{induction}) elaborate to a proof term.
 %
-It also supplies the booleans $\mathbb{B}$, integers $\mathbb{Z}$, and
-naturals $\mathbb{N}$ (with integer literals and arithmetic), which our
-encoding builds on (\autoref{sec:enc-formulas}).
-
+The grammars above are abridged; \autoref{app:syntax} gives an extended grammar.
