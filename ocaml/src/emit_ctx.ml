@@ -534,8 +534,13 @@ let find_axm9_match ctx goal =
     | None ->
       (* Derive the witness from the antecedent: the universal hyp body
          `R u` matched against `p_v` binds each `u` to the witness component
-         (a constant, e.g. `0`/`7`, that no `ctx.xs` var supplies).  Build the
-         tuple `unit ⨾ σ(u₀) ⨾ … ⨾ σ(uₙ)`. *)
+         (a constant, e.g. `0`/`7`, or a `prj i x` of a bound tuple, that no
+         `ctx.xs` whole-tuple candidate supplied).  Build the tuple so that
+         PP binder position j lands at slot `prj j` — i.e. σ(u_{n-1}) is the
+         deepest, σ(u₀) the rightmost (`prj 0`).  `⨾` appends on the right and
+         `prj 0` reads the rightmost, so the fold runs over the *reversed*
+         binder list; folding in PP order would cross the slots (`prj 0`
+         reading σ(u_{n-1})) and leave unprovable `prj 0 v ≡ prj 1 v` goals. *)
       let env =
         List.concat_map (fun (x, vs) ->
           List.mapi (fun i v -> (v, L.Proj (i, x))) vs) ctx.xs
@@ -549,7 +554,7 @@ let find_axm9_match ctx goal =
                List.fold_left (fun acc v ->
                  L.App (L.Name "\xe2\xa8\xbe",
                         [acc; L.Exp (env, List.assoc v sigma)]))
-                 (L.Name "unit") h_vars
+                 (L.Name "unit") (List.rev h_vars)
              in
              Some (witness, h_name)
            | _ -> None)
