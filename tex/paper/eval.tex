@@ -138,13 +138,12 @@ binder's third slot, and the result forms of two arithmetic rules no suite
 exercises --- always at emission with an error, never a silent degradation.
 
 \paragraph{Use of AI.}
-The \texttt{claude} suite was authored by an LLM agent that also helped
-develop the tool, so the suite could drift toward what the pipeline already
-handles.
+The \texttt{claude} suite was authored by an LLM agent that also helped build
+the tool, so it could drift toward what the pipeline already handles.
 %
-Our main safeguard is that the real-world \texttt{og} and \texttt{prv} suites
-guard every change; the synthetic suite is also goal-level only, so the agent
-sets the goals but not the rules \pp{} applies to them.
+Our safeguard: the real-world \texttt{og} and \texttt{prv} suites guard every
+change, and the synthetic suite is goal-level only, so the agent sets the goals
+but not the rules \pp{} applies to them.
 
 \paragraph{Future work.}
 The most direct future work is upstream: repairing \textsc{replay}'s
