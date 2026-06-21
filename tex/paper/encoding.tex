@@ -171,35 +171,10 @@ $\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
 		\to \Prf\,((\allI v,\ P\,v) \Rightarrow Q)
 	\end{aligned}
 \]
-\noindent For example, consider the result derivation below, for the body
-$P_1 \land P_2 \land P_3$ with each conjunct kept at a \rn{STOP\_1} leaf:
-\begin{center}\footnotesize
-	\ebproofset{separation=1em}%
-	\begin{prooftree}
-		\infer0[\rn{STOP\_1}]{(\seq P_3) \yields [P_3]}
-		\infer0[\rn{STOP\_1}]{(\seq P_2) \yields [P_2]}
-		\infer0[\rn{STOP\_1}]{(\seq P_1) \yields [P_1]}
-		\infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2) \yields [P_2, P_1]}
-		\infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2 \land P_3) \yields [P_3, P_2, P_1]}
-		\hypo{}
-		\ellipsis{}{\seq (\Dia x \cdot P_3 \land P_2 \land P_1) \Rightarrow G}
-		\infer2[\rn{ALL7}]{\seq (\forall x \cdot P_1 \land P_2 \land P_3) \Rightarrow G}
-	\end{prooftree}
-\end{center}
-The example shows why results are lists, not conjunctions: the two nested
-\rn{AND4\_1} steps concatenate their children's lists into the single flat
-list $[P_3, P_2, P_1]$, which \rn{ALL7} conjoins.  Combining eagerly with
-$\land$ would instead mirror the proof's nesting as $P_3 \land (P_2 \land
-	P_1)$; the list defers and flattens the conjunction.
-%
-Reconstructed, the \rn{ALL7} step becomes the proof term
-	{\small
-		\[
-			\rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
-		\]}%
-of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
-continuation antecedent $\restm\,(\rho\,v)$ reduces to $\bwand$ of the flat list
-$∎ ∷ P_3 ∷ P_2 ∷ P_1$.
+\noindent Because results are lists, the two nested \rn{AND4\_1} steps for a
+body $P_1 \land P_2 \land P_3$ flatten into the single list $[P_3, P_2, P_1]$
+that \rn{ALL7} conjoins, where eager $\land$ would instead nest them as
+$P_3 \land (P_2 \land P_1)$; \autoref{app:resderiv} works the instance in full.
 
 
 \paragraph{Arithmetic Side-conditions.}

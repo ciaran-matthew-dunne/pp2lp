@@ -135,3 +135,34 @@ declares each as an uninterpreted constant over the domain $\El\,\iota$, and
     \bottomrule
   \end{tabular}
 \end{center}
+
+
+\section{A Worked Result Derivation}\label{app:resderiv}
+
+For the body $P_1 \land P_2 \land P_3$ of \autoref{sec:enc-rules}, with each
+conjunct kept at a \rn{STOP\_1} leaf, the result derivation is:
+\begin{center}\footnotesize
+  \ebproofset{separation=1em}%
+  \begin{prooftree}
+    \infer0[\rn{STOP\_1}]{(\seq P_3) \yields [P_3]}
+    \infer0[\rn{STOP\_1}]{(\seq P_2) \yields [P_2]}
+    \infer0[\rn{STOP\_1}]{(\seq P_1) \yields [P_1]}
+    \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2) \yields [P_2, P_1]}
+    \infer2[\rn{AND4\_1}]{(\seq P_1 \land P_2 \land P_3) \yields [P_3, P_2, P_1]}
+    \hypo{}
+    \ellipsis{}{\seq (\Dia x \cdot P_3 \land P_2 \land P_1) \Rightarrow G}
+    \infer2[\rn{ALL7}]{\seq (\forall x \cdot P_1 \land P_2 \land P_3) \Rightarrow G}
+  \end{prooftree}
+\end{center}
+The two nested \rn{AND4\_1} steps concatenate their children's lists into the
+single flat list $[P_3, P_2, P_1]$, which \rn{ALL7} conjoins; combining eagerly
+with $\land$ would instead mirror the proof's nesting as
+$P_3 \land (P_2 \land P_1)$, so the list defers and flattens the conjunction.
+%
+Reconstructed, the \rn{ALL7} step becomes the proof term
+\[
+  \rn{ALL7}\ (\lambda v,\ \rn{AND4\_1}\ \rn{STOP\_1}\ (\rn{AND4\_1}\ \rn{STOP\_1}\ \rn{STOP\_1}))\ \ldots
+\]
+of type $\Prf\,((\allI v,\ P_1 \land P_2 \land P_3) \Rightarrow G)$, whose
+continuation antecedent $\restm\,(\rho\,v)$ reduces to $\bwand$ of the flat list
+$∎ ∷ P_3 ∷ P_2 ∷ P_1$.
