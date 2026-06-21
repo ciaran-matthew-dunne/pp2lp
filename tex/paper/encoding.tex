@@ -209,11 +209,10 @@ Every rule symbol carries a checked body, not a postulate: the inference
 rules are \lpmod{opaque} proofs and their result forms transparent
 definitions over $\Res$, and either way \lp{} accepts the symbol only once
 that body type-checks against the axiomatic base.  The proofs follow the
-structure of the encoding: propositional and quantifier rules discharge to
-the classical axioms and the quantifier bridges, conjunction rules to the
-$\bwand$ eliminators, equality rules to congruence and substitution, and
-arithmetic rules to the integer laws of \autoref{sec:enc-formulas} (and,
-through them, \lp's $\mathbb{Z}$).  What remains trusted is therefore exactly
+encoding's structure: propositional and quantifier rules discharge to the
+classical axioms and quantifier bridges, conjunction rules to the $\bwand$
+eliminators, equality rules to congruence and substitution, and arithmetic
+rules to \autoref{sec:enc-formulas}'s integer laws (hence \lp's $\mathbb{Z}$).  What remains trusted is therefore exactly
 \texttt{B.lp}'s primitives: the pairing and extensionality axioms, the
 boolean and integer injections with their defining axioms, the quantifier
 bridges, the $\bwand$/$\Res$ interface, and a typing oracle supplying the
