@@ -94,8 +94,7 @@ offending line, its replay step, and the rule lemma's signature together.
 
 We exercise \tool{} on four suites (\autoref{tab:results}).
 %
-\texttt{og} is a fixed set of \ogReplayed{} replays that served as an
-initial development corpus;
+\texttt{og} is \ogReplayed{} replays, our initial development corpus;
 %
 \texttt{prv} validates custom proof-rules from real \ab{} developments;
 %
@@ -131,8 +130,8 @@ format into \pp's rule-validation input.
 On the rule-validation and synthetic suites \tool{} reconstructs and
 type-checks every replay but \claudeFailed{}: \texttt{og} and \texttt{prv}
 in full, and \claudePass{} of \texttt{claude}'s \claudeReplayed{}, the
-exceptions being goals that reach shapes we do not yet support (INS
-contradiction search, nonlinear arithmetic, one result form).
+exceptions reaching shapes we do not yet support (INS contradiction
+search, nonlinear arithmetic, one result form).
 %
 \numRulesFired{} of the \numRulesCovered{} encoded rules fire across these
 replays.
