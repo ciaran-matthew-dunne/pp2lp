@@ -31,14 +31,6 @@ val find_and5_pair : prd list -> (int list * int) option
    main-tree AXM8 refines with it; the Res-chain AXM8_1 wraps it. *)
 val axm8_extraction : Emit_ctx.ctx -> rhs option -> Lp_tree.term option
 
-(* Res-chain form of NRM20: primes a chain-context NRM20 to [NRM20_1] with the
-   computed slot/witness, transporting along the conjunct-bubble congruence when
-   the pinning equality isn't already at the tail.  [Translate]'s [chain_term]
-   passes the already-built child sub-chain as the last argument. *)
-val nrm20_chain_term :
-  Emit_ctx.ctx -> rhs option -> Proof_tree.pp_tree list ->
-  Lp_tree.term -> Lp_tree.term
-
 (* The single `refine` tactic for a proof node.  Exhaustive over
    [Rule_db.emit]; the walker handles the tree-expanding strategies
    (And5/Opr/Ins/branching) before calling in here. *)
