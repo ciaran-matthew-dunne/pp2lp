@@ -22,13 +22,17 @@ try:
 except FileNotFoundError:
     sys.exit(f"bodypages: {AUX} not found — build the paper first")
 
-pages = [int(p) for _, p in
-         re.findall(r"\\newlabel\{(app:[^}]+)\}\{\{[^}]*\}\{(\d+)\}", aux)]
-if not pages:
-    sys.exit("bodypages: no 'app:*' label in the .aux — appendix missing, or "
-             "the first appendix \\section lacks an app: label")
-
-body = min(pages) - 1
+# Prefer the explicit body:end label (page of the LAST body content) — robust
+# even when the appendix shares that page.  Fall back to (first appendix page−1).
+m = re.search(r"\\newlabel\{body:end\}\{\{[^}]*\}\{(\d+)\}", aux)
+if m:
+    body = int(m.group(1))
+else:
+    pages = [int(p) for _, p in
+             re.findall(r"\\newlabel\{(app:[^}]+)\}\{\{[^}]*\}\{(\d+)\}", aux)]
+    if not pages:
+        sys.exit("bodypages: no body:end or 'app:*' label in the .aux")
+    body = min(pages) - 1
 over = body - LIMIT
 status = "OK — within budget" if over <= 0 else f"OVER budget by {over} page(s)"
 print(f"body = {body} pages (limit {LIMIT}) — {status}")
