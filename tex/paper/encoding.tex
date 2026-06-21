@@ -200,15 +200,10 @@ behind (a reassociated sum, a rescaled coefficient), we use \emph{proof by
 	reflection}: each side is reified to a normal form and the two compared, a
 reflexive procedure we take from Coltellacci and Merz~\cite{coltellacci2025lia}.
 
-Concretely, from $h_1 : \Prf\,(x \leq \mathbf{0})$ and
-$h_2 : \Prf\,(\mathbf{1} - (x + x) \leq \mathbf{0})$, the multipliers $1$ and
-$2$ add the bound of $h_2$ to twice that of $h_1$, giving
-$(\mathbf{1} - (x + x)) + x + x \leq \mathbf{0}$; the generated equality
-$e : \Prf\,(\mathbf{1} = (\mathbf{1} - (x + x)) + x + x)$ rewrites this to the
-false $\mathbf{1} \leq \mathbf{0}$, closed by the order lemma
-$\mathsf{one\_not\_leq\_zero}$ over a fold of $\mathsf{add\_leq\_zero}$.
-Here $e$ is itself closed by reflection, so \pp's sum reorderings need no
-bespoke permutation lemmas.
+Concretely, $h_1 : x \leq \mathbf{0}$ and $h_2 : \mathbf{1} - (x + x) \leq
+\mathbf{0}$ combine under multipliers $1$ and $2$ to the false $\mathbf{1} \leq
+\mathbf{0}$; the reordering equality this needs is itself closed by reflection,
+so \pp's sum permutations need no bespoke lemmas.
 
 
 \paragraph{Soundness of the rules.}
