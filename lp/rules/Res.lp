@@ -22,6 +22,14 @@ opaque symbol eq_trans [a] [P Q R : τ a]
   : π (P = Q) → π (Q = R) → π (P = R) ≔
 begin assume a P Q R h1 h2; rewrite h1; refine h2 end;
 
+// Transport a `Res` along a propositional equality of its statement: given
+// `a = b` and a `Res b`, build a `Res a`.  The emitter uses this to re-order
+// the conjuncts a chain `_1` form leaves at the tail (e.g. NRM20_1's pinning
+// equality) back to the position PP's goal carries them, *without* duplicating
+// the (large) underlying chain term across `res_tm`/`res_eq`.
+symbol res_cong [a b : τ o] (h : π (a = b)) (r : Res b) : Res a
+  ≔ mk_1 (res_tm r) (eq_trans h (res_eq r));
+
 // A true proposition equals ⊤.  This is the Schema-0 result bridge
 // (§8.13): a rule "sans antécédent véritable" produces the result VRAI,
 // which the spec requires to be *equivalent to the consequent P* — here

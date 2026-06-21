@@ -14,7 +14,8 @@ let reserved =
   SS.of_list (["VRAI"; "TRUE"; "FAUX"; "FALSE";
               "_eql_set"; "eql_set"; "_pj1"; "_pj2"; "pj1"; "pj2";
               (* uninterpreted set-theory operators declared in B.lp *)
-              "total_func"; "overriding"; "relcomp"; "prod"; "subset"; "power";
+              "total_func"; "partial_func"; "partial_surj"; "overriding";
+              "relcomp"; "prod"; "subset"; "power";
               (* PP-internal spellings of meta-ops (renamed by the emitter) *)
               "_sz"; "_func"]
               (* B built-in operators (card, dom, …) reference the B.lp globals *)

@@ -699,12 +699,119 @@ let find_leq_reorder ctx lhs =
          | _ -> None)
       | _ -> None) ctx.hyps
 
-(* Free occurrence of [v] in an expression / predicate (binder-respecting), used
-   to skip the [eq_rewrite_evidence] substitution for hyps the rewrite can't
-   touch. *)
+(* Propositional equality `π (p = q)` for two predicates differing only by
+   arithmetic normalisation of leaf expressions buried under binders /
+   conjunctions / connectives.  PP's equality prover (EGALITE) matches a stored
+   hyp to a needed antecedent modulo commutation / reassociation it performed
+   inside a function image (`s9(x+1)` ↦ `s9(1+x)`); [canon_prd] doesn't see that
+   (it is not arithmetic-aware) and it is NOT definitional in LP, so the bridge is
+   a real congruence proof.  Recurse through the shared shape composing one
+   congruence lemma per node — binders fold to `!!` (♢/♡ ≔ !!, so [!!_cong]
+   covers all three kinds), conjunction via the snoc-list [conj_*_cong], the
+   connectives via [not_cong]/[imp_cong_*], atom operands via
+   [Arith_proofs.prove_exp_eq].  Tried only after the [canon_prd] equality fails,
+   so it costs nothing on the already-matching path.  None when the shapes don't
+   line up (caller falls back). *)
+let fold_maplet_es = function
+  | [e] -> e
+  | es ->
+    let rec go = function
+      | [e] -> e
+      | e :: r -> Maplet (e, go r)
+      | [] -> assert false
+    in go es
+
+let fold_and_left = function
+  | [] -> assert false
+  | c :: cs -> List.fold_left (fun a b -> Binary (And, a, b)) c cs
+
+let rec prove_prd_cong ctx env p q : L.term option =
+  let ( let* ) = Option.bind in
+  if p = q then Some (eq_refl (L.Pred (env, p)))
+  else match p, q with
+    | Unary (Not, p'), Unary (Not, q') ->
+      let* h = prove_prd_cong ctx env p' q' in
+      Some (L.App (L.Name "not_cong", [ h ]))
+    | Binary (Imp, a, b), Binary (Imp, a', b') ->
+      (match a = a', b = b' with
+       | false, true ->
+         let* h = prove_prd_cong ctx env a a' in
+         Some (L.App (L.Name "imp_cong_l", [ h ]))
+       | true, false ->
+         let* h = prove_prd_cong ctx env b b' in
+         Some (L.App (L.Name "imp_cong_r", [ h ]))
+       | false, false ->
+         let* hl = prove_prd_cong ctx env a a' in
+         let* hr = prove_prd_cong ctx env b b' in
+         Some (L.App (L.Name "eq_trans",
+           [ L.App (L.Name "imp_cong_l", [ hl ]);
+             L.App (L.Name "imp_cong_r", [ hr ]) ]))
+       | true, true -> Some (eq_refl (L.Pred (env, p))))
+    | Binary (And, _, _), Binary (And, _, _) ->
+      let ps = Pp_lp.conj_children_left p and qs = Pp_lp.conj_children_left q in
+      if List.length ps <> List.length qs then None
+      else prove_conj_cong ctx env ps qs
+    | Bind (_, xs, pbody), Bind (_, ys, qbody)
+      when List.length xs = List.length ys ->
+      (* ♢/♡ ≔ !!, so the proof is `!!_cong` regardless of the two binder kinds;
+         align q's bound vars to p's so the bodies share atom names, and render
+         each `xs.(k)` as `v ⋕ k` against a fresh tuple var [v]. *)
+      let v = fresh_x_local ctx in
+      let env' = List.mapi (fun k x -> (x, L.Proj (k, v))) xs @ env in
+      let qbody' = subst_prd (List.map2 (fun y x -> (y, Var x)) ys xs) qbody in
+      let* h = prove_prd_cong ctx env' pbody qbody' in
+      Some (L.App (L.Name "!!_cong", [ L.Lambda (v, None, h) ]))
+    | Eq (a, c), Eq (b, d) ->
+      let* h1 = Arith_proofs.prove_exp_eq env a b in
+      let* h2 = Arith_proofs.prove_exp_eq env c d in
+      Some (L.App (L.Name "eq_cong", [ h1; h2 ]))
+    | Leq (a, c), Leq (b, d) ->
+      let* h1 = Arith_proofs.prove_exp_eq env a b in
+      let* h2 = Arith_proofs.prove_exp_eq env c d in
+      Some (L.App (L.Name "leq_cong", [ h1; h2 ]))
+    | Mem (es1, s1), Mem (es2, s2)
+      when es1 <> [] && List.length es1 = List.length es2 ->
+      let* h1 = Arith_proofs.prove_exp_eq env (fold_maplet_es es1) (fold_maplet_es es2) in
+      let* h2 = Arith_proofs.prove_exp_eq env s1 s2 in
+      Some (L.App (L.Name "mem_cong", [ h1; h2 ]))
+    | _ -> None
+
+(* `π (⋀ ps = ⋀ qs)` for equal-length conjunct lists (the renderer's snoc list),
+   transporting one differing conjunct at a time: [conj_init_cong] absorbs an
+   identical last conjunct (recurse on the init), [conj_snoc_last_cong] rewrites a
+   differing last (recurse via [prove_prd_cong]); both differ ⇒ [eq_trans] of the
+   two.  Reached only with ps ≠ qs (p = q is handled above). *)
+and prove_conj_cong ctx env ps qs : L.term option =
+  let ( let* ) = Option.bind in
+  if ps = qs then Some (eq_refl (L.Pred (env, fold_and_left ps)))
+  else match List.rev ps, List.rev qs with
+    | p_last :: ps_init_r, q_last :: qs_init_r ->
+      let ps_init = List.rev ps_init_r and qs_init = List.rev qs_init_r in
+      (match p_last = q_last, ps_init = qs_init with
+       | true, _ ->
+         let* h = prove_conj_cong ctx env ps_init qs_init in
+         Some (L.App (L.Name "conj_init_cong", [ h ]))
+       | false, true ->
+         let* h = prove_prd_cong ctx env p_last q_last in
+         Some (L.App (L.Name "conj_snoc_last_cong", [ h ]))
+       | false, false ->
+         let* hi = prove_conj_cong ctx env ps_init qs_init in
+         let* hl = prove_prd_cong ctx env p_last q_last in
+         Some (L.App (L.Name "eq_trans",
+           [ L.App (L.Name "conj_init_cong", [ hi ]);
+             L.App (L.Name "conj_snoc_last_cong", [ hl ]) ])))
+    | _ -> None
+
+(* Free occurrence of [v] in an expression / predicate (binder-respecting).  A
+   cheap guard letting [eq_rewrite_evidence] skip the expensive substitution +
+   canonicalisation for hyps the rewrite can't touch — so it must catch the same
+   occurrences [replace_subexp] rewrites, including a bare-string `App` head
+   (`v(x)`, where PP applies a function symbol) that the generic [fold_exp]
+   descent (args only) misses.  An [EApp] head is itself an [exp], so seen. *)
 let rec occurs_in_exp v e0 =
   match e0 with
   | Var x -> x = v
+  | App (h, args) -> h = v || List.exists (occurs_in_exp v) args
   | e -> fold_exp (fun acc se -> acc || occurs_in_exp v se) false e
 
 let rec occurs_in_prd v = function
@@ -723,12 +830,21 @@ let rec occurs_in_prd v = function
    how PP's equality prover (EGALITE, ch. 9) discharges goals: hypotheses are
    matched modulo the stored equalities.
 
+   The rewrite is [replace_subexp_prd] (Var v) other, not [subst_prd], so a `v`
+   that PP applied as a *function symbol* — `v(x)`, an `App`/`EApp` head, not a
+   plain `Var` — is also rewritten (e.g. `s28(s33)` ↦ `relcomp(s10,s32)(s33)` from
+   `s28 = relcomp(s10,s32)`); the same App-head case [replace_subexp] handles for
+   ECTR.  The motive likewise uses [replace_subexp_prd] (Var v) (Var z), so an
+   applied `v` becomes `eapp z …` and β-matches `needed` once `ind_eq` plugs in
+   `other`.
+
    Called only from [leaf_evidence], and only once [find_hyp_by_equiv ctx needed]
    has already failed — so no in-scope hyp is `≡ needed`.  That invariant lets us
-   (a) drop the always-false `prd_equiv hp needed` guard and (b) when `v` does not
-   occur in `hp` (so `hp[v:=other] = hp`), skip the substitution and the equiv
-   test entirely: the only discharge left is the Leq literal-fold, which a
-   constant-motive transport still yields. *)
+   drop the always-false `prd_equiv hp needed` guard; and when `v` does not occur
+   in `hp` ([occurs_in_prd], the cheap App-head-aware guard the INS leaf search
+   leans on) we skip the substitution + canonicalisation entirely — the only
+   discharge left is the Leq literal-fold, which a constant-motive transport still
+   yields. *)
 let eq_rewrite_evidence ctx needed =
   let render_env = proj_env_of_ctx ctx in
   (* [needed] is fixed across the whole scan, so canonicalise it once and compare
@@ -739,7 +855,7 @@ let eq_rewrite_evidence ctx needed =
     let z = fresh_x_local ctx in
     let motive =
       L.Lambda (z, Some L.Tau_i,
-        L.Pred (render_env, subst_prd [ (v, Var z) ] hyp_pred))
+        L.Pred (render_env, replace_subexp_prd (Var v) (Var z) hyp_pred))
     in
     let eqt =
       if sym then L.App (L.Name "eq_sym", [ L.Name heq_name ])
@@ -771,10 +887,19 @@ let eq_rewrite_evidence ctx needed =
           else if not (occurs_in_prd v hp) then
             literal_fold heq_name ~sym v h hp hp
           else
-            let hp' = subst_prd [ (v, other) ] hp in
+            let hp' = replace_subexp_prd (Var v) other hp in
             if canon_prd 0 [] hp' = k_needed
             then Some (transport heq_name ~sym v h hp)
-            else literal_fold heq_name ~sym v h hp hp') ctx.hyps
+            else
+              (* the rewrite lands on a hyp equal to [needed] only modulo an
+                 arithmetic normalisation PP did inside a function image
+                 (`s9(x+1)` ↦ `s9(1+x)`) — bridge `hp' = needed` by congruence and
+                 transport the rewritten hyp over it (`=⇒`). *)
+              match prove_prd_cong ctx render_env hp' needed with
+              | Some peq ->
+                Some (L.App (L.Name "=\xe2\x87\x92",  (* =⇒ *)
+                  [ peq; transport heq_name ~sym v h hp ]))
+              | None -> literal_fold heq_name ~sym v h hp hp') ctx.hyps
       in
       let a = match lhs with
         | Var v -> try_var_side v rhs ~sym:true
@@ -788,6 +913,33 @@ let eq_rewrite_evidence ctx needed =
          | _ -> None)
     | _ -> None) ctx.hyps
 
+(* A proof of `π (a = b)` from the equality facts [eqs] (each `(l, r, π(l=r))`),
+   by BFS over the closure: an edge in either direction (eq_sym), composed with
+   eq_trans.  PP's equality prover (EGALITE, ch. 9) closes a sequent with a
+   disequality `¬(u=v)` hypothesis once u and v are joined; an INS leaf may also
+   need a fact modulo the stored equalities (the injectivity `f(a)=f(b)` cases),
+   and an EGALITE antecedent may itself be an equality `a = b` re-promoted from a
+   chain `a = … = b` of stored equalities ([leaf_evidence]'s Eq bridge). *)
+let eq_path_proof proj_env eqs a b =
+  if a = b then Some (eq_refl (L.Exp (proj_env, a)))
+  else
+    let edges =
+      List.concat_map (fun (l, r, ev) ->
+        [ (l, r, ev); (r, l, L.App (L.Name "eq_sym", [ev])) ]) eqs in
+    let rec bfs visited = function
+      | [] -> None
+      | (t, ev) :: rest ->
+        if t = b then Some ev
+        else if List.mem t visited then bfs visited rest
+        else
+          let nexts =
+            List.filter_map (fun (l, r, e) ->
+              if l = t then Some (r, L.App (L.Name "eq_trans", [ev; e])) else None)
+              edges in
+          bfs (t :: visited) (rest @ nexts)
+    in
+    bfs [] [ (a, eq_refl (L.Exp (proj_env, a))) ]
+
 let leaf_evidence ctx env leaf =
   if is_true_atom leaf then Some true_intro
   else
@@ -798,11 +950,13 @@ let leaf_evidence ctx env leaf =
     match find_hyp_by_equiv ctx needed with
     | Some h -> Some (L.Name h)
     | None ->
-      (* arithmetic-reorder bridge: PP recorded the conjunct in a different
-         term order than the universal.  Prove `needed = hyp` and transport. *)
-      let reorder =
+      (* bridges when no hyp is `≡ needed`: an arithmetic-reorder ≤-hyp, or an
+         equality antecedent provable as a chain through the stored equalities. *)
+      let bridge =
         match needed with
         | Leq (lhs, Lit "0") ->
+          (* PP recorded the conjunct in a different term order than the
+             universal.  Prove `needed = hyp` and transport. *)
           (match find_leq_reorder ctx lhs with
            | Some (h, h_lhs) ->
              (match prove_sum_eq (proj_env_of_ctx ctx) lhs h_lhs with
@@ -810,9 +964,18 @@ let leaf_evidence ctx env leaf =
                 Some (L.App (L.Name "leq_subst_l", [ eqpf; L.Name h ]))
               | None -> None)
            | None -> None)
+        | Eq (a, b) ->
+          (* the equality holds by a chain `a = … = b` of stored equalities
+             (both sides equal a common term, `dom(s45<|s77|>s24) = s45 =
+             dom(s45<|s76|>s24)`) — close it with [eq_path_proof]. *)
+          let eqs =
+            List.filter_map (fun (n, p) -> match p with
+              | Eq (l, r) when l <> r -> Some (l, r, L.Name n)
+              | _ -> None) ctx.hyps in
+          eq_path_proof (proj_env_of_ctx ctx) eqs a b
         | _ -> None
       in
-      (match reorder with
+      (match bridge with
        | Some _ as r -> r
        | None -> eq_rewrite_evidence ctx needed)
 
@@ -878,31 +1041,6 @@ let ground_value e =
       match acc, a with
       | Some c, Lit l -> Option.map (fun n -> c + s * n) (int_of_string_opt l)
       | _ -> None) (Some 0) atoms
-
-(* A proof of `π (a = b)` from the equality facts [eqs] (each `(l, r, π(l=r))`),
-   by BFS over the closure: an edge in either direction (eq_sym), composed with
-   eq_trans.  PP's equality prover (EGALITE, ch. 9) closes a sequent with a
-   disequality `¬(u=v)` hypothesis once u and v are joined; an INS leaf may also
-   need a fact modulo the stored equalities (the injectivity `f(a)=f(b)` cases). *)
-let eq_path_proof proj_env eqs a b =
-  if a = b then Some (eq_refl (L.Exp (proj_env, a)))
-  else
-    let edges =
-      List.concat_map (fun (l, r, ev) ->
-        [ (l, r, ev); (r, l, L.App (L.Name "eq_sym", [ev])) ]) eqs in
-    let rec bfs visited = function
-      | [] -> None
-      | (t, ev) :: rest ->
-        if t = b then Some ev
-        else if List.mem t visited then bfs visited rest
-        else
-          let nexts =
-            List.filter_map (fun (l, r, e) ->
-              if l = t then Some (r, L.App (L.Name "eq_trans", [ev; e])) else None)
-              edges in
-          bfs (t :: visited) (rest @ nexts)
-    in
-    bfs [] [ (a, eq_refl (L.Exp (proj_env, a))) ]
 
 (* Does the LP identifier [name] occur in a proof term / tactic script?  Used to
    drop a derived-fact `have` whose name the rest of the INS script never

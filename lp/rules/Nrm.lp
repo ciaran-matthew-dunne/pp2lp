@@ -557,6 +557,21 @@ symbol NRM22_1 [Q : Prop] [ps : Tuple 1 → 𝕃* o] [E : τ ι]
   : Res ((`♡ v : Tuple 1, ¬ ⋀ (ps v ∷ (prj 0 v = E))) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm22_eq Q ps E) (res_eq r));
 
+// NRM20_1 — chain (Res) form of NRM20 (drop the binder at slot k pinned by the
+// tail equality `prj k v = E (rm k v)`).  POSTULATE: unlike the other `_1` forms
+// its soundness bridge `nrm20_eq : BIG = SMALL` is not yet proved (the general
+// slot-k `ins`/`rm` round-trip under ♡ is the open part), so this is an AXIOM
+// for now — emitting it trusts NRM20 inside a Res chain.  TODO: discharge with
+//   ≔ mk_1 (res_tm r) (eq_trans (@nrm20_eq n k qs Q E) (res_eq r));
+// once `nrm20_eq` exists (the main-tree `NRM20` lemma above is the ⇐ direction).
+// [qs] is *explicit* (the emitter supplies it as `λ v, ∎ ∷ …`): on the premise
+// it occurs as `qs (ins k (E v') v')`, a non-Miller application lambdapi cannot
+// infer (it OOMs trying), so passing it lets the splice reduce instead.
+symbol NRM20_1 [n] (k : ℕ) (qs : Tuple (+1 n) → 𝕃* o) [Q : Prop]
+  (E : Tuple n → τ ι)
+  (r : Res ((`♡ v' : Tuple n, ¬ ⋀ (qs (ins k (E v') v'))) ⇒ Q))
+  : Res ((`♡ v : Tuple (+1 n), ¬ ⋀ (qs v ∷ (prj k v = E (rm k v)))) ⇒ Q);
+
 // NRM4_1 — chain (Res) form of NRM4, via the `nrm4_eq` bridge (Res.lp).
 symbol NRM4_1 [n] [P R : Tuple n → Prop] [Q S : Prop]
   (r : Res ((Q ⇒ (`♢ v, P v ⇒ R v)) ⇒ S))

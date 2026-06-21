@@ -214,10 +214,17 @@ and tree_dispatch ctx = function
            match leaf_evidence ctx [] a with
            | Some ev -> ev
            | None ->
+             let dump =
+               if Sys.getenv_opt "PP2LP_DEBUG_EGALITE" = None then ""
+               else "\n  hyps in scope:\n" ^ String.concat "\n"
+                 (List.map (fun (n, p) ->
+                    Printf.sprintf "    %s : %s" n (Emit_pp.prd_to_pp p))
+                    ctx.hyps)
+             in
              failwith (Printf.sprintf
                "translate: EGALITE — no in-scope hyp matches the rewritten \
                 antecedent (directly or modulo a stored equality)\n  \
-                antecedent: %s" (Emit_pp.prd_to_pp a)))
+                antecedent: %s%s" (Emit_pp.prd_to_pp a) dump))
            antecedents
        in
        let k = fresh_x_local ctx in
@@ -301,16 +308,19 @@ and tree_dispatch ctx = function
              in
              L.Step (L.Refine (term, []))
            | None ->
-             let hyps =
-               String.concat "\n"
-                 (List.map (fun (n, p) ->
-                    Printf.sprintf "    %s : %s" n (Emit_pp.prd_to_pp p))
-                    ctx.hyps)
-             in
-             failwith (Printf.sprintf
-               "translate: EQS2 — no eql_set evidence found (neither an \
-                assumed `E = F`/marker hyp nor a marker antecedent in R's \
-                spine)\n  hyps in scope:\n%s" hyps)))
+             (* Out of scope: PP's EQS2 discharges ¬eql_set(E,F) by *disregarding*
+                the marker's proof (spec §10.4.3 "ne pas tenir compte de la preuve")
+                — it is sound only by the Set Translator's construction (E, F both
+                simple variables standing for an equality that held at translation),
+                so the equality is never recorded in the replay.  A trust-free
+                reconstruction needs explicit eql_set evidence; the searches above
+                cover every form we can recover it from.  When none matches the
+                evidence is genuinely absent from the sequent, so we stop here with
+                a diagnostic rather than guess. *)
+             Errors.fail "E_EMIT"
+               "EQS2: no eql_set(%s, %s) evidence in scope (PP disregards the \
+                marker's proof, spec \xc2\xa710.4.3) \xe2\x80\x94 out of scope"
+               (Emit_pp.prd_to_pp (Lift e)) (Emit_pp.prd_to_pp (Lift f))))
      | _ -> default ctx rule None anno [c])
   | P.Apply { rule; arg; anno; children = ([_; c1] as children); _ }
     when base rule = "AND4" ->
@@ -886,6 +896,13 @@ and chain_term ctx node : L.term =
      | _ ->
        Errors.fail "E_EMIT"
          "NRM2_1: expected a (♢v, P ⇒ Q v) ⇒ S chain annotation")
+  | P.Apply { rule; anno; children = [c]; _ }
+    when base rule = "NRM20" ->
+    (* NRM20 in a Res chain: primed to NRM20_1 (a postulate — its `nrm20_eq`
+       soundness bridge is deferred).  The slot/witness computation and the
+       conjunct-bubble transport live in [Rule_emit.nrm20_chain_term]; the child
+       sub-chain is built here and handed in. *)
+    nrm20_chain_term ctx anno [c] (chain_term ctx c)
   (* Chain-form binder merges (`[XST4_1]`, `[ALL3_1]`, …) and the De Morgan
      `[ALL5_1]` are NOT special-cased: they fall through to the generic
      single-child chain case below, which emits `<NAME>_1 child` (n/P/R inferred

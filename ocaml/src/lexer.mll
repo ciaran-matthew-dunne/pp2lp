@@ -33,7 +33,9 @@ rule token = parse
   | "<="  { LEQ }
   | "<:"  { SUBSET }    (* subset  S <: T *)
   | "<+"  { OVERRIDE }  (* relational override r <+ s *)
-  | "-->" { TFUN }      (* total-function space S --> T *)
+  | "+->>" { PSURJ }    (* partial surjection  S +->> T (before "+->": maximal munch) *)
+  | "-->" { TFUN }      (* total-function space   S --> T *)
+  | "+->" { PFUN }      (* partial-function space S +-> T *)
   | '<'   { LANGLE }
   | '>'   { RANGLE }
   (* FIN/sequents.  "|->" (maplet) must precede "|-" (turnstile): maximal

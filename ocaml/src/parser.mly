@@ -24,7 +24,7 @@
 %token NOT AND OR IMP IFF EQ LEQ
 %token PLUS MINUS TIMES POWER
 %token INTER UNION
-%token SEMI PERCENT NOTMEM SUBSET OVERRIDE TFUN SIGMA INSTANCIATION BOOLOP
+%token SEMI PERCENT NOTMEM SUBSET OVERRIDE TFUN PFUN PSURJ SIGMA INSTANCIATION BOOLOP
 %token FORALL0 FORALL1 FORALL2 EXISTS
 
 %nonassoc LIFT_EXP  (* lowest: raw_prd -> exp prefers shift over reduce *)
@@ -39,7 +39,7 @@
 %right PERIOD       (* binder has narrow scope: !x.P and Q = (∀x.P) ∧ Q *)
 %left UNION INTER   (* same level, left-assoc — like or/and: `s \/ t /\ s` is
                        `(s \/ t) /\ s`, mirroring how PP unfolds the membership *)
-%left TFUN OVERRIDE SEMI        (* uninterpreted set/relation operators *)
+%left TFUN PFUN PSURJ OVERRIDE SEMI  (* uninterpreted set/relation operators *)
 %left MAPLET DOMRESTR RANRESTR  (* B-Book: set-operator level, looser than .. *)
 %left DOTDOT        (* B-Book: .. looser than +/- — e-f..g+f = (e-f)..(g+f) *)
 %left PLUS MINUS
@@ -102,6 +102,10 @@ exp:
   { pairs (e :: es) }
   | e1 = exp; TFUN; e2 = exp
   { SetOp ("total_func", [e1; e2]) }
+  | e1 = exp; PFUN; e2 = exp
+  { SetOp ("partial_func", [e1; e2]) }
+  | e1 = exp; PSURJ; e2 = exp
+  { SetOp ("partial_surj", [e1; e2]) }
   | e1 = exp; OVERRIDE; e2 = exp
   { SetOp ("overriding", [e1; e2]) }
   | e1 = exp; SEMI; e2 = exp

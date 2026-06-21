@@ -30,6 +30,14 @@ val int_evidence : Lp_tree.proj_env -> exp -> Lp_tree.term
    normalisation gaps (INS conjuncts, AR3, Farkas) without `trust`. *)
 val prove_sum_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
 
+(* `π (e1 = e2)` for two τ ι expressions denoting the same value: structural
+   congruence through the function-image / pair / `+`/`−`/neg constructors PP
+   rewrites *through* (recursing on the differing child), then reflective ℤ-linear
+   equality (commutation / reassociation / constant folding).  None when neither
+   bridges the shape.  Exposed for the EGALITE hyp-match congruence bridge
+   ([Emit_ctx.prove_prd_cong]), which closes the same leaves under binders. *)
+val prove_exp_eq : Lp_tree.proj_env -> exp -> exp -> Lp_tree.term option
+
 (* `π (p = q)` for two predicates differing only by arithmetic normalisation of
    their leaf expressions (AR10's `solveur(p) = q`): congruence down to the
    operands, each closed by [prove_exp_eq] (structural congruence through the

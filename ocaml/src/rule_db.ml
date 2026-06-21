@@ -197,7 +197,7 @@ let rules : (string, rule_info) Hashtbl.t =
   r "NRM17" pass;
   r "NRM18" pass;
   r "NRM19" pass ~emit:Witness_hyp ~chain_form:true;
-  r "NRM20" (Arity [Con; Seq]) ~emit:Nrm20;
+  r "NRM20" (Arity [Con; Seq]) ~emit:Nrm20 ~chain_form:true;  (* NRM20_1 postulate + translate.ml chain dispatch; soundness bridge deferred *)
   r "NRM21" (Arity [Con; Seq]) ~emit:Nrm21;
   r "NRM22" pass ~emit:Nrm22 ~chain_form:true;
   r "NRM23" pass ~emit:Nrm23 ~chain_form:true;

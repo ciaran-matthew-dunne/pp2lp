@@ -241,6 +241,8 @@ constant symbol ran_restrict : τ ι → τ ι → τ ι; // r |> t range restri
 constant symbol set_cons : τ ι → τ ι → τ ι;     // {a, …} extension cell
 constant symbol set_empty : τ ι;                // {}     empty set
 constant symbol total_func : τ ι → τ ι → τ ι;   // s --> t total functions
+constant symbol partial_func : τ ι → τ ι → τ ι; // s +-> t partial functions
+constant symbol partial_surj : τ ι → τ ι → τ ι; // s +->> t partial surjections
 constant symbol overriding : τ ι → τ ι → τ ι;   // r <+ s relational override
 constant symbol relcomp : τ ι → τ ι → τ ι;      // r ; s  relational composition
 constant symbol prod : τ ι → τ ι → τ ι;         // s * t  Cartesian product (set ×); arithmetic · is `mult`

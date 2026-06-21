@@ -153,6 +153,94 @@ let pin_eq_conjunct ~rev pinned cs =
   in
   find 0 cs
 
+(* The pinned binder of an NRM20/21 node, read off the annotation: its name,
+   its prj-slot [k] (PP binder position i ↦ prj i), the pinning equality's
+   conjunct index [j] in [cs], and the witness expression [e] (over the
+   remaining binders).  [rev] selects the `E = x` orientation (NRM21).  Prefers
+   the binder the child actually dropped (annotation diff); falls back to the
+   first orientation-matching equality.  Shared by the main-tree dispatch and
+   the Res-chain form ([nrm20_chain_term]). *)
+let nrm20_candidate ~rev vars cs children =
+  let pos_of v =
+    let rec go i = function
+      | [] -> None
+      | x :: rest -> if x = v then Some i else go (i + 1) rest
+    in go 0 vars
+  in
+  let pinned_opt =
+    match children with
+    | [c] ->
+      (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
+       | Some cvars when List.length cvars = List.length vars - 1 ->
+         Option.map snd (dropped_var_pos vars cvars)
+       | _ -> None)
+    | _ -> None
+  in
+  let candidate =
+    let try_pinned p =
+      Option.map (fun (j, e) -> (p, j, e)) (pin_eq_conjunct ~rev p cs)
+    in
+    match pinned_opt with
+    | Some p -> try_pinned p
+    | None -> List.find_map try_pinned vars
+  in
+  Option.map
+    (fun (pinned, j, e) -> (pinned, Option.get (pos_of pinned), j, e))
+    candidate
+
+(* Res-chain form of NRM20 (rev=false; NRM21 chains are unfired).  PP leaves
+   NRM20 unprimed inside a result chain, so the emitter primes it to NRM20_1 and
+   supplies the same slot [k] / witness [E] the main-tree dispatch computes; the
+   child sub-chain [child_term] is already a `Res` term.  NRM20_1's result
+   carries the pinning equality at the conjunct *tail* (`qs v ∷ eq`); when PP
+   placed it earlier, transport the result `Res` along the bubble congruence
+   (`mk_1 (res_tm ·) (eq_trans (BIG = BIG_tail) (res_eq ·))` — the Res analogue
+   of the main-tree `=⇒`).  NRM20_1 is a postulate (its soundness bridge
+   `nrm20_eq` is deferred), so emitting it trusts NRM20 in a chain for now. *)
+let nrm20_chain_term ctx anno children child_term =
+  match goal_of_anno anno with
+  | Some (Binary (Imp, Bind (Forall2, vars, Unary (Not, body)), _)) ->
+    let cs = conjuncts body in
+    let n_cs = List.length cs in
+    (match nrm20_candidate ~rev:false vars cs children with
+     | Some (pinned, k, j, e) ->
+       let rvars = List.filter (fun v -> v <> pinned) vars in
+       let w = fresh_x_local ctx in
+       let env' =
+         List.mapi (fun i v -> (v, L.Proj (i, w))) rvars @ pp_env_of ctx in
+       (* qs : the conjunct list minus the pinning equality, as a function of the
+          full (n+1)-tuple (`λ v, ∎ ∷ c₀ ∷ …`).  Passed explicitly because its
+          premise occurrence `qs (ins k (E v') v')` is non-Miller — left implicit
+          it OOMs lambdapi's unifier; given, the `ins`/`prj` splice just reduces. *)
+       let vfull = fresh_x_local ctx in
+       let env_full =
+         List.mapi (fun i v -> (v, L.Proj (i, vfull))) vars @ pp_env_of ctx in
+       let qs_lam =
+         L.Lambda (vfull, None,
+           List.fold_left
+             (fun acc c ->
+                L.Infix ("\xe2\x88\xb7" (* ∷ *), acc, L.Pred (env_full, c)))
+             (L.Name "\xe2\x88\x8e" (* ∎ *))
+             (List.filteri (fun i _ -> i <> j) cs)) in
+       let base_app =
+         L.App (L.Name "NRM20_1",
+           [ L.Name (string_of_int k);
+             qs_lam;
+             L.Lambda (w, None, L.Exp (env', e));
+             child_term ]) in
+       if j = n_cs - 1 then base_app
+       else
+         (* `res_cong (BIG = BIG_tail) base_app : Res BIG` — base_app occurs once. *)
+         L.App (L.Name "res_cong",
+           [ conj_bubble_goal_cong ctx n_cs j; base_app ])
+     | None ->
+       Errors.fail "E_EMIT"
+         "NRM20_1 (chain): annotation lacks an `x = E` equality conjunct for \
+          the dropped binder")
+  | _ ->
+    Errors.fail "E_EMIT"
+      "NRM20_1 (chain): expected a `forall2(…)·¬(…) ⇒ Q` annotation"
+
 let find_and5_pair conjs =
   let arr = Array.of_list conjs in
   let n = Array.length arr in
@@ -385,32 +473,8 @@ let tactic_for_rule ctx rule arg anno children =
      | Some (Binary (Imp, Bind (Forall2, vars, Unary (Not, body)), _)) ->
        let cs = conjuncts body in
        let n_cs = List.length cs in
-       let pos_of v =
-         let rec go i = function
-           | [] -> None
-           | x :: rest -> if x = v then Some i else go (i + 1) rest
-         in go 0 vars
-       in
-       let pinned_opt =
-         match children with
-         | [c] ->
-           (match forall2_vars_of_goal (goal_of_anno (Proof_tree.anno_of c)) with
-            | Some cvars when List.length cvars = List.length vars - 1 ->
-              Option.map snd (dropped_var_pos vars cvars)
-            | _ -> None)
-         | _ -> None
-       in
-       let candidate =
-         let try_pinned p =
-           Option.map (fun (j, e) -> (p, j, e)) (pin_eq_conjunct ~rev p cs)
-         in
-         match pinned_opt with
-         | Some p -> try_pinned p
-         | None -> List.find_map try_pinned vars
-       in
-       (match candidate with
-        | Some (pinned, j, e) ->
-          let k = Option.get (pos_of pinned) in
+       (match nrm20_candidate ~rev vars cs children with
+        | Some (pinned, k, j, e) ->
           let e_vars =
             (Free_vars.free_vars_of_prd (Eq (e, Lit "0"))).Free_vars.exp_vars in
           let head_ok =
