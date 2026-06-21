@@ -29,9 +29,8 @@ is reassembled into that rule's first argument.
 Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
 and whose body is a tactic script (\autoref{fig:reconstruct}).
 %
-Each rule application in the \pp{} proof tree generally corresponds to an
-application of the corresponding rule lemma (e.g., $\refine\;\texttt{AND2\,\_}$),
-although some \pp{} rule applications require bespoke tactic applications.
+Each rule application generally becomes a \refine{} of the matching rule lemma
+(e.g., $\refine\;\texttt{AND2\,\_}$), though some need bespoke tactics.
 %
 Rules that invoke in-scope hypotheses receive their $\Prf$-argument
 by hypothesis lookup at the OCaml level; rules that introduce an antecedent
