@@ -87,8 +87,8 @@ search, nonlinear arithmetic, one result form).
 \numRulesFired{} of the \numRulesCovered{} encoded rules fire across these
 replays.
 %
-Re-emitting and re-checking the three suites takes \benchWallAll{} of
-wall-clock time on \benchMachine{} (\benchCpuAll{} of \lp{} checking).
+Re-emitting and re-checking these suites takes \benchWallAll{} on
+\benchMachine{} (\benchCpuAll{} of \lp{} checking).
 
 \texttt{apero} stresses the pipeline at industrial scale: a sampled
 obligation carries a median of about \aperoMedianHyps{} hypothesis
@@ -98,9 +98,9 @@ Of the \aperoReplayed{} replays \tool{} reconstructs, \aperoPass{} type-check
 within the budget and a further \aperoTimeout{} exceed it on the largest
 obligations; only \aperoFailed{} are genuine reconstruction failures.
 %
-These are also the first machine-produced replays to exercise \pp's equality
-store, in surface forms --- strict comparisons, tuple memberships, relational
-inverse --- that no synthetic goal had reached.
+They are also the first machine-produced replays to exercise \pp's equality
+store in surface forms no synthetic goal reached: strict comparisons, tuple
+memberships, relational inverse.
 
 
 \subsection{Conclusion and Future Work}\label{sec:conclusion}
