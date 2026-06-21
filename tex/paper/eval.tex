@@ -98,12 +98,11 @@ end;
   \end{minipage}
   \caption{Reconstruction of the benchmark \texttt{zp\_noncontra},
     $\lnot(a \land \lnot a)$.
-    Most replay lines become a \refine{} of the matching rule lemma; a rule
-    that introduces a hypothesis also emits an \texttt{assume} (here
-    \rn{IMP4}), and \rn{OPR1} discharges the definedness flag
-    $\mathtt{delta\_pa} = \mathtt{TRUE}$ (added by our goal generator) with an
-    \texttt{assume} and a \texttt{rewrite}.
-    The conjunction is the fold $\bwand$ of \autoref{sec:enc-formulas}.}
+    Most replay lines become a \refine{} of the matching rule lemma; a
+    hypothesis-introducing rule also emits an \texttt{assume} (here \rn{IMP4}),
+    and \rn{OPR1} discharges the goal generator's definedness flag
+    $\mathtt{delta\_pa} = \mathtt{TRUE}$ by an \texttt{assume} and a
+    \texttt{rewrite}.}
   \label{fig:reconstruct}
 \end{figure}
 % --------------------------------------------------------------------
@@ -204,8 +203,8 @@ records its pinned equality at a different conjunct position than
 specified, and \rn{OPR1}'s result derivation does not follow the schema
 laid out for it.
 %
-\tool{} implements the observed behaviour; we believe such discrepancies
-are themselves a useful by-product for the maintainers of \pp.
+\tool{} implements the observed behaviour, and surfaces these discrepancies
+as a by-product useful to \pp's maintainers.
 
 \paragraph{Engine partiality.}
 A few replay shapes are recognised but rejected: substitution rules
