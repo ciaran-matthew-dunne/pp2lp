@@ -126,16 +126,14 @@ A \lp{} development is a sequence of declarations:
     b &\Coloneqq& t \;\mid\; \text{\lpkw{begin}}\;\mathit{tac}^{*}\;\text{\lpkw{end}}
   \end{array}
 \]
-The \lpkw{symbol} command introduces a typed constant with explicit
-$(x : A)$ and implicit $[x : A]$ parameters $p$ and an optional definition
-$b$; \lpkw{rule} adds a rewrite rule over pattern variables \texttt{\$x},
-checked for type-preservation at declaration time; \lpkw{inductive}
-generates an inductive type with constructors $\mathit{cons}$ and a recursor.
+\lpkw{symbol} introduces a typed constant with explicit $(x : A)$ and implicit
+$[x : A]$ parameters $p$ and an optional definition $b$; \lpkw{rule} adds a
+type-preserving rewrite rule over pattern variables \texttt{\$x}; \lpkw{inductive}
+generates an inductive type with a recursor.
 %
-Modifiers $m$ refine a symbol's status: \lpmod{constant} symbols admit no
-rewrite rule at their head, \lpmod{injective} symbols may be inverted
-during unification, and the definition of an \lpmod{opaque} symbol is
-sealed once type-checked.
+Modifiers $m$ refine a symbol: \lpmod{constant} symbols admit no rewrite rule at
+their head, \lpmod{injective} ones may be inverted during unification, and an
+\lpmod{opaque} symbol's definition is sealed after type-checking.
 %
 A definition $b$ is a term or a proof script (\lpkw{begin} \ldots{}
 \lpkw{end}) whose tactics (e.g., \lpkw{assume}, \lpkw{refine},
