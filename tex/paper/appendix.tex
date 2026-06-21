@@ -1,6 +1,23 @@
 % ── appendix.tex ──────────────────────────────
 \appendix
 
+\section{Predicate Prover Syntax}\label{app:ppsyntax}
+
+The syntax of \pp's predicates and expressions (\autoref{sec:pp-syntax}):
+\begin{align*}
+	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
+	\mid E + F \mid E - F \mid -E                                     \\
+	P, Q & \Coloneqq E \mid E = F \mid E \leq F
+	\mid E_1,\ldots,E_k \in F
+	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
+	\mid P \Leftrightarrow Q
+	\mid \mathcal{Q}\,\vec{x} \cdot P
+\end{align*}
+where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
+$F(E_1,\ldots,E_k)$ applies $F$ to arguments, and membership relates a tuple of
+expressions to an expression.
+
+
 \section{Typing Rules for \lp}\label{app:typing}
 
 A signature $\Sigma$ declares typed constants and rewrite rules, and a context

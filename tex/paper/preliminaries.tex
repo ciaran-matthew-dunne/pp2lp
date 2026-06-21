@@ -3,26 +3,16 @@
 
 \subsection{The Predicate Prover}\label{sec:pp-syntax}
 
-The syntax for the \emph{predicates} and \emph{expressions} of \pp{} is
-given as follows:
-\begin{align*}
-	E, F & \Coloneqq x \mid n \mid E \mapsto F \mid F(E_1,\ldots,E_k)
-	\mid E + F \mid E - F \mid -E                                     \\
-	P, Q & \Coloneqq E \mid E = F \mid E \leq F
-	\mid E_1,\ldots,E_k \in F
-	\mid \lnot P \mid P \land Q \mid P \lor Q \mid P \Rightarrow Q
-	\mid P \Leftrightarrow Q
-	\mid \mathcal{Q}\,\vec{x} \cdot P
-\end{align*}
-where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
-$F(E_1,\ldots,E_k)$ applies $F$ to arguments, and membership relates a tuple of
-expressions to an expression.
+\pp's \emph{expressions} $E, F$ are variables, numerals, pairs $E \mapsto F$,
+applications $F(E_1,\ldots,E_k)$, and linear arithmetic ($+$, $-$); its
+\emph{predicates} $P, Q$ are membership $E_1,\ldots,E_k \in F$, equality, $\leq$,
+an expression standing as an atom, the propositional connectives, and
+quantifications $\mathcal{Q}\,\vec{x} \cdot P$ with
+$\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$
+(\autoref{app:ppsyntax} gives the grammar).
 %
-An expression may itself stand as an atomic predicate, shown by the leading
-$E$ in the production for $P$.
-%
-A quantifier $\mathcal{Q} \in \{\forall, \exists, \Dia, \Hrt\}$ binds a
-list of variables; $\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
+Each quantifier binds a list of variables;
+$\forall (x,y) \cdot P$ is distinct from $\forall x \cdot \forall y
 	\cdot P$, and dedicated rules (\rn{ALL1--4}, \rn{XST1--4}) regroup the
 latter into the former during proof search.
 %
