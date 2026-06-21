@@ -932,6 +932,24 @@ and chain_term ctx node : L.term =
        in
        L.App (L.Name "IMP4_1U", [L.Lambda (hp, None, body)])
      | _ -> assert false)
+  | P.Apply { rule; arg; anno; children = [c]; _ }
+    when Rule_db.emit rule = Rule_db.Ar3_f ->
+    (* AR3_F in a Res chain.  Like the main-tree AR3_F (see [tree_dispatch]): PP's
+       forward normalisation rewrites the `¬(a ≤ 𝟎)` occurrence to `r ≤ 𝟎` in
+       place.  Build the congruence `goal = goal'` for that exact (binder-nested)
+       position and transport the child sub-chain — typed at the normalised
+       `goal'` — back to `goal` with [res_cong] (`a = b → Res b → Res a`).
+       `(a, r)` from the PipeArg.  Falls back to the bare child chain when the
+       occurrence isn't on a supported path; that fails loud at the lambdapi
+       check rather than emitting trust (and was previously the `AR3_F` unknown
+       symbol the generic path emitted). *)
+    let env = proj_env_of_ctx ctx in
+    (match goal_of_anno anno, arg with
+     | Some g, Some (PipeArg (a_exp, r_exp)) ->
+       (match ar3f_cong ctx env [] g a_exp r_exp with
+        | Some cong -> L.App (L.Name "res_cong", [cong; chain_term ctx c])
+        | None -> chain_term ctx c)
+     | _ -> chain_term ctx c)
   | P.Apply { rule; arg; children = [c]; _ } ->
     (* Mirror the main-tree arg bundle: dynamic value args, then the solver
        side-condition metadata (AR9's `E = F` equality, as `eq_refl`), then slot
