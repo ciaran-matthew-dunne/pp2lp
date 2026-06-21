@@ -896,8 +896,12 @@ and chain_term ctx node : L.term =
        from the arg, the equality *generated* by [prove_sum_eq] (no `trust`).  Fail
        loud if the shape is off or the equality can't be built. *)
     let env = proj_env_of_ctx ctx in
+    (* `a` from the goal `¬(a≤𝟎) ⇒ R`; `r` (= `𝟏 − a`) from the arg.  PP records it
+       as the `a | r` PipeArg for the main-tree AR3 but as a bare `r` ExpArg for the
+       result-form `[AR3_1(r)]` — accept both, the goal supplies `a` either way. *)
     (match goal_of_anno anno, arg with
-     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Lit "0")), _)), Some (PipeArg (_, r_exp)) ->
+     | Some (Binary (Imp, Unary (Not, Leq (a_exp, Lit "0")), _)),
+       Some (PipeArg (_, r_exp) | ExpArg r_exp) ->
        (match Arith_proofs.prove_sum_eq env (AOp (Sub, Lit "1", a_exp)) r_exp with
         | Some eqpf ->
           L.App (L.Name "AR3_1",
@@ -905,7 +909,7 @@ and chain_term ctx node : L.term =
         | None -> failwith "translate: chain AR3 — couldn't build the `𝟏 - a = r` \
                             equality (prove_sum_eq), refusing to emit trust")
      | _ -> failwith "translate: chain AR3 — expected a `¬(leq a 𝟎) ⇒ R` goal with \
-                      an `a | r` PipeArg, refusing to emit trust")
+                      an `a | r` PipeArg or bare `r` ExpArg, refusing to emit trust")
   | P.Apply { rule; anno; children = [c]; _ }
     when base rule = "IMP5" ->
     (* IMP5_1 (hp : π P) (r : Res Q) : Res (P ⇒ Q) — strips a *known*
