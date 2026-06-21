@@ -167,11 +167,10 @@ or \rn{XST8} step, and for others it aborts mid-file.
 Both defects are detected at generation time and the affected goals dropped
 and reported.
 %
-They fall hardest on set-extensionality and equality-prover goals, and on the
-largest \texttt{apero} obligations, where \textsc{replay} discards most of the
-traces \pp{} produces, so our synthetic suites under-test exactly the equality
-reasoning \pp's store performs --- a gap the surviving \texttt{apero} replays
-begin to close.
+They fall hardest on set-extensionality, equality-prover goals, and the largest
+\texttt{apero} obligations, where \textsc{replay} discards most of \pp's traces;
+our synthetic suites thus under-test \pp's equality store --- a gap the surviving
+\texttt{apero} replays begin to close.
 
 \paragraph{Limitations.}
 Encoding every rule against the specification makes the encoding an executable
