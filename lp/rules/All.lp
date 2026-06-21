@@ -201,6 +201,20 @@ symbol ALL8_1 [n] [P : Tuple n → Prop]
   ≔ mk_1 (`!! v, res_tm (ρ v))
            (!!_cong (λ v, res_eq (ρ v)));
 
+// ALL8_1₀: the ⊤-collapsing ALL8'.  When every element's result is VRAI (`res_tm
+// (ρ v) ≡ ⊤`, as for an AXM8_1/Schema-0 leaf body), PP's `∀x·VRAI = VRAI` FIN
+// normalisation collapses the universal — but the plain `ALL8_1` above keeps the
+// binder, leaving `res_tm = !! v, ⊤` where the continuation (VR3…) wants bare ⊤.
+// This form takes the per-element ⊤-proofs (the emitter supplies `λ v, eq_refl`,
+// sound because the leaf's res_tm reduces to ⊤) and produces `mk_0` — so res_tm
+// reduces *cleanly* to ⊤ (empty list, no stuck `!!` binder), matching PP.
+symbol ALL8_1₀ [n] [P : Tuple n → Prop]
+  (ρ : Π v : Tuple n, Res (P v))
+  (htop : Π v : Tuple n, π (res_tm (ρ v) = ⊤))
+  : Res (`!! v, P v)
+  ≔ mk_0 (eq_trans (!!_cong (λ v, eq_trans (res_eq (ρ v)) (htop v)))
+                   (!!_const ⊤));
+
 // ALL9_1 (ALL9'): result-form ALL9 (♡-block removal), mapping to (∀x·P) ⇒ R.
 symbol ALL9_1 [n] [T : Tuple n → Prop] [Q : Prop]
   (r : Res Q) : Res ((`♡ v, T v) ⇒ Q)

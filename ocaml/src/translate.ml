@@ -116,6 +116,47 @@ let rec exp_has_arith e =
   | AOp _ | Neg _ -> true
   | _ -> fold_exp (fun acc sub -> acc || exp_has_arith sub) false e
 
+(* Does a Res-chain subtree reduce to the result VRAI (`res_tm ≡ ⊤`)?  Used at an
+   ALL8 chain node to pick the ⊤-collapsing `ALL8_1₀` (so `res_tm = ⊤`, matching
+   PP's `∀x·VRAI = VRAI` FIN normalisation) over the plain `ALL8_1` (which keeps a
+   `!! x, ⊤` the continuation can't consume).  Classification mirrors the per-rule
+   `res_tm` shapes in lp/rules: a `mk_0` leaf is ⊤; a single-Res passthrough is its
+   child's; a `concat` combine is ⊤ iff every child is; ALL8 itself collapses (this
+   form) iff its body does.  Everything else (STOP_1's `P`, IMP4_1's `P ⇒ _`,
+   ALL9_1's `(∀·) ⇒ _`, and any rule not listed) is *not* ⊤, so we keep `ALL8_1`.
+   Sound by construction — a false positive would only fail the emitted `eq_refl ⊤`
+   at check time, never mis-prove.  Keyed on [base] names (chain NRM rules are
+   unprimed); the `[c]` single-child guard makes multi-Res rules (ALL7/XST8) fall
+   through safely even though their res_tm is a passthrough. *)
+let chain_result_top_rules =
+  [ "AXM1"; "AXM2"; "AXM3"; "AXM4"; "AXM5"; "AXM6"; "AXM7"; "AXM8"; "AXM9";
+    "AR4"; "AR11"; "AR13"; "BOOL51"; "BOOL52"; "EAXM1"; "EAXM2";
+    "ECTR1"; "ECTR2"; "ECTR3"; "ECTR4"; "ECTR5"; "ECTR6";
+    "EVR1"; "EVR4"; "EVR11"; "FX2"; "FX3"; "INS"; "NRM19"; "VR1"; "VR4" ]
+let chain_result_combine_rules =
+  [ "AND1"; "AND4"; "EQV1"; "EQV2"; "EQV3"; "EQV4"; "IMP2"; "IMP3"; "OR2"; "OR3" ]
+let chain_result_pass_rules =
+  [ "ALL1"; "ALL2"; "ALL3"; "ALL4"; "ALL5"; "ALL6"; "ALL7"; "AND2"; "AND3"; "AND5";
+    "AR1"; "AR3"; "AR5"; "AR6"; "AR7"; "AR8"; "AR9"; "AR10"; "AR12";
+    "BOOL11"; "BOOL12"; "BOOL21"; "BOOL22"; "BOOL31"; "BOOL32"; "BOOL41"; "BOOL42";
+    "EAXM31"; "EAXM32"; "EAXM91"; "EAXM92"; "EIMP51"; "EIMP52";
+    "EQC1"; "EQC2"; "EQS1"; "EQS2"; "EVR2"; "EVR3"; "FX1"; "IMP1"; "IMP5";
+    "NOT1"; "NOT2"; "NRM1"; "NRM2"; "NRM3"; "NRM4"; "NRM5"; "NRM6"; "NRM7"; "NRM8";
+    "NRM9"; "NRM10"; "NRM11"; "NRM12"; "NRM13"; "NRM14"; "NRM15"; "NRM20"; "NRM22";
+    "NRM23"; "NRM24"; "NRM25"; "OPR1"; "OPR2"; "OR1"; "OR4"; "VR2"; "VR3";
+    "XST1"; "XST2"; "XST3"; "XST4"; "XST5"; "XST6"; "XST7"; "XST8" ]
+
+let rec chain_result_is_top (P.Apply { rule; children; _ }) =
+  let b = base rule in
+  if List.mem b chain_result_top_rules then true
+  else if List.mem b chain_result_combine_rules then
+    children <> [] && List.for_all chain_result_is_top children
+  else
+    (match children with
+     | [c] when b = "ALL8" || List.mem b chain_result_pass_rules ->
+       chain_result_is_top c
+     | _ -> false)
+
 let rec tree ctx node =
   match node with
   | P.Apply { rule; children = [c]; _ }
@@ -768,7 +809,16 @@ and chain_term ctx node : L.term =
       | None -> []
     in
     let x = fresh_x ctx pp_vars in
-    app rule [L.Lambda (x, None, chain_term ctx c)]
+    let body = L.Lambda (x, None, chain_term ctx c) in
+    if chain_result_is_top c then
+      (* ALL8 over an all-VRAI body: collapse `∀x·VRAI` to VRAI via `ALL8_1₀`
+         (res_tm reduces to bare ⊤, not `!! x, ⊤`), so the continuation that
+         expects PP's collapsed VRAI typechecks.  htop = `λ x, eq_refl ⊤`, sound
+         because the body chain's res_tm reduces to ⊤ ([chain_result_is_top]). *)
+      app "ALL8_1\xe2\x82\x80" (* ALL8_1₀ *)
+        [body; L.Lambda (x, None, eq_refl (L.Name "\xe2\x8a\xa4" (* ⊤ *)))]
+    else
+      app rule [body]
   | P.Apply { rule; anno; children = [c]; _ }
     when Rule_db.emit rule = Rule_db.Opr false
          || Rule_db.emit rule = Rule_db.Opr true ->
