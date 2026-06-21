@@ -621,19 +621,40 @@ let tactic_for_rule ctx rule arg anno children =
     let env = proj_env_of_ctx ctx in
     let e_opt = match goal_of_anno anno with
       | Some (Binary (Imp, Leq (e, Lit "0"), _)) -> Some e | _ -> None in
-    let generated =
+    (* ℤ-discreteness: PP normalises a `¬(-a≤0)` antecedent to its `1+a≤0` form
+       (AR3's `𝟏−a` step) and reports *that* as AR4's E, but the LP goal keeps the
+       `¬(-a≤0)`.  When E = `1+a` and the cancelling hyp F = `-a`, AR4's `leq (1+a)
+       0` conclusion is transported onto the goal's `¬(leq (neg a) 0)` via
+       `disc_eq a` (the `1+a` ⇒ `neg a` forms are not convertible).  Returns the
+       `a` to feed `disc_eq`. *)
+    let disc_arg e f =
+      let a_of = function
+        | AOp (Add, Lit "1", a) | AOp (Add, a, Lit "1") -> Some a
+        | _ -> None in
+      match a_of e with Some a when f = Neg a -> Some a | _ -> None in
+    let plain name h_gt = L.Refine (L.Name rule, [L.Name name; h_gt]) in
+    let bridged a name h_gt =
+      L.Refine (L.Name "=\xe2\x87\x92" (* =⇒ *),
+        [ L.App (L.Name "imp_cong_l",
+            [ L.App (L.Name "disc_eq", [ exp_term ctx a ]) ]);
+          L.App (L.Name rule, [L.Name name; h_gt]) ]) in
+    let find build pick =
       match e_opt with
       | Some e ->
         List.find_map (fun (name, p) -> match p with
           | Leq (f, Lit "0") ->
-            Option.map (fun h_gt ->
-              (* E, F implicit: F from the `name : F ≤ 𝟎` hyp, E from the goal,
-                 both via the B.lp `to_int`/`isGt` unification rules.  `(E+F) > 𝟎`
-                 is the reflective [prove_gt_zero] term. *)
-              L.Refine (L.Name rule, [L.Name name; h_gt]))
-              (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
+            (match pick e f with
+             | Some x -> Option.map (build x name)
+                           (Arith_proofs.prove_gt_zero env (AOp (Add, e, f)))
+             | None -> None)
           | _ -> None) ctx.hyps
-      | None -> None
+      | None -> None in
+    let generated =
+      (* prefer the discreteness-bridged hyp (E = 1+a, F = -a); else plain AR4
+         (F from the `F ≤ 𝟎` hyp, E from the goal, `(E+F) > 𝟎` via [prove_gt_zero]). *)
+      match find bridged disc_arg with
+      | Some _ as r -> r
+      | None -> find (fun () -> plain) (fun _ _ -> Some ())
     in
     (match generated with
      | Some t -> t

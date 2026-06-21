@@ -181,3 +181,24 @@ begin
   assume ρ a b h;
   rewrite norm_sound ρ a; rewrite norm_sound ρ b; rewrite h; reflexivity
 end;
+
+// ℤ-discreteness bridge: `(1+a ≤ 0) = ¬(-a ≤ 0)` (both ⟺ a < 0, by the integer
+// "+1 gap").  PP normalises a `¬(-a≤0)` antecedent to its `1+a≤0` form (AR3's
+// `𝟏−a` step); the LP goal keeps the `¬(-a≤0)`, so AR4's `leq (1+a) 0` conclusion
+// is transported onto it via `imp_cong_l (disc_eq a)` (see translate/rule_emit AR4).
+// Lives here (not Int.lp) for the reflective `(1+a)+(-a)=1` / `1+a=1-(-a)` proofs.
+opaque symbol disc_eq (a : τ ι) : π (leq (plus 𝟏 a) 𝟎 = ¬ (leq (neg a) 𝟎)) ≔
+begin
+  assume a;
+  have e1 : π (𝟏 = plus (plus 𝟏 a) (neg a))
+    { refine toint_eq 𝟏 (plus (plus 𝟏 a) (neg a)) (from_int_in_int 1) (add_in_int _ _)
+        (reflect ((to_int a) ⸬ □) (Llit 1)
+           (Ladd (Ladd (Llit 1) (Lvar 0)) (Lneg (Lvar 0))) (eq_refl _)) };
+  have e2 : π (plus 𝟏 a = minus 𝟏 (neg a))
+    { refine toint_eq (plus 𝟏 a) (minus 𝟏 (neg a)) (add_in_int _ _) (add_in_int _ _)
+        (reflect ((to_int a) ⸬ □) (Ladd (Llit 1) (Lvar 0))
+           (Ladd (Llit 1) (Lneg (Lneg (Lvar 0)))) (eq_refl _)) };
+  refine propExt _ _
+    (λ h1 h2, one_not_leq_zero (leq_subst_l e1 (add_leq_zero (plus 𝟏 a) (neg a) h1 h2)))
+    (λ h, leq_subst_l e2 (sub_leq 𝟏 (neg a) (discrete (neg a) h)))
+end;
