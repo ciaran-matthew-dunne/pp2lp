@@ -15,8 +15,8 @@ given as follows:
 	\mid \mathcal{Q}\,\vec{x} \cdot P
 \end{align*}
 where $x$ ranges over identifiers, $n$ over numerals, $\mapsto$ is B's pairing,
-function application $F(E_1,\ldots,E_k)$ applies an expression $F$ to the arguments $E_1,\ldots,E_k$,
-membership relates a tuple of expressions to an expression.
+$F(E_1,\ldots,E_k)$ applies $F$ to arguments, and membership relates a tuple of
+expressions to an expression.
 %
 An expression may itself stand as an atomic predicate, shown by the leading
 $E$ in the production for $P$.
@@ -31,10 +31,9 @@ to \pp's normalisation procedure; semantically both are $\forall$, with
 $\Dia$ marking a normalised universal on the goal side and $\Hrt$ one on the
 hypothesis side.
 
-Although B is a set-theoretic formalism, \pp{} itself proves formulas of
-first-order logic with linear arithmetic: a pre-processing step reduces much
-of the set theory of a proof obligation to first-order formulas over
-membership before \pp{} sees it.
+Although B is a set-theoretic formalism, \pp{} proves first-order logic with
+linear arithmetic: pre-processing reduces much of an obligation's set theory to
+formulas over membership before \pp{} sees it.
 %
 The set-theoretic operators that survive this reduction (intervals, maplets,
 and the set and relational operators of \autoref{app:operators}) reach
