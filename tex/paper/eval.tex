@@ -2,49 +2,6 @@
 % Table + prose read numbers from results-data.tex — never hard-code a
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
-The core of
-\tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
-is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
-driver; the rule library of \autoref{sec:encoding} is another \toolLpLines{}
-lines of \lp.
-%
-A single module holds rule metadata: arity, argument kinds,
-and an emission strategy per rule.
-%
-The pipeline (\autoref{fig:pipeline}) has three stages.
-
-A lexer and a Menhir-generated parser read the \replay{} file
-into a flat list of (rule, argument, goal) records.
-%
-This list is then transformed into a proof tree by consuming the prefix stream
-and using each rule's declared arity to attach the right number of child subproofs.
-%
-The two irregularities noted in \autoref{sec:pp-syntax} are handled
-at this stage: normalisation markers are filtered out, and the
-result derivation that precedes an instance of $\rn{ALL7}/\rn{XST8}$
-is reassembled into that rule's first argument.
-
-%
-Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
-and whose body is a tactic script.
-%
-Each rule application in the \pp{} proof tree generally corresponds to an
-application of the corresponding rule lemma (e.g., $\refine\;\texttt{AND2\,\_}$),
-although some \pp{} rule applications require bespoke tactic applications.
-%
-Rules that invoke in-scope hypotheses receive their $\Prf$-argument
-by hypothesis lookup at the OCaml level; rules that introduce an antecedent
-or a binder push an \texttt{assume}; result derivations are emitted as
-explicit $\Res$-terms and passed as an argument; and arithmetic solver
-side-conditions get proof-terms generated at translation time
-(\autoref{sec:enc-rules}).
-%
-The resulting symbol declaration is written to a \lpf{} file which
-may then be type-checked via \texttt{lambdapi check}.
-%
-For debugging, \tool{} records a table from each \lp{} line back to the
-replay step and \pp{} goal that produced it, so a failed check reports the
-offending line, its replay step, and the rule lemma's signature together.
 
 % --- reconstruction figure ------------------------------------------
 \begin{figure}[t]
@@ -88,6 +45,50 @@ end;
   \label{fig:reconstruct}
 \end{figure}
 % --------------------------------------------------------------------
+
+The core of
+\tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
+is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
+driver; the rule library of \autoref{sec:encoding} is another \toolLpLines{}
+lines of \lp.
+%
+A single module holds rule metadata: arity, argument kinds,
+and an emission strategy per rule.
+%
+The pipeline (\autoref{fig:pipeline}) has three stages.
+
+A lexer and a Menhir-generated parser read the \replay{} file
+into a flat list of (rule, argument, goal) records.
+%
+This list is then transformed into a proof tree by consuming the prefix stream
+and using each rule's declared arity to attach the right number of child subproofs.
+%
+The two irregularities noted in \autoref{sec:pp-syntax} are handled
+at this stage: normalisation markers are filtered out, and the
+result derivation that precedes an instance of $\rn{ALL7}/\rn{XST8}$
+is reassembled into that rule's first argument.
+
+%
+Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
+and whose body is a tactic script.
+%
+Each rule application in the \pp{} proof tree generally corresponds to an
+application of the corresponding rule lemma (e.g., $\refine\;\texttt{AND2\,\_}$),
+although some \pp{} rule applications require bespoke tactic applications.
+%
+Rules that invoke in-scope hypotheses receive their $\Prf$-argument
+by hypothesis lookup at the OCaml level; rules that introduce an antecedent
+or a binder push an \texttt{assume}; result derivations are emitted as
+explicit $\Res$-terms and passed as an argument; and arithmetic solver
+side-conditions get proof-terms generated at translation time
+(\autoref{sec:enc-rules}).
+%
+The resulting symbol declaration is written to a \lpf{} file which
+may then be type-checked via \texttt{lambdapi check}.
+%
+For debugging, \tool{} records a table from each \lp{} line back to the
+replay step and \pp{} goal that produced it, so a failed check reports the
+offending line, its replay step, and the rule lemma's signature together.
 
 \subsection{Benchmarks}\label{sec:bench}
 
