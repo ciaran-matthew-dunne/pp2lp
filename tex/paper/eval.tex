@@ -3,49 +3,6 @@
 % benchmark number in this file.
 \section{Implementation and Evaluation}\label{sec:eval}
 
-% --- reconstruction figure ------------------------------------------
-\begin{figure}[t]
-  \centering
-  \begin{minipage}[c]{0.47\linewidth}\centering
-    {\footnotesize\bfseries \pp{} proof replay}\\[3pt]
-\begin{codePP}
-[OPR1(1)] <delta_pa = TRUE
-   => not(a and not(a))>
-[AND2] <not(a and not(a))>
-[IMP4] <a => not(not(a))>
-[NOT2] <not(not(a))>
-[AXM3] <a>
-\end{codePP}
-  \end{minipage}\hfill
-  \begin{minipage}[c]{0.49\linewidth}\centering
-    {\footnotesize\bfseries emitted \lp{} (verbatim)}\\[3pt]
-\begin{codeLP}
-opaque symbol zp_noncontra
-  (a : Prop) (delta_pa : τ ι) :
-  π (delta_pa = BTRUE
-     ⇒ ¬ ($\bigwedge$ (∎ ∷ a ∷ ¬ a))) ≔
-begin
-  assume a delta_pa;
-  assume _h1; try rewrite _h1;
-  refine AND2 _;
-  refine IMP4 _;
-  assume _h2;
-  refine NOT2 _;
-  refine AXM3 _h2
-end;
-\end{codeLP}
-  \end{minipage}
-  \caption{Reconstruction of the benchmark \texttt{zp\_noncontra},
-    $\lnot(a \land \lnot a)$.
-    Most replay lines become a \refine{} of the matching rule lemma; a
-    hypothesis-introducing rule also emits an \texttt{assume} (here \rn{IMP4}),
-    and \rn{OPR1} discharges the goal generator's definedness flag
-    $\mathtt{delta\_pa} = \mathtt{TRUE}$ by an \texttt{assume} and a
-    \texttt{rewrite}.}
-  \label{fig:reconstruct}
-\end{figure}
-% --------------------------------------------------------------------
-
 The core of
 \tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
 is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
@@ -70,7 +27,7 @@ is reassembled into that rule's first argument.
 
 %
 Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
-and whose body is a tactic script.
+and whose body is a tactic script (\autoref{fig:reconstruct}).
 %
 Each rule application in the \pp{} proof tree generally corresponds to an
 application of the corresponding rule lemma (e.g., $\refine\;\texttt{AND2\,\_}$),

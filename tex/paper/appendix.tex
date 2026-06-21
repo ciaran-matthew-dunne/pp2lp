@@ -192,3 +192,48 @@ $∎ ∷ P_3 ∷ P_2 ∷ P_1$.
 \section{A Sample Replay}\label{app:replay}
 
 \input{fig-replay.tex}
+
+
+
+\section{Reconstruction Output}\label{app:reconstruct}
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.47\linewidth}\centering
+    {\footnotesize\bfseries \pp{} proof replay}\\[3pt]
+\begin{codePP}
+[OPR1(1)] <delta_pa = TRUE
+   => not(a and not(a))>
+[AND2] <not(a and not(a))>
+[IMP4] <a => not(not(a))>
+[NOT2] <not(not(a))>
+[AXM3] <a>
+\end{codePP}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.49\linewidth}\centering
+    {\footnotesize\bfseries emitted \lp{} (verbatim)}\\[3pt]
+\begin{codeLP}
+opaque symbol zp_noncontra
+  (a : Prop) (delta_pa : τ ι) :
+  π (delta_pa = BTRUE
+     ⇒ ¬ ($\bigwedge$ (∎ ∷ a ∷ ¬ a))) ≔
+begin
+  assume a delta_pa;
+  assume _h1; try rewrite _h1;
+  refine AND2 _;
+  refine IMP4 _;
+  assume _h2;
+  refine NOT2 _;
+  refine AXM3 _h2
+end;
+\end{codeLP}
+  \end{minipage}
+  \caption{Reconstruction of the benchmark \texttt{zp\_noncontra},
+    $\lnot(a \land \lnot a)$.
+    Most replay lines become a \refine{} of the matching rule lemma; a
+    hypothesis-introducing rule also emits an \texttt{assume} (here \rn{IMP4}),
+    and \rn{OPR1} discharges the goal generator's definedness flag
+    $\mathtt{delta\_pa} = \mathtt{TRUE}$ by an \texttt{assume} and a
+    \texttt{rewrite}.}
+  \label{fig:reconstruct}
+\end{figure}
