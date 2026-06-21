@@ -9,10 +9,10 @@
 \input{macros.tex}      % notation + system names (\pp, \lp, \tool, \rn, …)
 \input{results-data.tex}% ALL benchmark numbers live here — edit only this
 
-\title{Independently Checking Atelier~B's\\ Predicate Prover in LambdaPi%
+\title{Checking Atelier~B's\\ Predicate Prover in LambdaPi%
   \thanks{This work is supported by the ANR project ICSPA
     (ANR-21-CE25-0015), in collaboration with CLEARSY.}}
-\titlerunning{Independently Checking Atelier B's Predicate Prover}
+\titlerunning{Checking Atelier B's Predicate Prover}
 
 % TODO(authors): confirm affiliations/emails before submission.
 \author{
@@ -36,8 +36,8 @@
 \begin{abstract}
 	\noindent
 	Within the \bmethod{} ecosystem, the \emph{Predicate Prover} (\pp)
-	is an automated theorem prover that discharges first-order
-	proof obligations.
+	is an automated theorem prover for first-order logic and
+	linear integer arithmetic.
 	%
 	Because \pp's source code is not publicly available,
 	its results are currently trusted without independent verification.
@@ -47,14 +47,15 @@
 	%
 	Each of \pp's inference rules is encoded as a \lp{} symbol whose type
 	captures the rule's premises and conclusion and whose body proves
-	the rule sound with respect to classical logic.
+	the rule sound with respect to a small trusted core.
 	%
 	\pp{} can be instrumented to emit \emph{replays} of its proofs;
 	\tool{} parses the replay, rebuilds the proof tree,
-	and emits a tactic script that \lp{} independently type-checks.
+	and emits a tactic script that \lp{} typechecks.
 	%
-	We prove the soundness of nearly all of \pp's inference rules
-	and reconstruct proofs across several (real-world and synthetic)
+	% TODO. How many infernence rules does PP have (including _1 rules)?
+	We prove the soundness of all of \pp's inference rules
+	and reconstruct proofs across several real-world and synthetic
 	benchmark suites.
 \end{abstract}
 
