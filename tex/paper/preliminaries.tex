@@ -58,13 +58,8 @@ a singleton $[Q]$ (a single transformed formula, produced by a leaf such as
 \rn{STOP\_1}), or the concatenation of its two premises' lists (a combination).
 %
 For instance, \rn{AND4} (conjunction introduction) has the combination-schema
-result form \rn{AND4\_1}, concatenating the two premises' lists:
-\begin{center}
-  \begin{prooftree}
-    \hypo{(H \seq Q) \yields R_1} \hypo{(H \seq P) \yields R_2}
-    \infer2[\rn{AND4\_1}]{(H \seq P \land Q) \yields R_1 \app R_2}
-  \end{prooftree}
-\end{center}
+result form \rn{AND4\_1}, taking $(H \seq Q) \yields R_1$ and
+$(H \seq P) \yields R_2$ to $(H \seq P \land Q) \yields R_1 \app R_2$.
 
 Only \rn{ALL7} and \rn{XST8} consume a result, each turning a
 result derivation back into an ordinary sequent subproof.
