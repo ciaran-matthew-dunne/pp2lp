@@ -56,11 +56,10 @@ into reductions of $\mathsf{to\_int}$:
 	x \leq y                            & = (\mathsf{to\_int}\,x \leq \mathsf{to\_int}\,y).
 \end{align*}
 Ground arithmetic therefore computes in $\mathbb{Z}$ while the operators stay
-rigid in goals (the $\leq$ axiom has no companion reduction, landing in
-$\Prop$ rather than a $\mathsf{to\_int}$ position); subtraction is sugar for
-$x + (-y)$, and multiplication enters only as a literal coefficient.  \pp's arithmetic
-rules are then proved from these axioms (through the integer lemmas of
-\texttt{lemmas/Int.lp}), not postulated.
+rigid in goals ($\leq$ alone has no companion reduction, landing in $\Prop$);
+subtraction is sugar for $x + (-y)$, and multiplication enters only as a literal
+coefficient.  \pp's arithmetic rules are then proved from these axioms (through
+the integer lemmas of \texttt{lemmas/Int.lp}), not postulated.
 
 \paragraph{List-based Conjunction.}
 \pp{} treats $\land$ as left-associative, so $p \land q \land r$ parses as
@@ -75,9 +74,8 @@ conjunction as a list that grows on the right, folded by one operator:
 	{∷}\,[a]               & : \mathbb{L}^{*}\,a \to \El\,a \to \mathbb{L}^{*}\,a, &
 	\bwand(\pv{ps} ∷ \top) & ↪ \bwand\,\pv{ps}.
 \end{align*}
-$\mathbb{L}^{*}\,a$ is the type of lists over $\El\,a$ (empty $∎$, right
-append $∷$), and the injective $\bwand$ folds a list of propositions
-($a = o$) into their conjunction.  This conjunction stays abstract:
+$\mathbb{L}^{*}\,a$ is the type of lists over $\El\,a$, and the injective
+$\bwand$ folds a list of propositions ($a = o$) into their conjunction.  This conjunction stays abstract:
 its link to binary $\land$ is not a rewrite rule but a separate
 axiomatisation, used only inside the rules' soundness proofs.  The list form
 surfaces directly in a rule's type: \rn{AND4} (\autoref{sec:pp-syntax}),
