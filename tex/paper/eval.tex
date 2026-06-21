@@ -147,19 +147,17 @@ guard every change; the synthetic suite is also goal-level only, so the agent
 sets the goals but not the rules \pp{} applies to them.
 
 \paragraph{Future work.}
-The most direct future work is upstream: repairing the \textsc{replay}
-utility's truncations would recover the dropped goals, in particular the
-equality-prover fragment.
+The most direct future work is upstream: repairing \textsc{replay}'s
+truncations would recover the dropped goals, especially the equality-prover
+fragment.
 %
-On the encoding side, the binder-regrouping rules are currently
-consumed at the syntax level rather than emitted
-(\autoref{sec:enc-formulas}); deriving the regrouping isomorphisms over
-tuples would let \tool{} emit them like any other rule and drop its one
+On the encoding side, the binder-regrouping rules are consumed at the syntax
+level, not emitted (\autoref{sec:enc-formulas}); deriving their tuple
+isomorphisms would let \tool{} emit them like any other rule, dropping its last
 syntax-level normalisation.
 %
-Finally, this work folds \pp{} into the \dedukti{} interoperability
-ecosystem: a natural next step within the ICSPA project is exporting
-checked \ab{} proofs to set-theory-based assistants such as TLA$^+$'s
+Finally, folding \pp{} into the \dedukti{} ecosystem opens a natural ICSPA next
+step: exporting checked \ab{} proofs to set-theory assistants such as TLA$^+$'s
 TLAPS, Isabelle/ZF, and Megalodon.
 
 \subsubsection*{Acknowledgements.}
