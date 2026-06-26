@@ -16,12 +16,19 @@ let is_atom_exp = function
   | RanRestrict _ | BoolOf _ | Compr _ -> true
   | AOp _ | Neg _ -> false
 
-(* The native-int value of a literal that folds into the reified constant: a
-   `Lit` small enough to fit OCaml's `int`, so [lin_normal] sums it into the
-   constant and [reify] emits an `Llit`.  A too-big `Lit` (apero's 2⁶⁴ bounds)
-   overflows, so it stays a symbolic atom — reified as a `Lvar`, compared by
-   index, never summed — hence None here (apero's 2⁶⁴ bounds). *)
+(* The native-int value of a foldable literal.  Used by the Farkas/Fourier–Motzkin
+   search, whose coefficient tables stay native `int` (its literals are small); a
+   too-big `Lit` (apero's 2⁶⁴ uint64 bounds) overflows native int, so it returns
+   None there and the literal stays a symbolic atom. *)
 let fold_val = function Lit s -> int_of_string_opt s | _ -> None
+
+(* Arbitrary-precision value of a foldable literal, via `Stdlib`'s `Z` (zarith).
+   The reflective ℤ-linear path ([lin_normal]/[reify]/[collect_atoms]) folds along
+   `Z`, so apero's 2⁶⁴ uint64 bounds sum into the reified constant (and reify to an
+   `Llit (z_dec …)`, whose `Stdlib.Z` decimal the [reflect] lemma folds at full
+   precision) instead of staying opaque atoms that never cancel. *)
+let z_of_string_opt s = try Some (Z.of_string s) with _ -> None
+let fold_z = function Lit s -> z_of_string_opt s | _ -> None
 
 (* `prod(k, a)` / `prod(a, k)` with a *foldable* literal coefficient: its decimal
    string and the scaled operand.  Two arms (not one `|`-pattern) so each operand
@@ -111,17 +118,17 @@ let lfold_exp = function
    fold into the constant, every other atom (incl a too-big literal) stays symbolic and is
    compared structurally.  Two exprs denote the same value iff their [lin_normal]s
    are equal.  None if [e] is not `+`/`−`-linear. *)
-let lin_normal e : ((exp * int) list * int) option =
+let lin_normal e : ((exp * int) list * Z.t) option =
   match flatten_signed e with
   | None -> None
   | Some atoms ->
     let const =
       List.fold_left
-        (fun c (a, s) -> match fold_val a with Some n -> c + (s * n) | None -> c)
-        0 atoms in
+        (fun c (a, s) -> match fold_z a with Some n -> Z.(c + of_int s * n) | None -> c)
+        Z.zero atoms in
     let net =
       List.fold_left (fun acc (a, s) ->
-        match fold_val a with
+        match fold_z a with
         | Some _ -> acc
         | None ->
           let cur = try List.assoc a acc with Not_found -> 0 in
@@ -139,7 +146,7 @@ let collect_atoms es : exp list =
     | AOp ((Add | Sub), a, b) -> go (go acc a) b
     | Neg a -> go acc a
     | _ when prod_coeff e <> None -> go acc (snd (Option.get (prod_coeff e)))
-    | _ when fold_val e <> None -> acc        (* foldable literal: folds, not an atom *)
+    | _ when fold_z e <> None -> acc          (* foldable literal: folds, not an atom *)
     | _ when is_atom_exp e -> if List.mem e acc then acc else acc @ [ e ]
     | _ -> acc
   in
@@ -157,7 +164,7 @@ let rec reify idx e : L.term =
   | _ when prod_coeff e <> None ->
     let (ks, a) = Option.get (prod_coeff e) in
     L.App (L.Name "Lmul", [ z_dec ks; reify idx a ])
-  | Lit n when int_of_string_opt n <> None -> L.App (L.Name "Llit", [ z_dec n ])
+  | Lit n when z_of_string_opt n <> None -> L.App (L.Name "Llit", [ z_dec n ])
   | _ when is_atom_exp e ->
     L.App (L.Name "Lvar", [ L.Name (string_of_int (idx e)) ])
   | _ -> failwith "reflect_eq: non-linear expression"
@@ -168,7 +175,7 @@ let rec reify idx e : L.term =
    None when they are not equal linear combinations (callers fall through). *)
 let reflect_eq env e1 e2 : L.term option =
   match lin_normal e1, lin_normal e2 with
-  | Some n1, Some n2 when n1 = n2 ->
+  | Some (net1, c1), Some (net2, c2) when net1 = net2 && Z.equal c1 c2 ->
     let atoms = collect_atoms [ e1; e2 ] in
     let idx a =
       let rec pos i = function
@@ -193,12 +200,12 @@ let reflect_eq env e1 e2 : L.term option =
    reduces (le_elim, then the `to_int ∘ from_int` retract) to `Z.≤ c 0`, which
    `Stdlib.Z` decides `false` by head match on `Zpos … / Z0` for any magnitude —
    so `(…) ⊤ᵢ : ⊥`, O(1) (mirrors `one_not_leq_zero`, reused for c = 1). *)
-let positive_lit env c : L.term =
-  if c = 1 then L.Name "one_not_leq_zero"
+let positive_lit env (cs : string) : L.term =
+  if cs = "1" then L.Name "one_not_leq_zero"
   else
     L.Lambda ("_h", None,
       L.App (L.Name "le_elim",
-        [ L.Exp (env, Lit (string_of_int c)); L.Exp (env, Lit "0"); L.Name "_h";
+        [ L.Exp (env, Lit cs); L.Exp (env, Lit "0"); L.Name "_h";
           L.Name "\xe2\x8a\xa4\xe1\xb5\xa2" (* ⊤ᵢ *) ]))
 
 (* `π (e1 = e2)` for two `+`/`−` exprs denoting the same value: the `e1 = e2`
@@ -351,14 +358,14 @@ let prove_sum_zero env e : L.term option = reflect_eq env e (Lit "0")
    `¬(from_int c ≤ 𝟎)` (`positive_lit`) along the reflected `e = from_int c`. *)
 let prove_gt_zero env e : L.term option =
   match lin_normal e with
-  | Some ([], c) when c >= 1 ->
-    (match reflect_eq env e (Lit (string_of_int c)) with
+  | Some ([], c) when Z.geq c Z.one ->
+    (match reflect_eq env e (Lit (Z.to_string c)) with
      | Some e_eq_c ->                                  (* e_eq_c : e = from_int c *)
        Some (L.App (L.Name "=\xe2\x87\x92",            (* =⇒ : π (A = B) → π A → π B *)
          [ L.App (L.Name "eq_sym",
              [ L.App (L.Name "not_cong",
                  [ L.App (L.Name "leq_zero_eq", [ e_eq_c ]) ]) ]);
-           positive_lit env c ]))
+           positive_lit env (Z.to_string c) ]))
      | None -> None)
   | _ -> None
 
@@ -426,15 +433,16 @@ let find_arith_contradiction env hyps =
       let hsum, combined =
         List.fold_left (fun (pf, acc_e) (n, e) ->
           (L.App (L.Name "add_leq_zero",
-             [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name n ]),
+             [ L.Exp (env, acc_e); L.Exp (env, e); pf; n ]),
            AOp (Add, acc_e, e)))
-          (L.Name n0, e0) rest
+          (n0, e0) rest
       in
       Option.map
         (fun eqpf ->
            (* eqpf : from_int c = combined ; hsum : combined ≤ 𝟎.  leq_subst_l
-              substitutes to `c ≤ 𝟎`, refuted by positive_lit c. *)
-           L.Refine (positive_lit env c,
+              substitutes to `c ≤ 𝟎`, refuted by positive_lit c.  Returned as a
+              `π ⊥` TERM (the caller `refine`s it or nests it in an INS script). *)
+           L.App (positive_lit env (string_of_int c),
              [ L.App (L.Name "leq_subst_l", [ eqpf; hsum ]) ]))
         (prove_sum_eq env (Lit (string_of_int c)) combined)
   in
@@ -594,9 +602,9 @@ let farkas_prove_leq env hyps target =
         let hsum, combined =
           List.fold_left (fun (pf, acc_e) (nm, e) ->
             (L.App (L.Name "add_leq_zero",
-               [ L.Exp (env, acc_e); L.Exp (env, e); pf; L.Name nm ]),
+               [ L.Exp (env, acc_e); L.Exp (env, e); pf; nm ]),
              AOp (Add, acc_e, e)))
-            (L.Name n0, e0) rest in
+            (n0, e0) rest in
         Option.map
           (fun eqpf -> L.App (L.Name "leq_subst_l", [ eqpf; hsum ]))
           (prove_sum_eq env target combined)

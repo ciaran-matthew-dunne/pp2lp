@@ -8,35 +8,33 @@
     dep/.style={-{Stealth[length=4pt]}, dashed, thick, color=lpPunct},
     tool/.style={font=\scriptsize\ttfamily, text=lpFg},
     lbl/.style={font=\scriptsize, text=lpFg},
-    note/.style={font=\scriptsize\itshape, text=lpPunct},
     world/.style={dashed, thick, rounded corners=6pt, inner sep=6pt},
   ]
-  % ── Atelier B: formula → trace → replay ──────────────────────────────
+  % ── Atelier B: but → trace → replay ──────────────────────────────────
   \node[item, draw=lpModifier] (but)    at (0,0)   {.but};
   \node[item, draw=lpModifier] (trace)  at (2.5,0) {.trace};
   \node[item, draw=lpModifier] (replay) at (5.0,0) {.replay};
-  \node[note, below=3pt of but]    (butnote)    {formula};
-  \node[note, below=3pt of replay] (replaynote) {rule + goal lines};
   \draw[arr] (but)   -- node[lbl, above] {\pp}             (trace);
   \draw[arr] (trace) -- node[lbl, above] {\textsc{replay}} (replay);
-  \node[world, draw=lpModifier,
-        fit=(but)(trace)(replay)(butnote)(replaynote)] (abbox) {};
+  \node[world, draw=lpModifier, fit=(but)(trace)(replay)] (abbox) {};
   \node[lbl, text=lpModifier] at (2.5,0.85) {\ab};
 
-  % ── LambdaPi: emitted proof + soundness-proved rule library ──────────
-  \node[item, draw=lpType] (lp) at (8.3,0) {.lp};
-  \node[item, draw=lpType] (kernel) at (8.3,-1.1)
-       {B.lp + rules/\\{\normalfont\itshape soundness-proved}};
-  \draw[dep] (kernel) -- (lp);
-  \node[world, draw=lpType, fit=(lp)(kernel)] (lpbox) {};
+  % ── LambdaPi: .lp built on rules/*.lp built on the trusted base B.lp ──
+  \node[item, draw=lpType] (lp)    at (8.3,0)    {.lp};
+  \node[item, draw=lpType] (rules) at (8.3,-1.1) {rules/*.lp};
+  \node[item, draw=lpType] (blp)   at (8.3,-2.2) {B.lp};
+  \draw[dep] (blp)   -- (rules);
+  \draw[dep] (rules) -- (lp);
+  \node[world, draw=lpType, fit=(lp)(rules)(blp)] (lpbox) {};
   \node[lbl, text=lpType] at (8.3,0.85) {\lp};
 
   % ── pp2lp: replay → lp;  lambdapi: lp bundle → verdict ──────────────
   \draw[arr] (replay) -- (lp);
   \node[tool, above] at ($(abbox.east |- 0,0)!0.5!(lpbox.west |- 0,0)$) {\tool};
-  \node[lbl] (chk) at (8.3,-2.45)
+  \coordinate (chkout) at (lpbox.east |- lp);
+  \node[lbl, right=1.9cm of chkout] (chk)
        {{\color{lpModifier}$\checkmark$}\,/\,{\color{lpKeyword}$\times$}};
-  \draw[arr] (lpbox) -- node[tool, right] {lambdapi check} (chk);
+  \draw[arr] (chkout) -- node[tool, above] {lambdapi check} (chk);
 \end{tikzpicture}
 \caption{
     The \tool{} pipeline. \pp{} takes a goal in \butf{} format

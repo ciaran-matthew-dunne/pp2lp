@@ -1,0 +1,41 @@
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.51\linewidth}\centering
+\begin{codePP}
+[ALL8(1)] <!a.(a: s => #x.(x: s or x: t))>
+[IMP4] <a: s => #x.(x: s or x: t)>
+[STOP_1] <not(x: t)>
+[STOP_1] <not(x: s)>
+[OR2_1] <not(x: s or x: t)>
+[XST8(3)] <#x.(x: s or x: t)>
+[STOP_1] <not(x: s)>
+[STOP_1] <not(x: t)>
+[AND4_1] <not(x: t) and not(x: s)>
+[ALL7(3)] <!x.(not(x: t) and not(x: s)) => FAUX>
+[NRM7] <$\ldots$>
+[NRM14] <$\ldots$>
+[NRM19] <$\ldots$>
+[VR4] <VRAI>
+\end{codePP}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.47\linewidth}\centering
+\begin{codeLP}
+opaque symbol xst_weaken (s t : τ ι) :
+  π (`!! a : Tuple 1, (prj 0 a) ϵ s
+     ⇒ `?? x : Tuple 1,
+          (prj 0 x) ϵ s ∨ (prj 0 x) ϵ t) ≔
+begin
+  assume s t;
+  refine ALL8 _; assume _a;
+  refine IMP4 _; assume _h;
+  refine XST8 (λ _x, OR2_1 STOP_1 STOP_1) _;
+  refine ALL7 (λ _y, AND4_1 STOP_1 STOP_1) _;
+  refine NRM7 _; refine NRM14 _;
+  refine NRM19 _a _h
+end;
+\end{codeLP}
+  \end{minipage}
+  \caption{Reconstruction of the benchmark \texttt{xst\_weaken},
+    $\forall a \cdot (a \in s \Rightarrow \exists x \cdot (x \in s \lor x \in t))$.}
+  \label{fig:reconstruct}
+\end{figure}

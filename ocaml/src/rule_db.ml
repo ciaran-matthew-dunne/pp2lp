@@ -179,7 +179,7 @@ let rules : (string, rule_info) Hashtbl.t =
      PP emits all NRM rules unprimed in chains; the emitter primes only these and
      fails loud on the rest (keep in sync with the `symbol NRM<k>_1` set). *)
   r "NRM1" pass ~chain_form:true;
-  r "NRM2" pass ~chain_form:true;   (* evidence-form NRM2_1 + translate.ml dispatch *)
+  r "NRM2" pass ~chain_form:true;   (* pullout-form NRM2_1 + translate.ml dispatch *)
   r "NRM3" pass ~chain_form:true;
   r "NRM4" pass ~chain_form:true;
   r "NRM5" pass ~chain_form:true;

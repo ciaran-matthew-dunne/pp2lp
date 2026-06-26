@@ -27,10 +27,10 @@ and a type of integers $\mathbb{Z}$.
 We embed both in the domain by the following mappings and rewrite rules:
 \begin{align*}
 	\mathsf{from\_bool}                              & : \mathbb{B} \to \El\,\iota &
-	\mathsf{from\_int}                               & : \mathbb{Z} \to \El\,\iota  \\
-	\mathsf{to\_bool}                                & : \El\,\iota \to \mathbb{B}&
-	\mathsf{to\_int}                                 & : \El\,\iota \to \mathbb{Z}  \\
-	\mathsf{to\_bool}\,(\mathsf{from\_bool}\,\pv{b}) & ↪ \pv{b}                   &
+	\mathsf{from\_int}                               & : \mathbb{Z} \to \El\,\iota   \\
+	\mathsf{to\_bool}                                & : \El\,\iota \to \mathbb{B} &
+	\mathsf{to\_int}                                 & : \El\,\iota \to \mathbb{Z}   \\
+	\mathsf{to\_bool}\,(\mathsf{from\_bool}\,\pv{b}) & ↪ \pv{b}                    &
 	\mathsf{to\_int}\,(\mathsf{from\_int}\,\pv{z})   & ↪ \pv{z}.
 \end{align*}
 % $\mathsf{BOOL}$ and $\mathsf{INT}$ name their images; $\mathsf{BTRUE}$,
@@ -42,19 +42,19 @@ The arithmetic operators of PP are defined by the following
 equalities and rewrite rules:
 %
 \begin{align*}
-	\mathsf{plus}\,x\,y                 & = \mathsf{from\_int}(\mathsf{to\_int}\,x + \mathsf{to\_int}\,y) &
-	\mathsf{to\_int}\,(\mathsf{plus}\,\pv{x}\,\pv{y}) & ↪ \mathsf{to\_int}\,\pv{x} + \mathsf{to\_int}\,\pv{y}            \\
-	\mathsf{neg}\,{x}                   & = \mathsf{from\_int}(-\,\mathsf{to\_int}\,x)                   &
-	\mathsf{to\_int}\,(\mathsf{neg}\,\pv{x})         & ↪ -\,\mathsf{to\_int}\,\pv{x}                                 \\
-	\mathsf{leq}\,x\,y                  & = (\mathsf{to\_int}\,x \leq \mathsf{to\_int}\,y) \\
-	\mathsf{sub}\,x\,y                  & = \mathsf{from\_int}(\mathsf{to\_int}\,x - \mathsf{to\_int}\,y)  &
-	\mathsf{to\_int}\,(\mathsf{sub}\,\pv{x}\,\pv{y}) & ↪ \mathsf{to\_int}\,\pv{x} - \,\mathsf{to\_int}\,\pv{x}
+	\mathsf{plus}\,x\,y                               & = \mathsf{from\_int}(\mathsf{to\_int}\,x + \mathsf{to\_int}\,y) &
+	\mathsf{to\_int}\,(\mathsf{plus}\,\pv{x}\,\pv{y}) & ↪ \mathsf{to\_int}\,\pv{x} + \mathsf{to\_int}\,\pv{y}             \\
+	\mathsf{neg}\,{x}                                 & = \mathsf{from\_int}(-\,\mathsf{to\_int}\,x)                    &
+	\mathsf{to\_int}\,(\mathsf{neg}\,\pv{x})          & ↪ -\,\mathsf{to\_int}\,\pv{x}                                     \\
+	\mathsf{leq}\,x\,y                                & = (\mathsf{to\_int}\,x \leq \mathsf{to\_int}\,y)                  \\
+	\mathsf{sub}\,x\,y                                & = \mathsf{from\_int}(\mathsf{to\_int}\,x - \mathsf{to\_int}\,y) &
+	\mathsf{to\_int}\,(\mathsf{sub}\,\pv{x}\,\pv{y})  & ↪ \mathsf{to\_int}\,\pv{x} - \mathsf{to\_int}\,\pv{y}
 \end{align*}
 %
 The equalities are propositional so the operators do not reduce within goals,
 but the rewrite rules allow computation in $ℤ$ (e.g.,
-    $\mathsf{to\_int}\,
-        (\mathsf{plus}\,(\mathsf{from\_int}\,2)\,(\mathsf{from\_int}\,2))$
+$\mathsf{to\_int}\,
+	(\mathsf{plus}\,(\mathsf{from\_int}\,2)\,(\mathsf{from\_int}\,2))$
 reduces to $4$).
 % Subtraction is sugar for $\mathsf{plus}\,x\,(\mathsf{neg},y)$.
 
@@ -74,11 +74,11 @@ reach a conjunct at an arbitrary position.
 To serve both, we encode conjunction as a unary constructor $\bwand$
 that takes a list of propositions:
 \begin{align*}
-	\mathbb{L}^{*}         & : \TYPE,                                    &
-	\bwand                 & : \mathbb{L}^{*} \to \Prop                          \\
-	∎                 & : \mathbb{L}^{*}                                  &
-	\bwand(∎ ∷ \pv{p})     & ↪ \pv{p}                \\
-	{∷}               & : \mathbb{L}^{*} \to \Prop \to \mathbb{L}^{*} &
+	\mathbb{L}^{*}         & : \TYPE,                                      &
+	\bwand                 & : \mathbb{L}^{*} \to \Prop                      \\
+	∎                      & : \mathbb{L}^{*}                              &
+	\bwand(∎ ∷ \pv{p})     & ↪ \pv{p}                                        \\
+	{∷}                    & : \mathbb{L}^{*} \to \Prop \to \mathbb{L}^{*} &
 	\bwand(\pv{ps} ∷ \top) & ↪ \bwand\,\pv{ps}
 \end{align*}
 %
@@ -103,10 +103,10 @@ arguments to encode tuples and quantifiers,
 where $ℕ$ is the type of the natural numbers from the standard library:
 %
 \begin{align*}
-	\Tuple        & : ℕ \to \TYPE                                  &
-	\mathsf{unit} & : \Tuple\,0,                                    \\
+	\Tuple        & : ℕ \to \TYPE                                   &
+	\mathsf{unit} & : \Tuple\,0,                                      \\
 	{⨾}\,[n : ℕ]  & : \Tuple\,n \to \El\,\iota \to \Tuple\,(n{+}1), &
-	\prj\,[n : ℕ] & : ℕ \to \Tuple\,n \to \El\,\iota,           \\
+	\prj\,[n : ℕ] & : ℕ \to \Tuple\,n \to \El\,\iota,                 \\
 	\allI, \xstI  & : (\Tuple\,n \to \Prop) \to \Prop,              &
 	\Dia, \Hrt    & ≔ \allI.
 \end{align*}
@@ -128,13 +128,16 @@ rules are axioms rather than rewrite rules, e.g.:
 \]
 
 
-\subsection{Encoding Rules}\label{sec:enc-rules}
+\subsection{Encoding Rules and Proofs}\label{sec:enc-rules}
+%
+\input{fig-reconstruct.tex}
+%
 %
 Each \pp{} rule becomes a \lp{} symbol whose type states the rule and whose
 body is a proof script demonstrating its soundness.
-% TODO. add a sentence here pointing to the lp/rules dir for the encodings
-% and proofs.
 %
+The encodings and their soundness proofs are grouped by rule family in the
+\tool{} source tree.\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp/tree/main/lp/rules}}
 %
 Translating a rule's statement into that type is mostly straightforward:
 %
@@ -147,31 +150,33 @@ corresponds to an argument $\Prf\,P$.
 For example, the \rn{AXM1} rule and its \lp{} type are as follows:
 % TODO. add inference rule for AXM1 with side condition.
 \begin{align*}
-	\rn{AXM1}\,[P\,Q : \Prop] & : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q).
+	\rn{AXM1}\,[P\,Q : \Prop] & : \Prf\,(\lnot P) \to \Prf\,(P \Rightarrow Q)
 \end{align*}
 
 
 \paragraph{Result Derivations.}
-As discussed in \autoref{sec:prelim}, a result derivation maps a formula to
-a list of predicates whose conjunction is the normal form of some sequent.
+As discussed in \autoref{sec:prelim}, a result derivation gives a normal
+form for a predicate as a conjunction of a list of predicates.
 %
 The type constructor $\Res : \Prop → \TYPE$ maps a proposition $p$ to
 the type of its result derivations, where $\mathsf{mk\_res}$
 pairs a list of propositions $ps$ with a proof that $p$ equals $\bwand\,{ps}$:
 %
 \begin{align*}
-	\mathsf{mk\_res}\,[t]\,(ts : \mathbb{L}^{*})      & : \Prf\,(t = \bwand\,{ts}) \to \Res\,t, & & \\
-	\mathsf{res\_ts}\,[t]\,(r : \Res\,t)              & : \mathbb{L}^{*}, &
-	\mathsf{res\_ts}\,(\mathsf{mk\_res}\,\pv{ts}\,\_) & ↪ \pv{ts},        \\
-	\mathsf{res\_eq}\,[t]\,(r : \Res\,t)              & : \Prf\,(t = \bwand\,(\mathsf{res\_ts}\,r)), &
+	\mathsf{mk\_res}\,[p]\,(ps : \mathbb{L}^{*})      & : \Prf\,(p = \bwand\,{ps}) \to \Res\,p,      &   & \\
+	\mathsf{res\_ts}\,[p]\,(r : \Res\,ps)              & : \mathbb{L}^{*},                            &
+	\mathsf{res\_ts}\,(\mathsf{mk\_res}\,\pv{ps}\,\_) & ↪ \pv{ps},                                         \\
+	\mathsf{res\_eq}\,[p]\,(r : \Res\,ps)              & : \Prf\,(p = \bwand\,(\mathsf{res\_ts}\,r)), &
 	\mathsf{res\_eq}\,(\mathsf{mk\_res}\,\_\,\pv{h})  & ↪ \pv{h}.
 \end{align*}
-\noindent A result-form rule (suffixed \texttt{\_1} in replays) is a
-\lp{} function over $\Res$ values.  \rn{AND4\_1} realises the combination
-schema of \autoref{sec:pp-syntax}, concatenating its two children's lists;
-\rn{ALL7}, a result-consuming rule, takes a per-instance
-derivation $\rho$ and continues under its conjunction
-$\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
+\noindent Result-form rules (i.e., those suffixed with \texttt{\_1} in replays)
+are thus \lp{} functions over $\Res$ values.
+%
+For example, \rn{AND4\_1} realises the combination schema of
+\autoref{sec:prelim}, concatenating its two children's lists:
+% \rn{ALL7}, a result-consuming rule, takes a per-instance
+% derivation $\rho$ and continues under its conjunction
+% $\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
 \[
 	\begin{aligned}
 		\rn{AND4\_1}\,[ps : \mathbb{L}^{*}\,o]\,[p : \El\,o]
@@ -179,43 +184,63 @@ $\restm\,r ≔ \mathsf{conj}\,(\mathsf{res\_ts}\,r)$:
 		 & ≔ \lambda\,r_1\,r_2,\ \mathsf{mk\_res}\,(\mathsf{concat}\,(\mathsf{res\_ts}\,r_1)\,(\mathsf{res\_ts}\,r_2))\,(\ldots)
 	\end{aligned}
 \]
-\[
-	\begin{aligned}
-		 & \rn{ALL7}\,[n]\,[P : \Tuple\,n \to \Prop]\,[Q : \Prop]\ (\rho : \Pi\,v : \Tuple\,n,\ \Res\,(P\,v)) : {} \\
-		 & \quad \Prf\,((\Dia v,\ \restm\,(\rho\,v)) \Rightarrow Q)
-		\to \Prf\,((\allI v,\ P\,v) \Rightarrow Q)
-	\end{aligned}
-\]
-\noindent Because results are lists, the two nested \rn{AND4\_1} steps for a
-body $P_1 \land P_2 \land P_3$ flatten into the single list $[P_3, P_2, P_1]$
-that \rn{ALL7} conjoins, where eager $\land$ would instead nest them as
-$P_3 \land (P_2 \land P_1)$; \autoref{app:resderiv} works the instance in full.
+% \[
+% 	\begin{aligned}
+% 		 & \rn{ALL7}\,[n]\,[P : \Tuple\,n \to \Prop]\,[Q : \Prop]\ (\rho : \Pi\,v : \Tuple\,n,\ \Res\,(P\,v)) : {} \\
+% 		 & \quad \Prf\,((\Dia v,\ \restm\,(\rho\,v)) \Rightarrow Q)
+% 		\to \Prf\,((\allI v,\ P\,v) \Rightarrow Q)
+% 	\end{aligned}
+% \]
+% \noindent Because results are lists, the two nested \rn{AND4\_1} steps for a
+% body $P_1 \land P_2 \land P_3$ flatten into the single list $[P_3, P_2, P_1]$
+% that \rn{ALL7} conjoins, where eager $\land$ would instead nest them as
+% $P_3 \land (P_2 \land P_1)$; \autoref{app:resderiv} works the instance in full.
 
 
 \paragraph{Arithmetic Side-conditions.}
-A few rules carry an arithmetic side-condition that \pp's own solver discharges,
-leaving no subproof in the replay: \pp's contradiction terminal \rn{ARITH}
-closes a goal once its accumulated $\leq$-hypotheses are jointly contradictory,
-and \rn{AR4} needs
-$E + F > \mathbf{0}$ (for a hypothesis $F \leq \mathbf{0}$) to conclude
-$E \leq \mathbf{0} \Rightarrow R$.
+Some rules carry arithmetic side-conditions that \pp's own solver discharges
+with no subproof in the replay.
 %
-In the encoding each side-condition is an explicit $\Prf$-argument that \tool{}
-must rebuild.
+For example, \rn{AR2} needs $n > m$ to conclude $n ≤ m ⇒ R$,
+where $n$ and $m$ are numerals.
 %
-For \rn{ARITH}, a Fourier--Motzkin elimination over the in-scope
-$\leq$-hypotheses produces a \emph{Farkas certificate}~\cite{schrijver1986} ---
-nonnegative
-multipliers under which the scaled hypotheses sum to a contradiction such as
-$\mathbf{1} \leq \mathbf{0}$ --- assembled in \lp{} from the order lemmas of
-\autoref{sec:enc-formulas}.
+Fortunately, our encoding can defer to $>$ on $ℤ$ which reduces on integer literals.
 %
-For \rn{AR4}, and for the linear $\mathbb{Z}$-equalities that assembly leaves
-behind (a reassociated sum, a rescaled coefficient), we use \emph{proof by
-	reflection}: each side is reified to a normal form and the two compared, a
-reflexive procedure we take from Coltellacci and Merz~\cite{coltellacci2025lia}.
+More tricky examples are the \rn{ARITH} rule which closes a goal once
+its accumulated $\leq$-hypotheses are contradictory
+(e.g., $x ≤ 0$ and $1-(x+x) ≤ 0$),
+%
+and \rn{AR4} which needs $E + F > 0$
+where $E$ and $F$ are symbolic arithmetic expressions.
+%
 
-Concretely, $h_1 : x \leq \mathbf{0}$ and $h_2 : \mathbf{1} - (x + x) \leq
-\mathbf{0}$ combine under multipliers $1$ and $2$ to the false $\mathbf{1} \leq
-\mathbf{0}$; the reordering equality this needs is itself closed by reflection,
-so \pp's sum permutations need no bespoke lemmas.
+In the encoding each side-condition is an explicit $\Prf$-argument
+that our tool must rebuild.
+%
+For \rn{ARITH}, we use Fourier--Motzkin elimination to reduce the in-scope
+$\leq$-hypotheses to a proof term that demonstrates a concrete contradiction
+$1 ≤ 0$.
+%
+For \rn{AR4} and others, we build on the \emph{proof by reflection} technique
+given by Coltellacci and Merz~\cite{coltellacci2025lia} to reduce symbolic
+arithmetic expressions to a normal form.
+% ^^ TODO. how does this solve the E+F>0 side condition mentioned above?
+
+\paragraph{Proofs.}
+%
+Each replay becomes a \lp{} \lpkw{symbol} whose statement is the goal
+and whose body is a tactic script.
+%
+An example is shown in \autoref{fig:reconstruct}.
+%
+Each rule application generally becomes a \lpkw{refine} of the matching rule lemma
+(e.g., $\kw{refine}\;\texttt{AND2\,\_}$), though some need bespoke tactics.
+%
+Rules that invoke in-scope hypotheses receive their $\Prf$-argument
+by hypothesis lookup; rules that introduce an antecedent
+or a binder push an \lpkw{assume}; result derivations are emitted as
+$\Res$-terms and passed as an argument; and arithmetic solver
+side-conditions get proof-terms generated at translation time.
+%
+The resulting symbol declaration is written to a \lpf{} file which
+may then be typechecked via \texttt{lambdapi check}.

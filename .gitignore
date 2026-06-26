@@ -31,6 +31,8 @@ lp/bench/**/*.res
 # at vendor/apero/pog (gitignored) and the suite dirs are reproducible.
 vendor/apero/
 lp/bench/apero/
+# apero-mini — the <=24-premise slice of apero, rebuilt by `pp2lp gen apero-mini`.
+lp/bench/apero-mini/
 
 # Local environment
 .envrc
@@ -113,3 +115,4 @@ btraces
 *.orig
 *.tmp
 __pycache__/
+tex/CLAUDE.md

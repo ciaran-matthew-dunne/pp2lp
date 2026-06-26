@@ -460,27 +460,27 @@ symbol NRM1_1 [n] [P Q : Prop]
   (r : Res (P ⇒ Q)) : Res ((`♢ _ : Tuple n, P) ⇒ Q)
   ≔ mk_1 (res_tm r) (eq_trans (@nrm1_eq n P Q) (res_eq r));
 
-// NRM2 bridge (evidence form).  PP's chain NRM2 weakens the ♢-body by a v-free
-// hypothesis P (`(♢v·Q v) ⇒ S  ↦  (♢v·(P⇒Q v)) ⇒ S`), sound only given a proof
-// of P: under `hp : π P` the body equivalence `(P⇒Q v) ⟺ Q v` holds, lifted
-// under the ♢ by `!!_cong`.  Unlike the unconditional nrmK_eq bridges this
-// takes `hp`, so the emitter must supply it (translate.ml NRM2 chain dispatch).
-opaque symbol nrm2_eq [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop] (hp : π P)
-  : π (((`♢ v, P ⇒ Q v) ⇒ S) = ((`♢ v, Q v) ⇒ S)) ≔
+// NRM2 bridge (pullout form).  PP's chain NRM2 is the spec rule verbatim: pull
+// the v-free antecedent P out of the ♢-body — `(P ⇒ ♢v·Q v) ⇒ S ↦ (♢v·(P⇒Q v)) ⇒
+// S`.  The antecedents are *equivalent* (P free of v), so no proof of P is needed:
+// `(♢v·(P⇒Q v)) = (P ⇒ ♢v·Q v)` by propExt, congruent under `_ ⇒ S`.  (The earlier
+// hp-taking `nrm2_eq` mis-modelled this as a body weakening and never typechecked
+// against a real child — no emitted .lp ever referenced it.)
+opaque symbol nrm2_eq [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop]
+  : π (((`♢ v, P ⇒ Q v) ⇒ S) = ((P ⇒ `♢ v, Q v) ⇒ S)) ≔
 begin
-  assume n P Q S hp;
-  have hbody : Π v, π ((P ⇒ Q v) = (Q v))
-    { assume v; refine propExt _ _ (λ hpq, hpq hp) (λ hq _, hq) };
-  have hpred : π ((`♢ v, P ⇒ Q v) = (`♢ v, Q v))
-    { refine eq_trans (♢_eq_!! (λ v, P ⇒ Q v))
-        (eq_trans (!!_cong hbody) (eq_sym (♢_eq_!! (λ v, Q v)))) };
+  assume n P Q S;
+  have hpred : π ((`♢ v, P ⇒ Q v) = (P ⇒ `♢ v, Q v))
+    { refine propExt _ _
+        (λ h hP, pi_to_♢ Q (λ v, ♢_to_pi (λ v', P ⇒ Q v') h v hP))
+        (λ h, pi_to_♢ (λ v, P ⇒ Q v) (λ v hP, ♢_to_pi Q (h hP) v)) };
   rewrite hpred; reflexivity
 end;
 
-// NRM2_1 — chain (Res) form of NRM2, via the evidence-form `nrm2_eq` above.
-symbol NRM2_1 [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop] (hp : π P)
-  (r : Res ((`♢ v, Q v) ⇒ S)) : Res ((`♢ v, P ⇒ Q v) ⇒ S)
-  ≔ mk_1 (res_tm r) (eq_trans (@nrm2_eq n P Q S hp) (res_eq r));
+// NRM2_1 — chain (Res) form of NRM2, via the unconditional `nrm2_eq` above.
+symbol NRM2_1 [n] [P : Prop] [Q : Tuple n → Prop] [S : Prop]
+  (r : Res ((P ⇒ `♢ v, Q v) ⇒ S)) : Res ((`♢ v, P ⇒ Q v) ⇒ S)
+  ≔ mk_1 (res_tm r) (eq_trans (@nrm2_eq n P Q S) (res_eq r));
 
 // NRM14_1 — chain (Res) form of NRM14.  PP leaves NRM rules *unprimed* in the
 // first-normalisation chain (unlike ALL7/ALL9/STOP/IMP), so the emitter maps a

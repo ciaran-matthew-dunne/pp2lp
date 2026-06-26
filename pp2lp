@@ -46,6 +46,7 @@ EMIT_TIMEOUT = float(os.environ.get("PP2LP_EMIT_TIMEOUT", "20"))     # engine em
 GEN_TIMEOUT = float(os.environ.get("PP2LP_GEN_TIMEOUT", "10"))       # krt PP/REPLAY, CPU-s
 WALL_FACTOR = float(os.environ.get("PP2LP_WALL_FACTOR", "4"))        # wall backstop = ×budget
 CHILD_MEM_GB = float(os.environ.get("PP2LP_CHECK_MEM_GB", "4"))      # RLIMIT_AS, GiB
+CHECK_JOBS = int(os.environ.get("PP2LP_CHECK_JOBS", "0") or 0)       # check-phase worker cap (0/unset = cpu_count). Lower it when lambdapi RSS × cpu_count oversubscribes RAM → swapping inflates CPU → spurious timeouts. 1 = strictly sequential.
 MAX_FAIL_WINDOWS = int(os.environ.get("PP2LP_MAX_WINDOWS", "15"))    # full failure windows per suite run (0 = no cap)
 
 # ── Colour ─────────────────────────────────────────────────────────────────
@@ -928,7 +929,8 @@ def _run_suite(args, suite: str, replays: list[Path], phase: str) -> int:
         incr = getattr(args, "incremental", False)
         dep_mtime = _lp_dep_mtime() if incr else 0.0
         def worker(r): return check_one(r, timeout=to, incremental=incr, dep_mtime=dep_mtime)
-    results = _check_all(replays, worker, on_result=stream)
+    results = _check_all(replays, worker, on_result=stream,
+                         jobs=(CHECK_JOBS if phase == "check" else None))
     stream.finish()
     elapsed = (time.monotonic() - t_start) * 1000
 
@@ -1035,14 +1037,16 @@ def _warm_shared_cache() -> None:
         pass        # a missing/slow lambdapi resurfaces per-trace in the workers below
 
 
-def _check_all(replays, worker, on_result=None) -> dict[str, dict]:
+def _check_all(replays, worker, on_result=None, jobs=None) -> dict[str, dict]:
     """Run `worker(replay)` (emit_one or check_one) over every replay in parallel;
     keyed by stem.  `on_result(res, replay)` fires on the main thread as each trace
     finishes (completion order) so callers can stream live.  The caller is
     responsible for any one-off setup (e.g. the check phase warms the shared
-    library objects before calling)."""
+    library objects before calling).  `jobs` (>0) caps the worker pool — the check
+    phase passes it so a memory-heavy run can avoid oversubscribing RAM."""
     out: dict[str, dict] = {}
-    workers = min(len(replays), (os.cpu_count() or 2))
+    cap = jobs if (jobs and jobs > 0) else (os.cpu_count() or 2)
+    workers = max(1, min(len(replays), cap))
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(worker, r): r for r in replays}
         for fut in concurrent.futures.as_completed(futs):
@@ -1259,6 +1263,13 @@ _APERO_REAL_OPS = frozenset({
 # replayable band: <=100 premises is ~14k goals (the realistic suite) vs ~207k
 # uncapped, almost all dead weight.  0 = no cap (the full convertible corpus).
 _APERO_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MAX_PREMISE", "100"))
+
+# `apero-mini`: the small-hypothesis slice of the apero suite, carved out so a
+# run on the tractable band never clobbers the full suite's baseline results.
+# `gen apero-mini` copies every apero benchmark whose premise count (the same
+# _ap_premises metric the cap above uses) is <= this bound — the band where
+# replay-completeness is highest (the <25-hypothesis goals).
+_APERO_MINI_MAX_PREMISE = int(os.environ.get("PP2LP_APERO_MINI_MAX_PREMISE", "24"))
 
 
 def _apero_src() -> Path:
@@ -1512,6 +1523,84 @@ def gen_apero_buts(force=False):
     return stats
 
 
+def _apero_premise_counts(replays: list[Path]) -> dict[str, int]:
+    """name -> premise count for the given apero benchmarks, recomputed from the
+    source POGs with the gen-time metric (`_ap_premises`: top-level '&'-conjuncts
+    of the rendered hypothesis, the count PP/REPLAY actually sees).  Re-derives
+    each POG and its per-PO/per-goal indexing exactly as `_apero_goals` does, so
+    the number matches what `PP2LP_APERO_MAX_PREMISE` gated on at gen.  A name
+    whose POG is absent is simply omitted (the caller decides what to do)."""
+    want = {r.stem for r in replays}
+    pogs: set[tuple[str, str]] = set()        # (proj, stem) of the POGs to parse
+    for nm in want:
+        parts = nm.split("_")                 # ap, proj, stem, po{i}, g{j}
+        if len(parts) >= 5 and parts[0] == "ap":
+            pogs.add((parts[1], parts[2]))
+    src, counts = _apero_src(), {}
+    for proj, stem in pogs:
+        pog = src / proj / f"{stem}.pog"
+        if not pog.exists():
+            continue
+        root = ET.parse(pog).getroot()
+        defs = {d.get("name"): list(d) for d in root.findall(f"{_APERO_NS}Define")}
+        for i, po in enumerate(root.findall(f"{_APERO_NS}Proof_Obligation")):
+            hyp_els = []
+            for dref in po.findall(f"{_APERO_NS}Definition"):
+                hyp_els += defs.get(dref.get("name"), [])
+            hyp_els += [h[0] for h in po.findall(f"{_APERO_NS}Hypothesis")]
+            loc = {h.get("num"): h for h in po.findall(f"{_APERO_NS}Local_Hyp")}
+            base = sum(_ap_premises(h) for h in hyp_els)
+            for j, sg in enumerate(po.findall(f"{_APERO_NS}Simple_Goal")):
+                nm = f"ap_{proj}_{stem}_po{i}_g{j}"
+                if nm not in want:
+                    continue
+                refs = [loc[r.get("num")][0]
+                        for r in sg.findall(f"{_APERO_NS}Ref_Hyp")
+                        if r.get("num") in loc]
+                counts[nm] = base + sum(_ap_premises(r) for r in refs)
+    return counts
+
+
+def gen_apero_mini(force=False):
+    """Build the `apero-mini` suite: the apero benchmarks whose premise count is
+    <= _APERO_MINI_MAX_PREMISE (the high-replay-completeness, small-hypothesis
+    band).  Derived from the already-generated apero suite — copies each selected
+    benchmark's inputs (.but + .replay) into apero-mini/PROJ/NAME/, content-aware,
+    and wipes any apero-mini dir outside the current selection.  No Atelier B and
+    no POG conversion beyond the premise recount; deterministic.  Returns stats."""
+    src, dst = BENCH / "apero", BENCH / "apero-mini"
+    reps = sorted(src.rglob("*.replay"))
+    if not reps:
+        sys.exit("pp2lp: the apero suite is empty — run `pp2lp gen apero` first "
+                 "(apero-mini is carved out of it)")
+    counts = _apero_premise_counts(reps)
+    cap = _APERO_MINI_MAX_PREMISE
+    sel = {r.stem: r for r in reps if counts.get(r.stem, cap + 1) <= cap}
+    no_count = sum(1 for r in reps if r.stem not in counts)
+    dst.mkdir(parents=True, exist_ok=True)
+    for p in dst.rglob("*.replay"):           # wipe dirs outside the selection
+        if p.stem not in sel:
+            _rm_benchmark(p.parent)
+    written = 0
+    for name, r in sel.items():
+        proj = r.parent.parent.name
+        d = dst / proj / name; d.mkdir(parents=True, exist_ok=True)
+        for ext in (".but", ".replay"):       # the run/check inputs; outputs regen
+            srcf = r.with_suffix(ext)
+            if not srcf.exists():
+                continue
+            data = srcf.read_bytes()
+            out = d / f"{name}{ext}"
+            if force or not out.exists() or out.read_bytes() != data:
+                out.write_bytes(data); written += 1
+    for pd in dst.iterdir():                   # prune project dirs emptied by wipe
+        if pd.is_dir() and not any(pd.iterdir()):
+            pd.rmdir()
+    stats = {"apero": len(reps), "selected": len(sel), "written": written,
+             "no_count": no_count, "cap": cap}
+    return stats
+
+
 def _pp_one_but(krt, pp_kin, timer, but):
     """Prove one selected .but in its own dir; write .trace on success.  Returns
     (stem, verdict) with verdict in proved / no-proof / pp-timeout / saturation*."""
@@ -1747,6 +1836,13 @@ def cmd_gen(args) -> int:
     default — a stage skips items whose output is newer than its input; pass
     --force to regenerate everything."""
     suite = args.target.split("/", 1)[0]
+    if suite == "apero-mini":             # carved out of apero, not built via krt
+        s = gen_apero_mini(force=args.force)
+        if not args.quiet:
+            print(dim(f"gen apero-mini: {s['selected']}/{s['apero']} apero benchmarks "
+                      f"<= {s['cap']} premises → {s['written']} files written"
+                      + (f"; {s['no_count']} skipped (no POG)" if s['no_count'] else "")))
+        return 0
     if not args.quiet:
         print(dim(f"gen {suite}: {args.only}" + ("  (--force)" if args.force else "")))
     _gen_stages(suite, args.only, force=args.force)

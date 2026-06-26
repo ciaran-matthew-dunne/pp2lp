@@ -450,6 +450,13 @@ rule $x ϵ (union $a $b)    ↪ ($x ϵ $a) ∨ ($x ϵ $b);
 rule $x ϵ (inter $a $b)    ↪ ⋀ ((∎ ∷ ($x ϵ $a)) ∷ ($x ϵ $b));
 rule $x ϵ (set_diff $a $b) ↪ ⋀ ((∎ ∷ ($x ϵ $a)) ∷ (¬ ($x ϵ $b)));
 rule $x ϵ set_empty        ↪ ⊥;
+// set extension `{a, …}` (set_cons cells): PP unfolds `x ∈ {a₀, …, aₙ}` to the
+// disjunction `x = a₀ ∨ … ∨ x = aₙ`, bottoming out at the *last* element as a bare
+// equality (no trailing `∨ ⊥`).  Two non-overlapping rules — set_empty tail vs
+// set_cons tail — keep that exact shape, so it is confluent and matches PP's
+// right-nested `or`.  Sound: the defining membership semantics of a finite extension.
+rule $x ϵ (set_cons $e set_empty)        ↪ ($x = $e)
+with $x ϵ (set_cons $e (set_cons $f $s)) ↪ ($x = $e) ∨ ($x ϵ (set_cons $f $s));
 
 injective symbol Res : τ o → TYPE;
 symbol mk_res [t] (ts : 𝕃* o) : π (t = conj ts) → Res t;
@@ -503,3 +510,5 @@ with conj_prj ($ps ∷ _) (+1 $k) $h ↪ conj_prj $ps $k (⋀_init $h);
 symbol conj_rm (ps : 𝕃* o) (k : ℕ) : π (⋀ ps) → π (⋀ (crm k ps));
 rule conj_rm ($ps ∷ _) _0      $h ↪ ⋀_init $h
 with conj_rm ($ps ∷ _) (+1 $k) $h ↪ ⋀_intro (conj_rm $ps $k (⋀_init $h)) (⋀_last $h);
+
+compute (leq (plus 5 5) 5);

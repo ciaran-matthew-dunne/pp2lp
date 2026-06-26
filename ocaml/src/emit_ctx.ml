@@ -1035,17 +1035,23 @@ let rec vars_of_exp acc = function
   | Var v -> v :: acc
   | e -> fold_exp vars_of_exp acc e
 
-(* The native-int value of a *ground* `+`/`−` expression (every atom a parseable
-   literal); None if any atom is symbolic or a literal too big to fold.  Lets the
-   INS search decide a ground bound `e ≤ 𝟎` holds before emitting its proof. *)
+(* The constant value of a *ground* `+`/`−` expression (every atom a parseable
+   literal), None if any atom is symbolic.  Lets the INS search decide a ground
+   bound `e ≤ 𝟎` holds before emitting its proof.  Arbitrary-precision `Z` — the
+   uint64 register bounds (`18446744073709551615` = 2⁶⁴−1, `18446744073709551616`)
+   overflow a native int, so a range-membership universal instantiated at such a
+   literal must fold its ground bounds in `Z` (the LP-side `le_intro` already
+   decides `to_int … ≤ 0` in `Stdlib.Z`). *)
 let ground_value e =
   match flatten_signed e with
   | None -> None
   | Some atoms ->
     List.fold_left (fun acc (a, s) ->
       match acc, a with
-      | Some c, Lit l -> Option.map (fun n -> c + s * n) (int_of_string_opt l)
-      | _ -> None) (Some 0) atoms
+      | Some c, Lit l ->
+        Option.map (fun n -> Z.(c + of_int s * n))
+          (try Some (Z.of_string l) with _ -> None)
+      | _ -> None) (Some Z.zero) atoms
 
 (* Does the LP identifier [name] occur in a proof term / tactic script?  Used to
    drop a derived-fact `have` whose name the rest of the INS script never
@@ -1074,6 +1080,36 @@ let rec t_uses name = function
   | L.Branches (tac, l, r) -> tactic_uses name tac || t_uses name l || t_uses name r
   | L.Have (_, _, proof, rest) -> term_uses name proof || t_uses name rest
   | L.Commented (_, inner) -> t_uses name inner
+
+(* Evidence-carrying `≤ 𝟎` facts for a Farkas refutation, drawn from a
+   `(pred, evidence)` list (in-scope hyps and/or the INS saturation pool): a
+   `Leq(e,𝟎)` fact stands as itself; a discreteness fact `¬(e'≤𝟎)` is re-presented
+   as `𝟏−e' ≤ 𝟎` with the bridged evidence `sub_leq 𝟏 e' (discrete e' ev)` (ℤ has
+   nothing strictly between 𝟎 and 𝟏, so `¬(e'≤𝟎)` ⟺ `𝟏 ≤ e'` ⟺ `𝟏−e' ≤ 𝟎`).
+   This lets [Arith_proofs.find_arith_contradiction] close a contradiction whose
+   only `≤`-bound on one side is the negation a universal instantiation derived
+   (the apero MAXINT instances: `_h4 @ 2147483647` ⟹ `¬(−2147483646+MAXINT≤𝟎)`,
+   bridged to `2147483647−MAXINT ≤ 𝟎`, against `−10+MAXINT ≤ 𝟎`). *)
+let arith_evidence_of_facts env facts_ev =
+  let plain =
+    List.filter_map (fun (p, ev) -> match p with
+      | Leq (e, Lit "0") ->
+        Option.map (fun atoms -> (ev, e, atoms)) (flatten_signed e)
+      | _ -> None) facts_ev in
+  let disc =
+    List.filter_map (fun (p, ev) -> match p with
+      | Unary (Not, Leq (e', Lit "0")) ->
+        let e = AOp (Sub, Lit "1", e') in
+        Option.map (fun atoms ->
+          let ev' =
+            L.App (L.Name "sub_leq",
+              [ L.Exp (env, Lit "1"); L.Exp (env, e');
+                L.App (L.Name "discrete", [ L.Exp (env, e'); ev ]) ]) in
+          (ev', e, atoms)) (flatten_signed e)
+      | _ -> None) facts_ev in
+  (* discreteness facts first so a generous head-cap never drops the rare derived
+     bound in favour of bulk plain hyps *)
+  disc @ plain
 
 let find_ins_contradiction ctx =
   (* ---- §8.9 / §8.19 / §8.20 / §8.23 universal-instantiation search ----
@@ -1123,7 +1159,7 @@ let find_ins_contradiction ctx =
     let arith () = match needed with
       | Leq (e, Lit "0") ->
         (match ground_value e with
-         | Some c when c <= 0 ->
+         | Some c when Z.leq c Z.zero ->
            Some (L.App (L.Name "le_intro",
              [ L.Exp (proj_env, e); L.Name "\xf0\x9d\x9f\x8e" (* 𝟎 *);
                L.Lambda ("_h", None, L.Name "_h") ]))
@@ -1142,7 +1178,7 @@ let find_ins_contradiction ctx =
                List.filter_map (fun (nm, p) ->
                  match p with
                  | Leq (he, Lit "0") ->
-                   Option.map (fun atoms -> (nm, he, atoms)) (flatten_signed he)
+                   Option.map (fun atoms -> (L.Name nm, he, atoms)) (flatten_signed he)
                  | _ -> None) ctx.hyps in
              match Arith_proofs.farkas_prove_leq proj_env leq_hyps e with
              | Some _ as r -> r
@@ -1488,10 +1524,27 @@ let find_ins_contradiction ctx =
           | Unary (Not, Eq (l, r)) ->
             Option.map (fun pf -> L.App (ev, [pf])) (eq_path_proof proj_env eqs l r)
           | _ -> None) facts_ev in
+      (* arithmetic terminal: a Farkas refutation of the in-scope `≤ 𝟎` facts,
+         with discreteness `¬(e'≤𝟎)` bounds the saturation derived bridged in
+         ([arith_evidence_of_facts]).  Gated on a discreteness fact being present
+         (otherwise a pure-linear clash is PP's ARITH rule, not INS) so relational
+         INS never pays for Fourier–Motzkin.  Checked after the matching/equality
+         terminals; only fires when they don't. *)
+      let arith_term =
+        if not (List.exists (fun (p, _) -> match p with
+                  | Unary (Not, Leq (_, Lit "0")) -> true | _ -> false) facts_ev)
+        then None
+        else
+          let ev = arith_evidence_of_facts proj_env facts_ev in
+          let ev = List.filteri (fun i _ -> i < 64) ev in
+          Arith_proofs.find_arith_contradiction proj_env ev
+      in
       match List.find_opt (fun c -> unmatched_count c = 0) cs with
       | Some c -> Some (L.Step (L.Refine (terminal c, [])))
       | None when eq_term <> None ->
         Option.map (fun t -> L.Step (L.Refine (t, []))) eq_term
+      | None when arith_term <> None ->
+        Option.map (fun t -> L.Step (L.Refine (t, []))) arith_term
       | None ->
         let cat1 =
           List.find_map (fun c ->
@@ -1585,10 +1638,24 @@ let arith_leq_hyps ctx =
   (* most-recent-first; bound the number of hypotheses folded *)
   List.filteri (fun i _ -> i < arith_max_hyps) all
 
-(* Thin ctx wrapper: pull the in-scope `≤ 𝟎` hypotheses, then hand the
-   projection env + hyp list to the (ctx-free) certificate search. *)
+(* Thin ctx wrapper: pull the in-scope `≤ 𝟎` hypotheses (plus discreteness
+   `¬(e'≤𝟎)` bounds, bridged to `𝟏−e'≤𝟎` by [arith_evidence_of_facts]), then hand
+   the projection env + evidence list to the (ctx-free) certificate search, and
+   wrap its `π ⊥` term as a `refine`. *)
 let find_arith_contradiction ctx =
-  Arith_proofs.find_arith_contradiction (proj_env_of_ctx ctx) (arith_leq_hyps ctx)
+  let env = proj_env_of_ctx ctx in
+  let facts_ev = List.map (fun (n, p) -> (p, L.Name n)) ctx.hyps in
+  let ev =
+    List.filteri (fun i _ -> i < arith_max_hyps)
+      (arith_evidence_of_facts env facts_ev) in
+  (* the certificate is a `π ⊥` term `positive_lit … (leq_subst_l …)`; re-present
+     it as the original `refine positive_lit (leq_subst_l …)` (head + args, not a
+     pre-applied `refine (positive_lit …)`) so the ARITH terminal's emitted text
+     is unchanged. *)
+  Option.map (fun t -> match t with
+    | L.App (h, args) -> L.Refine (h, args)
+    | _ -> L.Refine (t, []))
+    (Arith_proofs.find_arith_contradiction env ev)
 
 let arith_diagnostic ctx =
   let hyps = arith_leq_hyps ctx in

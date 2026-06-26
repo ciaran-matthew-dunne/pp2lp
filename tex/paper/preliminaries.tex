@@ -48,15 +48,15 @@ premises, possibly under computational side-conditions
 (e.g., ``$P$ occurs in the list of hypotheses $H$'',
 ``$a$ and $b$ are numerals such that $a > b$'').
 
-Alongside sequents, proofs manipulate a second judgment form known as a
+Alongside sequents, proofs manipulate a second judgement form known as a
 \emph{result}; essentially an equality proof used by \pp{}'s
-normalization procedure.
+normalisation procedure.
 %
 We write $(H \seq P) \yields [Q_1, \ldots, Q_n]$ for
 ``under $H$, $P$ normalises to the list $[Q_1, \ldots, Q_n]$''.
 The conjunction $Q_1 ∧ \ldots ∧ Q_n$ is the normal form of $P$.
 %
-With a few exceptions, each the result form of each inference rule
+With a few exceptions, the result form of each inference rule
 (written with a $\mathsf{\_1}$ suffix) is derived by one of three schemas:
 the empty list (the formula is discharged),
 a singleton $[Q]$ (a single transformed formula),

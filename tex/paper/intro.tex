@@ -90,12 +90,11 @@ $\lambda\Pi$-calculus.
 \dedukti{} extends this calculus with rewrite rules,
 yielding the \lpcmr~\cite{CousineauDowek, assaf2023dedukti}, of which \lp{} is
 the interactive front end~\cite{hondet:hal-02981561}.
-% TODO. missing Melanie Taprogge's work on LEO-III.
-% probably others. search web for ATP encodings in dedukti/lambdapi.
 Replaying automated provers inside such checkers is an active line of research:
 SMT proofs have been reconstructed in \lp~\cite{coltellacci2026acta}
 (including proofs of TLAPS obligations, TLA$^+$'s proof system~\cite{coltellacci2023abz})
-and in Lean~\cite{mohamed25leansmt}.
+and in Lean~\cite{mohamed25leansmt}, and Taprogge encodes the higher-order
+prover Leo-III's proofs in \dedukti~\cite{taprogge2024leo3}.
 %
 The same idea underlies \emph{hammer} tools, which discharge a goal with
 external automated provers and rebuild the returned proof in the assistant's

@@ -54,25 +54,29 @@ val prove_sum_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
    transport [positive_lit] along the reflected `e = from_int c`. *)
 val prove_gt_zero : Lp_tree.proj_env -> exp -> Lp_tree.term option
 
-(* `π (¬ (from_int c ≤ 𝟎))` for a concrete positive literal c (`one_not_leq_zero`
-   for c = 1).  [prove_gt_zero] transports it along `e = from_int c`; exposed for
-   the Farkas certificate to refute its summed `c ≤ 𝟎`. *)
-val positive_lit : Lp_tree.proj_env -> int -> Lp_tree.term
+(* `π (¬ (from_int c ≤ 𝟎))` for a concrete positive literal c, passed as its
+   decimal string (`one_not_leq_zero` for c = 1; magnitude-independent, so apero's
+   2⁶⁴ bounds work).  [prove_gt_zero] transports it along `e = from_int c`; exposed
+   for the Farkas certificate to refute its summed `c ≤ 𝟎`. *)
+val positive_lit : Lp_tree.proj_env -> string -> Lp_tree.term
 
 (* Farkas certificate for ⊥ from the `e ≤ 𝟎` hypotheses, found by Fourier–Motzkin
    elimination: a nonnegative integer combination of the hyps summing to a positive
    constant, emitted as a generated add_leq_zero / prove_sum_eq proof (no `trust`).
    Complete for ℚ-linear refutation — telescoping chains, sum-positivity and
    weighted sums alike — and returns None on a genuinely non-linear goal.  Takes the
-   projection env and the candidate hyps as `(name, e, signed-atoms)`; [Emit_ctx]
-   supplies them from the context. *)
+   projection env and the candidate hyps as `(evidence, e, signed-atoms)`, where
+   [evidence] is a `π (e ≤ 𝟎)` proof term (a bare hyp `Name h`, or a derived proof
+   such as a discreteness-bridged `¬(e'≤𝟎)`); [Emit_ctx] supplies them from the
+   context.  Returns the `π ⊥` proof term. *)
 val find_arith_contradiction :
-  Lp_tree.proj_env -> (string * exp * (exp * int) list) list -> Lp_tree.tactic option
+  Lp_tree.proj_env -> (Lp_tree.term * exp * (exp * int) list) list -> Lp_tree.term option
 
 (* Prove `π (target ≤ 𝟎)` as a nonnegative integer combination of the `e ≤ 𝟎`
    hypotheses (the implied-bound dual of [find_arith_contradiction]).  Used by the
-   INS search to discharge a universal's arithmetic gap conjunct.  Same hyp form;
-   None when no nonnegative *integer* combination yields [target]. *)
+   INS search to discharge a universal's arithmetic gap conjunct.  Same hyp form
+   (evidence term + e + signed-atoms); None when no nonnegative *integer*
+   combination yields [target]. *)
 val farkas_prove_leq :
-  Lp_tree.proj_env -> (string * exp * (exp * int) list) list -> exp ->
+  Lp_tree.proj_env -> (Lp_tree.term * exp * (exp * int) list) list -> exp ->
   Lp_tree.term option

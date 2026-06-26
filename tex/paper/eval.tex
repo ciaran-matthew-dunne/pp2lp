@@ -5,81 +5,60 @@
 
 The core of
 \tool{}\footnote{\url{https://github.com/ciaran-matthew-dunne/pp2lp}}
-is an OCaml program of about \toolOcamlLines{} lines behind a Python command-line
-driver; the rule library of \autoref{sec:encoding} is another \toolLpLines{}
-lines of \lp.
+is an OCaml program of about \toolOcamlLines{} lines behind a
+Python command-line driver; the \lp rule library
+is another \toolLpLines{}.
 %
-The pipeline (\autoref{fig:pipeline}) has three stages.
-
+The pipeline has three stages.
+%
 A lexer and a Menhir-generated parser read the \replay{} file
 into a flat list of (rule, argument, goal) records.
 %
-This list is then transformed into a proof tree by consuming the prefix stream
-and using each rule's declared arity to attach the right number of child subproofs.
+This list is then transformed into a proof tree, using each rule's
+declared arity to attach the right number of child subproofs.
 %
-The two irregularities noted in \autoref{sec:pp-syntax} are handled
-at this stage: normalisation markers are filtered out, and the
-result derivation that precedes an instance of $\rn{ALL7}/\rn{XST8}$
-is reassembled into that rule's first argument.
+The two irregularities noted in \autoref{sec:prelim} are handled
+at this stage: the \texttt{NRM}, \texttt{STOP\_NRM} and \texttt{FIN}
+markers are filtered out, and the result derivation that precedes an
+instance of \texttt{ALL7}/\texttt{XST8} is reassembled into that
+rule's first argument.
 
 %
-Each replay becomes a \lp{} \texttt{symbol} whose statement is the goal
-and whose body is a tactic script (\autoref{fig:reconstruct}).
-%
-Each rule application generally becomes a \refine{} of the matching rule lemma
-(e.g., $\refine\;\texttt{AND2\,\_}$), though some need bespoke tactics.
-%
-Rules that invoke in-scope hypotheses receive their $\Prf$-argument
-by hypothesis lookup at the OCaml level; rules that introduce an antecedent
-or a binder push an \texttt{assume}; result derivations are emitted as
-explicit $\Res$-terms and passed as an argument; and arithmetic solver
-side-conditions get proof-terms generated at translation time
-(\autoref{sec:enc-rules}).
-%
-The resulting symbol declaration is written to a \lpf{} file which
-may then be type-checked via \texttt{lambdapi check}.
-
 \subsection{Benchmarks}\label{sec:bench}
 
-We exercise \tool{} on four suites (\autoref{tab:results}).
+We exercise \tool{} on four suites.
 %
-\texttt{og} is \ogReplayed{} replays, our initial development corpus;
+The \texttt{og} suite is \ogReplayed{} replays;
 %
 \texttt{prv} validates custom proof-rules from real \ab{} developments;
 %
 \texttt{claude} is a synthetic suite authored by an LLM agent (Claude
-Opus~4.8);
+Opus~4.8) which we used to surface failures during development;
 %
-and \texttt{apero} samples raw industrial obligations from CLEARSY's public
-proof-obligation dataset~\cite{deharbe2022pog}, translated from its POG
-format into \pp's rule-validation input.
+and \texttt{apero-mini} draws raw industrial proof-obligations from
+CLEARSY's public dataset~\cite{deharbe2022pog},
+using a custom translator from its POG format into \pp's \butf format.
 %
-\begin{table}[t]
-  \centering
-  \caption{Reconstruction per suite. \emph{Verified} replays type-check;
-    \emph{timeouts} hit the 20\,CPU-second emit or \lp{}-check budget;
-    \emph{failures} are genuine emit or type-check failures
-    (verified${}+{}$timeouts${}+{}$failures${}={}$replays).}
-  \label{tab:results}
-  \begin{tabular}{l r r r r}
-    \toprule
-    Suite           & Replays         & Verified    & Timeouts       & Failures \\
-    \midrule
-    \texttt{og}     & \ogReplayed     & \ogPass     & \ogTimeout     & \ogFailed \\
-    \texttt{prv}    & \prvReplayed    & \prvPass    & \prvTimeout    & \prvFailed \\
-    \texttt{claude} & \claudeReplayed & \claudePass & \claudeTimeout & \claudeFailed \\
-    \texttt{apero}  & \aperoReplayed  & \aperoPass  & \aperoTimeout  & \aperoFailed \\
-    \midrule
-    total           & \allReplayed    & \allPass    & \allTimeout    & \allFailed \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-On the rule-validation and synthetic suites \tool{} reconstructs and
-type-checks every replay but \claudeFailed{}: \texttt{og} and \texttt{prv}
-in full, and \claudePass{} of \texttt{claude}'s \claudeReplayed{}, the
-exceptions reaching shapes we do not yet support (INS contradiction
-search, nonlinear arithmetic, one result form).
+\begin{center}
+\begin{tabular}{l r r r r}
+\toprule
+Suite           & Replays         & Verified    & Timeouts       & Failures \\
+\midrule
+\texttt{og}     & \ogReplayed     & \ogPass     & \ogTimeout     & \ogFailed \\
+\texttt{prv}    & \prvReplayed    & \prvPass    & \prvTimeout    & \prvFailed \\
+\texttt{claude} & \claudeReplayed & \claudePass & \claudeTimeout & \claudeFailed \\
+\texttt{apero-mini}  & \aperoReplayed  & \aperoPass  & \aperoTimeout  & \aperoFailed \\
+\midrule
+total           & \allReplayed    & \allPass    & \allTimeout    & \allFailed \\
+\bottomrule
+\end{tabular}
+\end{center}
+%
+On the \texttt{og} and \texttt{prv} suites \tool{} reconstructs and
+typechecks every replay.
+%
+In the \texttt{claude} suite, the \claudeFailed{} failures are
+goals that PP succeeds in proving but we do not yet support.
 %
 \numRulesFired{} of the \numRulesCovered{} encoded rules fire across these
 replays.
@@ -87,73 +66,83 @@ replays.
 Re-emitting and re-checking these suites takes \benchWallAll{} on
 \benchMachine{} (\benchCpuAll{} of \lp{} checking).
 
-\texttt{apero} stresses the pipeline at industrial scale: a sampled
-obligation carries a median of about \aperoMedianHyps{} hypothesis
-predicates, yet \pp{} discharges most of them.
+\texttt{apero-mini} restricts CLEARSY's corpus to obligations with fewer
+than \aperoHypCap{} hypotheses --- by \ab{} folklore the regime in which
+\pp{} performs best, and the band in which \textsc{replay} loses the fewest
+of its traces.
 %
 Of the \aperoReplayed{} replays \tool{} reconstructs, \aperoPass{} type-check
-within the budget and a further \aperoTimeout{} exceed it on the largest
-obligations; only \aperoFailed{} are genuine reconstruction failures.
+within the budget and a further \aperoTimeout{} exceed it on the heaviest of
+them; only \aperoFailed{} are genuine reconstruction failures.
 %
-They are also the first machine-produced replays to exercise \pp's equality
-store in surface forms no synthetic goal reached: strict comparisons, tuple
-memberships, relational inverse.
 
 
 \subsection{Conclusion and Future Work}\label{sec:conclusion}
 
 We have presented \tool, which checks \ab's Predicate Prover by reconstructing
-its proofs in \lp: rather than postulating each rule as an axiom, every \pp{}
-rule is a symbol whose body proves it sound against a small axiomatic base, and
-the reconstructed corpus (rule-validation suite and arithmetic included)
-type-checks against that base, appealing to an oracle only for the $\mathsf{INT}$
-and $\mathsf{BOOL}$ memberships \pp{} assumes.
+its proofs in \lp.
+%
+Every inference rule of \pp{} is proved sound against a small trusted base,
+and the reconstructed suites typecheck against that base, appealing to an
+oracle for $\mathsf{INT}$ and $\mathsf{BOOL}$ memberships \pp{} assumes
+(see below).
 
 \paragraph{Upstream replay losses.}
-Fewer replays reach \tool{} than the goals we submit (only \prvReplayed{} of
-\prvGoals{} for \texttt{prv}), and the loss is upstream: for some provable
-goals the \textsc{replay} utility omits the final continuation of an \rn{ALL7}
-or \rn{XST8} step, and for others it aborts mid-file.
 %
-Both are detected at generation time and the affected goals dropped and reported;
-they fall hardest on set-extensionality, equality-prover goals, and the largest
-\texttt{apero} obligations, where \textsc{replay} discards most of \pp's traces;
-our synthetic suites thus under-test \pp's equality store --- a gap the surviving
-\texttt{apero} replays begin to close.
+Fewer replays reach \tool{} than the goals we submit
+(e.g., only \prvReplayed{} of \prvGoals{} for \texttt{prv}),
+and the loss is upstream: for some provable goals the replay utility
+omits the subproof of an \rn{ALL7} or \rn{XST8} step,
+and for others it aborts mid-file.
+%
+Both are detected at generation time and the affected goals dropped and reported.
 
-\paragraph{Limitations.}
-Encoding every rule against the specification makes the encoding an executable
-test of that document, which it does not always pass: \rn{NRM20} pins its
-equality at a different conjunct position than specified, and \rn{OPR1}'s result
-derivation departs from its schema; \tool{} implements the observed behaviour, a
-by-product useful to \pp's maintainers.
+\paragraph{Spec mismatch.}
+The in-proof use of some rules does not match their specification:
+\rn{NRM20} pins its equality at a different conjunct position than specified,
+and \rn{OPR1}'s result derivation departs from its schema.
 %
-A few replay shapes are recognised but rejected: substitution past a compound
-binder's third slot, and the result forms of two arithmetic rules no suite
-exercises --- always at emission with an error, never a silent degradation.
+We implement the observed behaviour in \tool{};
+a by-product useful to \pp's maintainers.
+%
+Also, the soundness of some rules for integer arithmetic and booleans
+relies on set-membership hypotheses that the PP proof does not produce.
+%
+When such rules occur within proofs, we appeal to two axioms
+$\mathsf{trust\_int}$ and $\mathsf{trust\_bool}$ to supply these conditions.
+%
+%
 
 \paragraph{Use of AI.}
-The \texttt{claude} suite was authored by an LLM agent that also helped build
-the tool, so it could drift toward what the pipeline already handles.
+The \texttt{claude} suite was authored by an LLM agent which also helped
+with some aspects of development, which introduces a risk of some of these
+benchmarks not being representative of true use of \pp{}.
 %
-Our safeguard: the real-world \texttt{og} and \texttt{prv} suites guard every
-change, and the synthetic suite is goal-level only, so the agent sets the goals
-but not the rules \pp{} applies to them.
+Many of the soundness proofs for PP's inference rules were also LLM-authored.
+%
+This risk is mitigated by \lp{}'s typechecking procedure,
+and by observing that the agent did not insert any extra symbols
+or rewrite rules outside of the proof scripts.
 
 \paragraph{Future work.}
-The most direct future work is upstream: repairing \textsc{replay}'s
+The most direct future work is upstream: repairing the replay tool's
 truncations would recover the dropped goals, especially the equality-prover
 fragment.
 %
-On the encoding side, the binder-regrouping rules are consumed at the syntax
-level, not emitted (\autoref{sec:enc-formulas}); deriving their tuple
-isomorphisms would let \tool{} emit them like any other rule, dropping its last
-syntax-level normalisation.
+We also plan to develop a procedure to eliminate \pp{} specific symbols
+from proofs (list-based conjunction, compound binders), which would allow
+using \pp{} proofs in standard \lp formalisations.
 %
 Finally, folding \pp{} into the \dedukti{} ecosystem opens a natural ICSPA next
 step: exporting checked \ab{} proofs to set-theory assistants such as TLA$^+$'s
 TLAPS, Isabelle/ZF, and Megalodon.
 
 \subsubsection*{Acknowledgements.}
-We thank David D\'eharbe for helpful discussions, and the Deducteam team for
-their work on \lp{} and \dedukti.
+We thank David D\'eharbe for helpful discussions and for hosting the
+first author at the CLEARSY offices.
+%
+We dedicate this work to the memory of Gilles Dowek,
+who pioneered the \lpcmr{} and the \dedukti{} ecosystem.
+%
+Finally, we thank the current and former members of Deducteam
+for their support and work on \lp{}.

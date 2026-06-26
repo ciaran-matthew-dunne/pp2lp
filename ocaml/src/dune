@@ -5,7 +5,7 @@
 
 (library
  (name pp2lp)
- (libraries unix)
+ (libraries unix zarith)
  (modules
    errors syntax_pp lexer parser parse_replay
    pp_lp emit_pp free_vars core_check
